@@ -147,17 +147,32 @@ Regra legal fixada em código encontrada: o limite anti-gaming "3 avaliações p
 | D-15 | `marketplace_reputacao` expunha a qualquer usuário autenticado `nivel_aviso_motivo`/`nivel_aviso_em` de todos os especialistas | `column_privileges` | Baixa | Média | MKY-112 | LGPD/privacidade do prestador | política `USING true` + SELECT de tabela inteira | **Corrigido** (leitura por coluna, sem as de aviso) |
 | D-16 | Visitante anônimo com SELECT de tabela inteira em `marketplace_avaliacoes` (inclusive `tenant_id`, `avaliador_id`); a política é só para authenticated, então devolvia zero linhas, mas a concessão ficava | MKY-112 (1ª execução) | Baixa | Média | rotina 112 falhou antes da correção | Segurança | grant padrão da plataforma | **Corrigido** (REVOKE SELECT de anon) |
 | D-17 | **13 políticas** (8 em `public`, 5 em `storage.objects`) liam `marketplace_profissionais.user_id` como o próprio usuário; com a coluna fechada (MKY-012), toda leitura direta de anúncios, pacotes, contratações, comissões e documentos por usuário logado e o upload/leitura de foto e documento do especialista davam `permission denied for table marketplace_profissionais` | `SELECT count(*) FROM marketplace_servicos` como authenticated | **Crítica** | **Crítica** | rotina 110 quebrou na 2ª execução; prova empírica na réplica | Cadastro/Portal/Storage; herança de risco | subconsulta em coluna sem grant, introduzida ao fechar as colunas na fundação e repetida nas políticas de Storage do #486 | **Corrigido** (políticas reescritas com `marketye_meu_id()`; sem tocar a coluna) — regressão coberta por MKY-110 |
-| D-06 | Autocompra não bloqueada: `marketye_abrir_lead` não impede usuário abrir lead com o próprio cadastro de especialista | MKY-082 | Alta | Média | leitura da função (sem verificação de identidade dupla) | Anti-gaming/Alto | verificação não construída | **Provável, não provado** — executar MKY-082 |
+| D-06 | Autocompra não bloqueada: `marketye_abrir_lead` não impede usuário abrir lead com o próprio cadastro de especialista | MKY-082 | Alta | Média | leitura da função (sem verificação de identidade dupla) | Anti-gaming/Alto | verificação não construída | **Confirmado** pela rotina MKY-082 (12/09): lead consigo mesmo aberto, ganho e avaliado; a própria empresa conta como cliente único e serviço. `bug_confirmado` |
 | D-07 | Alertas de compliance/psicossocial sem "Encontrar especialista" (invariante RN-015/RF-015) | abrir um alerta de NR-1 | Alta | Alta | componente existe e não é usado fora da vitrine | Integração/Alto | ligação não feita | **Aberto** (MKY-120 `aguardando_construcao`) |
 | D-08 | Esteira pula a guarda de cobertura e a semeadura da conta-robô | log da corrida: `QA_E2E_TOKEN ausente` | Média | Alta | corridas #420–#429 | Esteira | segredo não configurado no repositório | **Aberto** — configurar o segredo (ação do dono do repositório) |
 | D-09 | `console.error: Error fetching user data` em toda tela na suíte Cypress | DIAG de qualquer falha | Baixa | Média | corridas #420–#429 | Autenticação | não investigado (pré-existente ou consulta de `profiles`/`user_roles` falhando na primeira carga) | **Aberto, não investigado** |
 | D-10 | Limite por par (3/30 d) e mínimo de resultados para relaxar (3) fixos em código | leitura das funções | Baixa | Baixa | §7 (v) | Governança | falta de chave em `marketplace_config` | **Aberto** |
-| D-11 | Normalização dos pesos para 100% possivelmente só na tela | MKY-101 | Média | Média | tela Ajustes promete; `marketye_config_salvar` grava o JSON recebido | Governança | validação só no cliente | **Não provado** — executar MKY-101 |
+| D-11 | Normalização dos pesos para 100% possivelmente só na tela | MKY-101 | Média | Média | tela Ajustes promete; `marketye_config_salvar` grava o JSON recebido | Governança | validação só no cliente | **Confirmado** pela rotina MKY-101 (12/09): soma 120%, chave faltante e peso negativo gravados. `bug_confirmado` |
 | D-12 | Exclusão LGPD não remove documentos de verificação/foto do Storage | MKY-091 | Alta (dado pessoal retido sem prazo) | Média (pende prazos) | leitura de `marketye_excluir_meu_perfil` (só anonimiza tabela) | LGPD/Crítico | escopo da função | **Aberto** — pende decisão de prazos (A3) |
 | D-13 | Textos dos termos/política são placeholders | `termos_versoes` = `2026-09-v1` | Bloqueador jurídico | Crítica para produção | 3.4 do requisito | Jurídico | redação pendente | **Aberto** — fora do código |
 | D-14 | Sem limite de tentativas na Edge Function de cadastro público | MKY-117 | Baixa | Baixa | leitura de `marketye-cadastro` | Segurança | rate limit não construído | **Aberto** (melhoria) |
 
-Aprendizado de processo (para o próprio QA): D-02 escapou da réplica porque a empresa de teste local não tinha endereço. A partir deste pacote, a réplica de QA deve ter `empresa_cadastro` com latitude/longitude/UF para a empresa do cercado (recomendação de fixture).
+| D-18 | **Terceiro libera contato e muda status de conversa alheia.** `marketye_lead_liberar_contato` e `marketye_lead_status` calculam o papel do chamador (`marketye_lead_papel`) e, quando ele é nulo (não é a empresa, não é o especialista, não é superadmin), a comparação `NULL <> 'cliente'` / `NULL NOT IN (...)` não dispara o RAISE: a função SECURITY DEFINER segue e grava. Qualquer especialista logado libera o e-mail/telefone da empresa e marca "ganho" em conversa de outro. `marketye_lead_mensagem` só recusa por acidente (NOT NULL de `autor_tipo`) | MKY-071 (rotina `qa_caso_mky_071`, prova na réplica com `SELECT marketye_lead_liberar_contato(lead_de_outro)`) | **Crítica** | **Crítica** | rotina 071 falhou na 1ª execução | Conversa/privacidade do cliente; RN-020 | comparação com NULL nas guardas de papel | **Aberto — corrigir antes de qualquer perfil real** (`bug_confirmado`) |
+| D-19 | Notice-and-takedown incompleto: `marketye_denuncia_decidir(procedente)` registra ocorrência e recalcula reputação, mas o anúncio denunciado segue publicado e na busca | MKY-042 | Alta | Alta | rotina 042 | Devido processo (Marco Civil pós-STF) | remoção do anúncio não construída na decisão | **Aberto** (`bug_confirmado`) |
+| D-20 | Automação herdada da Rede de Parceiros muda status sem decisão humana: job pg_cron `bloquear-profissionais-expirados` e gatilho `trg_verificar_registro_profissional` põem o especialista em `bloqueado` (o mesmo status da rejeição) sem motivo, trilha ou contestação | MKY-046 | Alta | Alta | rotina 046 (varredura de `cron.job` e `pg_trigger`) | Devido processo / LGPD art. 20 | legado não desligado na fundação | **Aberto** (`bug_confirmado`) — decidir: desligar o job e o gatilho, ou trocar por aviso + fila humana |
+| D-21 | Anúncio removido ressuscita: `marketye_anuncio_publicar` publica de novo e `marketye_anuncio_salvar` devolve a rascunho | MKY-053 | Média | Média | rotina 053 | Anúncio | função não confere `removido` | **Aberto** (`bug_confirmado`) |
+| D-22 | Faixa de preço invertida (mínimo 500 > máximo 100) é gravada | MKY-052 | Baixa | Baixa | rotina 052 | Anúncio | sem validação de faixa | **Aberto** (`bug_confirmado`) |
+| D-23 | Percentual de promoção não é validado (0 e 95 aceitos) | MKY-054 | Baixa | Baixa | rotina 054 | Anúncio/CDC art. 36 | sem validação | **Aberto** (`bug_confirmado`) |
+| D-24 | Política pública de `marketplace_servicos` e contagem da vitrine não conferem o status do especialista: anúncio publicado de pendente/suspenso/bloqueado fica legível por visitante na tabela e entra em `anuncios_publicados` (a busca está certa) | MKY-068 | Média | Média | rotina 068 | Visibilidade / moderação | política sem join com o especialista | **Aberto** (`bug_confirmado`) |
+| D-25 | Recusa pelo especialista ("Não vou atender") não marca `primeira_resposta_em`: a taxa de resposta trata a recusa como falta (contraria RN-030); a mensagem de sistema diz "A empresa encerrou" mesmo quando foi o especialista | MKY-072 | Média | Alta (risco CLT: penalizar recusa) | rotina 072 | Autonomia / subordinação algorítmica | `marketye_lead_status` não registra resposta | **Aberto** (`bug_confirmado`) |
+| D-26 | Avaliação moderada some do portal e do cálculo, mas continua legível na tabela pública (`SELECT true` para authenticated) e nenhuma tela filtra `moderada` | MKY-087 | Média | Média | rotina 087 | Moderação / CDC | política sem filtro | **Aberto** (`bug_confirmado`) |
+| D-27 | `marketye_exportar_meus_dados` não inclui os cupons do especialista | MKY-090 | Baixa | Baixa | rotina 090 | LGPD art. 18 (portabilidade) | bloco não incluído | **Aberto** (`bug_confirmado`) |
+| D-28 | Exclusão LGPD não encerra as conversas abertas nem avisa a empresa: o lead segue "qualificado" com o especialista anonimizado | MKY-092 | Alta | Média | rotina 092 | LGPD / experiência do cliente | escopo de `marketye_excluir_meu_perfil` | **Aberto** (`bug_confirmado`) |
+| D-29 | Nova versão dos termos aparece como pendente no portal, mas `marketye_anuncio_publicar` publica sem o aceite | MKY-093 | Média | Alta (consentimento versionado é a base legal) | rotina 093 | LGPD / 3.4 | gate não construído | **Aberto** (`bug_confirmado`) |
+| D-30 | Apresentação (bio) gravada com telefone e e-mail em texto claro e exibida na vitrine (a máscara cobre anúncio, mensagens e avaliações, não a bio) | MKY-037 | Média | Média | rotina 037 | Anti-leakage / RN-020 | `marketye_meu_perfil_salvar` sem máscara | **Aberto** (`bug_confirmado`) |
+| D-31 | Ação do Plano de Ação nascida da conversa conclui sem validação de eficácia; a regra existe só para ações de alerta do ponto (`ponto_acao_concluir_com_eficacia`) | MKY-121 | Média | Média | rotina 121 (origem, 5W2H e isolamento passam) | Integração / CA-011 | não construído para origem `marketplace` | **Aberto** (`aguardando_construcao`) |
+
+Aprendizado de processo (para o próprio QA): a segunda leva de rotinas (58 casos, 12/09) achou 16 achados em 1,9 s de execução; nenhum deles é de tela e o mais grave (D-18) só aparece testando o lado negativo de quem NÃO é parte da conversa — a matriz negativa paga o próprio custo pela segunda vez. D-02 escapou da réplica porque a empresa de teste local não tinha endereço. A partir deste pacote, a réplica de QA deve ter `empresa_cadastro` com latitude/longitude/UF para a empresa do cercado (recomendação de fixture).
 
 ## 9. Matriz de cobertura (CA × casos × status)
 
@@ -165,73 +180,74 @@ Status: **passou** = rotina/spec verde na última corrida; **não provado** = do
 
 | CA | Casos | Status |
 |---|---|---|
-| CA-001 cadastro e 1 anúncio sem contrato | 001, 030, 031, 032, 033, 036, 117 | 001 passou; demais não provado |
+| CA-001 cadastro e 1 anúncio sem contrato | 001, 030, 031, 032, 033, 036, 117 | 001/031/032/033 passou; 030/036 (tela) e 117 não provado |
 | CA-002 IA gera anúncio de ≤3 campos | 050, 130, 131 | bloqueado (chave da IA) / não provado |
-| CA-003 perfil cross-tenant sem vazar | 002, 012, 068, 071, 094, 095, 110, 111 | 002/012/110/111 passou; demais não provado |
-| CA-004 filtros corretos; busca vazia relaxa e capta | 015, 021, 060, 063, 064, 066 | 015/021 passou; demais não provado |
-| CA-005 ordem personalizada e piso | 004, 061, 084 | 004 passou; demais não provado |
-| CA-006 proteção ao novato | 062 | não provado (ver A6) |
-| CA-007 só transação verificada; dois eixos | 003, 074, 080, 083, 088 | 003 passou; demais não provado |
-| CA-008 nível com métricas simultâneas | 085, 106 | não provado |
-| CA-009 ajuste após aviso e recuperação | 010, 096 | 010 passou; 096 não provado |
-| CA-010 destaque rotulado, não passa o piso | 004, 056 | 004 passou; 056 não provado |
-| CA-011 alerta com IA e ação | 076, 120, 121 | não provado; 120 aguardando construção (D-07) |
-| CA-012 documento no módulo Documentos | 075, 122 | não provado |
+| CA-003 perfil cross-tenant sem vazar | 002, 012, 068, 071, 094, 095, 110, 111 | 002/012/094/095/110/111 passou; **068 falhou (D-24); 071 falhou (D-18, crítico)** |
+| CA-004 filtros corretos; busca vazia relaxa e capta | 015, 021, 060, 063, 064, 066 | 015/021/060/063/064 passou; 066 (tela) não provado |
+| CA-005 ordem personalizada e piso | 004, 061, 084 | passou |
+| CA-006 proteção ao novato | 062 | passou (ver A6) |
+| CA-007 só transação verificada; dois eixos | 003, 074, 080, 083, 088 | passou |
+| CA-008 nível com métricas simultâneas | 085, 106 | passou |
+| CA-009 ajuste após aviso e recuperação | 010, 096 | passou |
+| CA-010 destaque rotulado, não passa o piso | 004, 056 | passou |
+| CA-011 alerta com IA e ação | 076, 120, 121 | 076 (tela) não provado; 120 aguardando construção (D-07); 121 falhou na eficácia (D-31, aguardando construção) |
+| CA-012 documento no módulo Documentos | 075, 122 | passou |
 | CA-013 ação sensível só por função | 001, 013, 116 | 001/013/116 passou |
-| CA-014 exclusão LGPD com retenção | 009, 091, 092 | 009 passou; 091 decisão de produto; 092 não provado |
-| CA-015 parâmetros versionados sem deploy | 100, 101, 102, 106 | não provado (D-11 a verificar) |
+| CA-014 exclusão LGPD com retenção | 009, 091, 092 | 009 passou; 091 decisão de produto; **092 falhou (D-28)** |
+| CA-015 parâmetros versionados sem deploy | 100, 101, 102, 106 | 100/102/106 passou; **101 falhou (D-11 confirmado)** |
 | CA-016 split/escrow (Evolução) | 160 | fora |
 | CA-017 selo ≠ garantia | 044 | não provado |
-| CA-018 sem penalização automática; SLA opt-in; sem léxico disciplinar | 007, 072, 073, 145 | 007 passou; demais não provado; opt-in pende (A5) |
+| CA-018 sem penalização automática; SLA opt-in; sem léxico disciplinar | 007, 072, 073, 145 | 007/073 passou; **072 falhou (D-25)**; 145 (tela) não provado; opt-in pende (A5) |
 | CA-019 ajuste só na visibilidade | 010 | passou |
-| CA-020 contestação por canal único com humano | 008, 040, 047, 096 | 008 passou; demais não provado |
-| CA-021 vagas de demanda com célula mínima | 005, 065 | 005 passou; 065 não provado |
-| CA-022 eventos de autonomia | 011, 057 | 011 passou; 057 não provado |
+| CA-020 contestação por canal único com humano | 008, 040, 047, 096 | 008/096 passou; 040/047 (tela) não provado |
+| CA-021 vagas de demanda com célula mínima | 005, 065 | passou |
+| CA-022 eventos de autonomia | 011, 057 | passou |
 | CA-023 pagamento só após GATE (Evolução) | 160 | fora |
 
-Cobertura por área de risco (casos documentados que já têm prova / total): Isolamento e RLS 9/13 (69%); RN-021 3/3; Busca 2/12; Devido processo 2/9; Avaliação 3/12; LGPD 2/9; Cadastro/portal 2/20; Integrações 0/7; IA 0/6; UX 1/7 (MKY-022). **Lacuna principal agora: minimização por anon (094/095) e a família de busca/reputação (lote 2).**
+Cobertura (12/09, depois da leva do motor): dos 114 casos MKY documentados, **83 têm prova automática** — 80 rotinas do motor (todos os 92 casos `api` menos 039, 069, 120 e 146 aguardando construção, 091 decisão de produto, 160/161 fora de escopo, 117 Edge Function, 104/130–135 IA) e 3 specs Cypress dos 22 casos `e2e`. Por família: cadastro 6/6 api; moderação 5/5; anúncio 8/8; busca 7/8 (069 desempenho fora); conversa 6/6; avaliação/reputação 9/9; LGPD 6/7 (091 decisão); ajustes 6/7 (104 IA); integrações 4/6 (120 construção, 117 Edge); segurança 7/7; IA 0/6; jornadas e UX (tela) 3/22. **Resultado da bateria do módulo na réplica: 64 passou, 16 falhou (todos com disposição registrada), 0 erro, 45 não implementados (tela/IA/construção), em 2,6 s.** Lacuna principal agora: os 19 casos de tela sem `it()` (lote 5) e os 6 de IA (lote 6).
 
 ## 10. Recomendação
 
-**Ambiente de teste: go-com-ressalvas** para continuar a validação humana (as três correções desta sessão estão provadas: D-01, D-02, D-03; bateria 15/15; Cypress 37/37 na corrida #429).
+**Ambiente de teste: go-com-ressalvas** para continuar a validação humana (correções D-01, D-02, D-03, D-05, D-15, D-16 e D-17 provadas; bateria do módulo 64 passou / 16 achados conhecidos / 0 erro; Cypress 37/37 na corrida #429). **Ressalva nova: D-18 permite a qualquer especialista logado liberar o contato de uma empresa em conversa alheia — no ambiente de teste é aceitável porque os dados são fictícios, mas o defeito não pode chegar à produção.**
 
 **Produção: no-go por enquanto.** Bloqueadores explícitos, em ordem:
 1. Validação humana no ambiente de teste (regra da casa: só depois do "aprovado").
 2. D-13 — textos dos termos e da política de privacidade do não-usuário em versão final (jurídico); sem isso, o consentimento colhido é sobre placeholder.
-3. ~~Executar as rotinas da família de segurança (MKY-110–116)~~ **feito (7/7 passou, com D-16 e D-17 corrigidos)**; falta a minimização por anon (094, 095) antes de expor qualquer perfil real.
+3. ~~Executar as rotinas da família de segurança (MKY-110–116)~~ **feito**; ~~minimização por anon (094, 095)~~ **feito (passou)**. **Novo bloqueador: D-18** (terceiro libera contato e muda status de conversa alheia) — correção de duas linhas nas guardas de papel (`IF v_papel IS NULL OR v_papel <> 'cliente'`), coberta por MKY-071.
 4. ~~D-05 — REVOKE de `anon`~~ **feito**.
-5. D-06 — provar (MKY-082) e, se confirmado, bloquear autocompra em `marketye_abrir_lead`.
+5. D-06 — **confirmado** por MKY-082: bloquear autocompra em `marketye_abrir_lead`/`marketye_avaliar` (mesmo usuário dos dois lados, ou empresa de origem do próprio cadastro).
 6. D-07 — ligar "Encontrar especialista" aos alertas (invariante global) ou registrar como onda seguinte com aceite do dono do produto.
 7. Novo: o ambiente de teste precisa de uma passada manual em upload de foto/documento do especialista e leitura direta de anúncios depois de D-17 (o defeito estava em produção de teste desde a fundação).
+8. Antes de produção, também: D-19 (takedown não remove o anúncio), D-20 (job e gatilho herdados bloqueiam sem decisão humana), D-25 (recusa pesa na taxa de resposta — risco trabalhista), D-28 (exclusão não fecha conversas), D-29 (termos novos não travam a publicação). Os demais (D-21..D-24, D-26, D-27, D-30, D-11) são de qualidade e podem entrar na onda seguinte com aceite do dono do produto.
 
 Reverificar após correções: bateria completa (`qa_rodar_bateria('manual','rede-parceiros')`), Cypress e a conferência do script de entrega.
 
 ## 11. Plano de automação e monitoramento
 
-**Regressão em CI/CD (já existe):** `qa_rodar_bateria` no staging (15 rotinas) e Cypress (3 specs MKY) a cada merge. **A adicionar, nesta ordem:**
+**Regressão em CI/CD (já existe):** `qa_rodar_bateria` no staging (80 rotinas MKY) e Cypress (3 specs MKY) a cada merge. **Situação dos lotes:**
 
 | Lote | Casos | Forma | Esforço manual que elimina por ciclo |
 |---|---|---|---|
 | 1 — Segurança/RLS | 110, 111, 112, 113, 114, 115, 116 | **feito**: sete rotinas sobre um cenário compartilhado, na bateria do staging | ~3 h de checagem manual impossível de fazer bem à mão |
-| 2 — Busca e reputação | 060, 061, 062, 063, 064, 065, 068, 080, 081, 082, 083, 084, 085 | rotinas `qa_caso_mky_*` | ~4 h |
-| 3 — LGPD e governança | 090, 092, 093, 094, 095, 096, 100, 101, 102, 103, 106 | rotinas | ~2 h |
-| 4 — Estruturais auto-regeneráveis | 044, 046, 112, 114, 145 | SQL sobre catálogos + varredura de texto (não dependem de layout) | ~1 h |
+| 2 — Busca e reputação | 060, 061, 062, 063, 064, 065, 068, 080, 081, 082, 083, 084, 085 | **feito** (migration 20260912040000), mais 031–038, 041–046, 051–058, 071–077, 086–088 | ~4 h |
+| 3 — LGPD e governança | 090, 092, 093, 094, 095, 096, 100, 101, 102, 103, 106 | **feito** (mesma migration), mais 105, 121–124 | ~2 h |
+| 4 — Estruturais auto-regeneráveis | 044, 046, 112, 114, 145 | 046/112/114 **feito** (catálogos); 044 e 145 pendem (varredura de texto das telas) | ~1 h |
 | 5 — Tela | 030, 040, 070, 140, 141, 142, 143, 144 | Cypress com `data-testid` semânticos já existentes (auto-regeneráveis a mudanças de layout) | ~2 h |
 | 6 — IA e desempenho | 130–135, 069 | Edge Function com chave de teste; rotina de carga | ~1 h |
 
-Estimativa: os 96 casos, a ~12 min cada em execução manual, custam ~19 h por ciclo de regressão; automatizados, custam minutos de esteira e liberam a pessoa para o teste exploratório.
+Estimativa: os 96 casos, a ~12 min cada em execução manual, custam ~19 h por ciclo de regressão; automatizados, custam minutos de esteira e liberam a pessoa para o teste exploratório. Medido: as 80 rotinas do módulo rodam em 2,6 s na réplica (limite da bateria: 120 s).
 
 **Shift-right (monitorar em produção quando entrar):** erros das RPCs `marketye_buscar` e `marketye_meu_portal` (logs do Supabase); taxa de "Não conseguimos buscar agora"; leads sem resposta > 48 h; contestações abertas > 7 dias; crescimento de demanda latente por célula; cadastros pendentes > 3 dias; console errors recorrentes (D-09). Cada anomalia realimenta um caso novo.
 
 ## Avaliação crítica do agente
 
-1. **Qual área crítica ficou subtestada?** Isolamento entre tenants foi de 2 para 9 casos com rotina; falta a minimização por visitante (094/095). E a primeira execução da família achou um defeito crítico (D-17) que estava no ambiente de teste desde a fundação: a matriz negativa paga o próprio custo.
+1. **Qual área crítica ficou subtestada?** Depois da leva do motor, o banco está coberto (80/92 casos api); o que falta é tela (19 casos e2e sem `it()`) e IA. A primeira execução de cada família achou defeito de verdade (D-17 na segurança; D-18 na conversa): a matriz negativa paga o próprio custo — duas vezes.
 2. **Onde estou assumindo que "a tela funciona" logo "o cálculo está certo"?** Em relevância (pesos) e em níveis: provei que os parâmetros são lidos, não que a ordem resultante é a que o produto quer. A1 pede validação humana dos números.
 3. **Testei o lado negativo do RLS?** Sim: linhas por tenant e por especialista (110/111), escrita silenciosa (113) e escrita direta (116), com controles positivos para a rotina não passar à toa.
 4. **O oráculo do meu teste é a norma ou só o spec?** Nos casos de LGPD, CDC e CLT citei artigos; mas a lista de categorias reguladas e os prazos de retenção vêm do jurídico, e sem eles o oráculo é incompleto (A2, A3).
 5. **Que borda a IA gerou que eu teria ignorado?** Autocompra por identidade dupla (MKY-082): o requisito prevê, o build não bloqueia, ninguém tinha olhado.
-6. **Onde emiti "passou" sem prova suficiente?** Em nenhum caso novo. Os 18 "passou" têm rotina ou spec verde na corrida #429. Mas o "passou" de MKY-021 depende do mobiliário do ambiente de teste, que já falhou em silêncio antes.
+6. **Onde emiti "passou" sem prova suficiente?** Em nenhum caso. Os 64 "passou" do módulo têm rotina verde; os 16 "falhou" têm disposição e motivo gravados no caso, e a conferência do script de entrega só aceita como inesperada a falha de caso `em_triagem`. Onde o desenho da construção difere da redação original (cupom aplicado sozinho, moderação de avaliação por contestação, exportação vazia para empresa), ajustei o texto do caso e deixei o ajuste anotado nas observações — nunca afrouxei a rotina para passar.
 7. **O que o teste de hoje não pega que o de produção pegaria?** Volume (069 não existe), latência do pooler, e-mails/notificações (não construídos), comportamento com dados reais heterogêneos (acentos, CNPJ com filiais).
 8. **Que defeito já corrigido pode voltar?** D-02: qualquer nova etapa de relaxamento escrita com `||` reincide; MKY-015 cobre as cinco atuais, não uma sexta.
 9. **Estou testando a regra ou a implementação?** Em 062/084/106 uso os valores da configuração como oráculo. Se a configuração estiver errada, o teste passa e o produto erra — por isso A1.
-10. **O que falta para um "go" honesto de produção?** Os seis bloqueadores da seção 10; nenhum deles é de tela, todos são de segurança, jurídico ou invariante.
+10. **O que falta para um "go" honesto de produção?** Os bloqueadores da seção 10, agora com D-18 no topo; nenhum deles é de tela, todos são de segurança, jurídico ou invariante.

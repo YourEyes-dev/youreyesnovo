@@ -111,6 +111,26 @@ na Documentação de testes. Casos PARC-001/002/004/024 atualizados.
 | "OPENAI_API_KEY não configurada" ao montar o anúncio com IA | Segredo de projeto não copiado para o projeto de teste (ver `docs/AMBIENTES.md`, "Recadastrar os secrets") | A função responde com mensagem em linguagem clara (e código 503) dizendo o que falta e que dá para preencher à mão. O segredo precisa ser cadastrado em *Project Settings → Edge Functions → Secrets* do projeto de teste. |
 | Botão MarketYE do cabeçalho pouco visível | — | Botão na cor laranja da paleta (`--brand-orange`). |
 
+## Correção de 13/09/2026 (relatório do motor: 24 "erro")
+
+O relatório de execução do motor (13/09) trouxe 24 rotinas com
+**"erro: cannot set parameter role within security-definer function"**. Causa:
+quando a bateria roda pela tela, ela entra por `qa_disparar_bateria`, que é
+SECURITY DEFINER, e o Postgres proíbe `SET ROLE` dentro de função security
+definer. As 24 rotinas de segurança/RLS usavam `SET LOCAL ROLE` para provar o
+isolamento de verdade — por isso passavam quando eu as chamava direto na
+réplica, mas davam "erro" pela tela.
+
+Correção sem afrouxar nenhum teste (migration `20260913120000`): ajudantes num
+schema próprio (`qa_rls`), donos `authenticated`/`anon` e SECURITY DEFINER.
+Entrar num ajudante troca o usuário efetivo pelo dono (que não é dono das
+tabelas nem tem BYPASSRLS), então o RLS vale — e a troca é pelo mecanismo de
+definer, permitido dentro de outra definer, ao contrário do `SET ROLE`. O
+schema não tem USAGE para os papéis de API nem é exposto pelo PostgREST, então
+o par de ajudantes de SQL dinâmico nunca fica ao alcance da API. **Resultado
+pela tela agora: 0 erro, 64 passou, 16 falhou** (os 16 são os achados de
+produto já dispostos, não defeito das rotinas). Nada do produto mudou.
+
 ## O que NÃO entrou (de propósito)
 
 - **Pagamento intra-plataforma, split, escrow, take rate, NF da taxa** —

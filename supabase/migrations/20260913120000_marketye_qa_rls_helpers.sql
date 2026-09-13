@@ -58,6 +58,11 @@ SET lock_timeout = '10s';
 CREATE SCHEMA IF NOT EXISTS qa_rls;
 REVOKE ALL ON SCHEMA qa_rls FROM PUBLIC;
 GRANT USAGE ON SCHEMA qa_rls TO postgres, service_role;
+-- Temporário: ALTER FUNCTION ... OWNER TO <papel> exige que o NOVO dono tenha CREATE no
+-- schema da função. Na Supabase o postgres NÃO é superusuário, então sem isto o ALTER falha
+-- com "permission denied for schema qa_rls" (na réplica com postgres superusuário passava).
+-- Concedido só para trocar o dono; revogado logo depois (o schema volta a ficar fechado).
+GRANT USAGE, CREATE ON SCHEMA qa_rls TO authenticated, anon;
 
 CREATE OR REPLACE FUNCTION qa_rls.conta_auth(p_sql text) RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $conta_auth$
 DECLARE n bigint; BEGIN EXECUTE p_sql INTO n; RETURN n; EXCEPTION WHEN insufficient_privilege THEN RETURN -1; END $conta_auth$;
@@ -73,6 +78,7 @@ ALTER FUNCTION qa_rls.exec_auth(text)  OWNER TO authenticated;
 ALTER FUNCTION qa_rls.conta_anon(text) OWNER TO anon;
 ALTER FUNCTION qa_rls.exec_anon(text)  OWNER TO anon;
 
+REVOKE ALL ON SCHEMA qa_rls FROM authenticated, anon;  -- fecha o schema: sem USAGE nem CREATE, fora do alcance da API (PostgREST só expõe public)
 REVOKE ALL ON FUNCTION qa_rls.conta_auth(text), qa_rls.exec_auth(text), qa_rls.conta_anon(text), qa_rls.exec_anon(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION qa_rls.conta_auth(text), qa_rls.exec_auth(text), qa_rls.conta_anon(text), qa_rls.exec_anon(text) TO postgres, service_role;
 

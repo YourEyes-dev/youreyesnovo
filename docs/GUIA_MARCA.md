@@ -119,3 +119,43 @@ um layout desenhado por vocês**. Método validado (09/2026):
    - `DAHVBAxKTYg` — "Dados em silos? UNIFIQUE RH, DP e SST num só lugar" (integração)
 6. Conforme surgirem mais posts-modelo (carrossel narrativo, etc.), registrar cada
    molde aqui com seu id e seus campos.
+
+## Organização no Canva (pastas + nomes) — padrão da casa
+
+Regra: **nenhuma arte solta**. Todo criativo nasce dentro de uma pasta e com nome
+padronizado, para uma equipe conseguir tocar sem se perder. A estrutura espelha o
+fluxo da casa (produção → aprovação → aprovado → publicado):
+
+```
+📁 YourEyes — Social            (FAHVFLzXRoQ)
+   ├─ 0. Referências & Marca    (FAHVFPZWA7w)  ← molde-mestre (36 modelos), logo, Íris, kit
+   ├─ 1. Em produção            (FAHVFO8HB0c)  ← rascunhos sendo montados
+   ├─ 2. Em aprovação           (FAHVFMFUneA)  ← aguardando o "ok" da Leiridiani (gate humano)
+   ├─ 3. Aprovados — a publicar (FAHVFGpgW7I)  ← prontos/agendados
+   ├─ 4. Publicados             (FAHVFLdvSXM)  ← histórico (subpastas por mês: 2026-09, ...)
+   └─ 9. Descartados            (FAHVFBfa2Rk)  ← versões abandonadas
+```
+
+O **status vive na PASTA** (a peça se move de pasta conforme avança), nunca no nome.
+
+**Padrão de nome de cada design:**
+`AAAA-MM-DD · CANAL · PILAR · título-curto · vN`
+Ex.: `2026-09-13 · IG · VISIBILIDADE · Você não protege o que não enxerga · v1`
+- **CANAL:** `IG` (feed), `IG-STORY`, `LINKEDIN`, `REELS`.
+- **PILAR** (o assunto): `CONTEXTO` (do dado ao contexto) · `EVIDÊNCIA` (da norma à
+  evidência) · `INTEGRAÇÃO` (um dado, uma vez, p/ tudo) · `MATURIDADE` · `LGPD` ·
+  `PESSOAS` · `VISIBILIDADE` · `DEMO` (post com tela do sistema).
+- **vN:** versão; sobe a cada revisão aprovada (v1 → v2).
+
+**Regras operacionais para a equipe:**
+- Criou peça nova → nasce em **1. Em produção** com o nome já no padrão.
+- Terminou → move para **2. Em aprovação** e chama a Leiridiani.
+- Aprovada → **3. Aprovados**; depois de postada → **4. Publicados/AAAA-MM**.
+- Reprovou/abandonou → **9. Descartados** (não apagar na hora; histórico ajuda).
+- O molde-mestre (`DAHVA4RxENo`) **nunca sai** de *0. Referências* e não se edita
+  para produzir peça — sempre se **copia** dele (ver seção do método acima).
+
+> **Aprendizado (09/2026):** rascunho de cópia deixado **sem título e solto** na
+> raiz pode ser limpo pelo Canva e some. Por isso: nomear e mover para a pasta
+> **assim que criar**. (Os 3 primeiros posts de teste se perderam exatamente assim;
+> os PNGs exportados sobreviveram, os designs editáveis não.)

@@ -11,6 +11,40 @@
 
 ---
 
+## 0. Progresso (atualizado 13/09/2026)
+
+Ambiente de desenvolvimento (migrations no repositório, validadas em réplica local
+com as 1009 migrations e cada caso isolado como o motor real faz — `qa_executar_descartavel`
+— com diff caso a caso contra o "antes" para provar que não há regressão):
+
+- **Fase 0 — concluída (4):** AFAST-020, AFAST-031 (regressão de 24/07), FERIAS-056, DESL-003.
+- **Fase 1 — concluída (46 casos + 1 ganho colateral):**
+  - Batch 1 (Metas/Plano/Hub): MCHK-010/011, MPAR-011, MEVD-010, PLTP-010, PLTM-010,
+    PLTF-010/011, PLEV-010, PDOC-010, PCHK-010, PROC-010/011, HTPL-010, HCAT-010, HCAL-012.
+  - Batch 2 (Empresa/Enq/Feriados/TAC/Cert): EMP-020/021/070/071, DADO-010, HIER-002,
+    FER-002/003/004, ENQ-010/011/013, TAC-003, CERT-010/011.
+  - Batch 3 (Adm/Afast/EPI/Férias): ADM-020, AFAST-011, AFAST-051, EPI-020, EPI-030,
+    FERIAS-013/014/052.
+  - Batch 4 (Colab/Idade): COLAB-025/027/029/033, ADM-030, DESL-083 (+ EMP-060, ganho colateral).
+- **Pendente da Fase 1:** **ADM-031** (idade × risco da função/turno) foi remetido à
+  fase de SST, porque depende do modelo de riscos por função (ainda a estruturar).
+
+**Total: 50 casos verdes a mais em desenvolvimento** (o motor local saiu de 487 para
+540 "passou"; a diferença fecha com os 50 alvos + EMP-060 + a correção do falso-positivo).
+
+**Dois artefatos de heurística a registrar (não são correções reais):**
+- **AFAST-060** passou a marcar verde porque a auditoria dele casa a palavra "prazo" em
+  qualquer função, e a guarda de status de afastamento passou a citar `prazo_indeterminado`.
+  O **motor de prazos do S-2230 continua pendente (Fase 4).**
+- **ADM-040** (cota de aprendiz) chegou a marcar verde pelo mesmo motivo (a palavra
+  "aprendiz"); a função de idade foi reescrita para **não** disparar isso, então ADM-040
+  permanece vermelho — **o motor de cálculo da cota continua pendente (Fase 3).**
+
+Nada foi aplicado em homologação ou produção. As migrations só chegam ao ambiente de
+teste quando a mudança for registrada na `main`.
+
+---
+
 ## 1. Como ler este plano (método)
 
 Cada caso do Motor é uma rotina `qa_caso_<código>()` que **simula** uma operação e

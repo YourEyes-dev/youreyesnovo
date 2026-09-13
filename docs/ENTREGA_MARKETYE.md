@@ -131,6 +131,27 @@ o par de ajudantes de SQL dinâmico nunca fica ao alcance da API. **Resultado
 pela tela agora: 0 erro, 64 passou, 16 falhou** (os 16 são os achados de
 produto já dispostos, não defeito das rotinas). Nada do produto mudou.
 
+## Correção de 13/09/2026 (relatório do motor no staging: 3 itens de ambiente)
+
+Rodando o motor no banco real do staging (não só na réplica), três rotinas que
+passavam na réplica apareceram — e eram diferença de ambiente, não achado de
+produto:
+
+- **MKY-058** dava `erro: cannot insert a non-DEFAULT value into column
+  path_tokens`. No Storage da Supabase `path_tokens` é coluna **gerada**; a
+  rotina inseria valor. Passou a inserir só `bucket_id`, `name`, `owner`.
+- **MKY-063 e MKY-123** falhavam porque dependiam de `empresa_cadastro` do
+  cercado, que no staging tem várias linhas; `marketye_buscar` lê
+  `ORDER BY created_at LIMIT 1` e, com `created_at` empatado, a rotina
+  atualizava uma linha e a busca lia outra. Passaram a **apagar e recriar
+  exatamente uma** linha do cercado (transação descartada), ficando
+  determinísticas. Reproduzido na réplica (empate de `created_at` derrubava
+  123 em 5/5) e corrigido (4/4 passa).
+
+Migration `20260913140000`, CREATE OR REPLACE; nenhuma função de produto muda.
+Bateria pela tela sob as condições do banco real: **0 erro, 64 passou, 16
+falhou** (os 16 são os achados de produto já dispostos).
+
 ## O que NÃO entrou (de propósito)
 
 - **Pagamento intra-plataforma, split, escrow, take rate, NF da taxa** —

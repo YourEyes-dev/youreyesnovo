@@ -11,7 +11,7 @@ fora de propósito e como conferir no ambiente de teste.
 acesso e painel de QA passam a dizer **MarketYE**. "Parceiros" fica só para o
 Programa de Parceiros (canal de vendas).
 
-**Banco (migrations 20260911220000 / 221000 / 222000 / 224000 / 230000 / 20260912002000; script de entrega
+**Banco (migrations 20260911220000 / 221000 / 222000 / 224000 / 230000 / 20260912002000 / 030000 / 040000; script de entrega
 `docs/script_marketye_fundacao.sql`).**
 
 | Requisito | Como ficou |
@@ -77,7 +77,27 @@ fechada desde a fundação, e quebravam qualquer leitura direta de anúncios/pac
 e o upload de foto/documento do especialista com "permission denied"**. Reescritas com
 `marketye_meu_id()`.
 
-**QA.** Casos MKY-001 a MKY-015 e MKY-110 a MKY-116 (api, com rotinas) e MKY-020 a MKY-022 (e2e,
+**Motor (banco) — rotinas para os casos documentados (12/09, migration 20260912040000).**
+Os 58 casos `api` restantes que o motor consegue executar (famílias cadastro, moderação,
+anúncio, busca, conversa, avaliação/reputação, LGPD, ajustes e integrações) ganharam rotina
+`qa_caso_mky_*`; com as 22 anteriores, o módulo tem **80 rotinas** registradas em
+`qa_implementacoes`. Elas rodam em **Super Admin → QA e Testes → Executar testes → Motor
+(banco)**, módulo MarketYE, em cerca de 3 segundos. As rotinas são honestas: onde o produto
+contraria o caso documentado elas **falham** e o texto começa com "ACHADO". Na primeira execução
+foram 64 passou / **16 falhou** / 0 erro; os 16 casos que falham têm a disposição registrada na
+Documentação de Testes (`bug_confirmado` ou `aguardando_construcao`, com o motivo), e a
+conferência do script de entrega só reprova falha inesperada (caso ainda `em_triagem`). O mais
+grave dos achados: **D-18 — qualquer especialista logado consegue liberar o contato e mudar o
+status de uma conversa de que não faz parte** (`marketye_lead_liberar_contato` e
+`marketye_lead_status` não recusam papel nulo). Lista completa e severidades em
+`docs/QA_MARKETYE.md`, seção 8 (D-06, D-11 e D-18 a D-31). Nada do produto foi alterado nesta
+entrega: só rotinas de teste, registro, ajustes de texto de caso e disposições. O script de
+entrega `docs/script_marketye_fundacao.sql` passou a ser autossuficiente: além das rotinas, incorpora
+o conteúdo de `script_marketye_anexos_fotos.sql` e `script_marketye_qa_documentacao.sql` (todos
+idempotentes), e a conferência final roda as 80 rotinas — só reprova erro de rotina ou falha em caso
+ainda `em_triagem`; os achados conhecidos saem na coluna `achados_conhecidos`.
+
+**QA.** Casos MKY-001 a MKY-015, MKY-031 a MKY-124 (api, 80 com rotina) e MKY-110 a MKY-116 e MKY-020 a MKY-022 (e2e,
 `cypress/e2e/marketye.cy.ts`); módulo `rede-parceiros` renomeado para MarketYE
 na Documentação de testes. Casos PARC-001/002/004/024 atualizados.
 
@@ -119,8 +139,13 @@ na Documentação de testes. Casos PARC-001/002/004/024 atualizados.
 5. Como especialista (`/marketye/entrar` com a conta do Especialista Staging):
    aba **Meu caminho** — siga os seis passos; em Meus serviços, escreva uma
    frase e clique em *Montar anúncio*.
-6. SQL Editor do projeto de TESTE: `SELECT * FROM public.qa_rodar_bateria('manual','rede-parceiros');`
-   e depois `SELECT codigo, situacao, obtido FROM public.qa_execucao_itens ... ` (ou a
-   conferência final do `docs/script_marketye_fundacao.sql`).
+6. Superadmin: **QA e Testes → Executar testes → Motor (banco)** → escolha o módulo
+   **MarketYE** e clique em Executar. Esperado: 64 passou, 16 falhou (cada "falhou" abre com o
+   texto "ACHADO: ..." e o caso correspondente mostra a disposição na Documentação de Testes),
+   0 erro, 45 não implementados (casos de tela, IA e aguardando construção).
+7. SQL Editor do projeto de TESTE: `SELECT * FROM public.qa_rodar_bateria('manual','rede-parceiros');`
+   e depois `SELECT codigo, situacao, left(obtido, 200) FROM public.qa_resultados WHERE execucao_id = '<id devolvido>' ORDER BY codigo;`
+   (ou a conferência final do `docs/script_marketye_fundacao.sql`, que roda as 80 rotinas e
+   mostra `qa_mky`, `achados_conhecidos` e `falhas_inesperadas`).
 
 A produção segue intacta: nada aqui toca o projeto de produção.

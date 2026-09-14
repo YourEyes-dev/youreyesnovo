@@ -263,6 +263,65 @@ async function semearMetas(admin: Admin, userId: string) {
   if (error) console.error("metas (fixtures):", error.message);
 }
 
+// Ação-sentinela do Plano de Ação: mesma ideia da meta-sentinela. A ilha pode
+// já ter ações de outra origem; guardar por "qualquer ação" pularia o seed.
+const PACAO_SENTINELA = "Instalar guarda-corpo na plataforma de carga (QA)";
+// Semeia 3 ações fictícias de Plano de Ação na ilha, com situação e prioridade
+// variadas, para os casos e2e profundos (listagem, filtro por situação, filtro
+// por prioridade). Idempotente pela ação-sentinela; NÃO-FATAL.
+async function semearPlanoAcao(admin: Admin, userId: string) {
+  const { data: existe } = await admin
+    .from("plano_acoes").select("id")
+    .eq("tenant_id", TENANT_ID).eq("titulo", PACAO_SENTINELA).limit(1);
+  if (existe && existe.length > 0) return; // minhas ações já semeadas
+
+  // Campos comuns. codigo:"" deixa o trigger gerar ACO-NNNNN. prazo no futuro
+  // para nenhuma cair como "atrasada". tipo/origem dentro dos domínios válidos.
+  const comum = {
+    tenant_id: TENANT_ID,
+    empresa_id: EMPRESA_ID,
+    codigo: "",
+    origem_modulo: "manual",
+    tipo: "corretiva",
+    prazo: "2026-12-31",
+    criado_por: userId,
+    criado_por_nome: "Robô de Testes",
+  };
+
+  const linhas = [
+    {
+      ...comum,
+      titulo: PACAO_SENTINELA,
+      descricao: "Ação fictícia de QA — instalar guarda-corpo na plataforma.",
+      status: "pendente",
+      prioridade: "imediato",
+      gravidade: 5, urgencia: 5, tendencia: 4,
+      progresso: 0,
+    },
+    {
+      ...comum,
+      titulo: "Revisar extintores vencidos (QA)",
+      descricao: "Ação fictícia de QA — revisão dos extintores vencidos.",
+      status: "em_andamento",
+      prioridade: "urgente",
+      gravidade: 4, urgencia: 4, tendencia: 3,
+      progresso: 50,
+    },
+    {
+      ...comum,
+      titulo: "Treinar brigada de incêndio (QA)",
+      descricao: "Ação fictícia de QA — treinamento da brigada de incêndio.",
+      status: "concluida",
+      prioridade: "medio",
+      gravidade: 3, urgencia: 2, tendencia: 2,
+      progresso: 100,
+    },
+  ];
+
+  const { error } = await admin.from("plano_acoes").insert(linhas);
+  if (error) console.error("plano_acoes (fixtures):", error.message);
+}
+
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -566,6 +625,14 @@ serve(async (req) => {
       await semearMetas(admin, userId);
     } catch (e) {
       console.error("Metas (fixtures, nao-fatal):", (e as Error).message);
+    }
+
+    // 7c) Ações fictícias de Plano de Ação — habilitam os casos e2e profundos
+    //     (listagem, filtro por situação, filtro por prioridade). NÃO-FATAL.
+    try {
+      await semearPlanoAcao(admin, userId);
+    } catch (e) {
+      console.error("Plano de Ação (fixtures, nao-fatal):", (e as Error).message);
     }
 
     // 6) Robô-PARCEIRO: conta sem perfil de tenant, vinculada ao parceiro

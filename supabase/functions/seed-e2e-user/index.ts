@@ -322,6 +322,28 @@ async function semearPlanoAcao(admin: Admin, userId: string) {
   if (error) console.error("plano_acoes (fixtures):", error.message);
 }
 
+// Semeia UM GHE (Grupo Homogêneo de Exposição) ativo na empresa da ilha. Sem
+// GHE ativo, a criação de campanha psicossocial mostra "Nenhum GHE ativo
+// cadastrado para esta empresa" e o teste TC-01 não fecha. Nada semeava GHE
+// (nem staging.sql, nem migration) — o teste só passava no ambiente de teste
+// por GHEs deixados por corridas anteriores. Idempotente pelo código; NÃO-FATAL.
+async function semearGhe(admin: Admin, _userId: string) {
+  const { data: existe } = await admin
+    .from("psicossocial_ghe").select("id")
+    .eq("tenant_id", TENANT_ID).eq("codigo", "GHE-001").limit(1);
+  if (existe && existe.length > 0) return; // GHE já semeado
+
+  const { error } = await admin.from("psicossocial_ghe").insert({
+    tenant_id: TENANT_ID,
+    empresa_id: EMPRESA_ID,
+    codigo: "GHE-001",
+    nome: "Administrativo (QA)",
+    descricao: "GHE fictício de QA para campanhas psicossociais.",
+    ativo: true,
+  });
+  if (error) console.error("psicossocial_ghe (fixtures):", error.message);
+}
+
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -633,6 +655,14 @@ serve(async (req) => {
       await semearPlanoAcao(admin, userId);
     } catch (e) {
       console.error("Plano de Ação (fixtures, nao-fatal):", (e as Error).message);
+    }
+
+    // 7d) GHE fictício — sem ele a criação de campanha psicossocial trava em
+    //     "Nenhum GHE ativo cadastrado". NÃO-FATAL, mesma razão.
+    try {
+      await semearGhe(admin, userId);
+    } catch (e) {
+      console.error("GHE (fixtures, nao-fatal):", (e as Error).message);
     }
 
     // 6) Robô-PARCEIRO: conta sem perfil de tenant, vinculada ao parceiro

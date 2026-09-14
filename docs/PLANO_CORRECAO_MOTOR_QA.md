@@ -41,10 +41,24 @@ com as 1009 migrations e cada caso isolado como o motor real faz — `qa_executa
     020/050/051/060 (elegibilidade, termo, VT, teto PAT, ponte Folha, proporcional Ponto,
     CCT) + EMP-053 (categoria reabilitado do INSS, ganho colateral legítimo).
 
-**Estado confirmado no ambiente de teste (relatório 13/09 19:16): 614 passou · 84 falhou
-· 0 erro.** As 170 falhas originais caíram para 84, sem nenhuma rotina quebrando (erro=0).
-As 5 falhas BEN restantes (030/040/042/070/071) são exatamente os subsistemas adiados de
-propósito — confirmando que o lote Admissão/Cota + Benefícios entrou verde.
+- **Conformidade (obrigações automáticas, 6):** REGRA-001 (déficit cota PcD), REGRA-002
+  (CIPA), REGRA-003 (SESMT), REGRA-004 (FAP), REGRA-005 (TAC), REGRA-006 (grau de risco) —
+  gatilho em empresa_cadastro que abre/retira a obrigação sem o clique manual.
+  (Artefato de heurística: ENQ-050/051 marcam verde na réplica só porque o gatilho cita
+  sesmt_obrigatorio/cipa_obrigatoria; o dimensionamento NR-04/NR-05 continua pendente.
+  No teste já estavam verdes.)
+- **Admissão: estrutura e travas (9):** ADM-021 (prazo determinado, teto 2 anos +
+  prorrogação única), ADM-022 (intermitente, valor_hora), ADM-050 (opção de VT),
+  ADM-051 (salário × piso da CCT), ADM-052 (checklist parametrizável), ADM-071
+  (justificativa de retroativa), ADM-072 (conclusão bloqueada com ASO inapto), ADM-073
+  (retenção/anonimização de candidato não admitido), ADM-107 (ASO admissional próprio).
+  Adiado: ADM-070 (conclusão condicionada à assinatura do contrato) exige o fluxo de
+  assinatura ponta-a-ponta (tela inclusa); ADM-031 (idade × risco) segue com SST.
+
+**Estado confirmado no ambiente de teste (relatório 14/09 11:46): 620 passou · 78 falhou
+· 0 erro.** As 170 falhas originais caíram para 78 (e para ~69 depois do lote ADM em
+desenvolvimento), sem nenhuma rotina quebrando (erro=0). As 5 falhas BEN restantes
+(030/040/042/070/071) são exatamente os subsistemas adiados de propósito.
 
 **Artefato de heurística ainda em aberto:**
 - **AFAST-060** marca verde porque a auditoria casa a palavra "prazo" em qualquer função,

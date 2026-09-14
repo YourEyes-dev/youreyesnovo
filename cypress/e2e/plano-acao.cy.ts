@@ -5,7 +5,12 @@
 //
 // Cada it() corresponde a um caso documentado (PACAO-TELA-*), ligado pela
 // ponte qa_cobertura_e2e. Escopo: a entrada de cada caso (o módulo/abas
-// montam, o formulário abre), sem salvar nada nem depender de dado semeado.
+// montam, o formulário abre), sem salvar nada.
+//
+// Casos "profundos" (PACAO-TELA-10/11/12) DEPENDEM das ações fictícias que o
+// seed-e2e-user semeia na ilha de QA (semearPlanoAcao): com ações na base dá
+// para conferir a listagem e os filtros por situação e por prioridade
+// (que aqui recortam a lista no servidor).
 // =====================================================================
 
 import { credenciaisDeTeste } from "../support/credenciais";
@@ -91,5 +96,31 @@ describe("Módulo Plano de Ação", () => {
     cy.contains("Total de Ações", { timeout: 20000 }).should("be.visible");
     cy.contains("Atrasadas").should("exist");
     cy.contains("Índice de Execução").should("exist");
+  });
+
+  // PACAO-TELA-10 — depende das ações semeadas na ilha (semearPlanoAcao).
+  it("lista as ações semeadas na aba Todas", () => {
+    cy.contains("Instalar guarda-corpo na plataforma de carga (QA)", { timeout: 20000 })
+      .should("be.visible");
+    cy.contains("Treinar brigada de incêndio (QA)").should("be.visible");
+  });
+
+  // PACAO-TELA-11 — filtro por situação recorta a lista (chip Concluídas).
+  it("filtra a lista pela situação Concluídas", () => {
+    cy.contains("Instalar guarda-corpo na plataforma de carga (QA)", { timeout: 20000 })
+      .should("be.visible");
+    cy.contains("Concluídas").should("exist").click({ force: true });
+    cy.contains("Treinar brigada de incêndio (QA)", { timeout: 20000 }).should("be.visible");
+    cy.contains("Instalar guarda-corpo na plataforma de carga (QA)").should("not.exist");
+  });
+
+  // PACAO-TELA-12 — filtro por prioridade recorta a lista (chip Imediato).
+  it("filtra a lista pela prioridade Imediato", () => {
+    cy.contains("Instalar guarda-corpo na plataforma de carga (QA)", { timeout: 20000 })
+      .should("be.visible");
+    cy.contains("Imediato").should("exist").click({ force: true });
+    cy.contains("Instalar guarda-corpo na plataforma de carga (QA)", { timeout: 20000 })
+      .should("be.visible");
+    cy.contains("Treinar brigada de incêndio (QA)").should("not.exist");
   });
 });

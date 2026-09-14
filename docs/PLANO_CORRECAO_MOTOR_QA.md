@@ -28,17 +28,34 @@ com as 1009 migrations e cada caso isolado como o motor real faz — `qa_executa
   - Batch 4 (Colab/Idade): COLAB-025/027/029/033, ADM-030, DESL-083 (+ EMP-060, ganho colateral).
 - **Pendente da Fase 1:** **ADM-031** (idade × risco da função/turno) foi remetido à
   fase de SST, porque depende do modelo de riscos por função (ainda a estruturar).
+- **Fase 2 — concluída (perfil/LGPD/log clínico):** DESL-110, FOLHA-090, EPI-041, SST-041
+  (políticas RESTRICTIVE `perfil_restringe_leitura_*`) + `log_acesso_clinico` e
+  `ler_cid_clinico()` (AFAST-080, SST-080).
+- **Fase 3 — concluída em lotes:**
+  - Férias lote 1 (estrutura e prazos): FERIAS-091/008/016/010/040/031/042.
+  - Férias lote 2 (pontes): FERIAS-003 (art. 133), FERIAS-024 (afastamento suspende),
+    FERIAS-053 (ponto barrado em gozo).
+  - EPI/SST vencimentos: EPI-011/022/050/052, SST-001/011/020/021.
+  - **Admissão/Cota + Benefícios (11):** ADM-040 (motor da cota de aprendiz),
+    ADM-041 (enquadramento PcD/reabilitado alimentando o realizado), BEN-001/010/011/012/
+    020/050/051/060 (elegibilidade, termo, VT, teto PAT, ponte Folha, proporcional Ponto,
+    CCT) + EMP-053 (categoria reabilitado do INSS, ganho colateral legítimo).
 
-**Total: 50 casos verdes a mais em desenvolvimento** (o motor local saiu de 487 para
-540 "passou"; a diferença fecha com os 50 alvos + EMP-060 + a correção do falso-positivo).
+**Estado confirmado no ambiente de teste (relatório 13/09 19:16): 614 passou · 84 falhou
+· 0 erro.** As 170 falhas originais caíram para 84, sem nenhuma rotina quebrando (erro=0).
+As 5 falhas BEN restantes (030/040/042/070/071) são exatamente os subsistemas adiados de
+propósito — confirmando que o lote Admissão/Cota + Benefícios entrou verde.
 
-**Dois artefatos de heurística a registrar (não são correções reais):**
-- **AFAST-060** passou a marcar verde porque a auditoria dele casa a palavra "prazo" em
-  qualquer função, e a guarda de status de afastamento passou a citar `prazo_indeterminado`.
-  O **motor de prazos do S-2230 continua pendente (Fase 4).**
-- **ADM-040** (cota de aprendiz) chegou a marcar verde pelo mesmo motivo (a palavra
-  "aprendiz"); a função de idade foi reescrita para **não** disparar isso, então ADM-040
-  permanece vermelho — **o motor de cálculo da cota continua pendente (Fase 3).**
+**Artefato de heurística ainda em aberto:**
+- **AFAST-060** marca verde porque a auditoria casa a palavra "prazo" em qualquer função,
+  e a guarda de status passou a citar `prazo_indeterminado`. O **motor de prazos do
+  S-2230 continua pendente (Fase 4).** (ADM-040 deixou de ser artefato: agora tem motor
+  real da cota de aprendiz.)
+
+**As 84 falhas restantes, por família:** ADM (11: 021/022/031/050/051/052/070/071/072/073/
+107), AFAST (7), BEN (5 estruturais adiados), DESL (5), EPI (7), FERIAS (7), FOLHA (6),
+MKY/Marketplace (16), SST (9), REGRA (6: obrigações automáticas), + MCHK-002, MWKF-011,
+PERFIL-003, PGP-014, PONTO-113.
 
 Nada foi aplicado em homologação ou produção. As migrations só chegam ao ambiente de
 teste quando a mudança for registrada na `main`.

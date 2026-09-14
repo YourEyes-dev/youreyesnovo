@@ -470,6 +470,31 @@ script só na produção e esquecer dela.
   repositório. Rodando os mesmos na produção e na homologação, a diferença entre
   os dois resultados é exatamente o quanto elas se afastaram.
 
+### Casos de tela ainda vermelhos na homologação (a investigar — 09/2026)
+
+Ao trazer o MarketYE e as fixtures profundas (Metas, Plano de Ação, GHE) para a
+homologação, os casos verdes no teste passaram a rodar lá também. Sobraram dois
+que falham **só na homologação** — e **não** são falta de esquema (isso já foi
+resolvido). Ficam registrados aqui até serem investigados:
+
+- **`PGP-031` (portal-parceiro — "copiar o link de indicação"):** o elemento
+  `portal-link-principal` vem **vazio**. A tela mostra o parceiro com **contrato
+  ainda pendente** de assinatura; o link `?ref=CODIGO` parece só ser populado com
+  contrato ativo / código de indicação setado. Hipótese: **estado/dado do
+  parceiro** (fixture), não bug de produto — a confirmar.
+- **`TRILHA-010` (trilhas — "cria uma trilha na Gestão"):** o diálogo "Nova
+  Trilha" **fica aberto, sem erro e sem sucesso** (`dialogs=1, spinner=0,
+  erros=(nenhum)`); "Trilha criada!" nunca aparece. O caminho de criação é antigo
+  e está presente na homologação (não é esquema). Tem cara de **runtime/dado** — a
+  criação não completa. **Se a investigação apontar bug de produto, mostrar ao
+  dono e só corrigir com autorização.**
+
+Aprendizado geral: a homologação também fica atrás da **base de dados de
+referência**, não só do esquema recente. Ex.: as categorias-raiz do marketplace
+(Fev/2026) nunca haviam sido semeadas ali — o que quebrava o MarketYE (MKY-021).
+Corrigido por scripts de entrega (`docs/script_marketye_homologacao.sql` e
+`docs/script_marketye_categorias_homologacao.sql`).
+
 ## Testes de tela (Cypress) na homologação
 
 Por padrão a suíte Cypress roda só no **teste** (é lá que a tela nasce, e as duas

@@ -41,6 +41,11 @@ export interface EntradaProgramacao {
   abonoDias: number;
   /** Limite concessivo do período (art. 134 caput). */
   limiteConcessivo: Date;
+  /** Exceção autorizada pela diretoria (admin+): libera programar além do
+   *  concessivo, assumindo a dobra do art. 137. */
+  autorizadoExcecao?: boolean;
+  /** Valor estimado das férias, para exibir o custo da dobra (art. 137). */
+  valorEstimado?: number;
   hoje?: Date;
   /** Contexto da 3B-2 (opcional — regra só roda se o dado estiver presente). */
   contexto?: ContextoRegras3B2;
@@ -145,11 +150,16 @@ export function avaliarRegrasProgramacao(e: EntradaProgramacao): ViolacaoRegra[]
   for (const s of subs) {
     if (!s.inicio) continue;
     if (d(s.inicio) > e.limiteConcessivo) {
-      v.push({
+      v.push(e.autorizadoExcecao ? {
+        regra: "Concessão fora do limite — autorizada pela diretoria",
+        baseLegal: "CLT art. 134, caput",
+        comportamento: "alerta",
+        mensagem: `Início ${d(s.inicio).toLocaleDateString("pt-BR")} ultrapassa o limite concessivo (${e.limiteConcessivo.toLocaleDateString("pt-BR")}), mas a exceção foi autorizada pela diretoria. O pagamento sai em dobro (art. 137).`,
+      } : {
         regra: "Concessão fora do limite",
         baseLegal: "CLT art. 134, caput",
         comportamento: "bloqueio",
-        mensagem: `Início ${d(s.inicio).toLocaleDateString("pt-BR")} ultrapassa o limite concessivo (${e.limiteConcessivo.toLocaleDateString("pt-BR")}). Requer justificativa de diretoria.`,
+        mensagem: `Início ${d(s.inicio).toLocaleDateString("pt-BR")} ultrapassa o limite concessivo (${e.limiteConcessivo.toLocaleDateString("pt-BR")}). Só a diretoria (admin ou acima) pode autorizar — e o pagamento sai em dobro (art. 137).`,
       });
       break;
     }
@@ -157,11 +167,14 @@ export function avaliarRegrasProgramacao(e: EntradaProgramacao): ViolacaoRegra[]
 
   // ── Art. 137 — período já vencido gera dobra (informativo) ─────────────────
   if (hoje > e.limiteConcessivo && e.saldo > 0) {
+    const dobra = e.valorEstimado && e.valorEstimado > 0
+      ? ` Custo estimado da dobra: ${e.valorEstimado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`
+      : "";
     v.push({
       regra: "Período vencido — pagamento em dobro",
       baseLegal: "CLT art. 137",
       comportamento: "informativo",
-      mensagem: `Este período já ultrapassou o limite concessivo (${e.limiteConcessivo.toLocaleDateString("pt-BR")}). As férias serão devidas em dobro.`,
+      mensagem: `Este período já ultrapassou o limite concessivo (${e.limiteConcessivo.toLocaleDateString("pt-BR")}). As férias serão devidas em dobro.${dobra}`,
     });
   }
 

@@ -59,6 +59,11 @@ describe("Módulo Trilhas", () => {
   });
 
   it("cria uma trilha na Gestão", () => {
+    // DIAGNÓSTICO TEMPORÁRIO: o TrilhaForm engole o erro de criação num catch
+    // vazio, então a falha some. Este intercept observa o POST real do INSERT de
+    // trilha e força o status/body para o log da esteira, para achar por que o
+    // insert é rejeitado só na homologação. Remover depois de diagnosticado.
+    cy.intercept("POST", "**/rest/v1/trilhas*").as("trilhaInsert");
     // O botão "Nova Trilha" do cabeçalho está sempre presente (abre um diálogo).
     // force:true nos cliques: o scroll-lock do Radix deixa o body com
     // pointer-events:none e o Cypress recusa o clique sem o force.
@@ -68,6 +73,12 @@ describe("Módulo Trilhas", () => {
     // Só o Nome é obrigatório; os demais campos têm padrão.
     cy.get('[role="dialog"]').find('input[placeholder="Ex: Gestão de Prioridades"]').type(nome, { force: true });
     cy.get('[role="dialog"]').contains("button", "Criar Trilha").should("not.be.disabled").click({ force: true });
+    // Captura o resultado real do INSERT (ou revela que ele nem disparou).
+    cy.wait("@trilhaInsert", { timeout: 20000 }).then((i) => {
+      const status = i.response && i.response.statusCode;
+      const body = JSON.stringify(i.response && i.response.body);
+      expect(status, `[TRILHA-INSERT] body=${body}`).to.be.within(200, 299);
+    });
     cy.contains("Trilha criada!", { timeout: 20000 }).should("exist");
   });
 });

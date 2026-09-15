@@ -389,6 +389,20 @@ async function semearRoboParceiro(admin: any, senha: string) {
   // A carteira precisa ter ao menos a Empresa Staging como cliente originado.
   await admin.from("tenants").update({ parceiro_id: parc.id, originado_em: new Date().toISOString() })
     .eq("id", TENANT_ID).is("parceiro_id", null);
+  // Registra o ACEITE do Contrato de Parceria (versão vigente) para o parceiro-robô.
+  // Sem aceite, parceiro_contrato_situacao().pendente=true e o Portal TRAVA o link
+  // de indicação (portal-link-principal não é renderizado) — o que quebrava o
+  // PGP-031. Idempotente pela UNIQUE(parceiro_id, versao). NÃO-FATAL: se o
+  // ambiente não tiver versão vigente do contrato, apenas segue.
+  const { data: versaoVigente } = await admin
+    .from("parceiro_contratos_versoes").select("versao, hash_texto").eq("vigente", true).maybeSingle();
+  if (versaoVigente) {
+    const { error: acErr } = await admin.from("parceiro_contratos_aceites").upsert({
+      parceiro_id: parc.id, versao: versaoVigente.versao, user_id: uid,
+      hash_texto: versaoVigente.hash_texto,
+    }, { onConflict: "parceiro_id,versao" });
+    if (acErr) console.error("parceiro_contratos_aceites (aceite robô):", acErr.message);
+  }
 }
 
 serve(async (req) => {

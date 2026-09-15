@@ -8,6 +8,7 @@ do zero. As travas de marca e LGPD já estão embutidas em cada prompt.
 | `apresentacao-institucional.md` | **PROMPT-MÃE** — gera uma apresentação (deck) slide a slide. Preencha as variáveis do topo (público, setor, objetivo, tamanho, telas) e cole numa IA. |
 | `deck-parceiros-consultores.md` | Texto-fonte do deck de parceiros/consultores (13 slides) já gerado pelo prompt-mãe. Versão editável do conteúdo do `.pptx`. |
 | `gerar-deck-parceiros.js` | Gerador do arquivo `YourEyes-Parceiros.pptx` (pptxgenjs) a partir do texto acima, no padrão visual da marca. |
+| `roteiro-video-parceiros.md` | Roteiros de narração (institucional ~2min40 · 16:9 e teaser ~35s · 9:16) para virar o deck em vídeo MP4 no PowerPoint/Canva. |
 
 ## Regerar o `.pptx` de parceiros
 

@@ -63,6 +63,16 @@ serve(async (req) => {
     const isPdf = lower.endsWith(".pdf");
     const isDocx = lower.endsWith(".docx") || lower.endsWith(".doc");
 
+    // Registrado ANTES de processar, de propósito. Quando o worker morre por
+    // estouro de recursos (status 546) ele não chega a logar mais nada — sem
+    // esta linha ficamos sem saber sequer o tamanho do arquivo que derrubou,
+    // que é exatamente a informação que faltou para diagnosticar o primeiro
+    // caso relatado.
+    console.log(
+      `Extração iniciada: ${fileName} — ${(pdfBytes.length / 1024 / 1024).toFixed(1)}MB ` +
+      `(${pdfBytes.length} bytes)`
+    );
+
     if (isPdf) {
       extractedText = await extractPdfText(pdfBytes);
     } else if (isDocx) {

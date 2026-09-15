@@ -114,7 +114,13 @@ export function TrilhaForm({ open, onOpenChange, trilha, onSuccess, onManageModu
       }
       onOpenChange(false);
       onSuccess?.();
-    } catch {}
+    } catch (e) {
+      // Sem este registro, uma falha ao salvar sumia sem rastro: o toast de
+      // erro até aparece (vem do onError da mutation em useTrilhas), mas nada
+      // ficava no console/telemetria e os testes de tela não enxergavam a
+      // falha. O diálogo segue aberto de propósito, preservando o formulário.
+      console.error("TrilhaForm.handleSubmit falhou ao salvar a trilha:", e);
+    }
   };
 
   return (

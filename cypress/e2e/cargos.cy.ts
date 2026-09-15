@@ -46,8 +46,11 @@ describe("Módulo Cargos", () => {
 
   // CARGO-TELA-06
   it("a busca filtra a lista de cargos", () => {
+    // force:true: o registro de humor ("Como você está hoje?") pode abrir e
+    // deixa o body com data-scroll-locked / pointer-events:none (scroll-lock do
+    // Radix); sem o force o Cypress recusa o type no campo de busca.
     cy.get('input[placeholder*="Buscar cargos"]', { timeout: 20000 })
-      .should("exist").type("Analista");
+      .should("exist").type("Analista", { force: true });
   });
 
   // CARGO-TELA-03
@@ -75,7 +78,10 @@ describe("Módulo Cargos", () => {
 
   // CARGO-TELA-07
   it("mostra o estado vazio ao buscar um cargo inexistente", () => {
-    cy.get('input[placeholder*="Buscar cargos"]', { timeout: 20000 }).type("zzz-cargo-inexistente-999");
+    // force:true pelo mesmo motivo do CARGO-TELA-06 (scroll-lock do Radix
+    // quando o registro de humor está aberto).
+    cy.get('input[placeholder*="Buscar cargos"]', { timeout: 20000 })
+      .type("zzz-cargo-inexistente-999", { force: true });
     cy.contains("Nenhuma cargo encontrada", { timeout: 20000 }).should("be.visible");
   });
 });

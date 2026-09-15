@@ -470,24 +470,41 @@ script só na produção e esquecer dela.
   repositório. Rodando os mesmos na produção e na homologação, a diferença entre
   os dois resultados é exatamente o quanto elas se afastaram.
 
-### Casos de tela ainda vermelhos na homologação (a investigar — 09/2026)
+### Casos de tela da homologação — fechados (09/2026)
 
 Ao trazer o MarketYE e as fixtures profundas (Metas, Plano de Ação, GHE) para a
-homologação, os casos verdes no teste passaram a rodar lá também. Sobraram dois
-que falham **só na homologação** — e **não** são falta de esquema (isso já foi
-resolvido). Ficam registrados aqui até serem investigados:
+homologação, os casos verdes no teste passaram a rodar lá também. Restaram alguns
+vermelhos **só na homologação**; todos investigados e fechados. Resultado final:
+a bateria `cypress-homologacao` **#45** (commit `c41a2db`, PR #519) fechou
+**37/37 specs verdes**. O que cada um era:
 
-- **`PGP-031` (portal-parceiro — "copiar o link de indicação"):** o elemento
-  `portal-link-principal` vem **vazio**. A tela mostra o parceiro com **contrato
-  ainda pendente** de assinatura; o link `?ref=CODIGO` parece só ser populado com
-  contrato ativo / código de indicação setado. Hipótese: **estado/dado do
-  parceiro** (fixture), não bug de produto — a confirmar.
-- **`TRILHA-010` (trilhas — "cria uma trilha na Gestão"):** o diálogo "Nova
-  Trilha" **fica aberto, sem erro e sem sucesso** (`dialogs=1, spinner=0,
-  erros=(nenhum)`); "Trilha criada!" nunca aparece. O caminho de criação é antigo
-  e está presente na homologação (não é esquema). Tem cara de **runtime/dado** — a
-  criação não completa. **Se a investigação apontar bug de produto, mostrar ao
-  dono e só corrigir com autorização.**
+- **`PGP-031` (portal-parceiro — "copiar o link de indicação") — era DADO, não
+  bug.** O `portal-link-principal` vinha vazio porque o parceiro-robô estava com
+  **contrato de parceria pendente** (`parceiro_contrato_situacao().pendente=true`),
+  e a tela só popula o link com contrato aceito. Corrigido no **seed** (andaime):
+  `seed-e2e-user > semearRoboParceiro` passou a registrar o **aceite** da versão
+  vigente do contrato (`parceiro_contratos_aceites`, idempotente por
+  `UNIQUE(parceiro_id, versao)`). Hoje **3/3**.
+- **`TRILHA-010` (trilhas — "cria uma trilha na Gestão") — era INSTABILIDADE, não
+  bug.** O `[DIAG] [FALHA]` era só a **1ª tentativa**; o Cypress repetiu e a
+  criação passou. Um diagnóstico temporário (`cy.intercept` no POST de
+  `/rest/v1/trilhas`) confirmou que o **INSERT responde 2xx** na homologação — a
+  trilha grava normalmente. O diagnóstico foi removido depois. Hoje **4/4**.
+  - Achado colateral (código de produto, corrigido **com autorização do dono**):
+    `TrilhaForm.handleSubmit` engolia a exceção num `catch {}` vazio. O usuário até
+    via o toast de erro (vem do `onError` da mutation em `useTrilhas`), mas a falha
+    não deixava rastro no console/telemetria nem era vista pelos testes. Trocado por
+    `catch (e) { console.error(...) }`; comportamento preservado (diálogo segue
+    aberto na falha). **Não era a causa** da falha do TRILHA-010.
+- **`cargos.cy.ts` (CARGO-TELA-07 — "estado vazio ao buscar cargo inexistente") —
+  era TESTE, não bug.** O registro de humor **"Como você está hoje?"** (psicossocial)
+  abria durante o spec e travava o body (`data-scroll-locked` / `pointer-events:none`
+  do Radix); o `cy.type()` na busca era recusado (falha intermitente, 1 de 7). Com
+  um modal aberto o fundo fica inerte **de propósito** — comportamento correto do
+  produto. Corrigido no teste com `{force:true}` nos `type()` da busca (mesmo padrão
+  de `trilhas`/`mural`/`swot`/`incidentes`). **Risco latente global:** esse modal de
+  humor pode abrir em qualquer página após o login e travar outros specs; se voltar a
+  incomodar, vale um fechamento global do modal no login dos testes.
 
 Aprendizado geral: a homologação também fica atrás da **base de dados de
 referência**, não só do esquema recente. Ex.: as categorias-raiz do marketplace

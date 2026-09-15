@@ -125,6 +125,16 @@ async function extractTextViaEdgeFunction(file: File): Promise<{ texto: string; 
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
+    // 546 é o código do Supabase para "o processamento estourou os recursos e
+    // foi encerrado". Chegava cru na tela ("Erro 546 na extração do arquivo"),
+    // sem dizer nada a ninguém. Vira uma orientação do que fazer.
+    if (resp.status === 546) {
+      throw new Error(
+        "O documento é pesado demais para a leitura automática e o processamento foi interrompido. " +
+        "Tente enviar um PDF menor — por exemplo, só as páginas do inventário de riscos e do plano de ação — " +
+        "ou um arquivo gerado direto do editor, em vez de digitalizado."
+      );
+    }
     throw new Error(err.error || `Erro ${resp.status} na extração do arquivo`);
   }
 

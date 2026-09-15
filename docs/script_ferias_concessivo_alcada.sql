@@ -104,10 +104,9 @@ $fn$;
 
 GRANT EXECUTE ON FUNCTION public.ferias_concessivo_avalia(DATE, DATE) TO authenticated;
 
--- ── 5. Conferencia final ──────────────────────────────────────────────────
+-- ── 5. Conferencia final (so catalogo do banco — nao depende de rotinas QA) ─
 SELECT
     (SELECT count(*) FROM information_schema.columns
        WHERE table_name = 'ferias_programacao' AND column_name = 'autorizado_excecao')  AS coluna_autoriza,
     (SELECT count(*) FROM pg_constraint WHERE conname = 'ferias_prog_concessivo')        AS trava_concessivo,
-    (to_regproc('public.ferias_concessivo_avalia') IS NOT NULL)                          AS helper_dobra,
-    (SELECT situacao FROM public.qa_caso_ferias_020())                                    AS qa_020;
+    (to_regproc('public.ferias_concessivo_avalia') IS NOT NULL)                          AS helper_dobra;

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Radar, AlertTriangle, Activity, HeartPulse, Bell, TrendingUp,
@@ -7,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { RadarClientes } from '@/components/admin/controle-clientes/RadarClientes';
+import { useClientesRadar } from '@/components/admin/controle-clientes/useClientesRadar';
 
 // Central de Controle de Clientes — monitoramento em tempo real dos clientes
 // em produção (documento de requisitos v1.0). Dois eixos:
@@ -21,7 +24,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 type Kpi = { label: string; ajuda: string; icon: typeof Radar };
 
 const KPIS: Kpi[] = [
-  { label: 'Clientes ativos agora', ajuda: 'Empresas com atividade nos últimos minutos', icon: Users },
   { label: 'Erros nas últimas 24h', ajuda: 'Ocorrências capturadas em produção', icon: AlertTriangle },
   { label: 'Alertas críticos abertos', ajuda: 'Ainda sem reconhecimento da equipe', icon: Bell },
   { label: 'Tempo médio de solução', ajuda: 'Da detecção até o alerta ser resolvido', icon: Timer },
@@ -51,6 +53,11 @@ function EmConstrucao({ titulo, itens }: { titulo: string; itens: string[] }) {
 
 export default function ControleClientesDashboard() {
   const navigate = useNavigate();
+  const [radarAberto, setRadarAberto] = useState(false);
+  // A contagem de clientes ativos já é dado real (contrato ativo), então o
+  // cartão mostra o número de verdade. "Ativos AGORA" (atividade no minuto)
+  // depende da captura de eventos e entra junto com ela.
+  const { data: clientes } = useClientesRadar(true);
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6">
@@ -85,6 +92,28 @@ export default function ControleClientesDashboard() {
 
         {/* KPIs ao vivo */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+          {/* Clientes ativos: o único com número real hoje, e a porta do radar. */}
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setRadarAberto(true)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setRadarAberto(true); } }}
+            className="cursor-pointer transition-colors hover:border-primary/50 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4 text-primary" />
+                </div>
+                <p className="text-xl font-bold leading-none">{clientes ? clientes.length : '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium">Clientes ativos</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Clique para ver o radar</p>
+              </div>
+            </CardContent>
+          </Card>
+
           {KPIS.map((k) => (
             <Card key={k.label}>
               <CardContent className="p-4 space-y-2">
@@ -145,6 +174,8 @@ export default function ControleClientesDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <RadarClientes aberto={radarAberto} aoFechar={() => setRadarAberto(false)} />
     </div>
   );
 }

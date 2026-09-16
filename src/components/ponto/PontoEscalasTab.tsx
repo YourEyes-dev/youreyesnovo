@@ -21,6 +21,13 @@ import { toast } from "sonner";
 import { confirm } from "@/components/ui/confirm-dialog";
 import { CadastroInteligenteEscala } from "./CadastroInteligenteEscala";
 import { formatarHoraMinuto } from "@/lib/ponto/formatoHoras";
+import {
+  DIAS_KEYS_CARGA as DIAS_KEYS,
+  calcularJornadasFixa,
+  intervaloDia,
+  minutosDia,
+  type DiaConfigCarga,
+} from "@/lib/ponto/cargaEscala";
 
 export function PontoEscalasTab() {
   const { escalas, loadingEscalas, atribuicoes: atribuicoesRaw, criarEscala, criandoEscala, atualizarEscala, atualizandoEscala, excluirEscala, atribuirEscala } = usePontoEscalas();
@@ -36,16 +43,11 @@ export function PontoEscalasTab() {
   const [editando, setEditando] = useState<PontoEscala | null>(null);
   const [showInteligente, setShowInteligente] = useState(false);
   const [showAtribuir, setShowAtribuir] = useState(false);
-  const DIAS_KEYS = ["segunda","terca","quarta","quinta","sexta","sabado","domingo"] as const;
   const DIAS_LBL: Record<string,string> = { segunda:"Segunda", terca:"Terça", quarta:"Quarta", quinta:"Quinta", sexta:"Sexta", sabado:"Sábado", domingo:"Domingo" };
-  type DiaConfig = {
-    trabalha: boolean;
-    tem_almoco: boolean;
-    entrada: string;        // 1ª marcação (início do expediente)
-    inicio_almoco: string;  // 2ª marcação (saída p/ almoço)
-    fim_almoco: string;     // 3ª marcação (retorno do almoço)
-    saida: string;          // 4ª marcação (fim do expediente)
-  };
+  // As 4 marcações do dia (entrada, saída p/ almoço, retorno, saída) e a conta
+  // de carga que nasce delas moram em @/lib/ponto/cargaEscala — fora do
+  // componente para poderem ser testadas.
+  type DiaConfig = DiaConfigCarga;
   type Compensacao = {
     ordinal_mes: string;   // "1","2","3","4","ultimo"
     dia_semana: string;
@@ -114,19 +116,6 @@ export function PontoEscalasTab() {
     });
     return out;
   };
-  const minutosDia = (c: DiaConfig): number => {
-    if (!c.trabalha) return 0;
-    const toMin = (s: string) => { const [h,m]=s.split(":").map(Number); return h*60+m; };
-    if (c.tem_almoco) {
-      return Math.max(0, (toMin(c.inicio_almoco) - toMin(c.entrada)) + (toMin(c.saida) - toMin(c.fim_almoco)));
-    }
-    return Math.max(0, toMin(c.saida) - toMin(c.entrada));
-  };
-  const intervaloDia = (c: DiaConfig): number => {
-    if (!c.trabalha || !c.tem_almoco) return 0;
-    const toMin = (s: string) => { const [h,m]=s.split(":").map(Number); return h*60+m; };
-    return Math.max(0, toMin(c.fim_almoco) - toMin(c.inicio_almoco));
-  };
   const [escalaForm, setEscalaForm] = useState<any>({
     nome: "",
     tipo: "5x2",
@@ -155,16 +144,6 @@ export function PontoEscalasTab() {
     comportamento_feriado: "folga" as "folga" | "trabalha",
   });
 
-  // Cálculo automático de jornadas a partir da configuração
-  const calcularJornadasFixa = (dc: Record<string, DiaConfig>) => {
-    let semanal = 0;
-    let diasTrab = 0;
-    DIAS_KEYS.forEach(d => {
-      const min = minutosDia(dc[d]);
-      if (min > 0) { semanal += min; diasTrab++; }
-    });
-    return { semanal, diaria: diasTrab > 0 ? Math.round(semanal/diasTrab) : 0, diasTrab };
-  };
   // Média semanal de horas extras vindas das compensações mensais (≈ 4.345 semanas/mês)
   const calcularCompensacaoSemanal = (lista: Compensacao[]) => {
     if (!lista?.length) return 0;
@@ -203,6 +182,36 @@ export function PontoEscalasTab() {
     enabled: escalas.length > 0,
   });
 
+  // Intervalo declarado por pré-assinalação, por escala. É a mesma fonte que o
+  // motor de apuração consulta (ponto_pre_assinalacao_do_dia): sem isto, a tela
+  // soma a janela crua e acusa 49h/semana onde a folha calcula 44h.
+  const { data: intervaloDeclaradoPorEscala = {} } = useQuery({
+    queryKey: ["ponto-pre-assinalacao-por-escala", escalas.map(e => e.id).join(",")],
+    queryFn: async (): Promise<Record<string, number>> => {
+      const hoje = new Date().toISOString().slice(0, 10);
+      const { data, error } = await (supabase as any)
+        .from("ponto_pre_assinalacao")
+        .select("escala_id, intervalo_minutos, data_inicio, data_fim, ativa")
+        .not("escala_id", "is", null)
+        .lte("data_inicio", hoje)
+        .order("data_inicio", { ascending: false });
+      if (error || !data) return {};
+      const mapa: Record<string, number> = {};
+      for (const d of data as any[]) {
+        if (d.ativa === false) continue;
+        if (d.data_fim && String(d.data_fim) < hoje) continue;
+        // A lista vem da vigência mais recente para a mais antiga: a primeira
+        // de cada escala é a que vale hoje.
+        if (mapa[d.escala_id] === undefined) mapa[d.escala_id] = Number(d.intervalo_minutos) || 0;
+      }
+      return mapa;
+    },
+    enabled: escalas.length > 0,
+  });
+
+  /** Minutos declarados para a escala em edição (0 quando não há declaração). */
+  const intervaloDeclarado = editando ? (intervaloDeclaradoPorEscala[editando.id] ?? 0) : 0;
+
   const selo_formalizacao = (escalaId: string) => {
     const st = statusFormalizacao[escalaId];
     if (st === "pendente") {
@@ -239,7 +248,7 @@ export function PontoEscalasTab() {
     if (!escalaForm.nome) { toast.error("Nome obrigatório"); return; }
     let payload: any = { ...escalaForm };
     if (escalaForm.modalidade !== "movel") {
-      const { diaria, semanal } = calcularJornadasFixa(escalaForm.dias_config);
+      const { diaria, semanal } = calcularJornadasFixa(escalaForm.dias_config, intervaloDeclarado);
       const compMin = calcularCompensacaoSemanal(escalaForm.compensacoes_mensais || []);
       payload.jornada_diaria_minutos = diaria;
       payload.jornada_semanal_minutos = semanal + compMin;
@@ -730,8 +739,8 @@ export function PontoEscalasTab() {
                     setEscalaForm({ ...escalaForm, dias_config: nova });
                     toast.success(`Horário de ${DIAS_LBL[d]} replicado nos demais dias trabalhados.`);
                   };
-                  const min = minutosDia(c);
-                  const intMin = intervaloDia(c);
+                  const min = minutosDia(c, intervaloDeclarado);
+                  const intMin = intervaloDia(c, intervaloDeclarado);
                   return (
                     <div key={d} className="grid grid-cols-[80px_50px_55px_1fr_1fr_1fr_1fr_70px_36px] gap-1.5 items-center">
                       <span className="text-sm font-medium">{DIAS_LBL[d]}</span>
@@ -743,7 +752,16 @@ export function PontoEscalasTab() {
                       <Input type="time" disabled={!c.trabalha} value={c.saida} onChange={e => upd({ saida: e.target.value })} className="h-8 text-xs px-1.5" />
                       <span className="text-right text-xs font-mono text-muted-foreground">
                         {c.trabalha ? `${Math.floor(min/60)}h${min%60?String(min%60).padStart(2,"0"):""}` : "—"}
-                        {c.trabalha && c.tem_almoco && <span className="block text-[9px] opacity-70">int {intMin}min</span>}
+                        {c.trabalha && intMin > 0 && (
+                          <span
+                            className="block text-[9px] opacity-70"
+                            title={c.tem_almoco
+                              ? "Intervalo batido: o colaborador registra a saída e o retorno do almoço."
+                              : "Intervalo pré-assinalado: declarado na escala, não é batido. Não integra a jornada (CLT art. 71, §2º)."}
+                          >
+                            int {intMin}min{!c.tem_almoco ? " (P)" : ""}
+                          </span>
+                        )}
                       </span>
                       <Button type="button" size="icon" variant="ghost" className="h-7 w-7" disabled={!c.trabalha} title="Replicar este horário para os demais dias trabalhados" onClick={replicarParaTrab}>
                         <Copy className="w-3.5 h-3.5" />
@@ -754,7 +772,7 @@ export function PontoEscalasTab() {
 
                 {/* Contador de carga semanal */}
                 {(() => {
-                  const j = calcularJornadasFixa(escalaForm.dias_config);
+                  const j = calcularJornadasFixa(escalaForm.dias_config, intervaloDeclarado);
                   const compMin = calcularCompensacaoSemanal(escalaForm.compensacoes_mensais || []);
                   const total = j.semanal + compMin;
                   const fmt = (m: number) => `${Math.floor(m/60)}h${m%60?` ${String(m%60).padStart(2,"0")}min`:""}`;
@@ -784,6 +802,11 @@ export function PontoEscalasTab() {
                         <div className="text-[11px] text-muted-foreground text-right">
                           {compMin > 0 ? <>Base {fmt(j.semanal)} + Comp {fmt(compMin)}/sem</> : <>Sem compensações</>}
                           <div>Meta CLT: 44h/sem • 220h/mês</div>
+                          {intervaloDeclarado > 0 && (
+                            <div className="text-emerald-700 dark:text-emerald-400">
+                              Já descontado o intervalo pré-assinalado de {intervaloDeclarado}min/dia
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -816,7 +839,7 @@ export function PontoEscalasTab() {
                       // RN09: só permite ativar quando há déficit real a equalizar.
                       // Se a carga real da escala já cobre (ou excede) a contratada,
                       // ligar geraria débito indevido / crédito duplicado — bloqueia.
-                      const real = calcularJornadasFixa(escalaForm.dias_config).semanal;
+                      const real = calcularJornadasFixa(escalaForm.dias_config, intervaloDeclarado).semanal;
                       const contratada = Number(escalaForm.carga_semanal_contratada_min) || 2640;
                       if (v && real >= contratada) {
                         toast.error(
@@ -834,7 +857,7 @@ export function PontoEscalasTab() {
                   sábado trabalhado como o dia de compensação.
                 </p>
                 {escalaForm.equalizacao_mensal_ativa && (() => {
-                  const real = calcularJornadasFixa(escalaForm.dias_config).semanal;
+                  const real = calcularJornadasFixa(escalaForm.dias_config, intervaloDeclarado).semanal;
                   const contratada = Number(escalaForm.carga_semanal_contratada_min) || 2640;
                   const deficit = Math.max(0, contratada - real);
                   const fmt = (m: number) => `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`;

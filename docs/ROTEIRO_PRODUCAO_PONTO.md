@@ -1726,6 +1726,52 @@ Conferência esperada: `t | t | t | t | OK`. Depois dele o Ponto fica em **119 d
 
 ---
 
+## Pacote 56 — apuração em duas peças: núcleo + invólucro (PONTO-300/301)
+
+`docs/script_ponto_apuracao_nucleo_e_involucro.sql` — entra depois do 55.
+
+Encerra a divergência que mais custou caro nesta esteira. O projeto dividiu o
+motor de apuração em duas peças há meses; a produção ficou com a peça única. Isso
+já derrubou dois pacotes no ensaio: o **#7** teria falhado em voz alta
+(`function ... does not exist`) e o **#26** teria falhado **em silêncio** — ele
+procura um trecho para alterar, não acha, e segue sem mudar nada; na prática o
+plantonista de 12x36 continuaria acumulando falta no dia de folga. Enquanto os
+dois ambientes divergirem, todo pacote futuro que tocar a apuração corre o mesmo
+risco.
+
+**O núcleo é o mesmo motor que já roda na produção.** Comparado linha a linha com
+o monolito remendado pelos pacotes #7 e #26, as únicas **11 linhas diferentes são
+comentários** — nenhuma linha de código executável muda.
+
+**O invólucro é fino e explícito:** dia que sai uma vez só passa intocado
+(`linhas = 1 → saldo_unico`), sem nem arredondamento; dia duplicado vira uma
+linha, com a mesma tolerância de 10 minutos da apuração.
+
+A assinatura pública não muda — mesmos parâmetros, mesma tabela de retorno. Os
+seis chamadores de banco e as telas continuam chamando a mesma função do mesmo
+jeito. O núcleo entra antes do invólucro de propósito: o invólucro é `LANGUAGE
+sql` e o banco valida o corpo na criação, então recusaria se o núcleo faltasse.
+
+### Como foi conferido
+
+Montou-se a homologação fiel numa réplica — o monolito da produção mais os
+pacotes #7 e #26 — e ela reproduziu o retrato de lá exatamente (119 passou, 1
+falhou, 1 erro, 7 sem rotina). Então:
+
+1. **Os números da apuração não mudaram.** Fotografou-se a saída da função
+   pública para **toda** combinação (tenant, CPF, competência) do banco — 602
+   linhas — antes e depois da troca: **mesma impressão digital**.
+2. **A bateria melhorou sem regredir:** 119 → **120 passou**, 0 erro. O PONTO-301
+   passou (*"Sem duplicata, a saída pública é idêntica à bruta"*) e o PONTO-300
+   (uma linha por dia civil) continuou de pé.
+3. Segunda passada sem divergência, e as duas funções ficam com a mesma soma de
+   verificação do projeto.
+
+Conferência esperada: `t | t | t | t | t | t | OK`. Depois dele o Ponto fica em
+**120 de 128** — sobrando apenas o PONTO-113 (regime rural), evolução de produto.
+
+---
+
 ## Depois desta fila: a bancada de QA
 
 Esta fila leva **o comportamento corrigido** para a produção — mas não leva **a

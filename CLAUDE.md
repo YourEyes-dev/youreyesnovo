@@ -176,7 +176,12 @@ contrário. Consequências práticas:
 ## Como fechar uma entrega (obrigatório)
 
 Ao terminar qualquer implementação, encerre a resposta com:
-1. o link do site de teste — https://ustudy123.github.io/youreyesnovo/teste/ ;
+1. o link do ambiente onde a mudança foi de fato validada — o site de teste
+   (https://ustudy123.github.io/youreyesnovo/teste/) quando o ciclo passou pelo
+   staging, ou o da homologação
+   (https://ustudy123.github.io/youreyesnovo/homologacao/) quando a validação foi
+   lá. Não repita o link de teste no automático: mandar o usuário conferir num
+   ambiente onde a mudança não foi aplicada não prova nada;
 2. o que exatamente o usuário deve abrir/clicar lá para conferir (tela, caminho
    no menu, o que deve aparecer) e, se for banco, a conferência SQL para o
    SQL Editor do projeto de TESTE;

@@ -42,16 +42,38 @@ export function useQaDocs(moduloId?: string | null) {
     },
   });
 
-  /** Contagem de casos por módulo, para exibir na árvore. */
+  /**
+   * Contagem de casos por módulo, para exibir na árvore.
+   *
+   * A leitura é PAGINADA de propósito. A API corta a resposta em 1.000 linhas
+   * por padrão, e a documentação já passou disso — o efeito era silencioso e
+   * enganoso: os módulos cujas linhas caíam fora da primeira página ficavam
+   * com contagem zero e PERDIAM o número na árvore (o caso que apareceu em
+   * Férias e em Usuários & Permissões). Zero por truncamento parece "módulo
+   * sem casos", que é justamente a leitura errada. Buscar até a página vir
+   * incompleta mantém a contagem certa por mais que a documentação cresça.
+   */
   const { data: contagem = {} } = useQuery({
     queryKey: ["qa_casos_contagem"],
     queryFn: async () => {
-      const { data, error } = await fromTable("qa_casos_teste").select("modulo_id");
-      if (error) throw error;
+      const PAGINA = 1000;
       const mapa: Record<string, number> = {};
-      (data || []).forEach((r: { modulo_id: string }) => {
-        mapa[r.modulo_id] = (mapa[r.modulo_id] || 0) + 1;
-      });
+
+      for (let inicio = 0; ; inicio += PAGINA) {
+        const { data, error } = await fromTable("qa_casos_teste")
+          .select("modulo_id")
+          .order("id", { ascending: true })
+          .range(inicio, inicio + PAGINA - 1);
+        if (error) throw error;
+
+        const linhas = (data || []) as { modulo_id: string }[];
+        linhas.forEach((r) => {
+          mapa[r.modulo_id] = (mapa[r.modulo_id] || 0) + 1;
+        });
+
+        if (linhas.length < PAGINA) break;
+      }
+
       return mapa;
     },
   });

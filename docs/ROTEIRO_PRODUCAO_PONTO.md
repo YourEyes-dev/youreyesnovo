@@ -125,6 +125,14 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
 | 52 | Onda 11 (parte 3) — ausência do art. 473 sem documento fica pendente (não abona por fé) | `docs/script_ponto_onda11_comprovacao_art473.sql` | — | ⏳ | ⬜ |
 | 53 | Vigilâncias do ponto — rotina diária que faz as monitorias rodarem | `docs/script_ponto_vigilancias_diarias.sql` | **#23 #38 #39 #44 #46 #47 #48** | ⏳ | ⬜ |
 | 54 | Comprovantes — extração restrita ao dono do CPF (correção de segurança) | `docs/script_ponto_comprovantes_extrair_dono.sql` | **#32** | ⏳ | ⬜ |
+| 57 | Jornada prevista desconta o intervalo pré-assinalado | `docs/script_ponto_jornada_desconta_pre_assinalacao.sql` | **#18** | ⏳ | ⬜ |
+| 58 | Regrava a jornada gravada nas escalas com intervalo declarado | `docs/script_ponto_escalas_regrava_jornada_declarada.sql` | **#18** | ⏳ | ⬜ |
+| 57/58-tela | Tela de escalas e cartão-ponto enxergam a declaração | **Publicar no Lovable** (não é script) | — | ✅ | ⬜ |
+
+> Os pacotes **53 a 56** nasceram depois desta tabela, durante o ensaio na
+> homologação, e estão descritos nas seções do fim deste roteiro — os números 53
+> e 54 das duas linhas acima são de outra contagem, anterior. Vale a numeração
+> das seções.
 
 > Quando eu validar cada onda com você no teste e você aprovar, marque a coluna
 > **Teste** como ✅. A coluna **Produção** só vira ✅ depois que você colar o
@@ -1769,6 +1777,101 @@ falhou, 1 erro, 7 sem rotina). Então:
 
 Conferência esperada: `t | t | t | t | t | t | OK`. Depois dele o Ponto fica em
 **120 de 128** — sobrando apenas o PONTO-113 (regime rural), evolução de produto.
+
+---
+
+## Pacote 57 — a jornada prevista desconta o intervalo pré-assinalado
+
+`docs/script_ponto_jornada_desconta_pre_assinalacao.sql` — **depende do pacote
+18** (Onda 4 parte 3, que instala a pré-assinalação) e do pacote da Onda 1
+(`ponto_escala_com_versao`).
+
+Achado no cartão-ponto de agosto/2026 de um cliente real. A escala tem o
+intervalo **declarado** por pré-assinalação — existe, mas não é batido. O cartão
+saía assim, quase todo dia:
+
+```
+Marcações 08:00 18:00 | H.D. 9:00 | H.N. 10:00 | H.A. 1:00
+Ocorrência: "Atraso / saída antecipada"
+```
+
+O trabalhado estava certo; a jornada **prevista** vinha com a janela crua, sem
+descontar o intervalo. A diferença virava uma hora de ausência por dia, e um dia
+integralmente cumprido era rotulado como atraso. No mês: **16:50 de ausência que
+nunca existiu**.
+
+A causa: `ponto_jornada_do_dia` só descontava o intervalo quando o próprio dia da
+escala trazia o trio `tem_almoco` + `inicio_almoco` + `fim_almoco`. A tabela de
+pré-assinalação nasceu marcada como "metadado de exibição; o motor de saldo não
+lê" — o cartão imprimia o "(P)" e a apuração ignorava a declaração. E foi por
+isso que as sextas saíam certas e o resto da semana não: naquele dia a escala
+tinha a janela de almoço preenchida.
+
+A jornada passa a descontar por precedência: janela de almoço do dia, minutos de
+intervalo do dia, pré-assinalação vigente. **Não** há um quarto passo caindo para
+`ponto_escalas.intervalo_intrajornada_minutos`: a tela cria toda escala com esse
+campo em 60 por padrão, então uma escala cuja janela já exclui o almoço
+(08:00–16:00) passaria a perder mais uma hora.
+
+**Este arquivo se recusa a aplicar sem os pré-requisitos.** O PostgreSQL não
+valida o corpo de uma função plpgsql na criação: sem a guarda, ele instalaria com
+sucesso uma função que quebraria na primeira apuração, derrubando o ponto de
+todos os clientes. Provado em réplica: onde a rotina de pré-assinalação não
+existe, a função **antiga fica intacta** e a conferência sai
+`f | t | f | PRE-REQUISITO FALTANDO`.
+
+Não altera dado nenhum: troca uma função de leitura. O relatório lê a apuração ao
+vivo, então não é preciso reprocessar competência — basta gerar o cartão de novo.
+
+Provado em réplica com a escala do relatório (seg–qui 08:00–18:00, sexta
+08:00–17:00, 60 min declarados): **antes** 600/540 minutos, **depois** 540/480 —
+as 44h da semana. Não-regressão: escala 08:00–16:00 sem declaração continua em
+480, não perde hora nenhuma.
+
+Conferência esperada: `t | t | t | OK`.
+
+---
+
+## Pacote 58 — regrava a jornada gravada nas escalas com intervalo declarado
+
+`docs/script_ponto_escalas_regrava_jornada_declarada.sql` — **depende do pacote
+18**. Independe do 57, mas faz sentido logo depois dele.
+
+Companheiro do 57. Aquele corrige o **motor**; este corrige o **número gravado**
+na escala. O motor não usa esse número quando há configuração por dia, mas ele
+vaza para dois lugares que importam:
+
+1. **O AEJ** (Arquivo Eletrônico de Jornada, Portaria MTP 671/2021): o registro
+   Tipo 4 "Horários contratuais" carrega a carga diária. Declarar 9h48 onde o
+   contrato é 9h é erro de conformidade, não detalhe de tela.
+2. A base da **cobertura por atestado** e do **teto diário (RN17)**, quando os
+   blocos previstos do dia não estão disponíveis.
+
+Só é tocada a escala que (a) tem configuração por dia, (b) tem declaração
+**vigente hoje** e (c) cujo número gravado difere da conta correta. Escala sem
+declaração **não** é tocada: ali a janela crua é mesmo a jornada, e mexer seria
+inventar um intervalo que ninguém declarou.
+
+**O gatilho de versão é suspenso durante a regravação.** `ponto_escalas` tem um
+gatilho que arquiva os parâmetros antigos quando a jornada muda, com vigência até
+ontem — e a apuração de datas passadas passa a ler esse arquivo. Isso existe para
+edição de verdade. Aqui **não houve mudança de contrato**: o contrato sempre foi
+9h, o sistema é que guardava a conta errada. Arquivar "9h48 vigorou até ontem"
+afirmaria sobre o passado uma coisa que nunca foi verdade, num arquivo que
+alimenta a apuração. O gatilho é religado no mesmo bloco; se algo falhar, a
+transação inteira volta atrás e o gatilho volta junto.
+
+Guarda as linhas antes em `backup_ponto_escalas_20260916` (cópia integral — a
+tabela é pequena), e o comando que desfaz está no rodapé do próprio arquivo.
+
+Provado em réplica, com três escalas lado a lado: a que tem declaração e almoço
+não batido foi de **588/2940 para 528/2640**; a **sem declaração** ficou intacta
+em 600/3000; a **com almoço batido** ficou intacta em 480/2400 (a declaração não
+desconta em dobro). Nenhuma linha de versão foi criada. Segunda execução não
+mexe em nada, e o comando de desfazer devolveu os 588/2940 originais. Em ambiente
+sem a tabela de pré-assinalação o arquivo pula com aviso legível, sem erro.
+
+Conferência esperada: `t | t | t | 1 (ou mais) | OK`.
 
 ---
 

@@ -101,3 +101,69 @@ export function useResumoCentral() {
     },
   });
 }
+
+export type EventoDoIncidente = {
+  id: string;
+  empresa: string;
+  ambiente: string;
+  origem: string;
+  usuarioPseudo: string | null;
+  modulo: string | null;
+  rota: string | null;
+  acao: string | null;
+  mensagem: string;
+  stack: string | null;
+  breadcrumbs: string[];
+  versaoApp: string | null;
+  navegadorOs: string | null;
+  ocorridoEm: string;
+};
+
+export type DetalheIncidente = {
+  incidente: Record<string, unknown> | null;
+  clientes: { tenantId: string | null; nome: string; ocorrencias: number; ultimo: string }[];
+  eventos: EventoDoIncidente[];
+};
+
+/** Detalhe de um incidente: quem sentiu e os últimos eventos, já mascarados. */
+export function useDetalheIncidente(fingerprint: string | null) {
+  return useQuery({
+    queryKey: ['controle-clientes', 'incidente', fingerprint],
+    enabled: Boolean(fingerprint),
+    queryFn: async (): Promise<DetalheIncidente> => {
+      const { data, error } = await supabase.rpc('central_incidente_detalhe', {
+        p_fingerprint: fingerprint as string,
+        p_limite: 20,
+      });
+      if (error) throw error;
+      const d = (data as Record<string, unknown> | null) ?? {};
+      const clientes = (d.clientes as Array<Record<string, unknown>> | undefined) ?? [];
+      const eventos = (d.eventos as Array<Record<string, unknown>> | undefined) ?? [];
+      return {
+        incidente: (d.incidente as Record<string, unknown>) ?? null,
+        clientes: clientes.map((c) => ({
+          tenantId: (c.tenant_id as string) ?? null,
+          nome: String(c.nome ?? 'Sem empresa vinculada'),
+          ocorrencias: Number(c.ocorrencias ?? 0),
+          ultimo: String(c.ultimo ?? ''),
+        })),
+        eventos: eventos.map((e) => ({
+          id: String(e.id),
+          empresa: String(e.empresa ?? 'Sem empresa vinculada'),
+          ambiente: String(e.ambiente ?? ''),
+          origem: String(e.origem ?? ''),
+          usuarioPseudo: (e.usuario_pseudo as string) ?? null,
+          modulo: (e.modulo as string) ?? null,
+          rota: (e.rota as string) ?? null,
+          acao: (e.acao as string) ?? null,
+          mensagem: String(e.mensagem ?? ''),
+          stack: (e.stack as string) ?? null,
+          breadcrumbs: Array.isArray(e.breadcrumbs) ? (e.breadcrumbs as string[]) : [],
+          versaoApp: (e.versao_app as string) ?? null,
+          navegadorOs: (e.navegador_os as string) ?? null,
+          ocorridoEm: String(e.ocorrido_em ?? ''),
+        })),
+      };
+    },
+  });
+}

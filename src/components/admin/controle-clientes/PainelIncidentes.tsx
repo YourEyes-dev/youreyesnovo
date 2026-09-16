@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AlertTriangle, Loader2, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +8,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useIncidentes, type Incidente } from './useClientesRadar';
+import { DetalheIncidenteDialog } from './DetalheIncidenteDialog';
 
 // Fila de trabalho do eixo técnico: erros iguais já agrupados em um incidente,
 // do mais grave para o menos grave. Nada de dado pessoal aparece aqui — o
@@ -27,6 +29,7 @@ function quando(iso: string) {
 
 export function PainelIncidentes() {
   const { data: incidentes = [], isLoading, error } = useIncidentes();
+  const [aberto, setAberto] = useState<Incidente | null>(null);
 
   if (isLoading) {
     return (
@@ -72,7 +75,14 @@ export function PainelIncidentes() {
           </TableHeader>
           <TableBody>
             {incidentes.map((i) => (
-              <TableRow key={i.fingerprint}>
+              <TableRow
+                key={i.fingerprint}
+                onClick={() => setAberto(i)}
+                onKeyDown={(e) => { if (e.key === 'Enter') setAberto(i); }}
+                tabIndex={0}
+                className="cursor-pointer"
+                title="Abrir o detalhe deste erro"
+              >
                 <TableCell className="font-medium">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -93,6 +103,7 @@ export function PainelIncidentes() {
           </TableBody>
         </Table>
       </CardContent>
+      <DetalheIncidenteDialog incidente={aberto} aoFechar={() => setAberto(null)} />
     </Card>
   );
 }

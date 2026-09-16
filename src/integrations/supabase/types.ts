@@ -27576,6 +27576,10 @@ export type Database = {
           ultimo_visto: string
         }[]
       }
+      central_incidente_detalhe: {
+        Args: { p_fingerprint: string; p_limite?: number }
+        Returns: Json
+      }
       central_resumo: { Args: never; Returns: Json }
       central_situacao_clientes: {
         Args: never

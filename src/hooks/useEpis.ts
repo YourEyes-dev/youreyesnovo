@@ -37,7 +37,7 @@ export function useEpis() {
         .eq("tenant_id", tenantId)
         .order("nome");
       if (error) throw error;
-      return data as { id: string; nome: string; tenant_id: string }[];
+      return data as { id: string; nome: string; tenant_id: string; exige_ca: boolean }[];
     },
     enabled: !!tenantId,
   });
@@ -173,6 +173,36 @@ export function useEpis() {
     },
   });
 
+  // Marca (ou desmarca) a exigência de CA de uma categoria.
+  //
+  // Usa upsert porque a lista de categorias oferecida no cadastro é maior que
+  // a tabela: ela junta as categorias padrão do sistema com as que aparecem
+  // nos tipos já cadastrados. Marcar uma dessas pela primeira vez precisa
+  // criar a linha; da segunda vez em diante, atualizar a que existe.
+  const definirExigeCaMutation = useMutation({
+    mutationFn: async ({ nome, exige_ca }: { nome: string; exige_ca: boolean }) => {
+      if (!tenantId) throw new Error("Tenant não identificado");
+      const { data, error } = await supabase
+        .from("epi_categorias")
+        .upsert({ nome, tenant_id: tenantId, exige_ca }, { onConflict: "tenant_id,nome" })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["epi-categorias"] });
+      toast.success(
+        vars.exige_ca
+          ? `"${vars.nome}" passa a exigir CA no cadastro.`
+          : `"${vars.nome}" não exige mais CA no cadastro.`
+      );
+    },
+    onError: (error) => {
+      toast.error("Erro ao salvar a categoria: " + error.message);
+    },
+  });
+
   // ==================== MUTATIONS - TIPOS ====================
 
   const criarTipoMutation = useMutation({
@@ -206,7 +236,10 @@ export function useEpis() {
           .from("epis")
           .insert({
             tenant_id: tenantId,
+            empresa_id: empresaAtivaId || null,
             tipo_id: data.id,
+            ca: dadosTipo.ca_numero ?? null,
+            data_validade: dadosTipo.ca_validade ?? null,
             quantidade_estoque: totalQtd,
             quantidade_minima: dados.estoque_minimo ?? 5,
             status: "disponivel",
@@ -214,9 +247,10 @@ export function useEpis() {
           .select()
           .single();
 
-        if (epiError) {
-          console.error("Erro ao criar EPI inicial:", epiError);
-        } else {
+        // Mesmo motivo do caminho sem grade: erro engolido aqui virava EPI
+        // que não aparece na lista, com "criado com sucesso" na tela.
+        if (epiError) throw epiError;
+        {
           // Create stock per tamanho/local
           for (const g of grade_tamanhos) {
             if (g.quantidade > 0 && g.local_estoque_id) {
@@ -242,35 +276,56 @@ export function useEpis() {
           });
         }
       } else {
-        const quantidadeInicial = estoque_inicial ?? 100;
+        // O ITEM SEMPRE NASCE, mesmo com estoque zero.
+        //
+        // Antes: `estoque_inicial ?? 100` e depois `if (quantidadeInicial > 0)`.
+        // O formulário manda 0 quando a pessoa não digita quantidade, então o
+        // `if` não entrava, a linha em `epis` — que é a tabela que alimenta a
+        // LISTA — nunca era criada, e mesmo assim o onSuccess dizia "EPI criado
+        // com sucesso". Cadastrar sem quantidade fazia o EPI sumir, com a tela
+        // avisando o contrário. Estoque zero é um estado legítimo (item que
+        // ainda vai ser comprado), não motivo para não existir.
+        //
+        // O `?? 100` também sai: inventar cem unidades que ninguém comprou é
+        // pior que registrar zero.
+        const quantidadeInicial = estoque_inicial ?? 0;
+        const { data: novoEpi, error: epiError } = await supabase
+          .from("epis")
+          .insert({
+            tenant_id: tenantId,
+            // Sem isto o item nasce sem empresa e some da lista quando há uma
+            // empresa ativa selecionada (o filtro está em useEpis.ts:78).
+            empresa_id: empresaAtivaId || null,
+            tipo_id: data.id,
+            // O CA é gravado NOS DOIS lugares enquanto a duplicidade existir:
+            // o cadastro grava epi_tipos.ca_numero, mas dez telas leem epis.ca.
+            ca: dadosTipo.ca_numero ?? null,
+            data_validade: dadosTipo.ca_validade ?? null,
+            quantidade_estoque: quantidadeInicial,
+            quantidade_minima: dados.estoque_minimo ?? 5,
+            status: "disponivel",
+          })
+          .select()
+          .single();
+
+        // Deixa de engolir o erro: antes era console.error, e uma falha de
+        // gravação virava sumiço silencioso com mensagem de sucesso na tela.
+        if (epiError) throw epiError;
+
+        // Só a MOVIMENTAÇÃO depende de haver quantidade — registrar uma
+        // entrada de zero unidades seria histórico falso.
         if (quantidadeInicial > 0) {
-          const { data: novoEpi, error: epiError } = await supabase
-            .from("epis")
-            .insert({
-              tenant_id: tenantId,
-              tipo_id: data.id,
-              quantidade_estoque: quantidadeInicial,
-              quantidade_minima: dados.estoque_minimo ?? 5,
-              status: "disponivel",
-            })
-            .select()
-            .single();
-          
-          if (epiError) {
-            console.error("Erro ao criar EPI inicial:", epiError);
-          } else {
-            await supabase.from("epi_movimentacoes").insert({
-              tenant_id: tenantId,
-              epi_id: novoEpi.id,
-              tipo: "entrada",
-              quantidade: quantidadeInicial,
-              quantidade_anterior: 0,
-              quantidade_atual: quantidadeInicial,
-              motivo: "Cadastro inicial do tipo de EPI",
-              realizado_por: user?.id,
-              realizado_por_nome: profile?.nome_completo,
-            });
-          }
+          await supabase.from("epi_movimentacoes").insert({
+            tenant_id: tenantId,
+            epi_id: novoEpi.id,
+            tipo: "entrada",
+            quantidade: quantidadeInicial,
+            quantidade_anterior: 0,
+            quantidade_atual: quantidadeInicial,
+            motivo: "Cadastro inicial do tipo de EPI",
+            realizado_por: user?.id,
+            realizado_por_nome: profile?.nome_completo,
+          });
         }
       }
       
@@ -643,6 +698,8 @@ export function useEpis() {
     tipos: tiposQuery.data || [],
     tiposLoading: tiposQuery.isLoading,
     customCategorias: (categoriasQuery.data || []).map(c => c.nome),
+    categorias: categoriasQuery.data || [],
+    categoriasLoading: categoriasQuery.isLoading,
     epis: episQuery.data || [],
     episLoading: episQuery.isLoading,
     entregas: entregasQuery.data || [],
@@ -656,6 +713,8 @@ export function useEpis() {
     // Mutations - Categorias
     criarCategoria: criarCategoriaMutation.mutateAsync,
     criandoCategoria: criarCategoriaMutation.isPending,
+    definirExigeCa: definirExigeCaMutation.mutateAsync,
+    definindoExigeCa: definirExigeCaMutation.isPending,
 
     // Mutations - Tipos
     criarTipo: criarTipoMutation.mutateAsync,

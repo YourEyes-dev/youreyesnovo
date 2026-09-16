@@ -98,6 +98,33 @@ export const EmpresaAtivaProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const semVinculos = isProfissional && !loadingVinculos && empresaIdsPermitidas.length === 0;
 
+  /**
+   * Registra no BANCO a empresa escolhida no seletor.
+   *
+   * Até aqui a escolha vivia só no navegador, e o banco decidia acesso por
+   * CLIENTE: um vínculo amplo em qualquer empresa valia em todas as outras do
+   * mesmo cliente (achados VIN-005/006 e CTX-003/006 do motor de QA). Sem o
+   * banco saber qual empresa está ativa, não há como ele recortar por empresa.
+   *
+   * Quem diz QUAL empresa é o navegador; quem diz SE pode é o banco — a rotina
+   * confere o vínculo antes de gravar e recusa empresa de outro cliente.
+   *
+   * De propósito NÃO bloqueia a troca na tela: nesta etapa nada decide com esse
+   * registro, então uma falha aqui (rede, sessão expirando) não pode impedir o
+   * usuário de trabalhar. Ela é registrada no console para aparecer na medição
+   * de adoção, que é o que autoriza apertar a regra depois.
+   */
+  const registrarEmpresaAtivaNoBanco = useCallback(async (empresaId: string | null) => {
+    try {
+      const { error } = await supabase.rpc("definir_empresa_ativa" as never, {
+        p_empresa_id: empresaId,
+      } as never);
+      if (error) throw error;
+    } catch (e) {
+      console.warn("[EmpresaAtiva] escolha não registrada no banco:", e);
+    }
+  }, []);
+
   const setEmpresaAtiva = useCallback(
     (empresa: EmpresaCadastro | null) => {
       setEmpresaAtivaState(empresa);
@@ -109,8 +136,9 @@ export const EmpresaAtivaProvider: React.FC<{ children: React.ReactNode }> = ({ 
           localStorage.removeItem(storageKey);
         }
       }
+      void registrarEmpresaAtivaNoBanco(empresa?.id ?? null);
     },
-    [tenantId]
+    [tenantId, registrarEmpresaAtivaNoBanco]
   );
 
   // Restore from localStorage or auto-select single company
@@ -141,6 +169,11 @@ export const EmpresaAtivaProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const found = empresas.find((e) => e.id === savedId);
       if (found) {
         setEmpresaAtivaState(found);
+        // Registrar TAMBÉM aqui é o que faz a medição de adoção valer: a maior
+        // parte das sessões restaura do navegador e nunca toca no seletor. Se
+        // só a troca registrasse, a medição contaria uma minoria e daria a
+        // impressão errada de que quase ninguém está pronto.
+        void registrarEmpresaAtivaNoBanco(found.id);
         setInitialized(true);
         return;
       }
@@ -149,8 +182,9 @@ export const EmpresaAtivaProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Auto-select first company when nothing saved (or saved ID not found)
     setEmpresaAtivaState(empresas[0]);
     localStorage.setItem(storageKey, empresas[0].id);
+    void registrarEmpresaAtivaNoBanco(empresas[0].id);
     setInitialized(true);
-  }, [tenantId, empresas, isLoading, empresaAtiva]);
+  }, [tenantId, empresas, isLoading, empresaAtiva, registrarEmpresaAtivaNoBanco]);
 
   // Se a empresa ativa não está mais na lista filtrada e já terminou de carregar, resetar para a primeira
   useEffect(() => {

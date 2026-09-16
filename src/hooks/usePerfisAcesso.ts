@@ -162,8 +162,8 @@ export const MODULOS_SISTEMA = [
   // Financeiro
   { id: "financeiro", label: "Financeiro", grupo: "Financeiro" },
 
-  // Rede de Parceiros
-  { id: "marketplace", label: "Rede de Parceiros", grupo: "Rede de Parceiros" },
+  // MarketYE (marketplace de serviços; o id "marketplace" fica, pois está gravado em perfil_permissoes.modulo)
+  { id: "marketplace", label: "MarketYE", grupo: "MarketYE" },
 
   // Academia
   { id: "academia", label: "Academia", grupo: "Academia" },

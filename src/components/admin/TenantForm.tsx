@@ -12,15 +12,14 @@
  import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
  import { Separator } from '@/components/ui/separator';
  import { Loader2, Eye, EyeOff, Mail, Key } from 'lucide-react';
-import type { Database } from '@/integrations/supabase/types';
+import { usePlanosCatalogo } from '@/hooks/usePlanosCatalogo';
 
-type TenantPlan = Database['public']['Enums']['tenant_plan'];
- type AccessMethod = 'invite' | 'password';
- 
+type AccessMethod = 'invite' | 'password';
+
   export interface TenantFormData {
     nome: string;
     slug: string;
-    plano: TenantPlan;
+    planoCode: string;
     email?: string;
     telefone?: string;
     cnpj?: string;
@@ -29,7 +28,7 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
     accessMethod: AccessMethod;
     ownerPassword?: string;
   }
-  
+
   interface TenantFormProps {
    onSubmit: (data: TenantFormData) => Promise<void>;
     isLoading?: boolean;
@@ -37,7 +36,6 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
     initialData?: {
       nome?: string;
       slug?: string;
-      plano?: TenantPlan;
       email?: string;
       telefone?: string;
       cnpj?: string;
@@ -46,9 +44,10 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
  
   export function TenantForm({ onSubmit, isLoading, onCancel, initialData }: TenantFormProps) {
     const isEditing = !!initialData;
+    const { planos } = usePlanosCatalogo();
      const [nome, setNome] = useState(initialData?.nome || '');
      const [slug, setSlug] = useState(initialData?.slug || '');
-     const [plano, setPlano] = useState<TenantPlan>(initialData?.plano || 'starter');
+     const [planoCode, setPlanoCode] = useState<string>('tester');
      const [email, setEmail] = useState(initialData?.email || '');
      const [telefone, setTelefone] = useState(initialData?.telefone || '');
      const [cnpj, setCnpj] = useState(initialData?.cnpj || '');
@@ -78,10 +77,10 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
  
    const handleSubmit = async (e: React.FormEvent) => {
      e.preventDefault();
-     await onSubmit({ 
-       nome, 
-       slug, 
-       plano,
+     await onSubmit({
+       nome,
+       slug,
+       planoCode,
        email,
        telefone,
        cnpj,
@@ -161,21 +160,26 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
          </p>
        </div>
  
-       <div className="space-y-2">
-         <Label htmlFor="plano">Plano</Label>
-        <Select value={plano} onValueChange={(v) => setPlano(v as TenantPlan)}>
-           <SelectTrigger>
-             <SelectValue placeholder="Selecione o plano" />
-           </SelectTrigger>
-           <SelectContent>
-            <SelectItem value="starter">Starter</SelectItem>
-             <SelectItem value="professional">Professional</SelectItem>
-             <SelectItem value="enterprise">Enterprise</SelectItem>
-             <SelectItem value="early_adopter">Early Adopter (Gratuito)</SelectItem>
-             <SelectItem value="tester">Tester (Interno)</SelectItem>
-           </SelectContent>
-         </Select>
-       </div>
+       {!isEditing && (
+         <div className="space-y-2">
+           <Label htmlFor="plano">Plano inicial</Label>
+           <Select value={planoCode} onValueChange={setPlanoCode}>
+             <SelectTrigger>
+               <SelectValue placeholder="Selecione o plano" />
+             </SelectTrigger>
+             <SelectContent>
+               {planos.map((p) => (
+                 <SelectItem key={p.code} value={p.code}>
+                   {p.name}{!p.is_public ? ' (interno)' : ''}
+                 </SelectItem>
+               ))}
+             </SelectContent>
+           </Select>
+           <p className="text-xs text-muted-foreground">
+             Pode ser ajustado depois em "Assinatura e teste". Padrão: Tester (acesso total).
+           </p>
+         </div>
+       )}
       </div>
  
        {!isEditing && (

@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { User, Mail, Briefcase, Building2, Shield, KeyRound, Camera, ArrowLeft } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { MeusComprovantesPonto } from "@/components/ponto/MeusComprovantesPonto";
 
 export default function MeuPerfil() {
   const { profile, user, isSuperAdmin, refetch } = useAuthContext() as any;
@@ -287,6 +288,10 @@ export default function MeuPerfil() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Comprovantes das próprias batidas (Portaria MTP 671/2021). O cartão
+          não aparece para quem não tem CPF vinculado à conta. */}
+      <MeusComprovantesPonto />
     </div>
   );
 }

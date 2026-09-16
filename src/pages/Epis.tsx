@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus, HardHat, Package, Users, History, Shield, AlertTriangle, Wrench, ArrowDownCircle, Warehouse, ShieldCheck, HelpCircle } from "lucide-react";
@@ -26,12 +26,19 @@ import type { EpiCompleto } from "@/types/epi";
 
 const Epis = () => {
   const {
-    tipos, tiposLoading, customCategorias, epis, episLoading,
+    tipos, tiposLoading, customCategorias, categorias, epis, episLoading,
     entregas, entregasLoading, movimentacoes, movimentacoesLoading,
     stats, criarCategoria, criandoCategoria, criarTipo, criandoTipo,
     criarEpi, criandoEpi, atualizarEpi, atualizandoEpi, excluirEpi,
     ajustarEstoque, registrarEntrega, registrandoEntrega, registrarDevolucao,
   } = useEpis();
+
+  // Quais categorias exigem CA, por nome (o formulário lê por nome porque é
+  // assim que epi_tipos.categoria guarda a categoria).
+  const categoriasExigemCa = useMemo(
+    () => Object.fromEntries((categorias || []).map((c) => [c.nome, c.exige_ca])),
+    [categorias]
+  );
 
   const perm = useEpiPermissions();
   const [searchParams] = useSearchParams();
@@ -216,7 +223,8 @@ const Epis = () => {
         onSubmit={editingEpi ? handleUpdateEpi : handleCreateEpi}
         onCreateTipo={async (data) => { await criarTipo(data); }}
         onCreateCategoria={async (nome) => { await criarCategoria(nome); }}
-        tipos={tipos} customCategorias={customCategorias} epi={editingEpi}
+        tipos={tipos} customCategorias={customCategorias}
+        categoriasExigemCa={categoriasExigemCa} epi={editingEpi}
         isLoading={criandoEpi || atualizandoEpi}
       />
       <EpiEntregaWizard open={showEntregaForm} onOpenChange={setShowEntregaForm}

@@ -11,13 +11,15 @@ import { useFeriasFinanceiro } from "@/hooks/useFeriasFinanceiro";
 import { FeriasCultura } from "@/components/ferias/FeriasCultura";
 import { FeriasRelatorios } from "@/components/ferias/FeriasRelatorios";
 import { FeriasGovernanca } from "@/components/ferias/FeriasGovernanca";
+import { FeriasAlertas } from "@/components/ferias/FeriasAlertas";
+import { FeriasColetivas } from "@/components/ferias/FeriasColetivas";
 import { useINR } from "@/hooks/useINR";
 import { useFerias, type FeriasSolicitacao } from "@/hooks/useFerias";
 import { calcularPeriodoFerias } from "@/lib/feriasPeriodo";
 import {
   Calendar, Plus, Filter, CheckCircle, XCircle, Clock, Sun, Plane,
   ChevronsUpDown, Check, DollarSign, Info, Banknote, AlertTriangle,
-  FileText, Send, TrendingUp, Brain, Heart, BarChart3, ShieldCheck, Wallet, CalendarRange,
+  FileText, Send, TrendingUp, Brain, Heart, BarChart3, ShieldCheck, Wallet, CalendarRange, CalendarClock,
   Loader2, MessageSquare, PenLine,
 } from "lucide-react";
 import { useFeed } from "@/hooks/useFeed";
@@ -43,7 +45,7 @@ import { useColaboradores } from "@/hooks/useColaboradores";
 import { useFinanceiro } from "@/hooks/useFinanceiro";
 import { useAuth } from "@/hooks/useAuth";
 import { validarFracionamentoCLT } from "@/lib/feriasPeriodo";
-import { gerarAvisoFeriasPDF, gerarReciboFeriasPDF, gerarReciboFeriasHTML } from "@/lib/feriasDocumentos";
+import { gerarAvisoFeriasPDF, gerarReciboFeriasPDF, gerarReciboFeriasHTML, gerarAvisoFeriasHTML } from "@/lib/feriasDocumentos";
 import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useEnviarParaHub } from "@/hooks/useEnviarParaHub";
@@ -102,9 +104,11 @@ interface FeriasCardProps {
   onEnviarReciboAssinatura: (item: FeriasSolicitacao) => void;
   onVerReciboAssinado: (item: FeriasSolicitacao) => void;
   onPublicarFeed: (item: FeriasSolicitacao) => void;
+  onIniciarGozo: (item: FeriasSolicitacao) => void;
+  onRegistrarCiencia: (item: FeriasSolicitacao) => void;
 }
 
-const FeriasCard = ({ item, index, onAprovar, onRecusar, onGerarAviso, onGerarRecibo, onGerarFinanceiro, onLinkAssinatura, onEnviarReciboAssinatura, onVerReciboAssinado, onPublicarFeed }: FeriasCardProps) => {
+const FeriasCard = ({ item, index, onAprovar, onRecusar, onGerarAviso, onGerarRecibo, onGerarFinanceiro, onLinkAssinatura, onEnviarReciboAssinatura, onVerReciboAssinado, onPublicarFeed, onIniciarGozo, onRegistrarCiencia }: FeriasCardProps) => {
   const config = statusConfig[item.status] || statusConfig.pendente;
   const startDate = new Date(item.data_inicio + "T12:00:00").toLocaleDateString("pt-BR");
   const endDate = new Date(item.data_fim + "T12:00:00").toLocaleDateString("pt-BR");
@@ -236,6 +240,25 @@ const FeriasCard = ({ item, index, onAprovar, onRecusar, onGerarAviso, onGerarRe
                 <FileText className="w-3.5 h-3.5 mr-1" /> Ver Recibo Assinado
               </Button>
             )}
+            {/* Ciencia do aviso + inicio do gozo (art. 135 / CA-005) */}
+            {item.aviso_ciencia_em ? (
+              <div className="col-span-2 text-xs text-success flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5" /> Aviso com ciência
+                {item.aviso_ciencia_origem === "papel" ? " (registrada em papel)" : ""}
+              </div>
+            ) : (
+              <Button size="sm" variant="outline" className="text-xs col-span-2 text-muted-foreground"
+                onClick={() => onRegistrarCiencia(item)}>
+                <FileText className="w-3.5 h-3.5 mr-1" /> Registrar ciência (papel)
+              </Button>
+            )}
+            {item.status === "aprovado" && (
+              <Button size="sm" variant="outline"
+                className="text-xs col-span-2 border-info/40 text-info hover:bg-info/5"
+                onClick={() => onIniciarGozo(item)}>
+                <Plane className="w-3.5 h-3.5 mr-1" /> Iniciar Gozo
+              </Button>
+            )}
             <Button size="sm" variant="outline" className="text-xs col-span-2 text-primary" onClick={() => onPublicarFeed(item)}>
               <MessageSquare className="w-3.5 h-3.5 mr-1" /> Publicar no Feed
             </Button>
@@ -261,7 +284,7 @@ const Ferias = () => {
 
   // Férias é direito CLT — exclui PJ/Pró-labore/Terceiros.
   const { colaboradores, isLoading: loadingColabs } = useColaboradores({ excluirPJ: true });
-  const { solicitacoes, isLoading: loadingFerias, criarSolicitacao, aprovar, recusar, atualizarCampo, stats } = useFerias();
+  const { solicitacoes, isLoading: loadingFerias, criarSolicitacao, aprovar, recusar, iniciarGozo, registrarCienciaManual, atualizarCampo, stats } = useFerias();
   const { criarPeriodo, criarFolhaItem, useFolhaPeriodos } = useFinanceiro();
   const { data: periodos } = useFolhaPeriodos();
   const { tenantId, user, profile } = useAuth();
@@ -339,7 +362,50 @@ const Ferias = () => {
     criarPost.mutate({ conteudo: msg, tipo: "aviso" as any });
   };
 
-  // ========== GERAR AVISO PDF ==========
+  // Arquiva um documento HTML no modulo Documentos, na pasta do colaborador.
+  // Reusa o padrao da casa (storage + tabela documentos). RF-003/CA-012: todo
+  // aviso/recibo fica arquivado com empresa, colaborador e periodo.
+  const arquivarEmDocumentos = async (
+    item: FeriasSolicitacao, html: string, tipo: string, rotulo: string,
+  ): Promise<string | null> => {
+    const safeNome = item.colaborador_nome.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `${tenantId}/ferias/${tipo}_${item.id}_${Date.now()}_${safeNome}.html`;
+    const blob = new Blob([html], { type: "text/html" });
+    const { error: upErr } = await supabase.storage
+      .from("documentos")
+      .upload(storagePath, blob, { contentType: "text/html", upsert: false });
+    if (upErr) throw upErr;
+
+    let pastaId: string | null = null;
+    if (item.colaborador_id) {
+      const { data: pasta } = await fromTable("documento_pastas")
+        .select("id").eq("tenant_id", tenantId).eq("colaborador_id", item.colaborador_id).maybeSingle();
+      pastaId = (pasta as any)?.id || null;
+    }
+
+    const { data: docIns, error: insErr } = await fromTable("documentos").insert({
+      tenant_id: tenantId,
+      empresa_id: item.empresa_id || null,
+      colaborador_id: item.colaborador_id || null,
+      colaborador_nome: item.colaborador_nome,
+      colaborador_cpf: item.colaborador_cpf || null,
+      nome_arquivo: storagePath,
+      nome_original: `${rotulo} - ${item.colaborador_nome}.html`,
+      tipo: rotulo,
+      tamanho: blob.size,
+      mime_type: "text/html",
+      storage_path: storagePath,
+      status: "valido",
+      observacoes: `Gerado do modulo Ferias (periodo ${item.data_inicio} a ${item.data_fim})`,
+      pasta_id: pastaId,
+      versao_atual: 1,
+      total_versoes: 1,
+    } as any).select("id").single();
+    if (insErr) throw insErr;
+    return (docIns as any)?.id || null;
+  };
+
+  // ========== GERAR AVISO PDF + ARQUIVAR ==========
   const handleGerarAviso = async (item: FeriasSolicitacao) => {
     if (!tenantId || !user) { toast.error("Usuário não autenticado"); return; }
     try {
@@ -352,13 +418,11 @@ const Ferias = () => {
       };
       const avisoPdf = gerarAvisoFeriasPDF(docData);
       avisoPdf.save(`Aviso_Ferias_${item.colaborador_nome.replace(/\s/g, "_")}.pdf`);
+      // Arquiva a versao (sem ciencia ainda) no modulo Documentos.
+      await arquivarEmDocumentos(item, gerarAvisoFeriasHTML(docData), "aviso_ferias", "Aviso de Férias");
       atualizarCampo.mutate({ id: item.id, campo: "aviso_gerado", valor: true });
-      await enviarParaHub({
-        tipo: "recibo_ferias", competencia: item.data_inicio.slice(0, 7),
-        descricao: `Aviso de Férias — ${item.dias_solicitados} dias`, colaborador_nome: item.colaborador_nome,
-      });
-      toast.success("Aviso de Férias gerado e registrado!");
-    } catch (err) { console.error(err); toast.error("Erro ao gerar aviso de férias"); }
+      toast.success("Aviso de Férias gerado e arquivado em Documentos!");
+    } catch (err) { console.error(err); toast.error("Erro ao gerar/arquivar aviso de férias"); }
   };
 
   // ========== GERAR RECIBO PDF ==========
@@ -374,12 +438,9 @@ const Ferias = () => {
       };
       const reciboPdf = gerarReciboFeriasPDF(docData);
       reciboPdf.save(`Recibo_Ferias_${item.colaborador_nome.replace(/\s/g, "_")}.pdf`);
+      await arquivarEmDocumentos(item, gerarReciboFeriasHTML(docData), "recibo_ferias", "Recibo de Férias");
       atualizarCampo.mutate({ id: item.id, campo: "recibo_gerado", valor: true });
-      await enviarParaHub({
-        tipo: "recibo_ferias", competencia: item.data_inicio.slice(0, 7),
-        descricao: `Recibo de Férias — ${item.dias_solicitados} dias`, colaborador_nome: item.colaborador_nome,
-      });
-      toast.success("Recibo de Férias gerado e registrado!");
+      toast.success("Recibo de Férias gerado e arquivado em Documentos!");
     } catch (err) { console.error(err); toast.error("Erro ao gerar recibo de férias"); }
   };
 
@@ -409,17 +470,42 @@ const Ferias = () => {
     } catch (err) { console.error(err); toast.error("Erro ao gerar registro financeiro"); }
   };
 
-  // ========== LINK ASSINATURA ==========
+  // ========== AVISO PARA ASSINAR (coleta a ciencia — art. 135) ==========
+  // Gera o HTML do AVISO, sobe ao storage e cria o link VINCULADO
+  // (tipo_documento='aviso', ferias_solicitacao_id). Ao assinar, a edge
+  // arquiva a versao assinada e a trigger do banco marca a ciencia — que
+  // libera o inicio do gozo.
   const handleLinkAssinatura = async (item: FeriasSolicitacao) => {
     if (!tenantId) { toast.error("Tenant não encontrado"); return; }
     try {
+      const docData = {
+        colaboradorNome: item.colaborador_nome, colaboradorCpf: item.colaborador_cpf || undefined,
+        departamento: item.departamento || "", dataInicio: item.data_inicio,
+        dataFim: item.data_fim, diasSolicitados: item.dias_solicitados,
+        abonoPecuniario: item.abono_pecuniario, diasAbono: item.dias_abono,
+        salarioBase: item.salario_base || 0,
+      };
+      const safeNome = item.colaborador_nome.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const storagePath = `${tenantId}/ferias/aviso_${item.id}_${Date.now()}_${safeNome}.html`;
+      const { error: upErr } = await supabase.storage
+        .from("documentos")
+        .upload(storagePath, new Blob([gerarAvisoFeriasHTML(docData)], { type: "text/html" }),
+          { contentType: "text/html", upsert: false });
+      if (upErr) throw upErr;
+
       const { data, error } = await fromTable("ferias_assinatura_links")
         .insert({
-          tenant_id: tenantId, colaborador_nome: item.colaborador_nome,
+          tenant_id: tenantId,
+          colaborador_id: item.colaborador_id,
+          empresa_id: item.empresa_id || null,
+          ferias_solicitacao_id: item.id,
+          tipo_documento: "aviso",
+          colaborador_nome: item.colaborador_nome,
+          colaborador_cpf: item.colaborador_cpf,
           departamento: item.departamento, data_inicio_ferias: item.data_inicio,
           data_fim_ferias: item.data_fim, dias_ferias: item.dias_solicitados,
           abono_pecuniario: item.abono_pecuniario, dias_abono: item.dias_abono,
-          salario_base: item.salario_base || 0, documento_storage_path: null,
+          salario_base: item.salario_base || 0, documento_storage_path: storagePath,
         } as any).select("token").single();
       if (error) throw error;
       const token = (data as any)?.token;
@@ -428,7 +514,7 @@ const Ferias = () => {
         setLinkAssinaturaDialog({ url, colaborador: item.colaborador_nome });
         atualizarCampo.mutate({ id: item.id, campo: "assinatura_link_id", valor: token });
       }
-    } catch (err) { console.error(err); toast.error("Erro ao gerar link de assinatura"); }
+    } catch (err) { console.error(err); toast.error("Erro ao gerar link de assinatura do aviso"); }
   };
   // ========== ENVIAR RECIBO PARA ASSINATURA ==========
   const handleEnviarReciboAssinatura = async (item: FeriasSolicitacao) => {
@@ -462,7 +548,7 @@ const Ferias = () => {
         .insert({
           tenant_id: tenantId,
           colaborador_id: item.colaborador_id,
-          empresa_id: (item as any).empresa_id || null,
+          empresa_id: item.empresa_id || null,
           ferias_solicitacao_id: item.id,
           tipo_documento: "recibo",
           colaborador_nome: item.colaborador_nome,
@@ -659,6 +745,8 @@ const Ferias = () => {
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="vencimentos"><CalendarClock className="w-3.5 h-3.5 mr-1" /> Vencimentos</TabsTrigger>
+            <TabsTrigger value="coletivas"><CalendarRange className="w-3.5 h-3.5 mr-1" /> Coletivas</TabsTrigger>
             <TabsTrigger value="cultura"><Heart className="w-3.5 h-3.5 mr-1" /> Cultura</TabsTrigger>
             <TabsTrigger value="relatorios"><BarChart3 className="w-3.5 h-3.5 mr-1" /> Relatórios</TabsTrigger>
             <TabsTrigger value="governanca"><ShieldCheck className="w-3.5 h-3.5 mr-1" /> Governança</TabsTrigger>
@@ -704,6 +792,8 @@ const Ferias = () => {
                   onEnviarReciboAssinatura={handleEnviarReciboAssinatura}
                   onVerReciboAssinado={handleVerReciboAssinado}
                   onPublicarFeed={handlePublicarFeed}
+                  onIniciarGozo={(it) => iniciarGozo.mutate(it.id)}
+                  onRegistrarCiencia={(it) => registrarCienciaManual.mutate(it.id)}
                 />
 
               ))}
@@ -724,6 +814,14 @@ const Ferias = () => {
 
         <TabsContent value="financeiro">
           <FeriasFinanceiro />
+        </TabsContent>
+
+        <TabsContent value="vencimentos" className="space-y-4">
+          <FeriasAlertas />
+        </TabsContent>
+
+        <TabsContent value="coletivas" className="space-y-4">
+          <FeriasColetivas />
         </TabsContent>
 
         <TabsContent value="inteligencia" className="space-y-4">

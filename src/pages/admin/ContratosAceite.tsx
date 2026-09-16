@@ -557,6 +557,7 @@ function DetalheAssinaturaModal({
         .row{display:flex;gap:24px;margin:6px 0;font-size:13px;}
         .row b{min-width:140px;color:#555;font-weight:600;}
         .corpo{font-size:13px;line-height:1.6;border:1px solid #eee;padding:16px;border-radius:6px;background:#fafafa;}
+        .corpo.gerado{border:0;padding:0;background:#fff;}
         .sig-box{display:flex;gap:24px;margin-top:24px;flex-wrap:wrap;}
         .sig-box > div{flex:1;min-width:240px;}
         .sig-box img{max-width:100%;border:1px solid #ccc;background:#fff;border-radius:4px;}
@@ -565,7 +566,7 @@ function DetalheAssinaturaModal({
       </style></head><body>
       <h1>${contrato.titulo}</h1>
       <h2>Conteúdo do contrato (versão ${contrato.versao})</h2>
-      <div class="corpo">${contrato.corpo_html}</div>
+      <div class="corpo${assinatura.html_assinado ? " gerado" : ""}">${assinatura.html_assinado || contrato.corpo_html}</div>
       <h2>Dados do signatário</h2>
       <div class="row"><b>Nome:</b> ${assinatura.signatario_nome || "—"}</div>
       <div class="row"><b>CPF:</b> ${assinatura.signatario_cpf || "—"}</div>
@@ -678,11 +679,11 @@ function DetalheAssinaturaModal({
           </div>
 
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Conteúdo do contrato (v{contrato.versao})</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">{assinatura.html_assinado ? `Contrato gerado para o signatário (v${contrato.versao})` : `Conteúdo do contrato (v${contrato.versao})`}</CardTitle></CardHeader>
             <CardContent>
               <div
-                className="prose prose-sm max-w-none max-h-[300px] overflow-y-auto border rounded p-3 bg-muted/30"
-                dangerouslySetInnerHTML={{ __html: contrato.corpo_html }}
+                className={assinatura.html_assinado ? "max-h-[420px] overflow-y-auto border rounded bg-white" : "prose prose-sm max-w-none max-h-[300px] overflow-y-auto border rounded p-3 bg-muted/30"}
+                dangerouslySetInnerHTML={{ __html: assinatura.html_assinado || contrato.corpo_html }}
               />
             </CardContent>
           </Card>

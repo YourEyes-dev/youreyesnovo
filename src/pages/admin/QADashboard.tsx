@@ -173,7 +173,7 @@ const AGENT_FLOWS: AgentFlow[] = [
   { id: "cargos", label: "Funções / Cargos", icon: "💼", description: "CRUD cargos com faixa salarial.", steps: 4, category: "estrutura" },
   { id: "filiais", label: "Estabelecimentos / Obras", icon: "🏭", description: "Unidades e filiais.", steps: 3, category: "estrutura" },
   { id: "terceiros", label: "Terceiros & SST", icon: "👷", description: "Terceiros, documentos, trabalhadores.", steps: 5, category: "estrutura" },
-  { id: "marketplace", label: "Rede de Parceiros", icon: "🏪", description: "Profissionais e marketplace.", steps: 3, category: "estrutura" },
+  { id: "marketplace", label: "MarketYE", icon: "🏪", description: "Marketplace de serviços: especialistas, anúncios e leads.", steps: 3, category: "estrutura" },
 
   // Pessoas & Cultura
   { id: "admissao", label: "Admissão Completa", icon: "👤", description: "Admissão com dados e documentos.", steps: 8, category: "pessoas" },

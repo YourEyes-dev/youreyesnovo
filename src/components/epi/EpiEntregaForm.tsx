@@ -229,7 +229,7 @@ export function EpiEntregaForm({
 
             {selectedEpi && (
               <div className="p-3 bg-muted rounded-lg text-sm">
-                <p><strong>CA:</strong> {selectedEpi.ca || "Não informado"}</p>
+                <p><strong>CA:</strong> {selectedEpi.ca || selectedEpi.tipo?.ca_numero || "Não informado"}</p>
                 <p><strong>Modelo:</strong> {selectedEpi.modelo || "Não informado"}</p>
                 <p><strong>Disponível:</strong> {selectedEpi.quantidade_estoque} unidades</p>
               </div>

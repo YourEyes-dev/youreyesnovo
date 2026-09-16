@@ -54,6 +54,8 @@ project_id = "diayjpsrcerycycyaxst"
     verify_jwt = false
   [functions.ai-pgr-riscos]
     verify_jwt = false
+  [functions.ai-marketye]
+    verify_jwt = false
   [functions.ai-plano-acao]
     verify_jwt = false
   [functions.ai-pop-generator]

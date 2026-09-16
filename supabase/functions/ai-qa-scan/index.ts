@@ -168,7 +168,7 @@ serve(async (req) => {
             findings.push({ categoria: "edge_functions", severidade: "info", titulo: `Edge Function "${fn}" respondendo ✓`, descricao: `Status: ${resp.status}`, sugestao: "", modulo: "Edge Functions" });
           }
         } catch (e) {
-          findings.push({ categoria: "edge_functions", severidade: "critico", titulo: `Edge Function "${fn}" inacessível`, descricao: `Erro de conexão: ${e.message}`, sugestao: "Verificar se a edge function está deployada e acessível.", modulo: "Edge Functions" });
+          findings.push({ categoria: "edge_functions", severidade: "critico", titulo: `Edge Function "${fn}" inacessível`, descricao: `Erro de conexão: ${(e as Error).message}`, sugestao: "Verificar se a edge function está deployada e acessível.", modulo: "Edge Functions" });
         }
       }
       }
@@ -213,7 +213,7 @@ serve(async (req) => {
           });
         }
       } catch (e) {
-        findings.push({ categoria: "edge_functions", severidade: "medio", titulo: "Falha na verificação de status do WhatsApp", descricao: e.message, sugestao: "Tentar novamente mais tarde.", modulo: "Psicossocial" });
+        findings.push({ categoria: "edge_functions", severidade: "medio", titulo: "Falha na verificação de status do WhatsApp", descricao: (e as Error).message, sugestao: "Tentar novamente mais tarde.", modulo: "Psicossocial" });
       }
 
     // ═══════════════════════════════════════════════════
@@ -327,7 +327,7 @@ Responda em português do Brasil. Seja direto e prático.`
 
   } catch (e) {
     console.error("QA scan error:", e);
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

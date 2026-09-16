@@ -98,8 +98,8 @@ export const YOUREYES_MODULOS: YourEyesModulo[] = [
   },
   {
     id: "rede-parceiros",
-    label: "Rede de Parceiros",
-    itens: [{ id: "marketplace", label: "Rede de Parceiros", path: "/marketplace" }],
+    label: "MarketYE",
+    itens: [{ id: "marketplace", label: "MarketYE (marketplace de serviços)", path: "/marketplace" }],
   },
   {
     id: "academia",

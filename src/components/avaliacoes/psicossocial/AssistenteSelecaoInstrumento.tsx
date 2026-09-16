@@ -339,7 +339,7 @@ export function AssistenteSelecaoInstrumento({
         await Promise.allSettled([
           // Campanhas psicossociais anteriores
           tenantId
-            ? (supabase as any).from('psicossocial_campanhas').select('id', { count: 'exact' }).eq('tenant_id', tenantId)
+            ? (supabase as any).from('questionario_psicossocial_campanhas').select('id', { count: 'exact' }).eq('tenant_id', tenantId)
             : Promise.resolve({ data: [], count: 0 }),
 
           // Afastamentos filtrados pela empresa ativa

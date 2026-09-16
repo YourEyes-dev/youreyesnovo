@@ -74,6 +74,19 @@ on:
         options:
           - completo
           - so_finalizar
+      mascarar:
+        description: 'sim = tudo embaralhado (padrão) | um_cliente = só o cliente de cliente_real vem real | nao = TUDO real'
+        required: false
+        type: choice
+        default: 'sim'
+        options:
+          - sim
+          - um_cliente
+          - nao
+      cliente_real:
+        description: 'Só para mascarar=um_cliente: o tenant_id (uuid) do cliente que virá com dados REAIS'
+        required: false
+        default: ''
 
 jobs:
   copiar-estrutura:
@@ -199,6 +212,90 @@ jobs:
             *"$HOMOLOGACAO_REF"*) echo "Destino confere: homologação." ;;
             *) echo "::error::O destino não é o projeto de homologação. Abortando."; exit 1 ;;
           esac
+
+      - name: Cópia CRUA exige ambiente fechado
+        env:
+          TESTADORES: ${{ secrets.HOMOLOGACAO_TESTADORES }}
+          SENHA_USUARIOS: ${{ secrets.HOMOLOGACAO_SENHA_USUARIOS }}
+        run: |
+          # Com mascarar=nao a homologação passa a conter dado pessoal e dado
+          # de saúde reais (LGPD art. 11). Decisão do dono do produto, tomada
+          # com o risco explicitado — mas ela só é defensável com o ambiente
+          # FECHADO, e "fechado" aqui tem um significado preciso e verificável:
+          # ninguém entra com senha compartilhada.
+          #
+          # O endereço da homologação é uma página pública, e não há como
+          # deixar de ser (GitHub Pages de repositório público). Então a
+          # proteção não pode estar na obscuridade do link: tem que estar na
+          # credencial. Por isso, sem máscara:
+          #
+          #   · é OBRIGATÓRIO o secret HOMOLOGACAO_TESTADORES — a lista de
+          #     quem recebe senha de verdade. Todas as OUTRAS contas recebem
+          #     uma senha aleatória que ninguém, nem esta esteira, conhece;
+          #   · a senha compartilhada é RECUSADA. Com e-mails reais no banco,
+          #     uma senha única e conhecida transformaria a lista de clientes
+          #     numa lista de credenciais válidas.
+          MODO_MASCARA="${{ github.event.inputs.mascarar }}"
+          CLIENTE="$(printf '%s' "${{ github.event.inputs.cliente_real }}" | tr -d '[:space:]')"
+
+          if [ "$MODO_MASCARA" = "sim" ] || [ -z "$MODO_MASCARA" ]; then
+            echo "SEM_MASCARA=0" >> "$GITHUB_ENV"
+            echo "CLIENTE_REAL=" >> "$GITHUB_ENV"
+            echo "Cópia com identidade embaralhada (padrão)."
+            exit 0
+          fi
+
+          if [ "$MODO_MASCARA" = "um_cliente" ]; then
+            # Recorte por CLIENTE: um cliente vem real, os outros 1113 seguem
+            # embaralhados. É bem menos exposto que a cópia crua total — mas
+            # continua sendo dado pessoal e de saúde de gente real, então as
+            # mesmas travas de acesso valem.
+            case "$CLIENTE" in
+              ????????-????-????-????-????????????) : ;;
+              *) echo "::error::mascarar=um_cliente exige cliente_real com um uuid válido."
+                 echo "::error::Recebido: '$CLIENTE'"; exit 1 ;;
+            esac
+            if [ -z "$TESTADORES" ]; then
+              echo "::error::O cliente $CLIENTE virá com dados REAIS, mas o secret"
+              echo "::error::HOMOLOGACAO_TESTADORES está vazio. Sem ele, as contas reais desse"
+              echo "::error::cliente ficariam com a senha compartilhada — e aí qualquer pessoa"
+              echo "::error::que soubesse um e-mail dele entraria e leria atestado e CPF reais."
+              echo "::error::Cadastre o secret com os e-mails de quem vai testar e rode de novo."
+              exit 1
+            fi
+            echo "SEM_MASCARA=0" >> "$GITHUB_ENV"
+            echo "CLIENTE_REAL=$CLIENTE" >> "$GITHUB_ENV"
+            echo "::warning::Cliente $CLIENTE virá com dados REAIS. Os demais seguem embaralhados."
+            echo "Testadores com senha própria: $(printf '%s' "$TESTADORES" | tr ',' '\n' | grep -c .)"
+            exit 0
+          fi
+
+          # Daqui para baixo: mascarar = nao (TUDO real).
+          if [ -z "$TESTADORES" ]; then
+            echo "::error::Cópia crua pedida, mas o secret HOMOLOGACAO_TESTADORES está vazio."
+            echo "::error::Sem a lista de testadores, TODAS as contas ficariam sem senha utilizável"
+            echo "::error::ou — pior — com a mesma senha. Cadastre o secret com os e-mails REAIS"
+            echo "::error::de quem vai testar, separados por vírgula, e rode de novo."
+            exit 1
+          fi
+          # Senha compartilhada + e-mail real = credencial válida para cada
+          # cliente da base. Recusa explícita, com o motivo na mensagem.
+          case "$SENHA_USUARIOS" in
+            ''|'123456'|'1234567'|'senha'|'teste') : ;;
+            *) echo "::warning::HOMOLOGACAO_SENHA_USUARIOS existe e será IGNORADO na cópia crua."
+               echo "::warning::Sem máscara, cada testador recebe senha individual." ;;
+          esac
+          if [ -n "$SENHA_USUARIOS" ] && [ "$SENHA_USUARIOS" = "123456" ]; then
+            echo "::error::A senha compartilhada ainda é 123456. Com e-mails reais no banco,"
+            echo "::error::isso daria acesso a dado de saúde real a quem tiver qualquer e-mail"
+            echo "::error::de cliente. Apague o secret HOMOLOGACAO_SENHA_USUARIOS antes de"
+            echo "::error::rodar sem máscara — as senhas passam a ser individuais."
+            exit 1
+          fi
+          echo "SEM_MASCARA=1" >> "$GITHUB_ENV"
+          echo "CLIENTE_REAL=" >> "$GITHUB_ENV"
+          echo "::warning::CÓPIA CRUA autorizada. A homologação conterá dado pessoal e de saúde REAIS."
+          echo "Testadores com senha própria: $(printf '%s' "$TESTADORES" | tr ',' '\n' | grep -c .)"
 
       - name: Instalar as ferramentas do PostgreSQL 17
         run: |
@@ -455,7 +552,15 @@ jobs:
 
           echo "== Lendo a estrutura das colunas na produção (somente leitura)"
           prod -tA -v ON_ERROR_STOP=1 -f scripts/homologacao/catalogo_colunas.sql > catalogo.tsv
-          python3 scripts/homologacao/gerar_copia_mascarada.py catalogo.tsv "$TEMPERO" > plano.tsv
+          if [ "$SEM_MASCARA" = "1" ]; then
+            echo "::warning::Copia CRUA: a homologacao recebera nome, CPF, e-mail e atestado REAIS."
+            python3 scripts/homologacao/gerar_copia_mascarada.py catalogo.tsv "$TEMPERO" --sem-mascara > plano.tsv
+          elif [ -n "$CLIENTE_REAL" ]; then
+            echo "Cliente $CLIENTE_REAL vira REAL; os demais seguem embaralhados."
+            python3 scripts/homologacao/gerar_copia_mascarada.py catalogo.tsv "$TEMPERO" --cliente-real "$CLIENTE_REAL" > plano.tsv
+          else
+            python3 scripts/homologacao/gerar_copia_mascarada.py catalogo.tsv "$TEMPERO" > plano.tsv
+          fi
           echo "Tabelas a copiar: $(wc -l < plano.tsv)"
 
           # ---------------------------------------------------------------
@@ -602,6 +707,7 @@ jobs:
         env:
           HOMOLOG_PASS: ${{ secrets.HOMOLOGACAO_DB_PASSWORD }}
           SENHA_USUARIOS: ${{ secrets.HOMOLOGACAO_SENHA_USUARIOS }}
+          TESTADORES: ${{ secrets.HOMOLOGACAO_TESTADORES }}
         run: |
           export PGPASSWORD="$(printf '%s' "$HOMOLOG_PASS" | tr -d '\r\n')"
           homolog() { psql -h "$HOST_HOMOLOGACAO" -p 5432 -U "$HOMOLOGACAO_USER" -d postgres "$@"; }
@@ -696,6 +802,36 @@ jobs:
           homolog -f remover_cadastros_locais.sql 2>&1 \
             | sed 's/^psql:[^:]*:[0-9]*: //' | grep -E 'NOTICE|ERROR' || true
 
+          # Na cópia CRUA estas medidas perderiam o sentido: elas provam que a
+          # máscara agiu, e não há máscara. Pior — elas dispararIam o
+          # apaga-tudo justamente porque o dado real chegou, que é o que foi
+          # pedido. Então saem de cena, e no lugar fica o registro explícito
+          # de que o ambiente carrega dado real (o log da corrida é o
+          # documento de quando isso passou a valer).
+          if [ "$SEM_MASCARA" = "1" ]; then
+            echo "::warning::Cópia CRUA: a conferência de máscara não se aplica."
+            echo "A homologação contém dado pessoal e de saúde REAIS, por decisão registrada."
+            echo "Acesso somente pelas contas da lista de testadores, com senha individual."
+            n_reais=$(homolog -tAc "SELECT count(*) FROM auth.users WHERE email NOT LIKE '%@exemplo.invalid'" 2>/dev/null || echo '?')
+            echo "Contas com e-mail real no destino: $n_reais"
+            exit 0
+          fi
+
+          # No modo um_cliente as linhas do cliente escolhido são REAIS por
+          # decisão — CPF que não começa com 9, e-mail que não é .invalid.
+          # Sem excluí-las da medição, a trava as leria como vazamento e
+          # apagaria a cópia inteira, fazendo exatamente o oposto do pedido.
+          # O resto da base continua sendo medido com o mesmo rigor de sempre:
+          # se a máscara falhar para QUALQUER outro cliente, o apaga-tudo
+          # dispara igual.
+          if [ -n "$CLIENTE_REAL" ]; then
+            EXCETO_UB="AND tenant_id <> '$CLIENTE_REAL'::uuid"
+            EXCETO_AU="AND id NOT IN (SELECT user_id FROM public.profiles WHERE tenant_id = '$CLIENTE_REAL'::uuid)"
+            echo "Cliente real $CLIENTE_REAL excluído da medição (é real por decisão)."
+          else
+            EXCETO_UB=""; EXCETO_AU=""
+          fi
+
           echo "MEDIDA                                   FORA DO PADRAO"
           fugiu=0
           conferir() {
@@ -715,13 +851,16 @@ jobs:
                WHERE cpf IS NOT NULL
                  AND regexp_replace(cpf,'[^0-9]','','g') <> ''
                  AND left(regexp_replace(cpf,'[^0-9]','','g'),1) <> '9'
+                 $EXCETO_UB
             ) x;"
           conferir "e-mail fora de .invalid (auth)" "
             SELECT count(*) FROM auth.users
-             WHERE email IS NOT NULL AND email NOT LIKE '%@exemplo.invalid';"
+             WHERE email IS NOT NULL AND email NOT LIKE '%@exemplo.invalid'
+               $EXCETO_AU;"
           conferir "metadado de usuario nao esvaziado" "
             SELECT count(*) FROM auth.users
-             WHERE raw_user_meta_data IS NOT NULL AND raw_user_meta_data <> '{}'::jsonb;"
+             WHERE raw_user_meta_data IS NOT NULL AND raw_user_meta_data <> '{}'::jsonb
+               $EXCETO_AU;"
 
           if [ "$fugiu" -ne 0 ]; then
             echo "::error::Dado identificável chegou à homologação. Apagando os dados por precaução."
@@ -819,36 +958,186 @@ jobs:
                  email_confirmed_at = COALESCE(email_confirmed_at, now());
           FIM_SQL
 
-          if [ -n "$SENHA_USUARIOS" ]; then
+          # Heredoc no nível EXTERNO, nunca dentro de um if: o marcador que
+          # encerra precisa começar na coluna zero depois que o YAML tira a
+          # indentação comum. Dentro do if ele ficaria indentado, o bash não o
+          # reconheceria e engoliria o resto do passo para dentro do arquivo,
+          # em silêncio. Já aconteceu neste mesmo arquivo (#314).
+          cat > liberar_testadores.sql <<'FIM_SQL'
+          -- Só os e-mails da lista recebem senha utilizável. A senha é
+          -- SORTEADA aqui (12 bytes -> 24 caracteres hex), não escolhida por
+          -- ninguém: senha decidida por pessoa acaba reaproveitada de outro
+          -- sistema, e senha guardada num secret acaba circulando por
+          -- mensagem. Fica numa tabela só para ser impressa uma vez no log
+          -- da corrida, e o passo seguinte a apaga.
+          DROP TABLE IF EXISTS homologacao_testadores_senhas;
+          CREATE TABLE homologacao_testadores_senhas (
+            email text PRIMARY KEY, senha_provisoria text NOT NULL);
+
+          -- A lista chega como 'a@x.com, b@y.com'. O trim tira o espaço
+          -- depois da vírgula; o lower casa com o e-mail gravado.
+          WITH pedidos AS (
+            SELECT lower(btrim(e)) AS email
+              FROM unnest(string_to_array(:'lista', ',')) e
+             WHERE btrim(e) <> ''
+          ), sorteio AS (
+            SELECT p.email, encode(gen_random_bytes(12), 'hex') AS senha
+              FROM pedidos p
+             WHERE EXISTS (SELECT 1 FROM auth.users u WHERE lower(u.email) = p.email)
+          ), gravar AS (
+            INSERT INTO homologacao_testadores_senhas (email, senha_provisoria)
+            SELECT email, senha FROM sorteio RETURNING email, senha_provisoria
+          )
+          UPDATE auth.users u
+             SET encrypted_password = crypt(g.senha_provisoria, gen_salt('bf')),
+                 email_confirmed_at = COALESCE(u.email_confirmed_at, now())
+            FROM gravar g
+           WHERE lower(u.email) = g.email;
+
+          -- E-mail da lista que não existe no banco é erro de digitação, e
+          -- erro de digitação aqui deixa a pessoa sem conseguir entrar sem
+          -- saber por quê. Avisa alto, mas não derruba a corrida.
+          --
+          -- A lista entra por set_config, e NÃO por :'lista' dentro do bloco:
+          -- o psql não substitui variável dentro de aspas-dólar, então a
+          -- primeira versão morreu com "syntax error at or near :" — o mesmo
+          -- tipo de armadilha do -c que já custou uma corrida (#314). Aqui a
+          -- substituição acontece na chamada da função, que é SQL comum, e o
+          -- bloco lê o valor de volta com current_setting.
+          SELECT set_config('homologacao.lista_testadores', :'lista', false);
+          DO $aviso$
+          DECLARE faltou text;
+          BEGIN
+            SELECT string_agg(btrim(e), ', ') INTO faltou
+              FROM unnest(string_to_array(
+                     current_setting('homologacao.lista_testadores'), ',')) e
+             WHERE btrim(e) <> ''
+               AND NOT EXISTS (SELECT 1 FROM auth.users u
+                                WHERE lower(u.email) = lower(btrim(e)));
+            IF faltou IS NOT NULL THEN
+              RAISE WARNING 'Testadores sem conta na base copiada: %', faltou;
+            END IF;
+          END $aviso$;
+          FIM_SQL
+
+          if [ "$SEM_MASCARA" = "1" ]; then
+            # ─────────────────────────────────────────────────────────────
+            # CÓPIA CRUA: senha INDIVIDUAL, nunca compartilhada.
+            #
+            # Os e-mails aqui são os reais dos clientes. Uma senha única e
+            # conhecida transformaria a base de clientes numa base de
+            # credenciais — quem soubesse o e-mail de qualquer pessoa entraria
+            # e leria atestado, afastamento e CPF dela. Então:
+            #
+            #   · TODA conta recebe primeiro uma senha aleatória de 32 bytes,
+            #     gerada no banco e que ninguém — nem esta esteira, nem quem
+            #     lê o log — chega a ver. Na prática, ninguém entra;
+            #   · depois, só os e-mails da lista HOMOLOGACAO_TESTADORES
+            #     recebem uma senha utilizável, também sorteada aqui, e
+            #     impressa UMA vez no log da corrida (que é privado do
+            #     repositório) para quem for testar copiar.
+            #
+            # Sorteada e não fixa de propósito: senha decidida por pessoa
+            # acaba reaproveitada de outro sistema, e senha que vive num
+            # secret acaba circulando por mensagem.
+            homolog -q -v ON_ERROR_STOP=1 -c "
+              UPDATE auth.users
+                 SET encrypted_password = crypt(encode(gen_random_bytes(32),'hex'), gen_salt('bf'))
+               WHERE email IS NOT NULL;" \
+              && echo "Todas as contas receberam senha aleatória (ninguém entra)."
+
+            # A lista chega como 'a@x.com, b@y.com' — vira array do Postgres
+            # por string_to_array + trim, sem laço no shell.
+            homolog -q -v ON_ERROR_STOP=1 -v lista="$TESTADORES" -f liberar_testadores.sql
+            echo "── SENHAS DOS TESTADORES (copie agora; só aparecem aqui) ──"
+            homolog -tA -F ' | ' -c "
+              SELECT email, senha_provisoria FROM homologacao_testadores_senhas
+               ORDER BY email;"
+            echo "───────────────────────────────────────────────────────────"
+            # A tabela some depois de impressa: senha em claro parada no banco
+            # é a mesma exposição que se está tentando evitar.
+            homolog -q -c "DROP TABLE IF EXISTS homologacao_testadores_senhas;"
+
+          elif [ -n "$CLIENTE_REAL" ]; then
+            # ─────────────────────────────────────────────────────────────
+            # UM CLIENTE REAL: três camadas de senha, e a do meio é a que
+            # quase escapou.
+            #
+            #  1. contas do cliente real  -> senha aleatória (ninguém entra),
+            #     depois liberadas só para quem está em TESTADORES;
+            #  2. SUPERADMINS -> também senha aleatória, mesmo tendo e-mail
+            #     mascarado. Superadmin enxerga TODOS os clientes, então uma
+            #     conta dessas com a senha compartilhada seria a porta dos
+            #     fundos para o dado real — a proteção do item 1 não valeria
+            #     nada. Isto não estava no desenho inicial;
+            #  3. o resto (contas mascaradas, sem poder de superadmin) ->
+            #     senha compartilhada como sempre, porque ali não há dado de
+            #     ninguém: são os 1113 clientes embaralhados.
+            homolog -q -v ON_ERROR_STOP=1 -v senha="$SENHA_USUARIOS" -c "
+              UPDATE auth.users u
+                 SET encrypted_password = crypt(:'senha', gen_salt('bf')),
+                     email_confirmed_at = COALESCE(u.email_confirmed_at, now())
+               WHERE u.email LIKE '%@exemplo.invalid'
+                 AND NOT EXISTS (SELECT 1 FROM public.superadmins s
+                                  WHERE s.user_id = u.id AND s.ativo)
+                 AND NOT EXISTS (SELECT 1 FROM public.user_roles r
+                                  WHERE r.user_id = u.id AND r.role::text = 'superadmin')
+                 AND NOT EXISTS (SELECT 1 FROM public.profiles p
+                                  WHERE p.user_id = u.id
+                                    AND p.tenant_id = '$CLIENTE_REAL'::uuid);" \
+              && echo "Senha compartilhada aplicada só às contas mascaradas sem poder de superadmin."
+
+            homolog -q -v ON_ERROR_STOP=1 -c "
+              UPDATE auth.users u
+                 SET encrypted_password = crypt(encode(gen_random_bytes(32),'hex'), gen_salt('bf'))
+               WHERE EXISTS (SELECT 1 FROM public.superadmins s
+                              WHERE s.user_id = u.id AND s.ativo)
+                  OR EXISTS (SELECT 1 FROM public.user_roles r
+                              WHERE r.user_id = u.id AND r.role::text = 'superadmin')
+                  OR EXISTS (SELECT 1 FROM public.profiles p
+                              WHERE p.user_id = u.id
+                                AND p.tenant_id = '$CLIENTE_REAL'::uuid);" \
+              && echo "Superadmins e contas do cliente real: senha aleatória (ninguém entra)."
+
+            homolog -q -v ON_ERROR_STOP=1 -v lista="$TESTADORES" -f liberar_testadores.sql
+            echo "── SENHAS DOS TESTADORES (copie agora; só aparecem aqui) ──"
+            homolog -tA -F ' | ' -c "
+              SELECT email, senha_provisoria FROM homologacao_testadores_senhas
+               ORDER BY email;"
+            echo "───────────────────────────────────────────────────────────"
+            homolog -q -c "DROP TABLE IF EXISTS homologacao_testadores_senhas;"
+
+          elif [ -n "$SENHA_USUARIOS" ]; then
             homolog -q -v ON_ERROR_STOP=1 -v senha="$SENHA_USUARIOS" \
                     -f aplicar_senha.sql \
               && echo "Senha única aplicada a todos os usuários da homologação."
-
-            # O login do Supabase exige, além da linha em auth.users, uma
-            # IDENTIDADE em auth.identities (provider 'email'). A cópia traz
-            # só os usuários — as identidades da produção não vêm, e as
-            # antigas caíram no TRUNCATE ... CASCADE. Sem esta inserção, a
-            # senha se aplica mas o login recusa, com um erro que não diz
-            # nada disso. O identity_data leva o e-mail JÁ MASCARADO — é o
-            # único que existe aqui.
-            homolog -q -v ON_ERROR_STOP=1 -c "
-              INSERT INTO auth.identities
-                (id, user_id, identity_data, provider, provider_id,
-                 last_sign_in_at, created_at, updated_at)
-              SELECT gen_random_uuid(), u.id,
-                     jsonb_build_object('sub', u.id::text,
-                                        'email', u.email,
-                                        'email_verified', true),
-                     'email', u.id::text, now(), now(), now()
-                FROM auth.users u
-               WHERE u.email IS NOT NULL
-                 AND NOT EXISTS (SELECT 1 FROM auth.identities i
-                                  WHERE i.user_id = u.id AND i.provider = 'email');" \
-              && echo "Identidades de e-mail criadas para os usuários."
           else
             echo "::warning::Sem o secret HOMOLOGACAO_SENHA_USUARIOS: ninguém consegue entrar na"
             echo "::warning::homologação (as senhas reais foram invalidadas na leitura, de propósito)."
           fi
+
+          # FORA do if, e isso importa: o login do Supabase exige, além da
+          # linha em auth.users, uma IDENTIDADE em auth.identities (provider
+          # 'email'). A cópia traz só os usuários — as identidades da produção
+          # não vêm, e as antigas caíram no TRUNCATE ... CASCADE. Sem esta
+          # inserção, a senha se aplica mas o login recusa, com um erro que
+          # não diz nada disso. Vale nos DOIS modos: na primeira versão do
+          # modo cru isto ficou dentro do ramo antigo, e o ambiente teria
+          # nascido com senha certa e login recusando.
+          homolog -q -v ON_ERROR_STOP=1 -c "
+            INSERT INTO auth.identities
+              (id, user_id, identity_data, provider, provider_id,
+               last_sign_in_at, created_at, updated_at)
+            SELECT gen_random_uuid(), u.id,
+                   jsonb_build_object('sub', u.id::text,
+                                      'email', u.email,
+                                      'email_verified', true),
+                   'email', u.id::text, now(), now(), now()
+              FROM auth.users u
+             WHERE u.email IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM auth.identities i
+                                WHERE i.user_id = u.id AND i.provider = 'email');" \
+            && echo "Identidades de e-mail criadas para os usuários."
 
       - name: Provar que a cópia é fiel
         env:

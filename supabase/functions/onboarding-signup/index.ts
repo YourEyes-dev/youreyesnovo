@@ -22,6 +22,8 @@ type Payload = {
   inviteMode?: boolean;
   // Plan for new tenant
   plano?: string;
+  // Programa de Parceiros: código do link de indicação (?ref=)
+  refCodigo?: string;
   // Company pre-registration
   tipoPessoa?: string;
   documento?: string;
@@ -294,6 +296,18 @@ serve(async (req) => {
     return json({ ok: true, tenantId: existingProfile.tenant_id }, 200);
   }
 
+  // Porta livre de cadastro de empresa (sem plano/pagamento): obedece a chave
+  // app_config.cadastro_empresa_livre ('nao' por padrão). Chamadas com a
+  // chave de serviço (rotinas da casa, checkout) passam sempre.
+  const chamadaDeServico = jwt === SUPABASE_SERVICE_ROLE_KEY;
+  if (!chamadaDeServico) {
+    const { data: cfg } = await admin.from("app_config").select("valor").eq("chave", "cadastro_empresa_livre").maybeSingle();
+    const livre = ["sim", "true", "1"].includes(String(cfg?.valor ?? "nao").trim().toLowerCase());
+    if (!livre) {
+      return json({ error: "O cadastro de empresa é feito pela contratação de um plano. Escolha um plano no site para criar a sua conta.", code: "cadastro_livre_fechado" }, 403);
+    }
+  }
+
   // Ensure tenant slug is unique — auto-append suffix if taken
   let finalSlug = tenantSlug;
   let slugAttempt = 0;
@@ -320,6 +334,11 @@ serve(async (req) => {
     .insert({ nome: tenantNome, slug: finalSlug, plano })
     .select("id")
     .single();
+
+  if (!tenantError && tenant?.id && payload.refCodigo) {
+    try { await admin.rpc("parceiro_atribuir_tenant_por_ref", { p_tenant_id: tenant.id, p_codigo: payload.refCodigo }); }
+    catch (e) { console.error("origem do parceiro (nao-fatal):", (e as Error).message); }
+  }
 
   if (tenantError || !tenant?.id) {
     return json({ error: tenantError?.message ?? "Tenant create failed" }, 500);

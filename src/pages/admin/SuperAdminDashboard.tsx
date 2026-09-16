@@ -1,407 +1,117 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import type { ComponentType } from "react";
+import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LandingLeadsTable } from "@/components/admin/LandingLeadsTable";
+import { SuperAdminOverview } from "@/components/admin/superadmin/SuperAdminOverview";
+import { LeadsCRMKanban } from "@/components/admin/superadmin/LeadsCRMKanban";
+import { TenantsStatusPanel, UsuariosGlobalPanel } from "@/components/admin/superadmin/PanelTenantsUsuarios";
+import { TenantsPanel } from "@/components/admin/superadmin/TenantsPanel";
+import { PsicossocialSuperAdminPanel } from "@/components/admin/superadmin/PsicossocialSuperAdminPanel";
+import { PrecosAddonsPanel } from "@/components/admin/superadmin/PrecosAddonsPanel";
+import { ParceirosPanel } from "@/components/admin/superadmin/ParceirosPanel";
+import { YourEyesEmpresaPanel } from "@/components/admin/superadmin/YourEyesEmpresaPanel";
+import { MarketYEAdminPanel } from "@/components/admin/superadmin/MarketYEAdminPanel";
+import { SUPER_ADMIN_MENU, localizarItemDoMenu, rotaDaAbaLegada } from "@/components/admin/superadmin/superAdminMenu";
 
-import {
-  Building2, Users, Plus, Bug, Search, MoreVertical, Shield, TrendingUp, CheckCircle,
-  UserPlus, Eye, Power, ArrowLeft, BookOpen, FileText, LayoutDashboard, Target,
-  Activity, MessageSquare, Brain, FileSignature, Rocket, Edit, Trash2, AlertTriangle, Loader2, CreditCard,
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+// Painel Super Admin. Antes era uma tela única com onze abas lado a lado;
+// agora cada seção tem endereço próprio (/admin/<secao>) e é escolhida pelo
+// menu lateral agrupado por área (SuperAdminLayout). Esta página só resolve
+// qual seção renderizar a partir da rota. As páginas que já tinham endereço
+// próprio (QA, Blog, Contratos, Manual, Controle de Clientes) continuam com
+// seus componentes; o roteador as atende antes de cair aqui.
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
-import { useSuperAdmin, TenantWithStats } from '@/hooks/useSuperAdmin';
-import { TenantForm } from '@/components/admin/TenantForm';
-import { TenantOwnerForm } from '@/components/admin/TenantOwnerForm';
-import { PromoverContaRaizModal } from '@/components/admin/PromoverContaRaizModal';
-import { LandingLeadsTable } from '@/components/admin/LandingLeadsTable';
-import { SuperAdminOverview } from '@/components/admin/superadmin/SuperAdminOverview';
-import { LeadsCRMKanban } from '@/components/admin/superadmin/LeadsCRMKanban';
-import { TenantsStatusPanel, UsuariosGlobalPanel } from '@/components/admin/superadmin/PanelTenantsUsuarios';
-import { EmpresasPromociveisPanel } from '@/components/admin/superadmin/EmpresasPromociveisPanel';
-import { PsicossocialSuperAdminPanel } from '@/components/admin/superadmin/PsicossocialSuperAdminPanel';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { toast } from 'sonner';
+/** Cartões de atalho por área, mostrados na Visão geral (útil no celular, onde o menu fica recolhido). */
+function AreasDoPainel() {
+  const areas = SUPER_ADMIN_MENU.filter((a) => a.id !== "painel");
+  return (
+    <section className="space-y-3" data-testid="admin-areas">
+      <div>
+        <h2 className="text-lg font-semibold">Áreas do painel</h2>
+        <p className="text-sm text-muted-foreground">O mesmo agrupamento do menu lateral, para chegar rápido em cada seção.</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {areas.map((area) => (
+          <Card key={area.id} data-testid={`admin-area-${area.id}`}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">{area.label}</CardTitle>
+              <CardDescription>{area.descricao}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1">
+                {area.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.id}>
+                      <Link
+                        to={item.path}
+                        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
+                      >
+                        <Icon className="w-4 h-4 text-primary shrink-0" />
+                        <span className="flex-1">{item.label}</span>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function VisaoGeral() {
+  return (
+    <div className="space-y-8">
+      <SuperAdminOverview />
+      <AreasDoPainel />
+    </div>
+  );
+}
+
+// Seções que abrem dentro do painel: rota → componente. Cada rota daqui
+// precisa existir também no menu (superAdminMenu.ts), que dá título e descrição.
+const SECOES: Record<string, ComponentType> = {
+  "/admin": VisaoGeral,
+  "/admin/situacao": TenantsStatusPanel,
+  "/admin/empresas": TenantsPanel,
+  "/admin/usuarios": UsuariosGlobalPanel,
+  "/admin/leads": LeadsCRMKanban,
+  "/admin/landing": LandingLeadsTable,
+  "/admin/precos": PrecosAddonsPanel,
+  "/admin/parceiros": ParceirosPanel,
+  "/admin/psicossocial": PsicossocialSuperAdminPanel,
+  "/admin/marketye": MarketYEAdminPanel,
+  "/admin/dados-youreyes": YourEyesEmpresaPanel,
+};
 
 export default function SuperAdminDashboard() {
-  const navigate = useNavigate();
-  const { tenants, isLoading, createTenant, updateTenant, toggleTenant, deleteTenant, isCreatingTenant, isUpdatingTenant } = useSuperAdmin();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showTenantForm, setShowTenantForm] = useState(false);
-  const [showEditForm, setShowEditForm] = useState(false);
-  const [showOwnerForm, setShowOwnerForm] = useState(false);
-  const [selectedTenant, setSelectedTenant] = useState<TenantWithStats | null>(null);
-  const [showSpinoff, setShowSpinoff] = useState(false);
-  const [spinoffTenant, setSpinoffTenant] = useState<TenantWithStats | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Endereço antigo (/admin?aba=x) → rota nova equivalente.
+  const rotaLegada = rotaDaAbaLegada(searchParams.get("aba"));
+  if (rotaLegada) return <Navigate to={rotaLegada} replace />;
 
-  const filteredTenants = tenants.filter(t =>
-    t.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.slug.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const rota = location.pathname.replace(/\/+$/, "") || "/";
+  const Secao = SECOES[rota];
+  const atual = localizarItemDoMenu(rota);
+  if (!Secao || !atual) return <Navigate to="/admin" replace />;
 
-  // Conta empresas derivadas (total - principal) por tenant para saber se "Promover" faz sentido
-  const { data: empresasAll = [] } = useQuery({
-    queryKey: ['superadmin-empresas-all'],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc('superadmin_list_all_empresas');
-      if (error) throw error;
-      return (data || []) as Array<{ tenant_id: string; total_empresas_tenant: number }>;
-    },
-  });
-  const derivadasPorTenant = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of empresasAll) {
-      const total = Number(e.total_empresas_tenant) || 0;
-      map.set(e.tenant_id, Math.max(0, total - 1));
-    }
-    return map;
-  }, [empresasAll]);
-
-
-  const handleToggleTenant = async (tenant: TenantWithStats) => {
-    try {
-      await toggleTenant({ id: tenant.id, ativo: !tenant.ativo });
-      toast.success(tenant.ativo ? 'Empresa desativada' : 'Empresa ativada');
-    } catch { toast.error('Erro ao alterar status'); }
-  };
-
-  const handleDeleteTenant = async () => {
-    if (!selectedTenant || deleteConfirmationText !== 'EXCLUIR') return;
-
-    try {
-      setIsDeleting(true);
-      await deleteTenant(selectedTenant.id);
-      toast.success('Empresa excluída permanentemente');
-      setShowDeleteConfirm(false);
-      setSelectedTenant(null);
-      setDeleteConfirmationText('');
-    } catch (e: any) {
-      toast.error(e.message || 'Erro ao excluir empresa');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
+  const Icon = atual.item.icon;
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
-      <div className="max-w-[1600px] mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-                <Shield className="w-7 h-7 text-primary" />
-                Painel Super Admin
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Controle total da plataforma · Tenants, usuários, leads e operações
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => navigate('/admin/manual')}>
-              <BookOpen className="w-4 h-4 mr-2" />Manual
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/admin/qa')}>
-              <Bug className="w-4 h-4 mr-2" />QA
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/admin/youreyes')}>
-              <Eye className="w-4 h-4 mr-2" />YourEyes
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/admin/blog')}>
-              <FileText className="w-4 h-4 mr-2" />Blog
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/admin/contratos')}>
-              <FileSignature className="w-4 h-4 mr-2" />Contratos
-            </Button>
-            <Button onClick={() => setShowTenantForm(true)} size="sm">
-              <Plus className="w-4 h-4 mr-2" />Nova Empresa
-            </Button>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid grid-cols-4 md:grid-cols-7 w-full">
-            <TabsTrigger value="overview"><LayoutDashboard className="w-4 h-4 mr-2" />Visão Geral</TabsTrigger>
-            <TabsTrigger value="tenants"><Building2 className="w-4 h-4 mr-2" />Empresas</TabsTrigger>
-            <TabsTrigger value="usuarios"><Users className="w-4 h-4 mr-2" />Usuários</TabsTrigger>
-            <TabsTrigger value="leads"><Target className="w-4 h-4 mr-2" />Leads CRM</TabsTrigger>
-            <TabsTrigger value="landing"><TrendingUp className="w-4 h-4 mr-2" />Landing</TabsTrigger>
-            <TabsTrigger value="psicossocial"><Brain className="w-4 h-4 mr-2" />Psicossocial</TabsTrigger>
-            <TabsTrigger value="situacao"><Activity className="w-4 h-4 mr-2" />Situação</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview"><SuperAdminOverview /></TabsContent>
-
-          <TabsContent value="tenants">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Empresas Cadastradas</CardTitle>
-                  <CardDescription>Principais empresas (Matrizes) e suas filiais agrupadas.</CardDescription>
-                </div>
-                <div className="relative w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder="Buscar empresa ou CNPJ..." value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="text-center py-8">Carregando...</div>
-                ) : filteredTenants.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">Nenhuma empresa</div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Empresa</TableHead>
-                        <TableHead>CNPJ</TableHead>
-                        <TableHead>Plano</TableHead>
-                        <TableHead className="text-center">Usuários</TableHead>
-                        <TableHead className="text-center">Colab.</TableHead>
-                        <TableHead>Criado</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredTenants.map((tenant) => (
-                        <TableRow key={tenant.id}>
-                          <TableCell className="font-medium">{tenant.nome}</TableCell>
-                          <TableCell><code className="text-xs bg-muted px-2 py-1 rounded">{tenant.cnpj || "—"}</code></TableCell>
-                          <TableCell><Badge variant="outline" className="capitalize">{tenant.plano}</Badge></TableCell>
-                          <TableCell className="text-center">{tenant.total_usuarios}</TableCell>
-                          <TableCell className="text-center">{tenant.total_colaboradores}</TableCell>
-                          <TableCell className="text-xs">{format(new Date(tenant.created_at), 'dd/MM/yy', { locale: ptBR })}</TableCell>
-                          <TableCell>
-                            {tenant.ativo
-                              ? <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Ativa</Badge>
-                              : <Badge variant="destructive">Inativa</Badge>}
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                 <DropdownMenuItem onClick={() => { setSelectedTenant(tenant); setShowEditForm(true); }}>
-                                  <Edit className="w-4 h-4 mr-2" />Editar empresa
-                                </DropdownMenuItem>
-                                 <DropdownMenuItem onClick={() => navigate(`/admin/tenants/${tenant.id}`)}>
-                                  <Eye className="w-4 h-4 mr-2" />Ver detalhes
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => navigate(`/admin/tenants/${tenant.id}/assinatura`)}>
-                                  <CreditCard className="w-4 h-4 mr-2" />Assinatura e teste
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setSelectedTenant(tenant); setShowOwnerForm(true); }}>
-                                  <UserPlus className="w-4 h-4 mr-2" />Criar usuário owner
-                                </DropdownMenuItem>
-                                {(derivadasPorTenant.get(tenant.id) ?? 0) > 0 && (
-                                  <DropdownMenuItem onClick={() => { setSpinoffTenant(tenant); setShowSpinoff(true); }}>
-                                    <Rocket className="w-4 h-4 mr-2" />Promover empresa a Conta-Raiz
-                                  </DropdownMenuItem>
-                                )}
-
-                                <DropdownMenuItem onClick={() => handleToggleTenant(tenant)}>
-                                  <Power className="w-4 h-4 mr-2" />{tenant.ativo ? 'Desativar' : 'Ativar'}
-                                </DropdownMenuItem>
-
-                                <DropdownMenuItem 
-                                  onClick={() => { setSelectedTenant(tenant); setShowDeleteConfirm(true); }}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />Excluir empresa
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-
-            <div className="mt-8 pt-8 border-t">
-              <EmpresasPromociveisPanel />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="usuarios"><UsuariosGlobalPanel /></TabsContent>
-
-          <TabsContent value="leads"><LeadsCRMKanban /></TabsContent>
-
-          <TabsContent value="landing"><LandingLeadsTable /></TabsContent>
-
-          <TabsContent value="psicossocial"><PsicossocialSuperAdminPanel /></TabsContent>
-
-          <TabsContent value="situacao"><TenantsStatusPanel /></TabsContent>
-        </Tabs>
+    <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 space-y-6" data-testid="admin-secao">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" data-testid="admin-secao-titulo">
+          <Icon className="w-7 h-7 text-primary" />
+          {atual.item.label}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">{atual.item.descricao}</p>
       </div>
-
-      {/* Modais */}
-      <Dialog open={showTenantForm} onOpenChange={setShowTenantForm}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nova Empresa</DialogTitle>
-            <DialogDescription>Cadastre a empresa e o administrador principal</DialogDescription>
-          </DialogHeader>
-          {showTenantForm && (
-            <TenantForm
-              key={`tenant-form-${showTenantForm}`}
-              onSubmit={async (data) => {
-                try {
-                  const result = await createTenant(data);
-                  toast.success(result.inviteSent ? 'Empresa criada! Convite enviado.' : 'Empresa criada com sucesso!');
-                  setShowTenantForm(false);
-                } catch (e: any) { toast.error(e.message || 'Erro'); }
-              }}
-              isLoading={isCreatingTenant}
-              onCancel={() => setShowTenantForm(false)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Empresa</DialogTitle>
-            <DialogDescription>Atualize os dados da empresa</DialogDescription>
-          </DialogHeader>
-          {showEditForm && selectedTenant && (
-            <TenantForm
-              initialData={{
-                nome: selectedTenant.nome,
-                slug: selectedTenant.slug,
-                plano: selectedTenant.plano,
-                email: selectedTenant.email,
-                telefone: selectedTenant.telefone,
-                cnpj: selectedTenant.cnpj,
-              }}
-              onSubmit={async (data) => {
-                try {
-                  await updateTenant({
-                    id: selectedTenant.id,
-                    nome: data.nome,
-                    slug: data.slug,
-                    plano: data.plano,
-                    email: data.email,
-                    telefone: data.telefone,
-                    cnpj: data.cnpj,
-                  });
-                  toast.success('Empresa atualizada com sucesso!');
-                  setShowEditForm(false);
-                  setSelectedTenant(null);
-                } catch (e: any) {
-                  toast.error(e.message || 'Erro ao atualizar empresa');
-                }
-              }}
-              isLoading={isUpdatingTenant}
-              onCancel={() => {
-                setShowEditForm(false);
-                setSelectedTenant(null);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showOwnerForm} onOpenChange={setShowOwnerForm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Adicionar Administrador - {selectedTenant?.nome}</DialogTitle>
-            <DialogDescription>Crie um novo usuário administrador</DialogDescription>
-          </DialogHeader>
-          {selectedTenant && (
-            <TenantOwnerForm
-              tenantId={selectedTenant.id}
-              onSuccess={() => { setShowOwnerForm(false); setSelectedTenant(null); }}
-              onCancel={() => { setShowOwnerForm(false); setSelectedTenant(null); }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {spinoffTenant && (
-        <PromoverContaRaizModal
-          open={showSpinoff}
-          onOpenChange={(v) => { setShowSpinoff(v); if (!v) setSpinoffTenant(null); }}
-          tenantId={spinoffTenant.id}
-          tenantNome={spinoffTenant.nome}
-        />
-      )}
-
-      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="w-5 h-5" />
-              Ação Irreversível
-            </DialogTitle>
-            <DialogDescription className="space-y-4 pt-2">
-              <p className="font-semibold text-foreground">
-                Você está prestes a excluir permanentemente a empresa <span className="underline">{selectedTenant?.nome}</span>.
-              </p>
-              <div className="bg-destructive/10 p-3 rounded-md border border-destructive/20 text-destructive text-xs">
-                <p className="font-bold mb-1 uppercase">Aviso Crítico:</p>
-                <ul className="list-disc ml-4 space-y-1">
-                  <li>Todos os usuários vinculados perderão acesso.</li>
-                  <li>Todas as empresas dependentes (filiais) serão removidas.</li>
-                  <li>Dados de colaboradores, ponto, financeiro e SST serão apagados.</li>
-                  <li>Esta ação NÃO pode ser desfeita.</li>
-                </ul>
-              </div>
-              <div className="space-y-2 pt-2">
-                <Label htmlFor="confirm-delete">Para confirmar, digite <strong>EXCLUIR</strong> abaixo:</Label>
-                <Input
-                  id="confirm-delete"
-                  placeholder="Digite EXCLUIR"
-                  value={deleteConfirmationText}
-                  onChange={(e) => setDeleteConfirmationText(e.target.value.toUpperCase())}
-                  className="border-destructive/30 focus-visible:ring-destructive"
-                />
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmationText(''); }}>
-              Cancelar
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDeleteTenant}
-              disabled={deleteConfirmationText !== 'EXCLUIR' || isDeleting}
-            >
-              {isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Excluir Permanentemente
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <Secao />
     </div>
   );
 }

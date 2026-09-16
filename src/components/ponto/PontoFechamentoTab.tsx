@@ -27,6 +27,19 @@ const STATUS_FECHAMENTO: Record<string, { label: string; color: string }> = {
   fechado: { label: "Fechado", color: "bg-red-100 text-red-800" },
 };
 
+interface PendenciaFechamento {
+  tipo: string;
+  colaborador_cpf: string | null;
+  data_referencia: string | null;
+  descricao: string | null;
+}
+
+const PENDENCIA_LABEL: Record<string, string> = {
+  ajuste_pendente: "Ajuste de ponto aguardando aprovação",
+  dia_incompleto: "Dia incompleto sem tratamento",
+  espelho_sem_ciencia: "Espelho sem ciência do colaborador",
+};
+
 const STATUS_ESPELHO: Record<string, { label: string; color: string }> = {
   preview: { label: "Em andamento", color: "bg-blue-100 text-blue-800" },
   gerado: { label: "Gerado", color: "bg-gray-100 text-gray-800" },
@@ -55,6 +68,37 @@ export function PontoFechamentoTab() {
 
   const fechamentoAtual = fechamentos.find(f => f.competencia === competencia);
   const isFechado = fechamentoAtual?.status === "fechado";
+
+  // Pendências que impedem o fechamento (PONTO-387/388). A mesma lista que o
+  // portão do banco consulta ao recusar o fechamento — aqui ela aparece ANTES,
+  // para o RH tratar em vez de esbarrar no bloqueio.
+  const { data: pendencias = [], isLoading: loadingPendencias } = useQuery({
+    queryKey: ["ponto-fechamento-pendencias", tenantId, empresaAtivaId, competencia],
+    queryFn: async (): Promise<PendenciaFechamento[]> => {
+      if (!tenantId) return [];
+      const { data, error } = await (supabase.rpc as any)("ponto_fechamento_pendencias_criticas", {
+        p_tenant_id: tenantId,
+        p_empresa_id: empresaAtivaId || null,
+        p_competencia: competencia,
+      });
+      if (error) throw error;
+      return (data || []) as PendenciaFechamento[];
+    },
+    enabled: !!tenantId && !!competencia && !isFechado,
+  });
+
+  // Nome do colaborador a partir do que já está carregado na competência;
+  // sem correspondência, mostra o CPF mesmo.
+  const nomePorCpf = (cpf: string | null) => {
+    const d = (cpf || "").replace(/\D/g, "");
+    const achado = [...espelhos, ...previewEspelhos].find(
+      e => (e.colaborador_cpf || "").replace(/\D/g, "") === d
+    );
+    return achado?.colaborador_nome || (cpf || "—");
+  };
+
+  const contarPendencias = (tipo: string) => pendencias.filter(p => p.tipo === tipo).length;
+  const temPendencias = pendencias.length > 0;
 
   // Live preview: aggregate ponto_diario when there are no persisted espelhos
   const periodo = (() => {
@@ -134,9 +178,15 @@ export function PontoFechamentoTab() {
   const formatMinutos = (min: number) => formatarHoraMinuto(Math.abs(min));
 
   const handleFechar = async () => {
-    await fecharPeriodo({ competencia, observacoes });
-    setShowFechar(false);
-    setObservacoes("");
+    try {
+      await fecharPeriodo({ competencia, observacoes });
+      setShowFechar(false);
+      setObservacoes("");
+    } catch {
+      // O portão do banco recusou (pendência crítica) — a mensagem já aparece
+      // em aviso; mantém o diálogo aberto e reconfere a lista de pendências.
+      queryClient.invalidateQueries({ queryKey: ["ponto-fechamento-pendencias"] });
+    }
   };
 
   const handleReabrir = async () => {
@@ -253,6 +303,58 @@ export function PontoFechamentoTab() {
           )}
         </div>
       </div>
+
+      {/* Pendências que impedem o fechamento (PONTO-387/388) */}
+      {!isFechado && temPendencias && (
+        <Card className="border-amber-300">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="w-5 h-5" />
+              Pendências que impedem o fechamento ({pendencias.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2 text-sm">
+              {Object.keys(PENDENCIA_LABEL).map(tipo => {
+                const n = contarPendencias(tipo);
+                if (!n) return null;
+                return (
+                  <Badge key={tipo} variant="outline" className="border-amber-400 text-amber-800">
+                    {n} · {PENDENCIA_LABEL[tipo]}
+                  </Badge>
+                );
+              })}
+            </div>
+            <div className="max-h-56 overflow-y-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Colaborador</TableHead>
+                    <TableHead>Ocorrência</TableHead>
+                    <TableHead className="text-center">Dia</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendencias.map((p, i) => (
+                    <TableRow key={`${p.tipo}-${p.colaborador_cpf}-${p.data_referencia}-${i}`}>
+                      <TableCell className="font-medium">{nomePorCpf(p.colaborador_cpf)}</TableCell>
+                      <TableCell className="text-sm">{PENDENCIA_LABEL[p.tipo] || p.descricao || p.tipo}</TableCell>
+                      <TableCell className="text-center text-sm">
+                        {p.data_referencia ? format(new Date(`${p.data_referencia}T00:00:00`), "dd/MM/yyyy") : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enquanto houver pendência aqui, o fechamento fica bloqueado: aprove ou recuse os ajustes,
+              trate os dias incompletos e colha a ciência dos espelhos (Súmula 338 do TST). Espelho com
+              ressalva formal registrada não bloqueia.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Status do Fechamento */}
       {fechamentoAtual && (
@@ -383,6 +485,21 @@ export function PontoFechamentoTab() {
             <div className="p-3 bg-destructive/10 rounded-lg text-sm text-destructive">
               <strong>Atenção:</strong> Os dados ficam bloqueados para alteração. Se precisar corrigir depois, use "Reabrir Período".
             </div>
+            {temPendencias && (
+              <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 text-sm text-amber-900 space-y-1">
+                <div className="flex items-center gap-2 font-medium">
+                  <AlertTriangle className="w-4 h-4" />
+                  {pendencias.length} pendência(s) impedem o fechamento
+                </div>
+                <ul className="list-disc pl-5">
+                  {Object.keys(PENDENCIA_LABEL).map(tipo => {
+                    const n = contarPendencias(tipo);
+                    return n ? <li key={tipo}>{n} · {PENDENCIA_LABEL[tipo]}</li> : null;
+                  })}
+                </ul>
+                <p>Trate as pendências listadas na aba antes de fechar.</p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Observações (opcional)</Label>
               <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações sobre o fechamento..." />
@@ -390,8 +507,12 @@ export function PontoFechamentoTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowFechar(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleFechar} disabled={fechandoPeriodo}>
-              {fechandoPeriodo ? "Fechando..." : "Confirmar Fechamento"}
+            <Button
+              variant="destructive"
+              onClick={handleFechar}
+              disabled={fechandoPeriodo || temPendencias || loadingPendencias}
+            >
+              {fechandoPeriodo ? "Fechando..." : temPendencias ? "Bloqueado por pendências" : "Confirmar Fechamento"}
             </Button>
           </DialogFooter>
         </DialogContent>

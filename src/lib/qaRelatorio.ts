@@ -7,7 +7,10 @@ import type { QaBateria, QaResultado } from "@/hooks/useQaRunner";
  * Gera relatorios de uma bateria de testes em tres formatos: PDF, CSV e uma
  * janela imprimivel. Usa as libs que o projeto ja tem (jspdf, xlsx).
  *
- * Todos mostram TUDO: passou, falhou, sem rotina e erro.
+ * O PDF e a fonte da verdade que vai para o setor responsavel corrigir, entao
+ * o detalhe de cada FALHA e completo e auto-suficiente: arquivo + teste, o
+ * ERRO EXATO que o Cypress reportou, o print da tela no momento da falha, o
+ * objetivo do caso e o passo a passo para reproduzir.
  */
 
 const SIT_LABEL: Record<string, string> = {
@@ -33,46 +36,190 @@ function ordenar(resultados: QaResultado[]): QaResultado[] {
   );
 }
 
+const eProblema = (r: QaResultado) => r.situacao === "falhou" || r.situacao === "erro";
+
+// O nome do arquivo/spec do Cypress vem embutido em `esperado` como
+// "Teste de tela em cypress/e2e/x.cy.ts" (ver qa_registrar_bateria_e2e).
+function specDoResultado(r: QaResultado): string {
+  return (r.esperado || "").replace(/^Teste de tela em\s*/i, "").trim();
+}
+
+// Texto do "erro exato": para falha/erro é o que o Cypress reportou
+// (erro_tecnico = displayError). Só cai no genérico se não houver.
+function erroExato(r: QaResultado): string {
+  const e = (r.erro_tecnico || "").trim();
+  if (e) return e;
+  return "(o Cypress não retornou uma mensagem de erro para este teste)";
+}
+
+// Resumo curto do erro para a coluna da tabela (a tabela é panorama; o detalhe
+// completo vem depois). Para quem passou, mantém a frase amigável.
+function resumoResultado(r: QaResultado): string {
+  if (eProblema(r)) {
+    const e = (r.erro_tecnico || r.obtido || "").replace(/\s+/g, " ").trim();
+    return e.length > 100 ? e.slice(0, 100) + "…" : e;
+  }
+  return r.obtido || "";
+}
+
 // ─────────────────────────────────────────────────────────
 // PDF
 // ─────────────────────────────────────────────────────────
 export function gerarPDF(bateria: QaBateria, resultados: QaResultado[]) {
   const doc = new jsPDF();
+  const M = 14; // margem esquerda
+  const LIMITE_Y = 285; // rodapé útil
   const quando = new Date(bateria.iniciada_em).toLocaleString("pt-BR");
   const mod = bateria.modulo_path === "todos" || !bateria.modulo_path
     ? "Todos os módulos"
     : bateria.modulo_path;
 
+  // cursor com quebra de página automática
+  let y = 0;
+  const novaPagina = () => { doc.addPage(); y = 20; };
+  const garantir = (h: number) => { if (y + h > LIMITE_Y) novaPagina(); };
+  const escrever = (
+    texto: string,
+    opts: { x?: number; size?: number; color?: [number, number, number]; bold?: boolean; lineH?: number } = {},
+  ) => {
+    const x = opts.x ?? M;
+    const size = opts.size ?? 9;
+    const lineH = opts.lineH ?? size * 0.5;
+    doc.setFontSize(size);
+    doc.setTextColor(...(opts.color ?? [0, 0, 0]));
+    doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+    const linhas = doc.splitTextToSize(texto, 210 - x - M);
+    for (const ln of linhas) {
+      garantir(lineH);
+      doc.text(ln, x, y);
+      y += lineH;
+    }
+  };
+
   // Cabecalho
   doc.setFontSize(16);
-  doc.text("Relatório de Testes Automatizados", 14, 18);
+  doc.setTextColor(0);
+  doc.text("Relatório de Testes Automatizados", M, 18);
   doc.setFontSize(10);
   doc.setTextColor(100);
-  doc.text(`Módulo: ${mod}`, 14, 26);
-  doc.text(`Execução: ${quando}`, 14, 31);
-  if (bateria.disparada_por_nome) doc.text(`Disparado por: ${bateria.disparada_por_nome}`, 14, 36);
+  doc.text(`Módulo: ${mod}`, M, 26);
+  doc.text(`Execução: ${quando}`, M, 31);
+  if (bateria.disparada_por_nome) doc.text(`Disparado por: ${bateria.disparada_por_nome}`, M, 36);
 
   // Placar
   doc.setTextColor(0);
   doc.setFontSize(11);
   const placar = `${bateria.passou} passou · ${bateria.falhou} falhou · ${bateria.erro} erro · ${bateria.nao_implementado} sem rotina  (total ${bateria.total})`;
-  doc.text(placar, 14, 45);
+  doc.text(placar, M, 45);
 
-  // Tabela
+  const ordenados = ordenar(resultados);
+  const problemas = ordenados.filter(eProblema);
+
+  // ── Falhas PRIMEIRO — é o que o setor responsável precisa ver, sem ter de
+  //    rolar a lista inteira. O panorama de todos os casos vem depois. ──
+  y = 52;
+  if (problemas.length === 0) {
+    escrever("Nenhuma falha nesta corrida. 🎉", { size: 12, bold: true, color: [21, 128, 61] });
+    y += 4;
+  } else {
+    escrever(`Falhas para correção (${problemas.length})`, { size: 13, bold: true });
+    escrever(
+      "Cada bloco é auto-suficiente: arquivo do teste, o erro exato reportado pelo Cypress, o print da tela no momento da falha e o passo a passo para reproduzir.",
+      { size: 8, color: [90, 90, 90] },
+    );
+    y += 3;
+  }
+
+  problemas.forEach((r, idx) => {
+    garantir(24);
+    // régua separadora
+    doc.setDrawColor(210);
+    doc.line(M, y, 210 - M, y);
+    y += 5;
+
+    // Identificação
+    escrever(`${idx + 1}. ${r.codigo}${r.titulo ? " — " + r.titulo : ""}`, { size: 11, bold: true });
+    const spec = specDoResultado(r);
+    if (spec) escrever(`Arquivo: ${spec}`, { size: 8, color: [80, 80, 80] });
+    if (r.passo_acao) escrever(`Teste: "${r.passo_acao}"`, { size: 8, color: [80, 80, 80] });
+    escrever(`Situação: ${SIT_LABEL[r.situacao] || r.situacao}`, {
+      size: 8,
+      bold: true,
+      color: r.situacao === "falhou" ? [185, 28, 28] : [194, 65, 12],
+    });
+    y += 1.5;
+
+    // ERRO EXATO — o item mais importante para o dev
+    escrever("Erro exato (Cypress):", { size: 9.5, bold: true, color: [150, 30, 30] });
+    escrever(erroExato(r), { x: 16, size: 8.5, color: [20, 20, 20], lineH: 4.2 });
+    y += 2;
+
+    // Print da tela no momento da falha
+    if (r.evidencia_png) {
+      escrever("Tela no momento da falha:", { size: 8.5, bold: true, color: [40, 40, 40] });
+      try {
+        const dataUrl = r.evidencia_png.startsWith("data:")
+          ? r.evidencia_png
+          : `data:image/png;base64,${r.evidencia_png}`;
+        let w = 170;
+        let h = w * 0.5625; // fallback 16:9
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const props = (doc as any).getImageProperties(dataUrl);
+          if (props?.width && props?.height) {
+            h = (props.height / props.width) * w;
+            const maxH = 165;
+            if (h > maxH) { h = maxH; w = (props.width / props.height) * h; }
+          }
+        } catch { /* usa o fallback 16:9 */ }
+        if (y + h > LIMITE_Y) novaPagina();
+        doc.addImage(dataUrl, "PNG", 16, y, w, h);
+        y += h + 3;
+      } catch {
+        escrever("(não consegui embutir o print; ele está no artefato da corrida na esteira)", {
+          x: 16, size: 7.5, color: [120, 120, 120],
+        });
+      }
+    }
+
+    // Contexto: objetivo do caso
+    if (r.objetivo) {
+      escrever(`Objetivo do teste: ${r.objetivo}`, { x: 16, size: 8, color: [90, 90, 90] });
+    }
+
+    // Passo a passo para reproduzir
+    if (r.passos && r.passos.length > 0) {
+      escrever("Passo a passo para reproduzir:", { x: 16, size: 8, bold: true, color: [40, 40, 40] });
+      r.passos.forEach((p) => {
+        const partes = [`${p.ordem}. ${p.acao}`];
+        if (p.onde_na_tela && p.onde_na_tela !== "-") partes.push(`   Onde: ${p.onde_na_tela}`);
+        if (p.dados && p.dados !== "-") partes.push(`   Dados: ${p.dados}`);
+        if (p.resultado_esperado) partes.push(`   Esperado: ${p.resultado_esperado}`);
+        escrever(partes.join("\n"), { x: 18, size: 8, color: [90, 90, 90] });
+      });
+    }
+
+    if (r.duracao_ms != null) {
+      escrever(`Duração: ${r.duracao_ms} ms`, { x: 16, size: 7.5, color: [120, 120, 120] });
+    }
+    y += 5;
+  });
+
+  // ── Panorama de TODOS os casos (depois das falhas) ──
+  garantir(20);
+  y += 4;
+  escrever("Todos os casos", { size: 12, bold: true });
+  y += 2;
   autoTable(doc, {
-    startY: 50,
-    head: [["Caso", "Situação", "Resultado"]],
-    body: ordenar(resultados).map((r) => [
-      r.codigo,
-      SIT_LABEL[r.situacao] || r.situacao,
-      r.obtido || "",
-    ]),
-    styles: { fontSize: 8, cellPadding: 2 },
+    startY: y,
+    head: [["Caso", "Situação", "Resultado / início do erro"]],
+    body: ordenados.map((r) => [r.codigo, SIT_LABEL[r.situacao] || r.situacao, resumoResultado(r)]),
+    styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
     headStyles: { fillColor: [30, 41, 59] },
-    columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 24 }, 2: { cellWidth: "auto" } },
+    columnStyles: { 0: { cellWidth: 26 }, 1: { cellWidth: 22 }, 2: { cellWidth: "auto" } },
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index === 1) {
-        const s = ordenar(resultados)[data.row.index]?.situacao;
+        const s = ordenados[data.row.index]?.situacao;
         if (s === "falhou") data.cell.styles.textColor = [185, 28, 28];
         else if (s === "erro") data.cell.styles.textColor = [194, 65, 12];
         else if (s === "passou") data.cell.styles.textColor = [21, 128, 61];
@@ -80,72 +227,6 @@ export function gerarPDF(bateria: QaBateria, resultados: QaResultado[]) {
       }
     },
   });
-
-  // Detalhe das falhas/erros (o que precisa de acao)
-  const problemas = ordenar(resultados).filter((r) => r.situacao === "falhou" || r.situacao === "erro");
-  if (problemas.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let y = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(12);
-    doc.text("Detalhe do que precisa de atenção", 14, y);
-    y += 6;
-    doc.setFontSize(8);
-    problemas.forEach((r) => {
-      if (y > 260) { doc.addPage(); y = 20; }
-      doc.setTextColor(0);
-      doc.setFont(undefined, "bold");
-      doc.text(`${r.codigo}${r.titulo ? " — " + r.titulo : ""}`, 14, y); y += 4;
-      doc.setFont(undefined, "normal");
-
-      // objetivo (o porquê)
-      if (r.objetivo) {
-        doc.setTextColor(80);
-        const l = doc.splitTextToSize(`Objetivo: ${r.objetivo}`, 178);
-        doc.text(l, 16, y); y += 4 * l.length;
-      }
-      // onde falhou
-      doc.setTextColor(150, 30, 30);
-      if (r.passo_acao) {
-        const l = doc.splitTextToSize(`Falhou no passo ${r.passo_ordem}: ${r.passo_acao}`, 178);
-        doc.text(l, 16, y); y += 4 * l.length;
-      }
-      doc.setTextColor(80);
-      if (r.esperado) { const l = doc.splitTextToSize(`Esperava: ${r.esperado}`, 178); doc.text(l, 16, y); y += 4 * l.length; }
-      if (r.obtido) { const l = doc.splitTextToSize(`Obteve: ${r.obtido}`, 178); doc.text(l, 16, y); y += 4 * l.length; }
-      // impacto e correção
-      if (r.observacoes) {
-        doc.setTextColor(140, 90, 0);
-        const l = doc.splitTextToSize(r.observacoes, 178);
-        if (y + 4 * l.length > 280) { doc.addPage(); y = 20; }
-        doc.text(l, 16, y); y += 4 * l.length;
-      }
-      // passo a passo para reproduzir
-      if (r.passos && r.passos.length > 0) {
-        doc.setTextColor(0);
-        doc.setFont(undefined, "bold");
-        if (y > 265) { doc.addPage(); y = 20; }
-        doc.text("Passo a passo para reproduzir:", 16, y); y += 4;
-        doc.setFont(undefined, "normal");
-        doc.setTextColor(80);
-        r.passos.forEach((p) => {
-          if (y > 275) { doc.addPage(); y = 20; }
-          const partes = [`${p.ordem}. ${p.acao}`];
-          if (p.onde_na_tela && p.onde_na_tela !== "-") partes.push(`   Onde: ${p.onde_na_tela}`);
-          if (p.dados && p.dados !== "-") partes.push(`   Dados: ${p.dados}`);
-          if (p.resultado_esperado) partes.push(`   Esperado: ${p.resultado_esperado}`);
-          const l = doc.splitTextToSize(partes.join("\n"), 176);
-          doc.text(l, 18, y); y += 4 * l.length;
-        });
-      }
-      if (r.erro_tecnico) {
-        doc.setTextColor(150);
-        const l = doc.splitTextToSize(`Técnico: ${r.erro_tecnico}`, 178);
-        if (y + 4 * l.length > 285) { doc.addPage(); y = 20; }
-        doc.text(l, 16, y); y += 4 * l.length;
-      }
-      y += 4;
-    });
-  }
 
   doc.save(nomeArquivo(bateria, "pdf"));
 }
@@ -158,13 +239,13 @@ export function gerarCSV(bateria: QaBateria, resultados: QaResultado[]) {
     Caso: r.codigo,
     Titulo: r.titulo || "",
     Situacao: SIT_LABEL[r.situacao] || r.situacao,
+    Arquivo: specDoResultado(r),
+    Teste: r.passo_acao || "",
+    Erro_exato: eProblema(r) ? erroExato(r) : "",
     Objetivo: r.objetivo || "",
-    Passo_que_falhou: r.passo_acao || "",
-    Esperado: r.esperado || "",
-    Obtido: r.obtido || "",
     Impacto_e_correcao: r.observacoes || "",
-    Erro_tecnico: r.erro_tecnico || "",
     Duracao_ms: r.duracao_ms ?? "",
+    Tem_print: r.evidencia_png ? "sim" : "",
   }));
   const ws = XLSX.utils.json_to_sheet(linhas);
   const wb = XLSX.utils.book_new();
@@ -182,15 +263,41 @@ export function abrirImprimivel(bateria: QaBateria, resultados: QaResultado[]) {
   const cor: Record<string, string> = {
     passou: "#15803d", falhou: "#b91c1c", erro: "#c2410c", nao_implementado: "#64748b",
   };
-  const linhas = ordenar(resultados).map((r) => `
+  const esc = (s: string) => (s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
+  const ordenados = ordenar(resultados);
+
+  const linhas = ordenados.map((r) => `
     <tr>
-      <td style="font-family:monospace;white-space:nowrap">${r.codigo}</td>
+      <td style="font-family:monospace;white-space:nowrap">${esc(r.codigo)}</td>
       <td style="color:${cor[r.situacao]};font-weight:600">${SIT_LABEL[r.situacao] || r.situacao}</td>
-      <td>${(r.obtido || "").replace(/</g, "&lt;")}</td>
+      <td>${esc(resumoResultado(r))}</td>
     </tr>`).join("");
 
+  const problemas = ordenados.filter(eProblema);
+  const detalhes = problemas.map((r, i) => {
+    const spec = specDoResultado(r);
+    const img = r.evidencia_png
+      ? `<div class="lbl">Tela no momento da falha:</div>
+         <img class="print" src="${r.evidencia_png.startsWith("data:") ? r.evidencia_png : `data:image/png;base64,${r.evidencia_png}`}" alt="print da falha ${esc(r.codigo)}">`
+      : "";
+    const passos = (r.passos && r.passos.length)
+      ? `<div class="lbl">Passo a passo para reproduzir:</div><ol class="passos">${r.passos.map((p) =>
+          `<li>${esc(p.acao)}${p.resultado_esperado ? ` <em>(esperado: ${esc(p.resultado_esperado)})</em>` : ""}</li>`).join("")}</ol>`
+      : "";
+    return `
+      <section class="falha">
+        <h3>${i + 1}. ${esc(r.codigo)}${r.titulo ? " — " + esc(r.titulo) : ""}</h3>
+        <div class="meta2">${spec ? `Arquivo: <code>${esc(spec)}</code> · ` : ""}${r.passo_acao ? `Teste: “${esc(r.passo_acao)}” · ` : ""}<span style="color:${cor[r.situacao]};font-weight:600">${SIT_LABEL[r.situacao] || r.situacao}</span></div>
+        <div class="lbl erro">Erro exato (Cypress):</div>
+        <pre class="erro">${esc(erroExato(r))}</pre>
+        ${img}
+        ${r.objetivo ? `<div class="obj">Objetivo do teste: ${esc(r.objetivo)}</div>` : ""}
+        ${passos}
+      </section>`;
+  }).join("");
+
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
-    <title>Relatório QA — ${mod}</title>
+    <title>Relatório QA — ${esc(mod)}</title>
     <style>
       body{font-family:system-ui,sans-serif;max-width:900px;margin:24px auto;padding:0 16px;color:#0f172a}
       h1{font-size:18px;margin:0 0 4px} .meta{color:#64748b;font-size:13px;margin-bottom:16px}
@@ -198,19 +305,35 @@ export function abrirImprimivel(bateria: QaBateria, resultados: QaResultado[]) {
       table{width:100%;border-collapse:collapse;font-size:13px}
       th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}
       th{background:#1e293b;color:#fff}
-      @media print{th{background:#1e293b!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+      h2{font-size:15px;margin:26px 0 6px}
+      .falha{border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin:12px 0;page-break-inside:avoid}
+      .falha h3{font-size:14px;margin:0 0 4px}
+      .meta2{color:#64748b;font-size:12px;margin-bottom:8px}
+      .lbl{font-weight:600;font-size:12px;margin:8px 0 3px}
+      .lbl.erro{color:#b91c1c}
+      pre.erro{background:#fef2f2;border:1px solid #fecaca;color:#7f1d1d;padding:10px;border-radius:6px;white-space:pre-wrap;word-break:break-word;font-size:12px;margin:0}
+      img.print{max-width:100%;border:1px solid #e2e8f0;border-radius:6px;margin:4px 0}
+      .obj{color:#475569;font-size:12px;margin-top:8px}
+      ol.passos{font-size:12px;color:#475569;margin:4px 0 0 18px}
+      code{background:#f1f5f9;padding:1px 4px;border-radius:4px;font-size:12px}
+      @media print{th{background:#1e293b!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        pre.erro,img.print{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
       .btn{margin:16px 0;padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px}
       @media print{.btn{display:none}}
     </style></head><body>
     <h1>Relatório de Testes Automatizados</h1>
-    <div class="meta">Módulo: ${mod} · Execução: ${quando}${bateria.disparada_por_nome ? " · " + bateria.disparada_por_nome : ""}</div>
+    <div class="meta">Módulo: ${esc(mod)} · Execução: ${quando}${bateria.disparada_por_nome ? " · " + esc(bateria.disparada_por_nome) : ""}</div>
     <button class="btn" onclick="window.print()">Imprimir / Salvar PDF</button>
     <div class="placar"><strong>${bateria.passou}</strong> passou ·
       <strong style="color:#b91c1c">${bateria.falhou}</strong> falhou ·
       <strong style="color:#c2410c">${bateria.erro}</strong> erro ·
       <strong style="color:#64748b">${bateria.nao_implementado}</strong> sem rotina
       (total ${bateria.total})</div>
-    <table><thead><tr><th>Caso</th><th>Situação</th><th>Resultado</th></tr></thead>
+    ${problemas.length
+      ? `<h2>Falhas para correção (${problemas.length})</h2>${detalhes}`
+      : `<div class="obj" style="font-size:14px;color:#15803d;font-weight:600">Nenhuma falha nesta corrida. 🎉</div>`}
+    <h2>Todos os casos</h2>
+    <table><thead><tr><th>Caso</th><th>Situação</th><th>Resultado / início do erro</th></tr></thead>
     <tbody>${linhas}</tbody></table>
     </body></html>`;
 

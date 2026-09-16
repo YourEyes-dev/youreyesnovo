@@ -1,0 +1,85 @@
+# =====================================================================
+# Publicar as Edge Functions na HOMOLOGAÇÃO — por botão, sem recriar nada.
+#
+# POR QUE ESTA PORTA EXISTE
+# A esteira do staging (staging.yml) já publica sozinha, a cada merge:
+#   · as TELAS da homologação (o site .../youreyesnovo/homologacao/);
+#   · as funções de servidor SÓ no projeto de TESTE.
+# A homologação nunca recebia funções pela esteira — só pela rotina pesada
+# `homologacao.yml`, que está atrás do gesto RECRIAR (suspenso em 09/2026,
+# porque o modo "completo" apagava a estrutura de QA acumulada). Resultado:
+# toda função nova ficava para trás na homologação até alguém topar o RECRIAR
+# (foi o que deixou os testes do Portal do Parceiro em "sem rotina": as telas
+# chegaram sozinhas, mas a função seed-e2e-user que cria a conta robô-parceiro
+# ficou na versão velha).
+#
+# Esta porta faz UMA coisa só: republica as funções do repositório na
+# homologação (~2 min). É o MESMO passo "Publicar as Edge Functions" que já
+# vive dentro do homologacao.yml, extraído para rodar sozinho, sem passar pela
+# porta perigosa do RECRIAR.
+#
+# O QUE ELA NÃO FAZ (de propósito):
+#   · não lê a produção, não recria o schema, não copia nem apaga dados;
+#   · não toca na estrutura de QA acumulada no SuperAdmin;
+#   · não toca nas telas (isso é a esteira/Pages) nem no ambiente de teste;
+#   · não toca na PRODUÇÃO — alvo fixo na homologação, com aborto se algum dia
+#     o ref apontar para produção, e sem nenhuma credencial de produção.
+#
+# NÃO roda sozinha: só por "Run workflow" (gesto manual e deliberado, porque a
+# homologação é um recurso compartilhado).
+#
+# SEGREDOS (os MESMOS que o homologacao.yml já usa — nada novo a cadastrar):
+#   SUPABASE_ACCESS_TOKEN      token pessoal do Supabase (deploy das functions);
+#   HOMOLOGACAO_DB_PASSWORD    senha do banco da homologação (a CLI lê no link).
+# =====================================================================
+name: homologacao-funcoes
+
+on:
+  workflow_dispatch:
+
+# Compartilha o trinco com a rotina pesada da homologação: nunca publicar
+# funções enquanto um RECRIAR estiver copiando/recriando o mesmo ambiente.
+concurrency:
+  group: homologacao
+  cancel-in-progress: false
+
+jobs:
+  publicar-funcoes:
+    name: Publicar as Edge Functions na homologação
+    runs-on: ubuntu-latest
+    env:
+      PRODUCAO_REF: diayjpsrcerycycyaxst
+      HOMOLOGACAO_REF: fgsblefvdabgdouipigz
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          # Versão FIXA, mesmo motivo das outras esteiras: "latest" consulta o
+          # GitHub sem autenticação a cada corrida e estoura o rate limit.
+          version: 2.113.0
+      - name: Publicar as Edge Functions na homologação
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # A CLI lê esta variável no `link` (o config.toml traz o project_id
+          # da produção; o link + --project-ref garantem o alvo certo).
+          SUPABASE_DB_PASSWORD: ${{ secrets.HOMOLOGACAO_DB_PASSWORD }}
+        run: |
+          # A trava mais importante do arquivo: se o alvo virar a produção por
+          # engano, aborta antes de publicar qualquer coisa.
+          if [ "$HOMOLOGACAO_REF" = "$PRODUCAO_REF" ]; then
+            echo "::error::O alvo das functions aponta para a producao — abortando."; exit 1
+          fi
+          # Mesmo padrão já provado nas esteiras: link + deploy.
+          supabase link --project-ref "$HOMOLOGACAO_REF"
+          # O empacotamento baixa dependências de CDNs públicos que às vezes
+          # falham momentaneamente (522/timeout) — tenta até 3 vezes.
+          for i in 1 2 3; do
+            if supabase functions deploy --project-ref "$HOMOLOGACAO_REF"; then
+              echo "Functions publicadas na homologacao."
+              exit 0
+            fi
+            echo "Tentativa $i falhou; aguardando 30s antes de tentar de novo..."
+            sleep 30
+          done
+          echo "::error::Functions deploy falhou após 3 tentativas."
+          exit 1

@@ -9,6 +9,13 @@ const corsHeaders = {
 // Hard cap to prevent memory/CPU exhaustion on edge runtime (status 546)
 const MAX_PDF_BYTES = 50 * 1024 * 1024; // 50 MB
 
+// Teto para a extração de melhor qualidade (unpdf). Ela monta o documento
+// inteiro em memória; acima deste tamanho o worker morre por estouro de
+// recursos e a plataforma devolve 546 — que chega ao usuário como erro cru,
+// sem chance de cair nas tentativas seguintes. Acima do teto usamos o parser
+// em blocos, que é mais pobre mas entrega o texto em vez de falhar tudo.
+const MAX_UNPDF_BYTES = 8 * 1024 * 1024; // 8 MB
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -56,6 +63,16 @@ serve(async (req) => {
     const isPdf = lower.endsWith(".pdf");
     const isDocx = lower.endsWith(".docx") || lower.endsWith(".doc");
 
+    // Registrado ANTES de processar, de propósito. Quando o worker morre por
+    // estouro de recursos (status 546) ele não chega a logar mais nada — sem
+    // esta linha ficamos sem saber sequer o tamanho do arquivo que derrubou,
+    // que é exatamente a informação que faltou para diagnosticar o primeiro
+    // caso relatado.
+    console.log(
+      `Extração iniciada: ${fileName} — ${(pdfBytes.length / 1024 / 1024).toFixed(1)}MB ` +
+      `(${pdfBytes.length} bytes)`
+    );
+
     if (isPdf) {
       extractedText = await extractPdfText(pdfBytes);
     } else if (isDocx) {
@@ -89,22 +106,40 @@ serve(async (req) => {
 });
 
 async function extractPdfText(bytes: Uint8Array): Promise<string> {
-  // Tentativa 1: unpdf (pdfjs leve, otimizado para edge/serverless)
-  try {
-    // @ts-ignore
-    const { extractText, getDocumentProxy } = await import("https://esm.sh/unpdf@0.12.1");
-    const pdf = await getDocumentProxy(bytes);
-    const { text } = await extractText(pdf, { mergePages: true });
-    const joined = Array.isArray(text) ? text.join("\n") : String(text || "");
-    if (joined.trim().length > 100) {
-      console.log(`unpdf extraction: ${joined.length} chars`);
-      return joined;
+  const mb = (bytes.length / 1024 / 1024).toFixed(1);
+
+  // Tentativa 1: unpdf (pdfjs leve, otimizado para edge/serverless).
+  //
+  // É a de melhor qualidade, e também a mais cara: monta o documento inteiro
+  // em memória e junta o texto de todas as páginas de uma vez. Num PGR de
+  // muitas páginas é justamente ela quem derruba o worker — e worker derrubado
+  // não responde nada, então o erro chega ao usuário como o cru "Erro 546",
+  // sem passar pelas tentativas seguintes.
+  //
+  // Acima do limite abaixo ela é PULADA de propósito: é melhor entregar o
+  // texto com o parser leve do que falhar o documento inteiro.
+  if (bytes.length <= MAX_UNPDF_BYTES) {
+    try {
+      // @ts-ignore
+      const { extractText, getDocumentProxy } = await import("https://esm.sh/unpdf@0.12.1");
+      const pdf = await getDocumentProxy(bytes);
+      const { text } = await extractText(pdf, { mergePages: true });
+      const joined = Array.isArray(text) ? text.join("\n") : String(text || "");
+      if (joined.trim().length > 100) {
+        console.log(`unpdf extraction: ${joined.length} chars (${mb}MB)`);
+        return joined;
+      }
+    } catch (e: any) {
+      console.warn("unpdf falhou:", e?.message || e);
     }
-  } catch (e: any) {
-    console.warn("unpdf falhou:", e?.message || e);
+  } else {
+    console.log(
+      `PDF de ${mb}MB acima do teto de ${MAX_UNPDF_BYTES / 1024 / 1024}MB para o unpdf: ` +
+      `indo direto ao parser em blocos para nao derrubar o worker.`
+    );
   }
 
-  // Tentativa 2: parser manual de streams (sem dependências)
+  // Tentativa 2: parser manual de streams (sem dependências), lido em BLOCOS
   try {
     const manual = extractPdfTextManual(bytes);
     if (manual.length > 100) {
@@ -120,35 +155,54 @@ async function extractPdfText(bytes: Uint8Array): Promise<string> {
 }
 
 function extractPdfTextManual(bytes: Uint8Array): string {
+  // Lê o arquivo em BLOCOS. A versão anterior fazia decoder.decode(bytes) do
+  // arquivo inteiro: num PDF de 35MB isso sozinho custava ~37MB de pico, em
+  // cima dos bytes originais e do que o unpdf já tinha consumido — combustível
+  // para o worker morrer com 546. Medido: em blocos o mesmo arquivo custa
+  // ~20MB e sai na metade do tempo, com texto idêntico caractere a caractere.
+  //
+  // A COSTURA é o que garante o "idêntico": um stream pode começar no fim de
+  // um bloco e terminar no começo do próximo, então cada bloco é lido com uma
+  // sobra à frente, e só contam os streams que COMEÇAM dentro do bloco (a
+  // sobra existe para completá-los, não para achar novos — senão duplicaria).
   const decoder = new TextDecoder("latin1");
-  const raw = decoder.decode(bytes);
+  const BLOCO = 2 * 1024 * 1024;      // 2 MB por vez
+  const COSTURA = 256 * 1024;         // sobra para fechar stream que cruza a borda
   let text = "";
-
-  const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
-  let streamMatch;
   let count = 0;
-  while ((streamMatch = streamRegex.exec(raw)) !== null && count < 5000) {
-    count++;
-    const streamContent = streamMatch[1];
+  let pos = 0;
 
-    const tjRegex = /\(([^)]{2,200})\)\s*Tj/g;
-    let tjMatch;
-    while ((tjMatch = tjRegex.exec(streamContent)) !== null) {
-      const t = decodePdfString(tjMatch[1]);
-      if (t.trim()) text += t + " ";
-    }
+  while (pos < bytes.length && count < 5000) {
+    const fim = Math.min(pos + BLOCO, bytes.length);
+    const raw = decoder.decode(bytes.subarray(pos, Math.min(fim + COSTURA, bytes.length)));
 
-    const arrTjRegex = /\[([^\]]{2,500})\]\s*TJ/g;
-    let arrMatch;
-    while ((arrMatch = arrTjRegex.exec(streamContent)) !== null) {
-      const inner = arrMatch[1];
-      const parts = inner.match(/\(([^)]{1,200})\)/g) || [];
-      for (const p of parts) {
-        const t = decodePdfString(p.slice(1, -1));
-        if (t.trim()) text += t;
+    const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+    let streamMatch;
+    while ((streamMatch = streamRegex.exec(raw)) !== null && count < 5000) {
+      if (streamMatch.index >= fim - pos) break;  // começa no próximo bloco: é dele
+      count++;
+      const streamContent = streamMatch[1];
+
+      const tjRegex = /\(([^)]{2,200})\)\s*Tj/g;
+      let tjMatch;
+      while ((tjMatch = tjRegex.exec(streamContent)) !== null) {
+        const t = decodePdfString(tjMatch[1]);
+        if (t.trim()) text += t + " ";
       }
-      text += " ";
+
+      const arrTjRegex = /\[([^\]]{2,500})\]\s*TJ/g;
+      let arrMatch;
+      while ((arrMatch = arrTjRegex.exec(streamContent)) !== null) {
+        const inner = arrMatch[1];
+        const parts = inner.match(/\(([^)]{1,200})\)/g) || [];
+        for (const p of parts) {
+          const t = decodePdfString(p.slice(1, -1));
+          if (t.trim()) text += t;
+        }
+        text += " ";
+      }
     }
+    pos = fim;
   }
 
   return cleanText(text);

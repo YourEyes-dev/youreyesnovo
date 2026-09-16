@@ -162,6 +162,11 @@ export function SolicitarAjusteModal({ open, onOpenChange, token, cpf }: Props) 
     const map: Record<string, string[]> = {};
     const porDia: Record<string, { hora: string }[]> = {};
     marcacoes.forEach((m) => {
+      // Só entra na folha o que é horário de verdade. Um registro sem hora
+      // legível virava um campo vazio no meio do dia — uma "batida fantasma"
+      // que empurrava as posições seguintes e, pior, fazia o primeiro horário
+      // digitado ali ser lido como CORREÇÃO de uma batida que não existe.
+      if (!/^\d{2}:\d{2}/.test(String(m.hora || ""))) return;
       (porDia[m.data] ||= []).push({ hora: m.hora });
     });
     Object.entries(porDia).forEach(([data, lista]) => {
@@ -216,8 +221,26 @@ export function SolicitarAjusteModal({ open, onOpenChange, token, cpf }: Props) 
     });
   };
 
-  // Remove a última marcação da sequência
+  // Remove uma marcação ACRESCENTADA agora. Nunca uma batida já registrada.
+  //
+  // Sem esta guarda o app tinha um beco sem saída silencioso: tirar um horário
+  // real marcava a linha como alterada (a justificativa até abria), mas o
+  // envio só monta item para horário ADICIONADO — então o contador ficava em
+  // zero, o botão continuava apagado e nenhuma mensagem aparecia. O
+  // funcionário mexia na folha, escolhia o motivo, e nada acontecia.
+  //
+  // Excluir batida também não existe no resto do sistema: ponto_ajustes.tipo_ajuste
+  // só aceita inclusao/correcao/justificativa/abono. Ou seja, a tela oferecia um
+  // gesto que o banco não sabe representar. A correção é impedir o gesto e
+  // dizer o que fazer no lugar — igual à folha interna, que já resolveu isso.
   const removerMarcacao = (data: string, idx: number) => {
+    const original = marcsPorDia[data] || [];
+    if (idx < original.length) {
+      toast.error(
+        "Não é possível excluir um horário já registrado. Para corrigi-lo, altere a hora; para anular o dia, escolha uma justificativa."
+      );
+      return;
+    }
     setEdits((prev) => {
       const cur = prev[data] || editDia(data);
       const base = cur.marcacoes !== undefined ? [...cur.marcacoes] : [...(marcsPorDia[data] || [])];
@@ -232,15 +255,22 @@ export function SolicitarAjusteModal({ open, onOpenChange, token, cpf }: Props) 
     setEdits((prev) => ({ ...prev, [data]: { ...editDia(data), justificativaOutro: v } }));
   };
 
-  // Itens efetivamente alterados, comparando POSIÇÃO a posição:
-  // - mudou e havia original na posição i  -> correção (horaOriginal = original[i])
-  // - posição nova (i >= nº de originais)   -> inclusão (sem horaOriginal)
-  // O tipo (entrada/saida) é dado pela posição (par/ímpar).
-  // Diferença POR HORÁRIO (não por posição): mantém as marcações que já
-  // existem, trata horários novos como INCLUSÃO (sem apagar nada) e só usa
-  // CORREÇÃO quando um horário original foi de fato trocado por outro. O tipo
-  // (entrada/saída) vem da posição cronológica do dia inteiro — assim adicionar
-  // a entrada da manhã não vira "correção" que sobrescreve a marcação da tarde.
+  // Itens efetivamente alterados, comparando POSIÇÃO a posição — exatamente o
+  // que a tela mostra: cada campo de horário é uma batida específica, e quando
+  // o funcionário troca o valor a própria linha exibe "orig: HH:MM".
+  //
+  // A versão anterior comparava CONJUNTOS (horários que sumiram × horários que
+  // apareceram) e casava um com o outro pela ordem da lista. Quando as duas
+  // listas tinham tamanhos diferentes, o casamento saía torto e o pedido ia
+  // para o gestor dizendo outra coisa: apagar a entrada das 08:00 e acrescentar
+  // uma batida às 12:05 virava "corrigir 08:00 para 12:05" — a marcação da
+  // manhã era sobrescrita. Errado com sucesso, que é o pior tipo de erro.
+  //
+  // Agora: posição i < nº de originais e valor diferente -> CORREÇÃO daquela
+  // batida; posição nova (i >= nº de originais) -> INCLUSÃO. Campo em branco
+  // não vira pedido nenhum. O tipo (entrada/saída) continua vindo da ordem
+  // cronológica do dia inteiro, para que acrescentar a entrada da manhã não
+  // seja rotulada como saída só por ter sido digitada por último.
   const itensAlterados = useMemo(() => {
     const out: { data: string; tipo: "entrada" | "saida"; hora: string; horaOriginal?: string; motivo: string }[] = [];
     Object.entries(edits).forEach(([data, ed]) => {
@@ -251,24 +281,36 @@ export function SolicitarAjusteModal({ open, onOpenChange, token, cpf }: Props) 
         ed.justificativaPreset === "Outro (descrever)"
           ? ed.justificativaOutro.trim()
           : ed.justificativaPreset.trim();
-      const novas = ed.marcacoes.map((s) => (s || "").trim()).filter(Boolean);
-      const origSet = new Set(original);
-      const novasSet = new Set(novas);
-      const ordenadas = [...novas].sort((a, b) => (toMin(a) ?? 0) - (toMin(b) ?? 0));
+      const propostas = ed.marcacoes.map((s) => (s || "").trim());
+      const ordenadas = propostas.filter(Boolean).sort((a, b) => (toMin(a) ?? 0) - (toMin(b) ?? 0));
       const tipoDe = (hora: string) => tipoPorIndice(ordenadas.indexOf(hora));
-      const removidos = original.filter((o) => !novasSet.has(o));
-      const adicionados = novas.filter((n) => !origSet.has(n));
-      let r = 0;
-      for (const hora of adicionados) {
-        if (r < removidos.length) {
-          out.push({ data, tipo: tipoDe(hora), hora, horaOriginal: removidos[r], motivo: motivoFinal });
-          r++;
-        } else {
-          out.push({ data, tipo: tipoDe(hora), hora, horaOriginal: undefined, motivo: motivoFinal });
-        }
-      }
+      propostas.forEach((hora, i) => {
+        if (!hora) return;                    // linha em branco: nada a pedir
+        const orig = original[i];             // undefined = linha acrescentada agora
+        if (orig === hora) return;            // não mexeu nesta batida
+        out.push({
+          data,
+          tipo: tipoDe(hora),
+          hora,
+          horaOriginal: orig || undefined,
+          motivo: motivoFinal,
+        });
+      });
     });
     return out;
+  }, [edits, marcsPorDia, pendentesPorDia]);
+
+  // Batida registrada que o funcionário apagou (limpou o campo ou sumiu com a
+  // linha). Não vira pedido — o banco não sabe representar "excluir batida" —,
+  // mas precisa de aviso próprio: sem ele o envio só dizia "altere ao menos um
+  // horário", que não descreve o que a pessoa acabou de fazer.
+  const apagouRegistrada = useMemo(() => {
+    return Object.entries(edits).some(([data, ed]) => {
+      if (ed.marcacoes === undefined) return false;
+      if (diaBloqueado(data)) return false;
+      const original = marcsPorDia[data] || [];
+      return original.some((o, i) => !!o && !((ed.marcacoes as string[])[i] || "").trim());
+    });
   }, [edits, marcsPorDia, pendentesPorDia]);
 
   const totalAlteracoes = itensAlterados.length;
@@ -284,6 +326,13 @@ export function SolicitarAjusteModal({ open, onOpenChange, token, cpf }: Props) 
   };
 
   const validar = (): string | null => {
+    // Este aviso vem ANTES do "altere ao menos um horário": apagar uma batida
+    // registrada não gera item, então os dois casos chegam aqui com contador
+    // zero — e quem apagou precisa ouvir sobre o que apagou, não um recado
+    // genérico que parece dizer que ele não fez nada.
+    if (apagouRegistrada) {
+      return "Não é possível excluir um horário já registrado. Para corrigi-lo, altere a hora; para anular o dia, escolha uma justificativa.";
+    }
     if (totalAlteracoes === 0) return "Altere ou inclua ao menos um horário na folha.";
     if (totalAlteracoes > MAX_ITENS) return `Máximo de ${MAX_ITENS} ajustes por envio.`;
     const now = new Date();
@@ -438,12 +487,16 @@ export function SolicitarAjusteModal({ open, onOpenChange, token, cpf }: Props) 
                     : ""
                   }`}
                 />
-                {ehUltima && (
+                {/* Só a marcação ACRESCENTADA agora ganha o X — antes era a
+                    última da lista, fosse ela real ou não, o que punha um
+                    botão de excluir em cima de uma batida do relógio. Mesmo
+                    critério da folha interna (`novaMarc`). */}
+                {novaMarc && ehUltima && (
                   <button
                     type="button"
                     onClick={() => removerMarcacao(data, i)}
                     className="text-muted-foreground hover:text-destructive shrink-0 p-1"
-                    title="Remover marcação"
+                    title="Remover marcação adicionada"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -677,7 +730,13 @@ export function SolicitarAjusteModal({ open, onOpenChange, token, cpf }: Props) 
               </div>
               <div className="grid grid-cols-2 gap-2 mt-auto">
                 <Button variant="outline" className="w-full" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                <Button className="w-full" onClick={handleSubmit} disabled={enviando || totalAlteracoes === 0}>
+                {/* O botão NÃO fica mais desabilitado por falta de alteração. Usar o
+                    `disabled` como validação impedia handleSubmit de rodar — e
+                    com ele validar(), que tem a mensagem pronta explicando o
+                    que falta. O resultado era um botão morto sem explicação
+                    nenhuma. Agora ele clica, valida e DIZ o motivo. Só
+                    `enviando` continua bloqueando, para não enviar duas vezes. */}
+                <Button className="w-full" onClick={handleSubmit} disabled={enviando}>
                   {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : `Enviar Ajustes (${totalAlteracoes || 0})`}
                 </Button>
               </div>

@@ -122,7 +122,7 @@ export function SaidaEstoqueForm({
                     <SelectContent>
                       {epis.map((epi) => (
                         <SelectItem key={epi.id} value={epi.id}>
-                          {epi.tipo?.nome || "EPI"} {epi.ca ? `(CA: ${epi.ca})` : ""} — Estoque: {epi.quantidade_estoque}
+                          {epi.tipo?.nome || "EPI"} {(epi.ca || epi.tipo?.ca_numero) ? `(CA: ${epi.ca || epi.tipo?.ca_numero})` : ""} — Estoque: {epi.quantidade_estoque}
                         </SelectItem>
                       ))}
                     </SelectContent>

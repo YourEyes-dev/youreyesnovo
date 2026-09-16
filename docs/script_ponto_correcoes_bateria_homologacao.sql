@@ -47,6 +47,19 @@ SET lock_timeout = '10s';
 -- ---------------------------------------------------------------------------
 -- (A) PONTO-191 — versao atual da verificacao da cadeia (somente leitura)
 -- ---------------------------------------------------------------------------
+DO $guarda191$
+BEGIN
+  -- A verificacao da cadeia le a coluna nsr das marcacoes. Onde a NSR ainda
+  -- nao existe (ambiente que nao recebeu a onda do AFD), a criacao falharia
+  -- na validacao e — por rodar tudo em UMA transacao — derrubaria tambem a
+  -- correcao (B). Entao ela so entra quando a coluna existe; do contrario o
+  -- arquivo segue e avisa. Sem NSR nao ha o que encadear, mesmo.
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'ponto_marcacoes'
+       AND column_name = 'nsr'
+  ) THEN
+    EXECUTE $def191$
 CREATE OR REPLACE FUNCTION public.ponto_verificar_cadeia_hash(p_tenant_id uuid DEFAULT NULL::uuid, p_empresa_id uuid DEFAULT NULL::uuid)
  RETURNS TABLE(tenant_id uuid, empresa_id uuid, nsr bigint, marcacao_id uuid, tipo_quebra text, detalhe text)
  LANGUAGE sql
@@ -101,7 +114,12 @@ AS $function$
      OR (prev_nsr IS NOT NULL AND nsr <> prev_nsr + 1)
   ORDER BY tenant_id, empresa_id NULLS FIRST, nsr;
 $function$
-;
+$def191$;
+    RAISE NOTICE 'PONTO-191: verificacao da cadeia de hash atualizada.';
+  ELSE
+    RAISE NOTICE 'PONTO-191 PULADO: este ambiente nao tem a coluna nsr em ponto_marcacoes — sem NSR nao ha cadeia a verificar. A correcao (B), do PONTO-354, foi aplicada normalmente.';
+  END IF;
+END $guarda191$;
 
 -- ---------------------------------------------------------------------------
 -- (B) PONTO-354 — conversao de saldo vencido com escopo opcional de tenant
@@ -227,7 +245,12 @@ END $function$
 
 -- ---------------------------------------------------------------------------
 -- CONFERENCIA — o SQL Editor mostra apenas o ultimo resultado.
--- Esperado: t | t | t | t | OK
+--
+-- Esperado onde HA a coluna nsr:      t | t | t | t | OK
+-- Esperado onde NAO HA a coluna nsr:  f | f | t | t | OK
+--   (a parte 191 e pulada de proposito: sem NSR nao ha cadeia a verificar)
+--
+--   tem_nsr         : o ambiente tem ponto_marcacoes.nsr
 --   p191_sonda_acha : a sonda do PONTO-191 encontra a funcao de verificacao
 --   p191_encadeado  : a verificacao continua conferindo o hash anterior
 --   p354_escopo     : converter_banco_horas_vencido(uuid) existe
@@ -235,6 +258,9 @@ END $function$
 -- ---------------------------------------------------------------------------
 WITH x AS MATERIALIZED (
   SELECT
+    EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'ponto_marcacoes'
+               AND column_name = 'nsr') AS tem_nsr,
     EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
              WHERE n.nspname = 'public' AND p.proname NOT LIKE 'qa\_%'
                AND p.prosrc ILIKE '%hash_marcacao%' AND p.prosrc ILIKE '%verific%') AS p191_sonda_acha,
@@ -247,6 +273,13 @@ WITH x AS MATERIALIZED (
                AND p.prosrc ILIKE '%converter_banco_horas_vencido(public.qa_sandbox_tenant_id())%') AS p354_caso_escopa
 )
 SELECT p191_sonda_acha, p191_encadeado, p354_escopo, p354_caso_escopa,
-       CASE WHEN p191_sonda_acha AND p191_encadeado AND p354_escopo AND p354_caso_escopa
-            THEN 'OK' ELSE 'CONFERIR' END AS erro_tecnico
+       CASE
+         -- Sem NSR, a parte 191 nao se aplica: o arquivo esta correto se a
+         -- correcao do 354 entrou. O PONTO-191 seguira reprovando na bateria,
+         -- e com razao: sem NSR nao ha numeracao sequencial a encadear.
+         WHEN NOT tem_nsr AND p354_escopo AND p354_caso_escopa THEN 'OK'
+         WHEN tem_nsr AND p191_sonda_acha AND p191_encadeado
+              AND p354_escopo AND p354_caso_escopa THEN 'OK'
+         ELSE 'CONFERIR'
+       END AS erro_tecnico
 FROM x;

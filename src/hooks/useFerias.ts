@@ -7,6 +7,7 @@ import { toast } from "sonner";
 export interface FeriasSolicitacao {
   id: string;
   tenant_id: string;
+  empresa_id?: string | null;
   colaborador_id: string | null;
   colaborador_nome: string;
   colaborador_cpf: string | null;
@@ -33,6 +34,8 @@ export interface FeriasSolicitacao {
   registro_financeiro_id: string | null;
   aviso_gerado: boolean;
   recibo_gerado: boolean;
+  aviso_ciencia_em: string | null;
+  aviso_ciencia_origem: string | null;
   assinatura_link_id: string | null;
   assinatura_status: string | null;
   inr_score_momento: number | null;
@@ -204,6 +207,51 @@ export function useFerias() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  // Iniciar o gozo. A trava do banco (trg_ferias_trava_em_gozo) recusa se o
+  // aviso ainda nao tem ciencia (art. 135) — traduzimos o erro para o usuario.
+  const iniciarGozo = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("ferias_solicitacoes" as any)
+        .update({ status: "em_gozo" } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ferias_solicitacoes"] });
+      toast.success("Gozo de férias iniciado.");
+    },
+    onError: (err: any) => {
+      const msg = String(err?.message || "");
+      if (msg.includes("ciência") || msg.includes("ciencia")) {
+        toast.error("O aviso ainda não tem ciência do colaborador. Colha a assinatura do aviso ou registre a ciência antes de iniciar o gozo.");
+      } else {
+        toast.error(msg || "Erro ao iniciar o gozo");
+      }
+    },
+  });
+
+  // Registrar a ciencia do aviso colhida FORA do sistema (papel). E a valvula
+  // para quem nao usa assinatura digital; fica rastreavel (quem e quando).
+  const registrarCienciaManual = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("ferias_solicitacoes" as any)
+        .update({
+          aviso_ciencia_em: new Date().toISOString(),
+          aviso_ciencia_origem: "papel",
+          aviso_ciencia_por: user?.id ?? null,
+        } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ferias_solicitacoes"] });
+      toast.success("Ciência do aviso registrada (em papel).");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const atualizarCampo = useMutation({
     mutationFn: async ({ id, campo, valor }: { id: string; campo: string; valor: any }) => {
       const { error } = await supabase
@@ -254,6 +302,8 @@ export function useFerias() {
     criarSolicitacao,
     aprovar,
     recusar,
+    iniciarGozo,
+    registrarCienciaManual,
     atualizarCampo,
     useHistorico,
     stats,

@@ -131,20 +131,28 @@ export function PlanoAcaoPGR({ campanhas }: PlanoAcaoPGRProps) {
     [selecionadas],
   );
 
-  // GHEs com respondentes suficientes para análise
+  // GHEs com respondentes suficientes para análise.
+  // Quando o próprio GHE tem menos de 5 elegíveis (empresa pequena), o piso de
+  // anonimato é inatingível por definição — nesse caso o mínimo passa a ser a
+  // população elegível do grupo (nunca menor que 1).
   const ghes = useMemo(
     () =>
       resultadosPorGHE
         .filter(g => g.count > 0)
-        .map(g => ({
-          ...g,
-          liberado: g.count >= minimoGrupo,
-          fatores: g.count >= minimoGrupo
-            ? calcularFatoresRisco(g.radar, { isSipro, severidades })
-            : [],
-        })),
+        .map(g => {
+          const minGrupo = Math.max(1, Math.min(minimoGrupo, g.elegiveis || minimoGrupo));
+          const liberado = g.count >= minGrupo;
+          return {
+            ...g,
+            liberado,
+            fatores: liberado
+              ? calcularFatoresRisco(g.radar, { isSipro, severidades })
+              : [],
+          };
+        }),
     [resultadosPorGHE, isSipro, severidades, minimoGrupo],
   );
+
 
   const acoesPorGhe = useMemo(() => {
     const mapa = new Map<string, AcaoPlanoPsicossocial[]>();

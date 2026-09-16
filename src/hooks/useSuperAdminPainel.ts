@@ -60,7 +60,7 @@ export function useSuperAdminUsuarios(search: string) {
 
 // ============ LEADS CRM ============
 export type LeadStatus = "novo" | "contatado" | "qualificado" | "proposta" | "negociacao" | "convertido" | "perdido";
-export type LeadOrigem = "landing_page" | "indicacao" | "prospect_manual" | "linkedin" | "whatsapp" | "evento" | "outro";
+export type LeadOrigem = "landing_page" | "indicacao" | "prospect_manual" | "linkedin" | "whatsapp" | "evento" | "meta_ads" | "outro";
 
 export interface Lead {
   id: string;
@@ -78,6 +78,12 @@ export interface Lead {
   notas?: string | null;
   tags?: string[];
   ultimo_contato_at?: string | null;
+  parceiro_id?: string | null;
+  parceiro_link_id?: string | null;
+  atribuicao?: 'link' | 'casa' | null;
+  implantador_parceiro_id?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
   created_at: string;
   updated_at: string;
 }

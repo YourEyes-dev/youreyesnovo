@@ -18,7 +18,7 @@ interface ServicoFormModalProps {
   categorias: MarketplaceCategoria[];
 }
 
-export function ServicoFormModal({ open, onClose, onSuccess, profissionalId, categorias }: ServicoFormModalProps) {
+export function ServicoFormModal({ open, onClose, onSuccess, categorias }: ServicoFormModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({
     nome: "",
@@ -45,20 +45,21 @@ export function ServicoFormModal({ open, onClose, onSuccess, profissionalId, cat
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.from("marketplace_servicos").insert({
-        profissional_id: profissionalId,
-        nome: form.nome,
-        descricao: form.descricao,
-        categoria_id: form.categoria_id || null,
-        base_legal: form.base_legal || null,
-        modalidade: form.modalidade,
-        publico_alvo: form.publico_alvo || null,
-        evidencia_minima: form.evidencia_minima || null,
-        vinculo_tipo_acao: form.vinculo_tipo_acao || null,
-        preco_referencia: form.preco_referencia ? parseFloat(form.preco_referencia) : null,
-        duracao_estimada_minutos: form.duracao_estimada_minutos ? parseInt(form.duracao_estimada_minutos) : null,
+      // Anúncio salvo como rascunho pela função e publicado em seguida (RN-021).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      const { data: salvo, error } = await sb.rpc("marketye_anuncio_salvar", {
+        _dados: {
+          categoria_id: form.categoria_id || null, nome: form.nome, descricao: form.descricao, base_legal: form.base_legal || null,
+          modalidade: form.modalidade, publico_alvo: form.publico_alvo || null, evidencia_minima: form.evidencia_minima || null,
+          preco_referencia: form.preco_referencia ? parseFloat(form.preco_referencia) : null,
+          tipo_preco: form.preco_referencia ? "visita" : "sob_orcamento",
+          duracao_estimada_minutos: form.duracao_estimada_minutos ? parseInt(form.duracao_estimada_minutos) : null,
+        },
       });
       if (error) throw error;
+      const { error: pubErr } = await sb.rpc("marketye_anuncio_publicar", { p_id: salvo.id });
+      if (pubErr) { toast.warning(String(pubErr.message).replace(/^.*?:\s*/, "")); }
       toast.success("Serviço cadastrado com sucesso!");
       onSuccess();
       onClose();

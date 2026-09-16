@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLeads, Lead, LeadStatus, enviarWhatsAppSuperAdmin } from "@/hooks/useSuperAdminPainel";
+import { useParceirosOpcoes, useSugestaoParceiros, encaminharLeadAoParceiro, PARCEIRO_TIPO_LABEL } from "@/hooks/useParceiros";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -160,6 +162,20 @@ function LeadFormDialog({ open, lead, onClose, onSubmit }: {
 }) {
   const [form, setForm] = useState<Partial<Lead>>({});
   const isEdit = !!lead;
+  const { data: parceiros = [] } = useParceirosOpcoes();
+  const SEM_PARCEIRO = "__nenhum__";
+  const [mostrarSugestao, setMostrarSugestao] = useState(false);
+  const { data: sugestoes = [], isLoading: carregandoSugestao } = useSugestaoParceiros(mostrarSugestao && lead ? lead.id : null);
+  const qc = useQueryClient();
+  const encaminhar = async (parceiroId: string) => {
+    if (!lead) return;
+    try {
+      await encaminharLeadAoParceiro(lead.id, parceiroId);
+      setForm((f) => ({ ...f, parceiro_id: parceiroId, atribuicao: "casa" }));
+      qc.invalidateQueries({ queryKey: ["superadmin", "leads"] });
+      toast.success("Lead encaminhado ao parceiro");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível encaminhar"); }
+  };
 
   // reset on open / quando o lead muda
   useEffect(() => {
@@ -184,11 +200,16 @@ function LeadFormDialog({ open, lead, onClose, onSubmit }: {
             <Input type="email" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div><Label>Telefone</Label>
             <Input value={form.telefone || ""} onChange={(e) => setForm({ ...form, telefone: e.target.value })} placeholder="(11) 99999-9999" /></div>
+          <div><Label>Cidade</Label>
+            <Input value={form.cidade || ""} onChange={(e) => setForm({ ...form, cidade: e.target.value })} placeholder="para sugerir parceiro por região" /></div>
+          <div><Label>UF</Label>
+            <Input maxLength={2} className="uppercase" value={form.uf || ""} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} /></div>
           <div><Label>Origem</Label>
             <Select value={form.origem} onValueChange={(v) => setForm({ ...form, origem: v as any })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="landing_page">Landing Page</SelectItem>
+                <SelectItem value="meta_ads">Meta Ads (tráfego pago)</SelectItem>
                 <SelectItem value="indicacao">Indicação</SelectItem>
                 <SelectItem value="prospect_manual">Prospect Manual</SelectItem>
                 <SelectItem value="linkedin">LinkedIn</SelectItem>
@@ -205,6 +226,37 @@ function LeadFormDialog({ open, lead, onClose, onSubmit }: {
                 {COLUNAS.map(s => <SelectItem key={s} value={s}>{STATUS_LABELS[s].label}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div className="col-span-2"><Label>Parceiro (quem indicou ou vai atender)</Label>
+            <Select value={form.parceiro_id || SEM_PARCEIRO}
+              onValueChange={(v) => setForm({ ...form, parceiro_id: v === SEM_PARCEIRO ? null : v, atribuicao: v === SEM_PARCEIRO ? null : (form.atribuicao || "casa"), ...(v !== SEM_PARCEIRO && form.origem === "prospect_manual" ? { origem: "indicacao" as const } : {}) })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SEM_PARCEIRO}>— sem parceiro —</SelectItem>
+                {parceiros.filter(p => p.status === "ativo" || p.id === form.parceiro_id).map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.nome} · {PARCEIRO_TIPO_LABEL[p.tipo_parceiro]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.parceiro_id && <p className="text-xs text-muted-foreground mt-1">Atribuição: {form.atribuicao === "link" ? "chegou pelo link do parceiro" : "encaminhado pela casa"}</p>}
+            {isEdit && !form.parceiro_id && (
+              <div className="mt-2">
+                {!mostrarSugestao ? (
+                  <Button type="button" size="sm" variant="outline" onClick={() => setMostrarSugestao(true)} data-testid="lead-sugerir-parceiro">Sugerir parceiro por localidade</Button>
+                ) : carregandoSugestao ? <p className="text-xs text-muted-foreground">Procurando parceiros perto de {form.cidade || form.uf || "…"}</p> : sugestoes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhum parceiro ativo para sugerir. Preencha cidade/UF do lead e cadastre parceiros na região.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {sugestoes.map((s) => (
+                      <li key={s.id} className="flex items-center justify-between rounded-md border px-2 py-1.5 text-sm">
+                        <span><span className="font-medium">{s.nome}</span> <span className="text-xs text-muted-foreground">· {PARCEIRO_TIPO_LABEL[s.tipo_parceiro]} · {[s.cidade, s.uf].filter(Boolean).join("/") || "sem região"} · {s.motivo}{s.nivel ? ` · ${s.nivel}` : ""} · {s.clientes} cliente(s)</span></span>
+                        <Button type="button" size="sm" variant="secondary" onClick={() => encaminhar(s.id)}>Encaminhar</Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
           <div><Label>Valor Estimado (R$)</Label>
             <Input type="number" step="0.01" value={form.valor_estimado ?? ""}

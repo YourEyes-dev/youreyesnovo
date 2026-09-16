@@ -146,7 +146,10 @@ export function ResultadosPorGHEPanel() {
       .map(g => {
         const fatores = avaliarFatores(g.radar, isSipro);
         fatores.sort((a, b) => (ordemNivel[a.nivelKey] ?? 4) - (ordemNivel[b.nivelKey] ?? 4));
-        const bloqueado = g.count < minimoGrupo;
+        // GHE com menos de 5 elegíveis (empresa pequena) nunca alcançaria o piso
+        // de anonimato: o mínimo passa a ser a própria população do grupo.
+        const minGrupo = Math.max(1, Math.min(minimoGrupo, g.elegiveis || minimoGrupo));
+        const bloqueado = g.count < minGrupo;
         return {
           ...g,
           fatores: bloqueado ? [] : fatores,

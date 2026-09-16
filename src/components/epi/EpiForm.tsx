@@ -43,17 +43,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+// CA e validade não são mais obrigatórios AQUI: quem decide é a categoria
+// (epi_categorias.exige_ca). Capacete e luva têm Certificado de Aprovação;
+// uniforme e crachá não têm. A exigência é conferida no envio, em
+// handleSubmit, onde a categoria escolhida já é conhecida. O formato continua
+// validado sempre que o campo vier preenchido.
 const schema = z.object({
   nome: z.string().min(2, "Nome do EPI deve ter pelo menos 2 caracteres"),
   categoria: z.string().optional(),
   codigo: z.string().optional(),
-  ca: z.string().min(1, "Número do CA é obrigatório (NR-06)").regex(/^\d+$/, "CA deve conter apenas números"),
+  ca: z.string().regex(/^\d*$/, "CA deve conter apenas números").optional(),
   marca: z.string().optional(),
   modelo: z.string().optional(),
   tamanho: z.string().optional(),
   data_fabricacao: z.string().optional(),
-  data_validade: z.string().min(1, "Data de validade do CA é obrigatória").refine((val) => {
-    if (!val) return false;
+  data_validade: z.string().optional().refine((val) => {
+    if (!val) return true;
     const date = new Date(val);
     return !isNaN(date.getTime());
   }, "Data de validade inválida"),
@@ -96,6 +101,12 @@ interface EpiFormProps {
   onCreateCategoria?: (nome: string) => Promise<void>;
   tipos: EpiTipo[];
   customCategorias?: string[];
+  /**
+   * Categorias que exigem CA, por nome. Categoria ausente do mapa conta como
+   * "exige" — é o padrão da coluna no banco e mantém a NR-06 valendo para
+   * tudo que ninguém marcou ainda.
+   */
+  categoriasExigemCa?: Record<string, boolean>;
   epi?: EpiCompleto | null;
   isLoading?: boolean;
 }
@@ -108,6 +119,7 @@ export function EpiForm({
   onCreateCategoria,
   tipos,
   customCategorias = [],
+  categoriasExigemCa = {},
   epi,
   isLoading,
 }: EpiFormProps) {
@@ -128,6 +140,10 @@ export function EpiForm({
     const allCategories = [...new Set([...CATEGORIAS_EPI, ...existingCategories, ...customCategorias])];
     return allCategories.sort();
   }, [tipos, customCategorias]);
+
+  // A categoria manda na exigência do CA. Sem categoria escolhida, exige —
+  // é o comportamento antigo, e é o lado seguro do erro.
+  const exigeCa = categoriasExigemCa[selectedCategoria] ?? true;
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -209,6 +225,26 @@ export function EpiForm({
   }, [caValue, epi?.ca]);
 
   const handleSubmit = async (data: FormData) => {
+    // Exigência de CA conforme a categoria escolhida (NR-06 para o que é EPI
+    // de verdade; nada para uniforme e afins).
+    if (exigeCa) {
+      let faltou = false;
+      if (!data.ca?.trim()) {
+        form.setError("ca", { message: "Número do CA é obrigatório para esta categoria (NR-06)." });
+        faltou = true;
+      }
+      if (!data.data_validade?.trim()) {
+        form.setError("data_validade", { message: "Data de validade do CA é obrigatória para esta categoria." });
+        faltou = true;
+      }
+      if (faltou) {
+        toast.error(
+          "Esta categoria exige CA e data de validade. Se este item não tem CA (uniforme, por exemplo), marque a categoria como isenta em EPI › Configurações."
+        );
+        return;
+      }
+    }
+
     // CT-36: Bloquear se CA já existe
     if (caExistente) {
       toast.error(`O CA ${data.ca} já está cadastrado para o EPI "${caExistente}".`);
@@ -227,7 +263,14 @@ export function EpiForm({
         periodicidade_troca_dias: data.periodicidade_troca_dias ? Number(data.periodicidade_troca_dias) : null,
         marca: data.marca,
         fabricante: data.fabricante,
-        ca_numero: data.ca,
+        // Vazio vira undefined: categoria isenta de CA cadastra sem número e
+        // sem validade, e string vazia em coluna de data quebraria o insert.
+        ca_numero: data.ca?.trim() || undefined,
+        // Faltava enviar a validade: a assinatura de onCreateTipo já a
+        // declarava, mas handleSubmit nunca a mandava, então
+        // epi_tipos.ca_validade ficava sempre NULL — e os alertas de CA
+        // vencido/vencendo nunca disparavam para item nenhum.
+        ca_validade: data.data_validade?.trim() || undefined,
         estoque_minimo: data.quantidade_minima,
         estoque_inicial: data.quantidade_estoque,
         controla_tamanho: controlaTamanho,
@@ -365,8 +408,13 @@ export function EpiForm({
               )} />
               <FormField control={form.control} name="ca" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>CA (Certificado de Aprovação)</FormLabel>
-                  <FormControl><Input placeholder="Número do CA" {...field} /></FormControl>
+                  <FormLabel>CA (Certificado de Aprovação){exigeCa ? " *" : ""}</FormLabel>
+                  <FormControl><Input placeholder={exigeCa ? "Número do CA" : "Número do CA (opcional)"} {...field} /></FormControl>
+                  {!exigeCa && selectedCategoria && (
+                    <p className="text-xs text-muted-foreground">
+                      A categoria "{selectedCategoria}" está marcada como isenta de CA.
+                    </p>
+                  )}
                   {caExistente && (
                     <p className="text-xs text-destructive font-medium">
                       ⚠ CA já cadastrado para: {caExistente}
@@ -453,7 +501,7 @@ export function EpiForm({
               )} />
               <FormField control={form.control} name="data_validade" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Data de Validade</FormLabel>
+                  <FormLabel>Data de Validade{exigeCa ? " *" : ""}</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

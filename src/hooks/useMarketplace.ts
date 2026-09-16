@@ -202,7 +202,7 @@ export function useMarketplace() {
       if (!tenantId) return [];
       const { data, error } = await supabase
         .from("marketplace_contratacoes")
-        .select("*, servico:marketplace_servicos(*), profissional:marketplace_profissionais(*)")
+        .select(`*, servico:marketplace_servicos(*), profissional:marketplace_profissionais(${PROF_PUBLIC_COLS})`)
         .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false });
       if (error) throw error;

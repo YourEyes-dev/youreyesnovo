@@ -156,7 +156,7 @@ serve(async (req) => {
     return json({ error: "Campos obrigatórios: email, nomeCompleto, role" }, 400);
   }
 
-  if (role === "owner") {
+  if ((role as string) === "owner") {
     return json({ error: "Não é possível criar owners por esta função" }, 400);
   }
 

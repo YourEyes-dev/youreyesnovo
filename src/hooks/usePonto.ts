@@ -47,6 +47,11 @@ export interface PontoDiario {
   status: "pendente" | "regular" | "atraso" | "falta" | "incompleto" | "ajuste_pendente" | "justificado";
   observacao: string | null;
   tipo_dia: "normal" | "feriado" | "ferias" | "atestado" | "afastamento" | null;
+  // Súmula 338/TST: de onde veio o intervalo do dia — batido ("marcado") ou
+  // declarado em pré-assinalação ("pre_assinalado"). Metadado de exibição:
+  // o motor de saldo não lê.
+  intervalo_origem: "marcado" | "pre_assinalado" | null;
+  intervalo_pre_assinalado_minutos: number | null;
   feriado_nome: string | null;
   feriado_trabalhado: boolean | null;
   created_at: string;
@@ -403,6 +408,21 @@ export function usePonto() {
         }
         throw error;
       }
+
+      // Portaria MTP 671/2021: a marcação gera um COMPROVANTE — recibo do
+      // trabalhador com empregador, data/hora, NSR e hash, arquivado e
+      // disponibilizado (prazo de 48h). Falha aqui não desfaz a batida: a
+      // marcação já está registrada e a vigilância de 48h cobra o comprovante
+      // que faltar.
+      try {
+        await (supabase.rpc as any)("ponto_gerar_comprovante", {
+          p_tenant_id: tenantId,
+          p_marcacao_id: (data as any)?.id,
+        });
+      } catch {
+        // silencioso de propósito — ver comentário acima
+      }
+
       return data as PontoMarcacao;
     },
     onSuccess: (data, variables) => {

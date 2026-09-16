@@ -8,9 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useTenant } from "@/hooks/useTenant";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FileCode, Send, DollarSign, Building2, RefreshCw } from "lucide-react";
+import { FileCode, Send, DollarSign, Building2, RefreshCw, Gift, ShieldCheck, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useDecimoTerceiroESocial, type ValidacaoESocial13 } from "@/hooks/useDecimoTerceiroESocial";
 import {
   gerarEventoS1200,
   gerarEventoS1210,
@@ -22,6 +23,58 @@ export function FolhaESocialTab() {
   const { tenantId } = useTenant();
   const [competencia, setCompetencia] = useState(format(new Date(), "yyyy-MM"));
   const [gerando, setGerando] = useState(false);
+
+  // ── 13º salário: apuração ANUAL própria, separada da folha mensal ──
+  const [ano13, setAno13] = useState(new Date().getFullYear());
+  const [validacao13, setValidacao13] = useState<ValidacaoESocial13 | null>(null);
+  const esocial13 = useDecimoTerceiroESocial();
+
+  const { data: eventos13 = [], refetch: recarregarEventos13 } = useQuery({
+    queryKey: ["esocial-13", tenantId, ano13],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      const { data } = await supabase
+        .from("esocial_transmissoes" as any)
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("origem_modulo", "decimo_terceiro")
+        .eq("ano", ano13)
+        .order("created_at", { ascending: false }) as { data: any[] | null };
+      return data || [];
+    },
+    enabled: !!tenantId,
+  });
+
+  const validar13 = async () => {
+    try {
+      const r = await esocial13.validar(ano13);
+      setValidacao13(r);
+      if (!r) return;
+      if (r.pode_transmitir) {
+        toast.success(`13º de ${ano13}: ${r.aptos} cálculo(s) aptos para o eSocial.`);
+      } else if (r.aptos === 0 && r.com_problema === 0) {
+        toast.warning(`Nenhum cálculo de 13º encontrado para ${ano13}.`);
+      } else {
+        toast.warning(`${r.com_problema} pendência(s) a corrigir antes de montar os eventos.`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha na validação do 13º.");
+    }
+  };
+
+  const gerar13 = async (tipo: "S-1200" | "S-1210") => {
+    try {
+      const r = await esocial13.gerar(ano13, tipo);
+      toast.success(
+        `${tipo}: ${r.eventos_gerados} evento(s) montado(s)` +
+        (r.ja_existiam ? `, ${r.ja_existiam} já existia(m).` : ".") +
+        " Os eventos ficam PENDENTES — a transmissão é um passo à parte."
+      );
+      recarregarEventos13();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao montar os eventos do 13º.");
+    }
+  };
 
   // Buscar folha items da competência
   const { data: folhaItens = [] } = useQuery({
@@ -169,6 +222,103 @@ export function FolhaESocialTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── 13º salário: apuração anual (indApuracao = 2) ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Gift className="w-4 h-4 text-primary" /> 13º salário — apuração anual
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                O 13º não entra na folha do mês: vai no S-1200 com apuração <strong>anual</strong> e nos
+                pagamentos do S-1210. Valide antes — é onde se evita a rejeição.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="ano13" className="text-sm">Ano</Label>
+              <input
+                id="ano13"
+                type="number"
+                className="h-9 w-24 rounded-md border border-input bg-background px-2 text-sm"
+                value={ano13}
+                onChange={(e) => { setAno13(Number(e.target.value)); setValidacao13(null); }}
+              />
+              <Button size="sm" variant="outline" onClick={validar13} disabled={esocial13.ocupado}>
+                <ShieldCheck className="w-4 h-4 mr-1" /> Validar 13º
+              </Button>
+              <Button size="sm" onClick={() => gerar13("S-1200")} disabled={esocial13.ocupado}>
+                <Send className="w-4 h-4 mr-1" /> Gerar S-1200
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => gerar13("S-1210")} disabled={esocial13.ocupado}>
+                <Send className="w-4 h-4 mr-1" /> Gerar S-1210
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {validacao13 && (
+            <div className="rounded-md border p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium">
+                {validacao13.pode_transmitir ? (
+                  <><ShieldCheck className="w-4 h-4 text-green-600" /> {validacao13.aptos} cálculo(s) aptos — pode montar os eventos.</>
+                ) : (
+                  <><AlertTriangle className="w-4 h-4 text-amber-600" /> {validacao13.com_problema} pendência(s) a corrigir.</>
+                )}
+              </div>
+              {validacao13.problemas.length > 0 && (
+                <ul className="mt-2 space-y-1 text-muted-foreground">
+                  {validacao13.problemas.map((p) => (
+                    <li key={`${p.calculo_id}-${p.parcela}`}>
+                      • <strong>{p.colaborador}</strong> (parcela {p.parcela}): {p.problema}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {eventos13.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Evento</TableHead>
+                  <TableHead>CPF</TableHead>
+                  <TableHead className="text-center">Apuração</TableHead>
+                  <TableHead className="text-center">Período</TableHead>
+                  <TableHead className="text-center">Parcela</TableHead>
+                  <TableHead className="text-center">Leiaute</TableHead>
+                  <TableHead className="text-center">Situação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {eventos13.map((ev: any) => (
+                  <TableRow key={ev.id}>
+                    <TableCell className="font-mono text-xs">{ev.tipo_evento}</TableCell>
+                    <TableCell>{String(ev.colaborador_cpf || "").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</TableCell>
+                    <TableCell className="text-center">{ev.ind_apuracao === 2 ? "Anual" : "Mensal"}</TableCell>
+                    <TableCell className="text-center">{ev.periodo_apuracao}</TableCell>
+                    <TableCell className="text-center">{ev.parcela ?? "—"}</TableCell>
+                    <TableCell className="text-center">{ev.leiaute_versao}</TableCell>
+                    <TableCell className="text-center"><Badge variant="secondary">{ev.status}</Badge></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Nenhum evento de 13º montado para {ano13}.
+            </p>
+          )}
+
+          <p className="text-xs text-muted-foreground border-t pt-3">
+            Os eventos são <strong>montados e conferidos</strong>, não enviados: a transmissão depende de
+            certificado digital, procuração eletrônica e do ambiente do eSocial. Confira também a versão do
+            leiaute vigente na data do envio — leiaute desatualizado é a causa mais comum de rejeição.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Detalhamento S-1200 */}
       {resumos && resumos.eventosS1200.length > 0 && (

@@ -5,8 +5,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Star, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { useTenant } from "@/hooks/useTenant";
 import { toast } from "sonner";
 import type { MarketplaceContratacao } from "@/hooks/useMarketplace";
 
@@ -51,8 +49,6 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
 }
 
 export function AvaliacaoModal({ contratacao, open, onClose, onSuccess }: AvaliacaoModalProps) {
-  const { user } = useAuth();
-  const { tenantId } = useTenant();
   const [isLoading, setIsLoading] = useState(false);
   const [notas, setNotas] = useState<Record<string, number>>({
     pontualidade: 0,
@@ -74,53 +70,16 @@ export function AvaliacaoModal({ contratacao, open, onClose, onSuccess }: Avalia
       toast.error("Avalie todos os critérios antes de enviar");
       return;
     }
-    if (!tenantId) return;
 
     setIsLoading(true);
     try {
-      // 1. Insert evaluation
-      const { error } = await supabase.from("marketplace_avaliacoes").insert({
-        contratacao_id: contratacao.id,
-        profissional_id: contratacao.profissional_id,
-        servico_id: contratacao.servico_id,
-        avaliador_id: user?.id || null,
-        tenant_id: tenantId,
-        pontualidade: notas.pontualidade,
-        clareza: notas.clareza,
-        aderencia_escopo: notas.aderencia_escopo,
-        profissionalismo: notas.profissionalismo,
-        nota_geral: notaGeral,
-        comentario: comentario.trim() || null,
+      // Só transação verificada avalia (RN-004): a função confere status/prazo e
+      // recalcula a reputação em dois eixos; nada de UPDATE direto de nota.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).rpc("marketye_avaliar", {
+        p_ref_tipo: "contratacao", p_ref_id: contratacao.id, p_notas: notas, p_comentario: comentario.trim() || null,
       });
       if (error) throw error;
-
-      // 2. Update professional average rating
-      const { data: avaliacoes } = await supabase
-        .from("marketplace_avaliacoes")
-        .select("nota_geral")
-        .eq("profissional_id", contratacao.profissional_id);
-
-      if (avaliacoes && avaliacoes.length > 0) {
-        const media = +(avaliacoes.reduce((s, a) => s + (a.nota_geral || 0), 0) / avaliacoes.length).toFixed(1);
-        await supabase
-          .from("marketplace_profissionais")
-          .update({
-            nota_media: media,
-            total_avaliacoes: avaliacoes.length,
-          })
-          .eq("id", contratacao.profissional_id);
-      }
-
-      // 3. Audit log
-      await supabase.from("marketplace_audit_log").insert({
-        tenant_id: tenantId,
-        contratacao_id: contratacao.id,
-        profissional_id: contratacao.profissional_id,
-        acao: "avaliacao_enviada",
-        descricao: `Avaliação enviada: ${notaGeral}/5`,
-        dados: { notas, nota_geral: notaGeral },
-      });
-
       toast.success("Avaliação enviada com sucesso!");
       onSuccess();
       onClose();

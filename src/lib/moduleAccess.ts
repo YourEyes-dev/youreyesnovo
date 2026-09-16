@@ -116,9 +116,10 @@ export const ADMIN_PATHS = new Set<string>([
  */
 export const ALWAYS_ALLOWED_PATHS = new Set<string>([
   "/",
-  "/marketplace", // Rede de Parceiros: módulo global no header
+  "/marketplace", // MarketYE (marketplace de serviços): módulo global no header
 
   "/meu-perfil",
+  "/meu-plano", // autosserviço: cada empresa vê o próprio plano/consumo
   "/suporte",
   "/pendencias",
   "/configuracoes", // a página em si filtra por role; necessário p/ auto-serviço
@@ -196,6 +197,10 @@ export const ROTAS_PUBLICAS = new Set<string>([
   "/site",
   "/politica-de-privacidade",
   "/termos-de-uso",
+  "/marketye",               // MarketYE: página pública de captação de especialistas
+  "/marketye/cadastro",      // MarketYE: cadastro do especialista sem acesso ao sistema
+  "/marketye/entrar",        // MarketYE: login do especialista
+  "/marketye/portal",        // MarketYE: portal restrito do especialista (guarda própria)
 ]);
 
 /** Rotas internas da YourEyes, liberadas apenas para superadmin. */
@@ -207,6 +212,7 @@ export const ROTAS_SUPERADMIN = new Set<string>([
   "/admin/qa",
   "/admin/qa/docs",
   "/admin/qa/runner",
+  "/admin/controle-clientes",
   "/admin/youreyes",
 ]);
 

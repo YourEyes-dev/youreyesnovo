@@ -194,7 +194,7 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [vinculoFilter, setVinculoFilter] = useState<"clt" | "pj" | "todos">("todos");
+  const [estabelecimentoFilter, setEstabelecimentoFilter] = useState<string>("todos");
 
   const [showForm, setShowForm] = useState(false);
   const [showNovoChoice, setShowNovoChoice] = useState(false);
@@ -291,7 +291,9 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
         Celular: c.celular || "",
         Cargo: c.cargo,
         Departamento: c.departamento || "",
-        Filial: c.filial || "",
+        // Mesmo nome do campo no cadastro e do filtro novo — "Filial" era
+        // um terceiro nome para a mesma coisa.
+        "Estabelecimento / Obra": c.filial || "",
         "Tipo Contrato": c.tipo_contrato || "",
         "Data Admissão": c.data_admissao || "",
         Status: statusLabels[c.status] || c.status,
@@ -314,7 +316,7 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
     // (centro_custo, gestor_imediato, matricula_esocial, cbo, etc.)
     const { data: full, error: fullErr } = await supabase
       .from("admissoes")
-      .select("id, nome_completo, cpf, email, celular, tipo_contrato, cargo, departamento, filial, centro_custo, gestor_imediato, data_admissao, matricula_esocial, cbo, foto_url, bate_ponto")
+      .select("id, nome_completo, cpf, email, celular, tipo_contrato, cargo, departamento, filial, centro_custo, gestor_imediato, data_admissao, matricula_esocial, cbo, foto_url, bate_ponto, art62_inciso, art62_documento, teletrabalho_modalidade")
       .eq("id", colab.id)
       .maybeSingle();
 
@@ -341,6 +343,9 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
       cbo: src.cbo ?? null,
       foto_url: src.foto_url ?? colab.foto_url,
       bate_ponto: src.bate_ponto,
+      art62_inciso: src.art62_inciso,
+      art62_documento: src.art62_documento,
+      teletrabalho_modalidade: src.teletrabalho_modalidade,
     });
     setShowForm(true);
   };
@@ -410,15 +415,35 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
     const matchesDepartment = departmentFilter === "all" || colab.departamento === departmentFilter;
     const matchesStatus = statusFilter === "all" || colab.status === statusFilter;
     // Vínculo: CLT (não-PJ) | PJ (somente ativos) | Todos (oculta PJ inativos)
+    // O filtro CLT/PJ saiu (pedido dos usuários: dava menos resultado do que
+    // ocupava espaço), mas a regra que morava no seu ramo "todos" FICA: PJ
+    // inativo continua oculto. Apagar o Select sem trazer esta linha junto
+    // faria prestadores desligados reaparecerem na lista de ativos — efeito
+    // colateral silencioso de uma remoção que parecia inofensiva.
     const ehPJ = isPJ(colab.tipo_contrato);
     const inativo = !!(colab as any).inativo;
-    let matchesVinculo = true;
-    if (vinculoFilter === "clt") matchesVinculo = !ehPJ;
-    else if (vinculoFilter === "pj") matchesVinculo = ehPJ && !inativo;
-    else matchesVinculo = !ehPJ || !inativo; // todos: oculta PJ inativo
-    return matchesSearch && matchesDepartment && matchesStatus && matchesVinculo;
+    const matchesVinculo = !ehPJ || !inativo;
+
+    // No lugar dele, o filtro por Estabelecimento / Obra. O dado já vem na
+    // consulta (admissoes.filial) e é o mesmo que o cadastro do colaborador
+    // grava no campo "Estabelecimento / Obra" — que guarda o NOME, não o id.
+    const matchesEstabelecimento =
+      estabelecimentoFilter === "todos" ||
+      (colab.filial || "").trim() === estabelecimentoFilter;
+
+    return matchesSearch && matchesDepartment && matchesStatus
+      && matchesVinculo && matchesEstabelecimento;
   });
 
+
+  const estabelecimentos = [
+    ...new Set(
+      colaboradores
+        .map((c) => c.filial)
+        .filter((f): f is string => typeof f === "string" && f.trim().length > 0)
+        .map((f) => f.trim()),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   const departments = [
     ...new Set(
@@ -457,14 +482,15 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
                 ))}
             </SelectContent>
           </Select>
-          <Select value={vinculoFilter} onValueChange={(v) => setVinculoFilter(v as "clt" | "pj" | "todos")}>
-            <SelectTrigger className="w-full md:w-[180px]">
-              <SelectValue placeholder="Vínculo" />
+          <Select value={estabelecimentoFilter} onValueChange={setEstabelecimentoFilter}>
+            <SelectTrigger className="w-full md:w-[200px]">
+              <SelectValue placeholder="Estabelecimento / Obra" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="clt">CLT</SelectItem>
-              <SelectItem value="pj">PJ / CNPJ</SelectItem>
-              <SelectItem value="todos">Todos os vínculos</SelectItem>
+              <SelectItem value="todos">Todos os estabelecimentos</SelectItem>
+              {estabelecimentos.map((est) => (
+                <SelectItem key={est} value={est}>{est}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           {podeExportar("colaboradores") && (
@@ -511,8 +537,8 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
             Nenhum colaborador corresponde aos filtros atuais.
           </p>
           <p className="text-xs text-muted-foreground mb-4">
-            {vinculoFilter !== "todos"
-              ? `O filtro de vínculo "${vinculoFilter === "clt" ? "CLT" : "PJ / CNPJ"}" pode estar ocultando colaboradores. Há ${colaboradores.length} cadastrado${colaboradores.length !== 1 ? "s" : ""} nesta empresa.`
+            {estabelecimentoFilter !== "todos"
+              ? `O filtro "${estabelecimentoFilter}" pode estar ocultando colaboradores. Há ${colaboradores.length} cadastrado${colaboradores.length !== 1 ? "s" : ""} nesta empresa.`
               : `Há ${colaboradores.length} colaborador${colaboradores.length !== 1 ? "es" : ""} cadastrado${colaboradores.length !== 1 ? "s" : ""} nesta empresa.`}
           </p>
           <Button
@@ -521,7 +547,7 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
               setSearchTerm("");
               setDepartmentFilter("all");
               setStatusFilter("all");
-              setVinculoFilter("todos");
+              setEstabelecimentoFilter("todos");
             }}
           >
             Limpar filtros

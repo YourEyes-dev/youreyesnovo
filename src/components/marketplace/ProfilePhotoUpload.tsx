@@ -55,7 +55,7 @@ export function ProfilePhotoUpload({ file, preview, onChange }: ProfilePhotoUplo
         </Button>
       )}
       <p className="text-[11px] text-muted-foreground text-center">
-        Esta foto será exibida no seu perfil público na Rede de Parceiros.
+        Esta foto será exibida no seu perfil público no MarketYE.
       </p>
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
     </div>

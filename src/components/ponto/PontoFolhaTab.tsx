@@ -45,8 +45,26 @@ export function PontoFolhaTab() {
   const [gerando, setGerando] = useState(false);
   const [perguntandoBanco, setPerguntandoBanco] = useState(false);
 
-  const { useBancoHorasPorCompetencia } = usePontoBancoHoras();
+  const { useBancoHorasPorCompetencia, useBancoHorasOficial } = usePontoBancoHoras();
   const { data: bancosHoras = [] } = useBancoHorasPorCompetencia(competencia);
+
+  /**
+   * Quem tem instrumento de compensação vigente NÃO leva hora extra para a
+   * folha: o excedente já virou crédito no banco (CLT art. 59, §2º). Emitir a
+   * mesma hora nas duas pontas é pagar duas vezes o que já foi creditado —
+   * apontado na auditoria de DP de 01/09/2026, que viu os mesmos 1h51
+   * aparecerem como "Horas extras" e como "Crédito Banco de Horas".
+   * Sem regime vigente, as horas são devidas em dinheiro e seguem para a
+   * folha normalmente (art. 59, §1º).
+   */
+  const { data: bancoOficial = [] } = useBancoHorasOficial(competencia);
+  const emBancoDeHoras = (cpf: string) => {
+    const d = String(cpf || "").replace(/\D/g, "");
+    const o: any = (bancoOficial as any[]).find(
+      (x) => String(x.colaborador_cpf || "").replace(/\D/g, "") === d,
+    );
+    return o?.tem_regime === true;
+  };
   const soDigitos = (v: string) => String(v || "").replace(/\D/g, "");
   const bancoDoCpf = (cpf: string) =>
     bancosHoras.find((b: any) => soDigitos(b.colaborador_cpf) === soDigitos(cpf));
@@ -83,20 +101,28 @@ export function PontoFolhaTab() {
 
 
   const gerarDadosFolha = () => {
-    return espelhos.map((e: any) => ({
+    return espelhos.map((e: any) => {
+      // Hora que foi para o banco não vai para a folha: já foi creditada.
+      const noBanco = emBancoDeHoras(e.colaborador_cpf);
+      return ({
       cpf: e.colaborador_cpf,
       nome: e.colaborador_nome,
       competencia: competencia,
+      em_banco_de_horas: noBanco,
       dias_trabalhados: e.total_dias_trabalhados || 0,
       horas_normais_min: (e.total_dias_trabalhados || 0) * 480,
-      he_50_min: e.total_horas_extras_50_minutos || 0,
-      he_100_min: e.total_horas_extras_100_minutos || 0,
+      he_50_min: noBanco ? 0 : (e.total_horas_extras_50_minutos || 0),
+      he_100_min: noBanco ? 0 : (e.total_horas_extras_100_minutos || 0),
+      he_creditada_banco_min: noBanco
+        ? (e.total_horas_extras_50_minutos || 0) + (e.total_horas_extras_100_minutos || 0)
+        : 0,
       adicional_noturno_min: e.total_adicional_noturno_minutos || 0,
       feriado_100_min: feriadoMinDoCpf(e.colaborador_cpf),
       faltas: e.total_faltas || 0,
       atrasos_min: e.total_atrasos_minutos || 0,
       dsr_descontar: e.total_faltas > 0 ? 1 : 0,
-    }));
+    });
+    });
   };
 
   const gerarExportacao = async (comBanco: boolean) => {
@@ -128,6 +154,11 @@ export function PontoFolhaTab() {
           "Faltas": d.faltas,
           "Atrasos": formatMinutos(d.atrasos_min),
           "DSR Descontar": d.dsr_descontar,
+          // Onde as horas foram parar. Sem esta coluna, o HE zerado de quem
+          // esta em banco parece erro de apuracao em vez de decisao correta.
+          "Destino do Excedente": d.em_banco_de_horas
+            ? `Banco de horas (${formatMinutos(d.he_creditada_banco_min)} creditados 1:1)`
+            : "A pagar na folha",
           ...(comBanco ? {
             "BH Saldo Anterior": formatMinutos(b?.saldo_anterior_minutos || 0),
             "BH Créditos": formatMinutos(b?.creditos_minutos || 0),
@@ -278,23 +309,38 @@ export function PontoFolhaTab() {
                 <TableHead className="text-center">Feriado 100%</TableHead>
                 <TableHead className="text-center">Faltas</TableHead>
                 <TableHead className="text-center">Atrasos</TableHead>
+                <TableHead>Destino do excedente</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {espelhos.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Faça o fechamento da competência para ver os dados.</TableCell></TableRow>
-              ) : espelhos.map((e: any) => (
+                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Faça o fechamento da competência para ver os dados.</TableCell></TableRow>
+              ) : espelhos.map((e: any) => {
+                // A prévia mostra o que SERÁ exportado. Mostrar aqui a hora
+                // extra cheia e exportar zero seria pior que o erro original.
+                const noBanco = emBancoDeHoras(e.colaborador_cpf);
+                const he50 = noBanco ? 0 : (e.total_horas_extras_50_minutos || 0);
+                const he100 = noBanco ? 0 : (e.total_horas_extras_100_minutos || 0);
+                return (
                 <TableRow key={e.id}>
                   <TableCell className="font-medium">{e.colaborador_nome}</TableCell>
                   <TableCell className="text-center">{e.total_dias_trabalhados || 0}</TableCell>
-                  <TableCell className="text-center">{formatMinutos(e.total_horas_extras_50_minutos || 0)}</TableCell>
-                  <TableCell className="text-center">{formatMinutos(e.total_horas_extras_100_minutos || 0)}</TableCell>
+                  <TableCell className="text-center">{formatMinutos(he50)}</TableCell>
+                  <TableCell className="text-center">{formatMinutos(he100)}</TableCell>
                   <TableCell className="text-center">{formatMinutos(e.total_adicional_noturno_minutos || 0)}</TableCell>
                   <TableCell className="text-center">{formatMinutos(feriadoMinDoCpf(e.colaborador_cpf))}</TableCell>
                   <TableCell className="text-center">{e.total_faltas || 0}</TableCell>
                   <TableCell className="text-center">{formatMinutos(e.total_atrasos_minutos || 0)}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {noBanco
+                      ? `Banco de horas — ${formatMinutos(
+                          (e.total_horas_extras_50_minutos || 0) + (e.total_horas_extras_100_minutos || 0),
+                        )} creditados 1:1, não vão para a folha`
+                      : "A pagar na folha"}
+                  </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

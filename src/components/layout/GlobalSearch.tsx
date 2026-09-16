@@ -41,7 +41,7 @@ const searchItems: SearchItem[] = [
   { title: "Departamentos", path: "/cadastros/departamentos", section: "Cadastros", keywords: ["departamento", "setor", "área"] },
   { title: "Cargos", path: "/cadastros/cargos", section: "Cadastros", keywords: ["cargo", "cargo", "cbo"] },
   { title: "Estabelecimento ou Obra", path: "/cadastros/filiais", section: "Cadastros", keywords: ["filial", "obra", "estabelecimento", "unidade"] },
-  { title: "Rede de Parceiros", path: "/marketplace", section: "Estrutura", keywords: ["marketplace", "parceiro", "profissional", "rede"] },
+  { title: "MarketYE — marketplace de serviços", path: "/marketplace", section: "Estrutura", keywords: ["marketye", "marketplace", "especialista", "profissional", "servicos", "rede de parceiros"] },
   { title: "Terceiros & SST", path: "/terceiros", section: "Estrutura", keywords: ["terceiro", "terceirizado", "prestador"] },
   { title: "Documentos", path: "/documentos", section: "Documentos", keywords: ["documento", "arquivo", "pasta", "upload"] },
   { title: "Financeiro", path: "/financeiro", section: "Financeiro", keywords: ["financeiro", "guia", "pagamento", "certidão"] },

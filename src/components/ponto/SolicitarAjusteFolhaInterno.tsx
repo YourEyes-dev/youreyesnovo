@@ -757,7 +757,12 @@ export function SolicitarAjusteFolhaInterno({
 
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                <Button className="flex-1" onClick={handleSubmit} disabled={enviando || totalAlteracoes === 0 || !colaboradorId}>
+                {/* Mesmo motivo do modal do app: o `disabled` escondia a mensagem
+                    de validar() (linha ~319), então o usuário via um botão
+                    apagado sem saber que faltava preencher a HORA — a linha já
+                    aparecia como "em edição" e a justificativa já tinha aberto,
+                    o que fazia parecer que estava tudo preenchido. */}
+                <Button className="flex-1" onClick={handleSubmit} disabled={enviando}>
                   {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : `Enviar Ajustes${totalAlteracoes ? ` (${totalAlteracoes} dia${totalAlteracoes !== 1 ? "s" : ""})` : ""}`}
                 </Button>
               </div>

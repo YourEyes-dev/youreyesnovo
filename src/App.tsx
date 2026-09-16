@@ -10,8 +10,15 @@ import { AuthProvider, useAuthContext } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { AuthLayout } from "@/components/layout/AuthLayout";
+import { ParceiroRoute } from "@/components/auth/ParceiroRoute";
+const ParceirosPublico = lazy(() => import("./pages/parceiros/ParceirosPublico"));
+const CadastroParceiro = lazy(() => import("./pages/parceiros/CadastroParceiro"));
+const PortalParceiro = lazy(() => import("./pages/parceiro/PortalParceiro"));
+const PerfilParceiro = lazy(() => import("./pages/parceiro/PerfilParceiro"));
+const ContratoParceria = lazy(() => import("./pages/parceiros/ContratoParceria"));
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SuperAdminRoute } from "@/components/admin/SuperAdminRoute";
+import { SuperAdminLayout } from "@/components/admin/superadmin/SuperAdminLayout";
 import { Loader2 } from "lucide-react";
 
 // Eager imports for all protected app pages (no loading delay on navigation)
@@ -41,6 +48,10 @@ import Financeiro from "./pages/Financeiro";
 import Academia from "./pages/Academia";
 import Empresa from "./pages/Empresa";
 import Marketplace from "./pages/Marketplace";
+import MarketYEPublico from "./pages/marketye/MarketYEPublico";
+import CadastroEspecialista from "./pages/marketye/CadastroEspecialista";
+import PortalEspecialista from "./pages/marketye/PortalEspecialista";
+import { EspecialistaRoute } from "./components/auth/EspecialistaRoute";
 import Terceiros from "./pages/Terceiros";
 import IncidentesAcidentes from "./pages/IncidentesAcidentes";
 import CulturaCelebracoes from "./pages/CulturaCelebracoes";
@@ -54,6 +65,7 @@ import SobreSistema from "./pages/SobreSistema";
 import Usuarios from "./pages/Usuarios";
 import PerfisAcesso from "./pages/PerfisAcesso";
 import MeuPerfil from "./pages/MeuPerfil";
+import MeuPlano from "./pages/MeuPlano";
 import Pendencias from "./pages/Pendencias";
 import Departamentos from "./pages/cadastros/Departamentos";
 import Cargos from "./pages/cadastros/Cargos";
@@ -100,7 +112,7 @@ const QADashboard = lazy(() => import("./pages/admin/QADashboard"));
 const QADocs = lazy(() => import("./pages/admin/QADocs"));
 const QARunner = lazy(() => import("./pages/admin/QARunner"));
 const TenantAssinatura = lazy(() => import("./pages/admin/TenantAssinatura"));
-const YourEyesDashboard = lazy(() => import("./pages/admin/YourEyesDashboard"));
+const ControleClientesDashboard = lazy(() => import("./pages/admin/ControleClientesDashboard"));
 const BlogAdmin = lazy(() => import("./pages/admin/BlogAdmin"));
 const ContratosAceite = lazy(() => import("./pages/admin/ContratosAceite"));
 const AssinarContrato = lazy(() => import("./pages/AssinarContrato"));
@@ -172,7 +184,20 @@ const App = () => (
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/parceiros/entrar" element={<Login destino="/parceiro" variante="parceiro" />} />
+                <Route path="/marketye/entrar" element={<Login destino="/marketye/portal" variante="especialista" />} />
               </Route>
+
+              {/* Programa de Parceiros — seção pública do site e Área do Parceiro (fora do sistema) */}
+              <Route path="/parceiros" element={<ParceirosPublico />} />
+              <Route path="/parceiros/cadastro" element={<CadastroParceiro />} />
+              <Route path="/parceiros/contrato" element={<ContratoParceria />} />
+              {/* MarketYE: página pública de captação, cadastro do especialista (sem acesso ao sistema) e portal restrito */}
+              <Route path="/marketye" element={<MarketYEPublico />} />
+              <Route path="/marketye/cadastro" element={<CadastroEspecialista />} />
+              <Route path="/marketye/portal" element={<EspecialistaRoute><PortalEspecialista /></EspecialistaRoute>} />
+              <Route path="/parceiro" element={<ParceiroRoute><PortalParceiro /></ParceiroRoute>} />
+              <Route path="/parceiro/perfil" element={<ParceiroRoute><PerfilParceiro /></ParceiroRoute>} />
 
               {/* Rota Pública - Questionário Psicossocial */}
               <Route path="/questionario/:token" element={<QuestionarioPsicossocial />} />
@@ -202,17 +227,25 @@ const App = () => (
               <Route path="/termos-de-uso" element={<TermosDeUso />} />
               <Route path="/politica-de-privacidade" element={<PoliticaPrivacidade />} />
 
-              {/* Super Admin Routes */}
-              <Route path="/admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
-              <Route path="/admin/tenants/:id" element={<SuperAdminRoute><TenantDetalhe /></SuperAdminRoute>} />
-              <Route path="/admin/tenants/:id/assinatura" element={<SuperAdminRoute><TenantAssinatura /></SuperAdminRoute>} />
-              <Route path="/admin/manual" element={<SuperAdminRoute><ManualSistema /></SuperAdminRoute>} />
-              <Route path="/admin/qa" element={<SuperAdminRoute><QADashboard /></SuperAdminRoute>} />
-              <Route path="/admin/qa/docs" element={<SuperAdminRoute><QADocs /></SuperAdminRoute>} />
-              <Route path="/admin/qa/runner" element={<SuperAdminRoute><QARunner /></SuperAdminRoute>} />
-              <Route path="/admin/youreyes" element={<SuperAdminRoute><YourEyesDashboard /></SuperAdminRoute>} />
-              <Route path="/admin/blog" element={<SuperAdminRoute><BlogAdmin /></SuperAdminRoute>} />
-              <Route path="/admin/contratos" element={<SuperAdminRoute><ContratosAceite /></SuperAdminRoute>} />
+              {/* Super Admin — todas as rotas abrem dentro da casca com o menu
+                  lateral agrupado por área (SuperAdminLayout). /admin e
+                  /admin/:secao são as seções do painel; as demais são páginas
+                  com componente próprio que ganharam o mesmo menu. */}
+              <Route element={<SuperAdminRoute><SuperAdminLayout /></SuperAdminRoute>}>
+                <Route path="/admin" element={<SuperAdminDashboard />} />
+                <Route path="/admin/tenants/:id" element={<TenantDetalhe />} />
+                <Route path="/admin/tenants/:id/assinatura" element={<TenantAssinatura />} />
+                <Route path="/admin/manual" element={<ManualSistema />} />
+                <Route path="/admin/qa" element={<QADashboard />} />
+                <Route path="/admin/qa/docs" element={<QADocs />} />
+                <Route path="/admin/qa/runner" element={<QARunner />} />
+                <Route path="/admin/controle-clientes" element={<ControleClientesDashboard />} />
+                {/* Endereço antigo da Central de Testes, hoje Central de Controle de Clientes. */}
+                <Route path="/admin/youreyes" element={<Navigate to="/admin/controle-clientes" replace />} />
+                <Route path="/admin/blog" element={<BlogAdmin />} />
+                <Route path="/admin/contratos" element={<ContratosAceite />} />
+                <Route path="/admin/:secao" element={<SuperAdminDashboard />} />
+              </Route>
 
               {/* Protected Onboarding Route */}
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingProtegido /></ProtectedRoute>} />
@@ -263,6 +296,7 @@ const App = () => (
                 <Route path="/suporte" element={<Suporte />} />
                 <Route path="/sobre-sistema" element={<SobreSistema />} />
                 <Route path="/meu-perfil" element={<MeuPerfil />} />
+                <Route path="/meu-plano" element={<MeuPlano />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

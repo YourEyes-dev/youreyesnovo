@@ -397,6 +397,32 @@ export function usePlanoAcao(filters?: PlanoAcaoFilters) {
 
       if (error) throw error;
 
+      /**
+       * Conclusão de ação nascida de um alerta do PONTO não pode dar baixa
+       * cega (PONTO-390): antes, marcar "concluída" fechava a ação e o alerta
+       * junto, mesmo que a ocorrência continuasse acontecendo na semana
+       * seguinte — e ninguém percebia. A rotina do banco reavalia a origem: se
+       * a ocorrência persiste, ela avisa em vez de encerrar em silêncio.
+       */
+      if ((data as any)?.status === "concluida" && (updated as any)?.origem_modulo === "ponto") {
+        try {
+          const { data: eficacia } = await (supabase.rpc as any)("ponto_acao_concluir_com_eficacia", {
+            p_tenant_id: tenantId,
+            p_acao_id: id,
+            p_evidencia: (data as any)?.evidencia_conclusao || null,
+          });
+          if (eficacia && (eficacia as any).eficaz === false) {
+            toast.warning(
+              "Ação concluída, mas a ocorrência que a originou ainda acontece. " +
+              "Um alerta de eficácia foi aberto para acompanhamento.",
+            );
+          }
+        } catch {
+          // A conclusão da ação não depende da reavaliação; o alerta de
+          // eficácia é acompanhamento, não bloqueio.
+        }
+      }
+
       // Registrar histórico
       await (supabase.from("plano_historico") as any).insert({
         tenant_id: tenantId,

@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "./useTenant";
 import { useAuth } from "./useAuth";
-import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { toast } from "sonner";
 import type { Manifestacao, TipoManifestacao, StatusManifestacao, PrioridadeManifestacao } from "@/types/ouvidoria";
 
@@ -38,7 +37,6 @@ export function useOuvidoria() {
   const queryClient = useQueryClient();
   const { tenantId } = useTenant();
   const { user, profile } = useAuth();
-  const { empresaAtivaId } = useEmpresaAtiva();
 
   // Buscar manifestações (usuários veem apenas as suas, managers veem todas)
   const manifestacoesQuery = useQuery({
@@ -114,7 +112,6 @@ export function useOuvidoria() {
 
       const manifestacao = {
         tenant_id: tenantId,
-        empresa_id: empresaAtivaId || null,
         tipo: data.tipo,
         assunto: data.assunto,
         mensagem: data.mensagem,

@@ -69,6 +69,8 @@ export interface LinhaProgramacao {
   abonoDias: number;
   adiantar13: boolean;
   estado: EstadoProg;
+  /** Exceção ao limite concessivo autorizada pela diretoria (art. 134/137). */
+  autorizadoExcecao: boolean;
 
   // Derivados
   diasProgramados: number;
@@ -302,6 +304,7 @@ export function useFeriasProgramacao() {
         abonoDias,
         adiantar13: !!prog?.adiantar_13,
         estado: estadoDe(prog?.estado),
+        autorizadoExcecao: !!prog?.autorizado_excecao,
         diasProgramados,
         diasNaoProgramados: Math.max(0, periodo.diasSaldo - diasProgramados),
         valorEstimado,
@@ -342,12 +345,19 @@ export function useFeriasProgramacao() {
         abono_dias: l.abonoDias,
         adiantar_13: l.adiantar13,
         estado: l.estado,
+        autorizado_excecao: l.autorizadoExcecao,
         criado_por: user?.id ?? null,
       };
       const { error } = await fromTable("ferias_programacao").upsert(payload, {
         onConflict: "tenant_id,colaborador_cpf,aquisitivo_inicio",
       });
-      if (error) throw error;
+      if (error) {
+        // Trava do concessivo no banco (art. 134/137): mensagem clara em vez do erro cru.
+        if (error.code === "23514" || /concessivo|alçada|alcada|diretoria/i.test(error.message ?? "")) {
+          throw new Error("Programação além do limite concessivo exige autorização da diretoria (admin ou acima).");
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ferias-programacao"] });

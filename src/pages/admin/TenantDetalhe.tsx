@@ -7,6 +7,50 @@ import { ArrowLeft, Building2, Users, LayoutDashboard, Shield } from 'lucide-rea
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useParceiros, PARCEIRO_TIPO_LABEL } from '@/hooks/useParceiros';
+import { Handshake } from 'lucide-react';
+
+// Origem comercial da empresa (Programa de Parceiros): quem indicou e quem implanta.
+function ParceiroOrigemCard({ tenantId }: { tenantId: string }) {
+  const { tenants, parceiros, vincularTenant } = useParceiros();
+  const t = tenants.find((x) => x.id === tenantId);
+  const NENHUM = '__nenhum__';
+  const elegiveis = parceiros.filter((p) => p.status === 'ativo' || p.status === 'pendente' || p.id === t?.parceiro_id || p.id === t?.implantador_parceiro_id);
+  return (
+    <Card data-testid="tenant-parceiro-origem">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base"><Handshake className="w-4 h-4 text-primary" />Parceiro de origem e implantação</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-4 md:grid-cols-2">
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Quem indicou esta empresa</p>
+          <Select value={t?.parceiro_id ?? NENHUM} disabled={!t}
+            onValueChange={(v) => vincularTenant.mutate({ tenantId, parceiroId: v === NENHUM ? null : v, implantadorId: t?.implantador_parceiro_id ?? null })}>
+            <SelectTrigger><SelectValue placeholder="Carregando…" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NENHUM}>— sem parceiro (veio direto) —</SelectItem>
+              {elegiveis.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome} · {PARCEIRO_TIPO_LABEL[p.tipo_parceiro]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {t?.originado_em && <p className="text-xs text-muted-foreground mt-1">Origem registrada em {new Date(t.originado_em).toLocaleDateString('pt-BR')}</p>}
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Quem faz a implantação</p>
+          <Select value={t?.implantador_parceiro_id ?? NENHUM} disabled={!t}
+            onValueChange={(v) => vincularTenant.mutate({ tenantId, parceiroId: t?.parceiro_id ?? null, implantadorId: v === NENHUM ? null : v })}>
+            <SelectTrigger><SelectValue placeholder="Carregando…" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NENHUM}>— a própria casa —</SelectItem>
+              {elegiveis.filter((p) => p.tipo_parceiro !== 'indicador').map((p) => <SelectItem key={p.id} value={p.id}>{p.nome} · {PARCEIRO_TIPO_LABEL[p.tipo_parceiro]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">O implantador recebe o valor de setup configurado em Parceiros › Níveis e remuneração.</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function TenantDetalhe() {
   const { id } = useParams();
@@ -69,7 +113,7 @@ export default function TenantDetalhe() {
               <Shield className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold capitalize">{tenant?.plano || '...'}</div>
+              <div className="text-2xl font-bold capitalize">{tenant?.plano_atual ?? tenant?.plano ?? '...'}</div>
               <p className="text-xs text-muted-foreground mt-1">Tenant ID: {id}</p>
             </CardContent>
           </Card>
@@ -96,6 +140,8 @@ export default function TenantDetalhe() {
             </CardContent>
           </Card>
         </div>
+
+        {id && <ParceiroOrigemCard tenantId={id} />}
 
         <Card>
           <CardHeader>

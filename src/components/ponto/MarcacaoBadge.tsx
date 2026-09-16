@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { confirm } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
@@ -24,13 +25,38 @@ interface Props {
   tipo?: string;
   distanciaMetros?: number | null;
   dentroCerca?: boolean | null;
+  /** Tenant e CPF do dono da marcação — para registrar quem viu a selfie. */
+  tenantId?: string | null;
+  colaboradorCpf?: string | null;
 }
 
 export function MarcacaoBadge({ 
   id, hora, isEntry, original, podeEditar, editando, onSalvar, onExcluir, excluindo,
-  endereco, selfieUrl, tipo, distanciaMetros, dentroCerca
+  endereco, selfieUrl, tipo, distanciaMetros, dentroCerca, tenantId, colaboradorCpf
 }: Props) {
   const [open, setOpen] = useState(false);
+  // LGPD arts. 11 e 46 (PONTO-397): a selfie é dado pessoal sensível. Fica
+  // coberta por padrão e só é revelada por um gesto deliberado — e esse gesto
+  // é registrado na trilha, com quem viu, o que viu e quando. Antes ela era
+  // servida a quem apenas abrisse a lista, sem deixar rastro.
+  const [selfieRevelada, setSelfieRevelada] = useState(false);
+
+  const revelarSelfie = async () => {
+    setSelfieRevelada(true);
+    if (!tenantId) return;
+    try {
+      await (supabase.rpc as any)("ponto_log_acesso_sensivel", {
+        p_tenant_id: tenantId,
+        p_acao: "visualizou_selfie",
+        p_recurso: "ponto_marcacoes",
+        p_recurso_id: id,
+        p_colaborador_cpf: colaboradorCpf || null,
+        p_descricao: "Selfie da marcação exibida na tela de espelho de ponto.",
+      });
+    } catch {
+      // O registro não pode impedir o RH de trabalhar; a falha fica no console.
+    }
+  };
   const [novaHora, setNovaHora] = useState(hora?.substring(0, 5) || "");
   const [motivo, setMotivo] = useState("");
   const motivoValido = motivo.trim().length >= 10;
@@ -85,7 +111,18 @@ export function MarcacaoBadge({
         )}
       </div>
 
-      {selfieUrl && (
+      {selfieUrl && !selfieRevelada && (
+        <button
+          type="button"
+          title="Ver a selfie desta marcação. O acesso fica registrado (LGPD)."
+          className="w-8 h-8 rounded border bg-muted shrink-0 flex items-center justify-center hover:bg-muted/70 transition"
+          onClick={(e) => { e.stopPropagation(); void revelarSelfie(); }}
+        >
+          <Camera className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+      )}
+
+      {selfieUrl && selfieRevelada && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>

@@ -5,7 +5,10 @@ import { CompetenciaInput } from "@/components/ui/competencia-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PiggyBank } from "lucide-react";
+import { PiggyBank, RefreshCw, Scale } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useDecimoTerceiroContabil, type Conciliacao13 } from "@/hooks/useDecimoTerceiro";
+import { toast } from "sonner";
 import { useFolhaCalculo } from "@/hooks/useFolhaCalculo";
 import { format } from "date-fns";
 
@@ -14,7 +17,35 @@ const fmtMoeda = (v: number) => (v || 0).toLocaleString("pt-BR", { minimumFracti
 export function ProvisoesTab() {
   const { useProvisoes } = useFolhaCalculo();
   const [competencia, setCompetencia] = useState(format(new Date(), "yyyy-MM"));
-  const { data: provisoes = [], isLoading } = useProvisoes(competencia);
+  const { data: provisoes = [], isLoading, refetch } = useProvisoes(competencia);
+  const { provisionar, conciliar, ocupado } = useDecimoTerceiroContabil();
+  const [conc, setConc] = useState<Conciliacao13 | null>(null);
+
+  // A provisão do 13º nasce 1/12 por mês (regime de competência). Até
+  // aqui era lançada à mão, quando alguém lembrava.
+  const rodarProvisao = async () => {
+    try {
+      const r = await provisionar(competencia);
+      if (!r) return;
+      await refetch();
+      toast.success(
+        `${r.provisionados} colaborador(es) provisionado(s) em ${r.competencia}` +
+        (r.revertidos > 0 ? `; ${r.revertidos} provisão(ões) revertida(s) por desligamento` : "") +
+        `. Total R$ ${fmtMoeda(r.total_provisionado)}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível provisionar");
+    }
+  };
+
+  const rodarConciliacao = async () => {
+    try {
+      const r = await conciliar(Number(competencia.slice(0, 4)));
+      setConc(r);
+      if (r) toast.info(`Conciliação ${r.ano}: ${r.situacao}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível conciliar");
+    }
+  };
 
   const pFerias = provisoes.filter((p: any) => p.tipo === "ferias");
   const p13 = provisoes.filter((p: any) => p.tipo === "13_salario");
@@ -31,11 +62,39 @@ export function ProvisoesTab() {
           </h3>
           <p className="text-sm text-muted-foreground">Provisões mensais de férias e 13º salário</p>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Competência</Label>
-          <CompetenciaInput value={competencia} onChange={setCompetencia} className="w-40" />
+        <div className="flex items-end gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Competência</Label>
+            <CompetenciaInput value={competencia} onChange={setCompetencia} className="w-40" />
+          </div>
+          <Button variant="outline" onClick={rodarProvisao} disabled={ocupado}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            {ocupado ? "Processando..." : "Provisionar 13º"}
+          </Button>
+          <Button variant="outline" onClick={rodarConciliacao}>
+            <Scale className="w-4 h-4 mr-2" /> Conciliar ano
+          </Button>
         </div>
       </div>
+
+      {conc && (
+        <Card className="border-l-4 border-l-blue-500">
+          <CardContent className="p-4 space-y-1">
+            <p className="text-sm font-medium">
+              Conciliação do 13º de {conc.ano}: {conc.situacao}
+            </p>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div><span className="text-muted-foreground">Provisionado:</span> R$ {fmtMoeda(conc.provisionado)}</div>
+              <div><span className="text-muted-foreground">Pago:</span> R$ {fmtMoeda(conc.pago)}</div>
+              <div><span className="text-muted-foreground">Diferença:</span> R$ {fmtMoeda(conc.diferenca)}</div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O custo do 13º nasce 1/12 por mês. Diferença grande no fim do ano costuma ser
+              mês sem provisionar — rode a provisão das competências que faltam.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-l-4 border-l-amber-500">

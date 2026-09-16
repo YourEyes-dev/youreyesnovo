@@ -34,7 +34,7 @@ async function runStep(stepName: string, action: string, fn: () => Promise<strin
     const details = await fn();
     return { step: stepName, action, status: "success", details, duration_ms: Date.now() - start };
   } catch (e) {
-    return { step: stepName, action, status: "fail", details: e.message || String(e), duration_ms: Date.now() - start };
+    return { step: stepName, action, status: "fail", details: (e as Error).message || String(e), duration_ms: Date.now() - start };
   }
 }
 
@@ -181,7 +181,7 @@ serve(async (req) => {
               authTenantId = data?.tenant_id || tenantId;
             }
           } catch (e) {
-            send("step_done", { flow: "auth", step: "Auto-login", action: "signIn", status: "fail", details: e.message, duration_ms: 0 });
+            send("step_done", { flow: "auth", step: "Auto-login", action: "signIn", status: "fail", details: (e as Error).message, duration_ms: 0 });
           }
         }
 
@@ -1349,7 +1349,7 @@ Seja direto e técnico. Português do Brasil.`,
       },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message || "Erro interno" }), {
+    return new Response(JSON.stringify({ error: (e as Error).message || "Erro interno" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

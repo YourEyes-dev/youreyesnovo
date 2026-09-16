@@ -26,7 +26,7 @@ A plataforma opera sob o princípio: **"Ação é evidência, e evidência é pr
 - Acesso via **e-mail e senha** com recuperação de senha integrada
 - **Multi-tenant**: cada organização possui seu espaço isolado
 - **Controle de acesso por perfis** (RBAC): Proprietário, Admin, Gestor, Colaborador
-- **Painel Super Admin** para administração geral da plataforma
+- **Painel Super Admin** para administração geral da plataforma (rota `/admin`), com menu lateral agrupado por área: **Painel** (Visão geral, Situação das empresas), **Clientes** (Empresas, Usuários, Contratos e termos), **Comercial e marketing** (Leads CRM, Leads da landing, Preços e add-ons, Programa de Parceiros, Blog), **Produtos** (Psicossocial, MarketYE), **A YourEyes** (Dados da YourEyes) e **Qualidade e suporte** (QA e testes, Central de Controle de Clientes, Manual do sistema)
 
 ### Onboarding Guiado
 Ao criar uma conta, o usuário é conduzido por um **fluxo de onboarding** que configura o tenant inicial: dados da empresa, estrutura organizacional e preferências do sistema.

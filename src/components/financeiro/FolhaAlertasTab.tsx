@@ -32,6 +32,12 @@ const TIPO_LABELS: Record<string, string> = {
   esocial_s1210: "eSocial S-1210",
   dctfweb: "DCTFWeb",
   inss_patronal: "INSS Patronal (dia 20)",
+  rescisao_pagamento: "Pagamento de rescisão",
+  // 13º salário — gerados pela varredura do banco, não por esta tela
+  decimo_terceiro_1a_parcela: "13º — 1ª parcela (até 30/11)",
+  decimo_terceiro_2a_parcela: "13º — 2ª parcela (até 20/12)",
+  decimo_terceiro_base_incompleta: "13º — base de médias incompleta",
+  decimo_terceiro_afastamento: "13º — afastamento a validar",
 };
 
 const TIPO_ICONS: Record<string, string> = {
@@ -42,6 +48,11 @@ const TIPO_ICONS: Record<string, string> = {
   esocial_s1210: "📡",
   dctfweb: "📄",
   inss_patronal: "🏛️",
+  rescisao_pagamento: "🤝",
+  decimo_terceiro_1a_parcela: "🎁",
+  decimo_terceiro_2a_parcela: "🎁",
+  decimo_terceiro_base_incompleta: "🧮",
+  decimo_terceiro_afastamento: "🩺",
 };
 
 /**
@@ -118,12 +129,43 @@ export function FolhaAlertasTab() {
         .from("folha_alertas_prazo" as any)
         .select("*")
         .eq("tenant_id", tenantId)
-        .eq("competencia", competencia)
+        // Os alertas do 13º nascem da varredura do banco e valem para o
+        // ano inteiro, não para uma competência só: por isso entram
+        // sempre, ao lado dos alertas mensais da competência escolhida.
+        .or(`competencia.eq.${competencia},tipo.like.decimo_terceiro%`)
         .order("data_limite", { ascending: true }) as { data: any[] | null };
       return (data || []) as AlertaPrazo[];
     },
     enabled: !!tenantId,
   });
+
+  // Varredura do 13º: roda no banco (prazo das parcelas, base de médias
+  // incompleta, afastamento a validar) e é idempotente — o mesmo alerta
+  // não nasce duas vezes. O agendamento diário faz isso sozinho; o botão
+  // serve para conferir na hora.
+  const [varrendo, setVarrendo] = useState(false);
+  const varrer13 = async () => {
+    if (!tenantId) return;
+    setVarrendo(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rpc = (supabase as any).rpc.bind(supabase);
+      const { data, error } = await rpc("decimo_terceiro_alertas_varrer", {
+        p_tenant: tenantId,
+        p_ano: Number(competencia.slice(0, 4)),
+      });
+      if (error) throw error;
+      const novos = Number((data || {}).alertas_novos ?? 0);
+      const acoes = Number((data || {}).acoes_criadas ?? 0);
+      queryClient.invalidateQueries({ queryKey: ["folha-alertas"] });
+      if (novos === 0) toast.info("13º: nenhum alerta novo — nada vencendo nem faltando.");
+      else toast.success(`13º: ${novos} alerta(s)${acoes > 0 ? `, ${acoes} já com ação no Plano` : ""}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível varrer os alertas do 13º");
+    } finally {
+      setVarrendo(false);
+    }
+  };
 
   const gerarAlertas = async () => {
     if (alertas.length > 0) {
@@ -172,6 +214,9 @@ export function FolhaAlertasTab() {
         </div>
         <div className="flex items-center gap-3">
           <CompetenciaInput value={competencia} onChange={setCompetencia} />
+          <Button onClick={varrer13} size="sm" variant="outline" disabled={varrendo}>
+            🎁 {varrendo ? "Varrendo..." : "Varrer 13º"}
+          </Button>
           {alertas.length === 0 && (
             <Button onClick={gerarAlertas} size="sm">
               <Plus className="w-4 h-4 mr-1" /> Gerar Alertas

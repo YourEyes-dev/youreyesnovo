@@ -35,6 +35,20 @@
 
 DO $renomeia$
 BEGIN
+  -- Guarda contra o cenario em que o involucro ja existe mas o corpo bruto
+  -- sumiu (uma restauracao parcial, por exemplo): renomear o involucro faria
+  -- dele o proprio "bruto" que ele chama, e a apuracao entraria em recursao
+  -- infinita ("stack depth limit exceeded") na primeira competencia apurada.
+  IF to_regprocedure('public.ponto_saldo_dias_competencia_bruto(uuid,text,text)') IS NULL
+     AND EXISTS (
+       SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public' AND p.proname = 'ponto_saldo_dias_competencia'
+         AND position('ponto_saldo_dias_competencia_bruto' in p.prosrc) > 0
+     ) THEN
+    RAISE NOTICE 'ATENCAO: ponto_saldo_dias_competencia ja e o involucro, mas o corpo bruto nao existe nesta base. Nada foi renomeado (renomear criaria recursao infinita). Restaure ponto_saldo_dias_competencia_bruto antes de rodar este script.';
+    RETURN;
+  END IF;
+
   IF to_regprocedure('public.ponto_saldo_dias_competencia_bruto(uuid,text,text)') IS NULL THEN
     ALTER FUNCTION public.ponto_saldo_dias_competencia(uuid, text, text)
       RENAME TO ponto_saldo_dias_competencia_bruto;

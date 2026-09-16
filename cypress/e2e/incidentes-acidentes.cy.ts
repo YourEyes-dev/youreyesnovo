@@ -273,7 +273,9 @@ describe("Módulo Incidentes & Acidentes", () => {
 
   it("aplica filtros da aba ocorrências", () => {
     openTab("Ocorrências");
-    cy.get('input[placeholder="Buscar por código, nome, setor..."]').clear().type("Administrativo");
+    // force:true por causa do scroll-lock do Radix (body pointer-events:none
+    // herdado de um diálogo/combobox anterior) — padrão da suíte.
+    cy.get('input[placeholder="Buscar por código, nome, setor..."]').clear({ force: true }).type("Administrativo", { force: true });
 
     openNthCombobox(0);
     selectRadixOption("Incidentes");
@@ -288,8 +290,8 @@ describe("Módulo Incidentes & Acidentes", () => {
       }
     });
 
-    cy.get('input[type="date"]').eq(0).clear().type("2026-03-01");
-    cy.get('input[type="date"]').eq(1).clear().type("2026-03-31");
+    cy.get('input[type="date"]').eq(0).clear({ force: true }).type("2026-03-01", { force: true });
+    cy.get('input[type="date"]').eq(1).clear({ force: true }).type("2026-03-31", { force: true });
   });
 
   it("cadastra um incidente com colaborador manual", () => {

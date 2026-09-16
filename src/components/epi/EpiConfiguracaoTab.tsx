@@ -65,6 +65,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useEpiConfig } from "@/hooks/useEpiConfig";
+import { useEpis } from "@/hooks/useEpis";
+import { CATEGORIAS_EPI } from "@/types/epi";
 import { useEpiLocais, LOCAL_TIPO_LABELS, type LocalEstoqueTipo } from "@/hooks/useEpiLocais";
 import { useFiliais } from "@/hooks/useCadastros";
 import { useColaboradores } from "@/hooks/useColaboradores";
@@ -121,6 +123,84 @@ function ResponsavelCombobox({ colaboradores, value, onChange }: {
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+// Quais categorias exigem o número do CA no cadastro de EPI.
+//
+// Existia uma regra fixa: TODO item precisava de CA. Está certo para capacete,
+// luva e bota — é a NR-06 —, e está errado para uniforme, camiseta e crachá,
+// que não têm Certificado de Aprovação e mesmo assim ficavam impedidos de
+// entrar no sistema. Em vez de o sistema escolher pelos clientes, cada um
+// marca aqui as suas. Categoria nunca marcada continua exigindo.
+function CategoriasExigemCaCard() {
+  const { tipos, categorias, categoriasLoading, definirExigeCa, definindoExigeCa } = useEpis();
+
+  const linhas = useMemo(() => {
+    const daTabela = new Map(categorias.map((c) => [c.nome, c.exige_ca]));
+    const dosTipos = tipos
+      .filter((t) => t.is_active !== false && t.categoria)
+      .map((t) => t.categoria as string);
+    // A lista oferecida no cadastro é a união das três fontes — a marcação
+    // precisa cobrir exatamente as mesmas opções, senão sobra categoria sem
+    // como ser marcada.
+    const nomes = [...new Set([...CATEGORIAS_EPI, ...dosTipos, ...categorias.map((c) => c.nome)])].sort();
+    return nomes.map((nome) => ({ nome, exigeCa: daTabela.get(nome) ?? true }));
+  }, [tipos, categorias]);
+
+  const isentas = linhas.filter((l) => !l.exigeCa).length;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Package className="w-5 h-5 text-primary" />
+            Exigência de CA por Categoria
+          </CardTitle>
+          <CardDescription>
+            O Certificado de Aprovação (CA) é obrigatório para EPI de verdade — capacete, luva, bota.
+            Desmarque as categorias que não têm CA, como uniformes e crachás: elas passam a ser
+            cadastradas sem número e sem data de validade.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {categoriasLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando categorias...</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {linhas.map((linha) => (
+                  <div
+                    key={linha.nome}
+                    className="flex items-center justify-between gap-4 p-3 rounded-lg border bg-muted/20"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{linha.nome}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {linha.exigeCa ? "Exige CA e validade" : "Sem CA (uniforme, vestuário)"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={linha.exigeCa}
+                      disabled={definindoExigeCa}
+                      onCheckedChange={(checked) =>
+                        definirExigeCa({ nome: linha.nome, exige_ca: checked })
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                {isentas === 0
+                  ? "Todas as categorias exigem CA."
+                  : `${isentas} categoria(s) isenta(s) de CA.`}
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -255,6 +335,8 @@ export function EpiConfiguracaoTab() {
           </CardContent>
         </Card>
       </motion.div>
+
+      <CategoriasExigemCaCard />
 
       {/* RF-EPI-EST-02: Locais de Estoque */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>

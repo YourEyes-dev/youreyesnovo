@@ -72,6 +72,10 @@ const formSchema = z.object({
   cbo: z.string().optional(),
   foto_url: z.string().optional(),
   bate_ponto: z.boolean().default(true),
+  // Art. 62 da CLT: enquadramento que DISPENSA o controle de jornada.
+  art62_inciso: z.string().optional(),
+  art62_documento: z.string().optional(),
+  teletrabalho_modalidade: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -93,6 +97,9 @@ export interface ColaboradorEditData {
   cbo?: string | null;
   foto_url?: string | null;
   bate_ponto?: boolean | null;
+  art62_inciso?: string | null;
+  art62_documento?: string | null;
+  teletrabalho_modalidade?: string | null;
 }
 
 interface ColaboradorFormProps {
@@ -141,6 +148,9 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
       cbo: "",
       foto_url: "",
       bate_ponto: true,
+      art62_inciso: "nenhum",
+      art62_documento: "",
+      teletrabalho_modalidade: "nao_se_aplica",
     },
   });
   const resolvedPhotoUrl = useStorageImageUrl(form.watch("foto_url"), "documentos");
@@ -163,6 +173,9 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
         cbo: colaborador.cbo || "",
         foto_url: colaborador.foto_url || "",
         bate_ponto: colaborador.bate_ponto !== false,
+        art62_inciso: colaborador.art62_inciso || "nenhum",
+        art62_documento: colaborador.art62_documento || "",
+        teletrabalho_modalidade: colaborador.teletrabalho_modalidade || "nao_se_aplica",
       });
     } else if (open && !colaborador) {
       form.reset({
@@ -181,6 +194,9 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
         cbo: "",
         foto_url: "",
         bate_ponto: true,
+      art62_inciso: "nenhum",
+      art62_documento: "",
+      teletrabalho_modalidade: "nao_se_aplica",
       });
     }
   }, [open, colaborador, form]);
@@ -236,6 +252,12 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
           cbo: normalizeCBO(data.cbo) || null,
           foto_url: data.foto_url || null,
           bate_ponto: data.bate_ponto,
+          art62_inciso: data.art62_inciso && data.art62_inciso !== "nenhum" ? data.art62_inciso : null,
+          art62_documento: data.art62_documento?.trim() || null,
+          teletrabalho_modalidade:
+            data.teletrabalho_modalidade && data.teletrabalho_modalidade !== "nao_se_aplica"
+              ? data.teletrabalho_modalidade
+              : null,
         };
 
         const { data: updatedRow, error } = await supabase
@@ -291,6 +313,12 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
           cbo: normalizeCBO(data.cbo) || null,
           foto_url: data.foto_url || null,
           bate_ponto: data.bate_ponto,
+          art62_inciso: data.art62_inciso && data.art62_inciso !== "nenhum" ? data.art62_inciso : null,
+          art62_documento: data.art62_documento?.trim() || null,
+          teletrabalho_modalidade:
+            data.teletrabalho_modalidade && data.teletrabalho_modalidade !== "nao_se_aplica"
+              ? data.teletrabalho_modalidade
+              : null,
         }).select("id").single();
 
         if (error) {
@@ -539,6 +567,90 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
                 }}
               />
 
+
+              {/* Art. 62 da CLT — dispensa de controle de jornada.
+                  A regra de quem fica dispensado vive no banco
+                  (ponto_art62_dispensa): teletrabalho por JORNADA continua
+                  controlado mesmo com inciso marcado. Aqui só se declara o
+                  enquadramento e o documento que o sustenta. */}
+              <div className="rounded-md border p-3 space-y-3">
+                <div>
+                  <FormLabel className="text-sm">Dispensa de controle de jornada (art. 62 da CLT)</FormLabel>
+                  <p className="text-xs text-muted-foreground">
+                    Quem se enquadra no art. 62 não marca ponto — e, por isso, não pode receber
+                    falta por não marcar. Deixe em "não se enquadra" quando houver dúvida: a
+                    dispensa é exceção e precisa de documento que a sustente.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="art62_inciso"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Enquadramento</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Não se enquadra" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="nenhum">Não se enquadra (marca ponto)</SelectItem>
+                            <SelectItem value="I">I — atividade externa incompatível com controle</SelectItem>
+                            <SelectItem value="II">II — cargo de gestão / confiança</SelectItem>
+                            <SelectItem value="III">III — teletrabalho por produção ou tarefa</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="teletrabalho_modalidade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Teletrabalho</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Não se aplica" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="nao_se_aplica">Não se aplica</SelectItem>
+                            <SelectItem value="jornada">Por jornada (continua marcando ponto)</SelectItem>
+                            <SelectItem value="producao">Por produção ou tarefa</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="art62_documento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Documento que sustenta o enquadramento</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: contrato de trabalho, cláusula 5ª; aditivo de teletrabalho" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {form.watch("teletrabalho_modalidade") === "jornada" &&
+                  (form.watch("art62_inciso") || "nenhum") !== "nenhum" && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                    Teletrabalho <strong>por jornada</strong> continua sujeito ao controle de ponto
+                    (Lei 14.442/2022), mesmo com o inciso marcado. O sistema mantém este
+                    colaborador marcando ponto — o enquadramento fica registrado, mas não dispensa.
+                  </div>
+                )}
+              </div>
 
               {/* Estabelecimento | Departamento */}
               <div className="grid grid-cols-2 gap-3">

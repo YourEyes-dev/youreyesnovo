@@ -73,6 +73,7 @@ O tempero fica num parâmetro para que o mapeamento não seja reproduzível por
 quem só conhece o algoritmo: sem ele, não dá para testar "o CPF X virou Y?".
 """
 
+import re
 import sys
 
 # ---------------------------------------------------------------------------
@@ -223,10 +224,18 @@ def classificar(coluna: str, tipo: str, tem_check_enum: bool,
     'cep', 'credencial', 'json_vazio', 'lista_vazia' ou 'generico'."""
     c = coluna.lower()
 
-    if tipo in ("jsonb", "json"):
+    if tipo == "jsonb":
         # Não é texto, mas carrega texto livre — e é onde mora o nome
         # completo do usuário, em auth.users.raw_user_meta_data.
         return "json_vazio"
+    if tipo == "json":
+        # json e jsonb precisam de tratamentos SEPARADOS. Enquanto a máscara
+        # era a expressão inteira, devolver jsonb numa coluna json passava
+        # (o COPY serializa para texto e o destino reinterpreta). Com o
+        # embrulho do cliente real virou erro de compilação — os dois ramos
+        # de um CASE têm que ter o mesmo tipo:
+        #   "CASE/WHEN could not convert type json to jsonb"
+        return "json_vazio_json"
 
     if tipo == "ARRAY" and coluna_e_lista_de_texto:
         # text[]: mesma exposição de uma coluna de texto, em lista.
@@ -361,12 +370,18 @@ def expr_json_vazio(col: str, tempero: str) -> str:
     return f"(CASE WHEN {col} IS NULL THEN NULL ELSE '{{}}'::jsonb END)"
 
 
+def expr_json_vazio_json(col: str, tempero: str) -> str:
+    """Igual ao de cima, no tipo json — o tipo tem que bater com o da coluna."""
+    return f"(CASE WHEN {col} IS NULL THEN NULL ELSE '{{}}'::json END)"
+
+
 def expr_lista_vazia(col: str, tempero: str) -> str:
     return f"(CASE WHEN {col} IS NULL THEN NULL ELSE '{{}}'::text[] END)"
 
 
 EXPRESSOES = {
     "json_vazio": expr_json_vazio,
+    "json_vazio_json": expr_json_vazio_json,
     "lista_vazia": expr_lista_vazia,
     "cpf": expr_cpf,
     "cnpj": expr_cnpj,
@@ -376,6 +391,39 @@ EXPRESSOES = {
     "credencial": expr_credencial,
     "generico": expr_generico,
 }
+
+
+def condicao_do_cliente(tabela: str, colunas: set[str], tenant: str) -> str | None:
+    """Como reconhecer, NESTA tabela, as linhas do cliente escolhido.
+
+    Devolve None quando a tabela não tem como ser ligada a um cliente — e aí
+    ela continua inteiramente mascarada. Isso é o certo, não uma limitação:
+    as tabelas sem vínculo são catálogos públicos (CBO), o motor de QA e
+    configuração de plataforma. Nenhuma guarda dado de cliente.
+
+    Medido no schema: 311 das 354 tabelas têm tenant_id, 86 têm empresa_id,
+    42 não têm nenhum dos dois.
+    """
+    t = f"'{tenant}'::uuid"
+    # A própria linha do cliente na tabela de clientes.
+    if tabela == "public.tenants":
+        return f"id = {t}"
+    # As contas de login: ligadas ao cliente pelo profile.
+    if tabela == "auth.users":
+        return (f"id IN (SELECT user_id FROM public.profiles "
+                f"WHERE tenant_id = {t})")
+    # O caso comum, e o mais confiável: a coluna que o RLS já usa.
+    if "tenant_id" in colunas:
+        return f"tenant_id = {t}"
+    # Sem tenant_id, mas presa a uma empresa — que por sua vez é do cliente.
+    if "empresa_id" in colunas:
+        return (f"empresa_id IN (SELECT id FROM public.empresa_cadastro "
+                f"WHERE tenant_id = {t})")
+    # Papéis e afins: ligados à pessoa, e a pessoa ao cliente.
+    if "user_id" in colunas:
+        return (f"user_id IN (SELECT user_id FROM public.profiles "
+                f"WHERE tenant_id = {t})")
+    return None
 
 
 def expressao(coluna: str, tratamento: str, tempero_sql: str,
@@ -399,9 +447,44 @@ def expressao(coluna: str, tratamento: str, tempero_sql: str,
 
 def main() -> int:
     if len(sys.argv) < 3:
-        print("uso: gerar_copia_mascarada.py <catalogo.tsv> <tempero>", file=sys.stderr)
+        print("uso: gerar_copia_mascarada.py <catalogo.tsv> <tempero> [--sem-mascara]",
+              file=sys.stderr)
         print("  catalogo.tsv: tabela|coluna|tipo|tem_check_enum, vindo do psql", file=sys.stderr)
+        print("  --sem-mascara: copia TUDO cru, sem embaralhar nada. Ver aviso abaixo.",
+              file=sys.stderr)
         return 2
+
+    # --sem-mascara: a cópia sai IDÊNTICA à produção — nome, CPF, e-mail,
+    # atestado. Decisão do dono do produto (08/2026), tomada com o risco
+    # explicitado: a homologação passa a conter dado pessoal e dado de saúde
+    # (LGPD art. 11), e por isso SÓ pode ser usada com o ambiente fechado —
+    # senha individual forte por pessoa, nunca a senha compartilhada.
+    #
+    # A esteira não confia neste script para essa trava: ela mesma recusa
+    # rodar sem máscara se a lista de testadores estiver vazia. Aqui o flag
+    # só monta o SELECT.
+    sem_mascara = "--sem-mascara" in sys.argv[3:]
+
+    # --cliente-real <uuid>: UM cliente vem cru; todo o resto continua
+    # embaralhado. É o meio-termo que o dono do produto escolheu (08/2026),
+    # e é bem menos exposto que --sem-mascara: dado real de um cliente em vez
+    # de 1114. O recorte por CLIENTE (tenant) e não por empresa não é
+    # preferência — é o que o schema permite: usuarios_base, onde moram nome e
+    # CPF, tem tenant_id e NÃO tem empresa_id. As pessoas pertencem ao
+    # cliente; a ligação com a empresa só existe via admissoes.
+    cliente_real = None
+    if "--cliente-real" in sys.argv:
+        i = sys.argv.index("--cliente-real")
+        if i + 1 >= len(sys.argv):
+            print("erro: --cliente-real exige o uuid do tenant", file=sys.stderr)
+            return 2
+        cliente_real = sys.argv[i + 1]
+        # Só uuid entra: este valor vai para dentro do SQL, e um literal
+        # arbitrário aqui seria injeção com credencial de leitura da produção.
+        if not re.fullmatch(r"[0-9a-fA-F-]{36}", cliente_real):
+            print(f"erro: --cliente-real nao parece um uuid: {cliente_real}",
+                  file=sys.stderr)
+            return 2
 
     caminho, tempero = sys.argv[1], sys.argv[2]
     # O tempero entra no SQL como literal entre aspas simples; escapa aspa.
@@ -410,11 +493,17 @@ def main() -> int:
     tabelas: dict[str, list[str]] = {}
     nomes: dict[str, list[str]] = {}
     resumo = {"copiar": 0, "generico": 0, "credencial": 0, "json_vazio": 0,
-              "lista_vazia": 0, "cpf": 0, "cnpj": 0, "email": 0,
+              "json_vazio_json": 0, "lista_vazia": 0, "cpf": 0, "cnpj": 0, "email": 0,
               "telefone": 0, "cep": 0, "tabela_preservada": 0,
-              "excecao_por_linha": 0}
+              "excecao_por_linha": 0, "cliente_real": 0}
     preservadas_vistas: set[str] = set()
 
+    # DUAS passadas. A primeira só levanta quais colunas cada tabela tem,
+    # porque a decisão "esta linha é do cliente escolhido?" depende de a
+    # tabela ter tenant_id, empresa_id ou user_id — e isso não se sabe ao
+    # processar a primeira coluna dela.
+    linhas_catalogo: list[tuple[str, str, str, str, bool]] = []
+    colunas_da_tabela: dict[str, set[str]] = {}
     with open(caminho, encoding="utf-8") as f:
         for linha in f:
             linha = linha.rstrip("\n")
@@ -423,26 +512,60 @@ def main() -> int:
             partes = linha.split("|")
             if len(partes) < 4:
                 continue
-            tabela, coluna, tipo, check = partes[0], partes[1], partes[2], partes[3]
-            # 5ª coluna, opcional: 't' quando é lista DE TEXTO (text[]).
             lista_texto = len(partes) > 4 and partes[4] in ("t", "true", "1")
-            if tabela in PRESERVAR_TABELAS:
-                # Tabela do motor de QA: tudo passa intacto, inclusive
-                # jsonb e listas — é documentação, não dado de pessoa.
-                tratamento = "copiar"
-                preservadas_vistas.add(tabela)
-                resumo["tabela_preservada"] += 1
-            else:
-                tratamento = classificar(coluna, tipo,
-                                         check in ("t", "true", "1"),
-                                         lista_texto)
-                resumo[tratamento] = resumo.get(tratamento, 0) + 1
-            condicao = EXCECOES_POR_LINHA.get((tabela, coluna))
-            if condicao and tratamento != "copiar":
-                resumo["excecao_por_linha"] += 1
-            tabelas.setdefault(tabela, []).append(
-                expressao(coluna, tratamento, tempero_sql, condicao))
+            linhas_catalogo.append((partes[0], partes[1], partes[2],
+                                    partes[3], lista_texto))
+            colunas_da_tabela.setdefault(partes[0], set()).add(partes[1])
+
+    # Cache: a condição é a mesma para todas as colunas de uma tabela.
+    cond_cliente: dict[str, str | None] = {}
+    if cliente_real:
+        for tab, cols in colunas_da_tabela.items():
+            cond_cliente[tab] = condicao_do_cliente(tab, cols, cliente_real)
+
+    for tabela, coluna, tipo, check, lista_texto in linhas_catalogo:
+        if sem_mascara:
+            # Cópia crua: toda coluna passa como está.
+            tratamento = "copiar"
+            resumo["copiar"] += 1
+            tabelas.setdefault(tabela, []).append(f'"{coluna}"')
             nomes.setdefault(tabela, []).append(f'"{coluna}"')
+            continue
+        if tabela in PRESERVAR_TABELAS:
+            # Tabela do motor de QA: tudo passa intacto, inclusive
+            # jsonb e listas — é documentação, não dado de pessoa.
+            tratamento = "copiar"
+            preservadas_vistas.add(tabela)
+            resumo["tabela_preservada"] += 1
+        else:
+            tratamento = classificar(coluna, tipo,
+                                     check in ("t", "true", "1"),
+                                     lista_texto)
+            resumo[tratamento] = resumo.get(tratamento, 0) + 1
+        condicao = EXCECOES_POR_LINHA.get((tabela, coluna))
+        # A exceção do cliente escolhido soma-se às que já existiam (o
+        # cercado do QA). Quando as duas valem para a mesma coluna, um OR:
+        # nenhuma das duas deve deixar de valer por causa da outra.
+        cond_tenant = cond_cliente.get(tabela)
+        if cond_tenant:
+            condicao = f"({condicao}) OR ({cond_tenant})" if condicao else cond_tenant
+            if tratamento != "copiar":
+                resumo["cliente_real"] += 1
+        if condicao and tratamento != "copiar" and not cond_tenant:
+            resumo["excecao_por_linha"] += 1
+        tabelas.setdefault(tabela, []).append(
+            expressao(coluna, tratamento, tempero_sql, condicao))
+        nomes.setdefault(tabela, []).append(f'"{coluna}"')
+
+    if sem_mascara:
+        print("-- ATENCAO: plano gerado SEM MASCARA. A copia sai identica a "
+              "producao,\n--   com nome, CPF, e-mail e atestado reais. So use "
+              "com o ambiente fechado.", file=sys.stderr)
+        for tabela, colunas in sorted(tabelas.items()):
+            print(f"{tabela}\t{', '.join(colunas)}\t{', '.join(nomes[tabela])}")
+        print(f"-- colunas: {resumo['copiar']} | todas copiadas cruas",
+              file=sys.stderr)
+        return 0
 
     # Nome errado na lista de preservadas ficaria mascarando em silêncio —
     # exatamente o tipo de erro que não dá sinal. Acusa alto.
@@ -461,15 +584,26 @@ def main() -> int:
         # data em campo de texto, e o erro apareceria longe daqui.
         print(f"{tabela}\t{', '.join(colunas)}\t{', '.join(nomes[tabela])}")
 
-    total = sum(resumo.values()) - resumo["excecao_por_linha"]
+    # excecao_por_linha e cliente_real são MARCAS sobre colunas já contadas
+    # no seu tratamento — somá-las ao total contaria a mesma coluna duas
+    # vezes (a primeira versão imprimia 7007 de 5382).
+    total = (sum(resumo.values())
+             - resumo["excecao_por_linha"] - resumo["cliente_real"])
     mascaradas = total - resumo["copiar"] - resumo["tabela_preservada"]
     print(f"-- colunas: {total} | copiadas: {resumo['copiar']} "
           f"| preservadas por tabela (QA): {resumo['tabela_preservada']} "
           f"| mascaradas: {mascaradas} "
           f"(com excecao por linha: {resumo['excecao_por_linha']})",
           file=sys.stderr)
+    if cliente_real:
+        sem_vinculo = sorted(t for t, c in cond_cliente.items() if c is None)
+        print(f"-- CLIENTE REAL {cliente_real}: {resumo['cliente_real']} colunas "
+              f"saem CRUAS para as linhas dele, mascaradas para todos os outros.",
+              file=sys.stderr)
+        print(f"--   tabelas sem vinculo com cliente (seguem 100% mascaradas): "
+              f"{len(sem_vinculo)}", file=sys.stderr)
     for k in ("cpf", "cnpj", "email", "telefone", "cep", "credencial",
-              "json_vazio", "lista_vazia", "generico"):
+              "json_vazio", "json_vazio_json", "lista_vazia", "generico"):
         if resumo.get(k):
             print(f"--   {k}: {resumo[k]}", file=sys.stderr)
     return 0

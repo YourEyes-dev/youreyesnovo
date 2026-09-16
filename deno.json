@@ -1,0 +1,7 @@
+{
+  "nodeModulesDir": "auto",
+  "imports": {
+    "npm:@supabase/supabase-js@2": "npm:@supabase/supabase-js@2.90.1",
+    "npm:openai@^4.52.5": "npm:openai@4.52.5"
+  }
+}

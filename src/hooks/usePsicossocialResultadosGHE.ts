@@ -13,6 +13,8 @@ interface RespostaRow {
   setor_snapshot: string | null;
   cargo_snapshot: string | null;
   indicadores: { radar?: RadarDimensao[]; IPS?: number } | null;
+  /** Marca as linhas derivadas de entrevistas guiadas (não anônimas). */
+  origem_entrevista?: boolean;
 }
 
 interface CampanhaGheRow {
@@ -114,6 +116,7 @@ function entrevistasParaRespostas(rows: EntrevistaRow[]): RespostaRow[] {
       indicadores: radar.length > 0
         ? { radar, IPS: Math.round(100 - riscoMedio) }
         : null,
+      origem_entrevista: true,
     };
   });
 }
@@ -399,6 +402,8 @@ export function usePsicossocialResultadosGHE(campanhaIds: string[] | undefined) 
     const grupos = new Map<string, {
       nome: string;
       count: number;
+      /** Quantas das linhas do grupo vieram de entrevistas guiadas. */
+      entrevistas: number;
       radarAcc: Map<string, { soma: number; n: number }>;
       ipsList: number[];
       campanhas: Set<string>;
@@ -409,12 +414,13 @@ export function usePsicossocialResultadosGHE(campanhaIds: string[] | undefined) 
     const addToGrupo = (key: string, nome: string, r: RespostaRow) => {
       if (!grupos.has(key)) {
         grupos.set(key, {
-          nome, count: 0, radarAcc: new Map(), ipsList: [], campanhas: new Set(),
+          nome, count: 0, entrevistas: 0, radarAcc: new Map(), ipsList: [], campanhas: new Set(),
           setoresAcc: new Map(), cargosAcc: new Map(),
         });
       }
       const g = grupos.get(key)!;
       g.count += 1;
+      if (r.origem_entrevista) g.entrevistas += 1;
       g.campanhas.add(r.campanha_id);
       const radar = (r.indicadores?.radar ?? []) as RadarDimensao[];
       for (const d of radar) {
@@ -486,11 +492,17 @@ export function usePsicossocialResultadosGHE(campanhaIds: string[] | undefined) 
         ghe_nome: g.nome,
         ghe_codigo: realGheId ? gheCodigoMap.get(realGheId) ?? null : null,
         // Respondentes = questionários (via cpf_hash) + entrevistas guiadas
-        // individuais vinculadas ao GHE. Sem somar as entrevistas, campanhas
-        // 100% por entrevista ficavam com count 0 e o GHE era bloqueado.
+        // do grupo. As entrevistas são contadas pelo agrupamento efetivo (que
+        // já resolve o GHE por snapshot OU pelo GHE único da campanha), e não
+        // apenas pelo `ghe_id_snapshot`: entrevistas concluídas antes do
+        // vínculo do GHE ficam com snapshot nulo e o GHE aparecia com 0
+        // respondentes, bloqueando o plano de ação.
         count: realGheId
           ? (respondentesReais.has(realGheId)
-              ? respondentesReais.get(realGheId)! + (entrevistasPorGhe.get(realGheId) ?? 0)
+              ? Math.max(
+                  respondentesReais.get(realGheId)! + Math.max(g.entrevistas, entrevistasPorGhe.get(realGheId) ?? 0),
+                  g.count,
+                )
               : Math.max(g.count, entrevistasPorGhe.get(realGheId) ?? 0))
           : g.count,
         elegiveis: realGheId ? (elegiveisPorGhe.get(realGheId) ?? 0) : 0,

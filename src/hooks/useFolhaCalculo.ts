@@ -17,6 +17,7 @@ import {
   MATRIZ_VINCULOS_PADRAO,
   type VinculoConfig,
 } from "@/lib/folha/calculos";
+import { traduzirErro13 } from "@/lib/decimoTerceiroErros";
 
 export function useFolhaCalculo() {
   const { tenantId, user, profile } = useAuth();
@@ -220,12 +221,21 @@ export function useFolhaCalculo() {
       const prazoLegal = new Date(dados.data_inicio_gozo);
       prazoLegal.setDate(prazoLegal.getDate() - 2);
 
+      // Campos que servem ao cálculo mas não são colunas da tabela ficam de
+      // fora do insert; a memória da média entra dentro de memoria_calculo,
+      // para o valor se reproduzir depois (art. 142 / RNF-008).
+      const { dependentes_irrf, media_memoria, ...colunas } = dados;
+
       const { data, error } = await fromTable("folha_ferias_calculo")
         .insert({
-          ...dados,
+          ...colunas,
           ...resultado,
           prazo_legal: prazoLegal.toISOString().split("T")[0],
-          memoria_calculo: resultado,
+          memoria_calculo: {
+            ...resultado,
+            dependentes_irrf: dependentes_irrf || 0,
+            media_variaveis: media_memoria || null,
+          },
           tenant_id: tenantId,
         } as any)
         .select()
@@ -269,11 +279,20 @@ export function useFolhaCalculo() {
         dependentesIRRF: dados.dependentes_irrf || 0,
       });
 
+      // Campos que servem ao cálculo mas não são colunas da tabela ficam de
+      // fora do insert; as memórias de avos e média entram dentro de
+      // memoria_calculo, para o valor se reproduzir depois (RNF-001/007).
+      const { dependentes_irrf, apuracao_memoria, ...colunas } = dados;
+
       const { data, error } = await fromTable("folha_13_calculo")
         .insert({
-          ...dados,
+          ...colunas,
           ...resultado,
-          memoria_calculo: resultado,
+          memoria_calculo: {
+            ...resultado,
+            dependentes_irrf: dependentes_irrf || 0,
+            apuracao: apuracao_memoria || null,
+          },
           tenant_id: tenantId,
         } as any)
         .select()
@@ -285,7 +304,10 @@ export function useFolhaCalculo() {
       queryClient.invalidateQueries({ queryKey: ["folha-13-calculo"] });
       toast.success("13º calculado!");
     },
-    onError: (e: Error) => toast.error(e.message),
+    // O banco tem travas que impedem gravar coisa errada (parcela repetida,
+    // encargos na 1ª parcela, cálculo já fechado). Elas voltavam em inglês,
+    // com nome de índice; aqui viram instrução do que fazer na tela.
+    onError: (e: unknown) => toast.error(traduzirErro13(e)),
   });
 
   // ======== RESCISÕES ========

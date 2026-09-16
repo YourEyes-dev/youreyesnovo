@@ -56,6 +56,9 @@ export interface ContratoAssinatura {
   signatario_cnpj: string | null;
   signatario_razao_social: string | null;
   signatario_representante: string | null;
+  /** Contrato gerado para este signatário (ex.: Contrato de Parceria com as duas partes). Prevalece sobre o modelo. */
+  html_assinado?: string | null;
+  parceiro_id?: string | null;
   created_at: string;
 }
 

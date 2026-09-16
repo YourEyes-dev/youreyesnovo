@@ -27,6 +27,7 @@ import {
 import { FeriasTimeline } from "./FeriasTimeline";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 const ESTADO_LABEL: Record<EstadoProg, { label: string; cls: string }> = {
   sugerido:   { label: "Sugerido",   cls: "bg-slate-100 text-slate-700" },
@@ -337,7 +338,15 @@ function EditarProgramacaoDialog({ linha, onOpenChange, onSalvar, salvando }: {
   const [l, setL] = useState<LinhaProgramacao>(linha);
   useEffect(() => setL(linha), [linha]);
 
+  const { roles } = useAuth();
+  const podeAutorizar = roles.some(r => ["admin", "owner", "superadmin"].includes(r));
+
   const travado = ["confirmado","solicitado","aprovado","em_gozo","concluido"].includes(l.estado);
+
+  // Concessivo (art. 134): algum sub-período começa depois do limite?
+  const concessivoExcedido = [l.p1, l.p2, l.p3].some(
+    s => s.inicio && new Date(s.inicio + "T12:00:00") > l.limiteConcessivoDate,
+  );
 
   // Recalcula dias de um sub-período pelas datas
   const setSub = (n: 1 | 2 | 3, patch: Partial<SubPeriodo>) => {
@@ -364,6 +373,8 @@ function EditarProgramacaoDialog({ linha, onOpenChange, onSalvar, salvando }: {
       abonoVender: l.abonoVender,
       abonoDias: l.abonoDias,
       limiteConcessivo: l.limiteConcessivoDate,
+      autorizadoExcecao: l.autorizadoExcecao,
+      valorEstimado: l.valorEstimado,
       contexto: {
         feriados: l.feriados,
         feriasFamiliares: l.feriasFamiliares,
@@ -371,7 +382,7 @@ function EditarProgramacaoDialog({ linha, onOpenChange, onSalvar, salvando }: {
       },
     }),
     [l.aquisitivoFim, l.saldo, l.p1, l.p2, l.p3, l.abonoVender, l.abonoDias, l.limiteConcessivoDate,
-     l.feriados, l.feriasFamiliares, l.afastamentoReinicia],
+     l.autorizadoExcecao, l.valorEstimado, l.feriados, l.feriasFamiliares, l.afastamentoReinicia],
   );
   const bloqueado = temBloqueio(violacoes);
   const temProgramacao = totalProg > 0;
@@ -439,6 +450,35 @@ function EditarProgramacaoDialog({ linha, onOpenChange, onSalvar, salvando }: {
             <Switch checked={l.adiantar13} onCheckedChange={v => setL({ ...l, adiantar13: v })} />
           </div>
         </div>
+
+        {/* Concessivo vencido (art. 134/137): alçada de diretoria */}
+        {concessivoExcedido && !travado && (
+          <div className={cn(
+            "flex items-start gap-2 rounded-lg border p-2.5 text-xs",
+            l.autorizadoExcecao ? "border-amber-200 bg-amber-50/60 text-amber-800"
+                                : "border-red-200 bg-red-50/60 text-red-700",
+          )}>
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <p className="font-medium">Programação além do limite concessivo (art. 134)</p>
+              <p className="opacity-90">
+                As férias deviam ser concedidas até {l.limiteConcessivo}. Prosseguir assume o
+                pagamento <strong>em dobro</strong> (art. 137){l.valorEstimado > 0
+                  ? <> — custo estimado da dobra: <strong>{formatBRL(l.valorEstimado)}</strong></>
+                  : null}.
+              </p>
+              {podeAutorizar ? (
+                <label className="flex items-center gap-2 pt-0.5">
+                  <Switch checked={l.autorizadoExcecao}
+                    onCheckedChange={v => setL({ ...l, autorizadoExcecao: v })} />
+                  <span>Autorizar a exceção (alçada de diretoria) e assumir a dobra</span>
+                </label>
+              ) : (
+                <p className="opacity-80">Somente a diretoria (admin ou acima) pode autorizar esta exceção.</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Violações do motor de regras (3B) */}
         {violacoes.length > 0 && (

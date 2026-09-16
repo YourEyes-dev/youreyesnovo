@@ -96,8 +96,6 @@ Responda APENAS com um JSON válido, sem markdown, no formato:
   ]
 }`;
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurada");
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { capturarRefDaUrl, lerRef } from "@/lib/parceiroRef";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Shield, AlertTriangle, CheckCircle, ArrowRight, Clock, 
@@ -78,6 +79,7 @@ const pulseGlow = {
 };
 
 export default function LandingPage() {
+  useEffect(() => { capturarRefDaUrl(); }, []);
   const navigate = useNavigate();
   const [vagasRestantes, setVagasRestantes] = useState(4);
   const [nome, setNome] = useState("");
@@ -130,10 +132,12 @@ export default function LandingPage() {
     }
     setLoading(true);
     try {
-      await supabase.from("landing_leads").insert({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("landing_leads").insert({
         nome: nome.trim().substring(0, 100),
         email: email.trim().substring(0, 255),
         telefone: digits,
+        ref_codigo: lerRef(),
       });
       setLeadEnviado(true);
       toast.success("Cadastro realizado! Garanta sua vaga agora.");

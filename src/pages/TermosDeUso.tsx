@@ -14,7 +14,7 @@ export default function TermosDeUso() {
         </Button>
 
         <h1 className="text-3xl font-bold mb-2">Termos de Uso</h1>
-        <p className="text-muted-foreground mb-8">Última atualização: 10 de março de 2026</p>
+        <p className="text-muted-foreground mb-8">Última atualização: 3 de setembro de 2026</p>
 
         <div className="prose prose-sm max-w-none space-y-6 text-foreground">
           <section>
@@ -46,6 +46,16 @@ export default function TermosDeUso() {
           <section>
             <h2 className="text-xl font-semibold">5. Propriedade Intelectual</h2>
             <p>Todo o conteúdo, design, código e funcionalidades da plataforma são de propriedade da YourEyes, protegidos por leis de propriedade intelectual.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold">5.1. Confidencialidade e segredos comerciais</h2>
+            <p>Ao usar a plataforma, participar de demonstrações, implantações ou do Programa de Parceiros, o usuário pode ter acesso a informações confidenciais da YourEyes: modelo de negócios, tabela de preços e descontos não públicos, estrutura de comissões, roteiros comerciais, materiais de implantação, metodologias, roadmap de produto, métricas e relação de clientes. Essas informações são segredos de negócio protegidos pela Lei 9.279/1996 (art. 195) e só podem ser usadas para a finalidade a que foram disponibilizadas. É vedado copiá-las, divulgá-las, usá-las para desenvolver ou favorecer produto concorrente, ou empregá-las para aliciar clientes, colaboradores ou parceiros da YourEyes. A obrigação de sigilo vigora enquanto a informação mantiver natureza confidencial e, no mínimo, por cinco anos após o término da relação.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold">5.2. Programa de Parceiros</h2>
+            <p>A adesão ao Programa de Parceiros (indicador, representante, implantador, clínica de SST, contabilidade) é regida pelo <Link to="/parceiros/contrato" className="text-primary underline underline-offset-2">Contrato de Parceria Comercial</Link>, aceito eletronicamente no cadastro, que complementa estes Termos e prevalece sobre eles no que se refere ao programa. Ele detalha atribuição de clientes, remuneração e níveis, fechamento e pagamento, confidencialidade, não concorrência e não aliciamento pelo prazo de doze meses após o término, uso da marca e rescisão. O parceiro não tem acesso a dados de pessoas físicas dos clientes: a Área do Parceiro exibe apenas dados da empresa (nome, plano, estágio e valores).</p>
           </section>
 
           <section>

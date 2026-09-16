@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { DiagnosticoPsicossocial } from "@/components/site/DiagnosticoPsicossocial";
-import logoAsset from "@/assets/logo-youreyes-3.png.asset.json";
+import logoLocal from "@/assets/logo-youreyes.svg";
+import { capturarRefDaUrl, lerRef } from "@/lib/parceiroRef";
 import mascot from "@/assets/mascot-ye.png.asset.json";
 import {
   ShieldCheck,
@@ -194,6 +195,17 @@ const FAQ = [
 // ---------------- Component ----------------
 export default function Site() {
   const [ciclo, setCiclo] = useState<Ciclo>("semestral");
+  // Indicação de parceiro: guarda o código e mostra quem indicou
+  const [indicador, setIndicador] = useState<{ nome: string; cidade: string | null; uf: string | null } | null>(null);
+  const [faixaFechada, setFaixaFechada] = useState(false);
+  useEffect(() => {
+    const ref = capturarRefDaUrl();
+    if (!ref) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).rpc("parceiro_ref_publico", { p_codigo: ref }).then(({ data }: { data: { nome: string; cidade: string | null; uf: string | null } | null }) => { if (data?.nome) setIndicador(data); });
+    // Link "contratar" (#planos): rola até os planos depois que a página monta
+    if (window.location.hash === "#planos") setTimeout(() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" }), 400);
+  }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [loadingPlano, setLoadingPlano] = useState<string | null>(null);
 
@@ -256,6 +268,7 @@ export default function Site() {
           preco_mensal,
           ciclo,
           origin: window.location.origin,
+          ref_codigo: lerRef(),
         },
       });
       if (error) throw error;
@@ -276,16 +289,27 @@ export default function Site() {
     <div className="min-h-screen bg-[#0B1D34] text-slate-100">
 
       {/* NAV */}
+      {indicador && !faixaFechada && (
+        <div className="bg-[#FF8A00] text-[#0B1D34] text-sm" data-testid="faixa-indicacao">
+          <div className="max-w-7xl mx-auto px-6 py-2 flex flex-wrap items-center justify-between gap-2">
+            <span>🤝 Você foi indicado(a) por <b>{indicador.nome}</b>{indicador.cidade ? ` (${indicador.cidade}${indicador.uf ? `/${indicador.uf}` : ""})` : ""}, parceiro(a) YourEyes. Sua indicação já está registrada.</span>
+            <span className="flex items-center gap-3">
+              <a href="#planos" className="font-semibold underline underline-offset-2">Ver planos</a>
+              <button type="button" aria-label="Fechar" className="opacity-70 hover:opacity-100" onClick={() => setFaixaFechada(true)}>✕</button>
+            </span>
+          </div>
+        </div>
+      )}
       <header className="sticky top-0 z-40 bg-[#0B1D34]/85 backdrop-blur border-b border-white/10">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <a href="#topo" className="flex items-center gap-3">
-            <img src={logoAsset.url} alt="YourEyes" className="h-10 w-10 rounded-full" />
+            <img src={logoLocal} alt="YourEyes" className="h-10 w-auto" />
             <div className="leading-tight">
               <div className="font-bold text-white tracking-tight">YourEyes</div>
               <div className="text-[10px] uppercase tracking-widest text-slate-400">Maturidade Organizacional</div>
             </div>
           </a>
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-200">
+          <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-sm font-medium text-slate-200">
             <a href="#problema" className="hover:text-[#60ABEF]">Problema</a>
             <a href="#diagnostico" className="hover:text-[#60ABEF]">Diagnóstico</a>
             <a href="#niveis" className="hover:text-[#60ABEF]">Níveis</a>
@@ -293,6 +317,8 @@ export default function Site() {
             <a href="#planos" className="hover:text-[#60ABEF]">Planos</a>
             <a href="#seguranca" className="hover:text-[#60ABEF]">Segurança</a>
             <a href="#contato" className="hover:text-[#60ABEF]">Contato</a>
+            <Link to="/parceiros" className="hover:text-[#60ABEF]">Parceiros</Link>
+            <Link to="/marketye" className="hover:text-[#60ABEF]">MarketYE</Link>
           </nav>
           {/* Desde que o site virou a porta do domínio principal, quem chega
               aqui para TRABALHAR (cliente indo bater ponto, RH indo lançar
@@ -307,12 +333,6 @@ export default function Site() {
             >
               <LogIn className="w-4 h-4" /> Entrar / Cadastrar
             </Link>
-            <a
-              href="#diagnostico"
-              className="inline-flex items-center gap-2 bg-[#FF8A00] hover:bg-[#e67a00] text-white text-sm font-semibold px-4 py-2 rounded-md transition"
-            >
-              Diagnóstico grátis <ArrowRight className="w-4 h-4" />
-            </a>
           </div>
           {/* No celular o acesso fica FORA do menu sanduíche: escondido atrás
               de dois toques, ele não serve a quem só quer entrar. */}
@@ -339,6 +359,8 @@ export default function Site() {
                 {s === "niveis" ? "Níveis" : s === "seguranca" ? "Segurança" : s === "diagnostico" ? "Diagnóstico" : s}
               </a>
             ))}
+            <Link to="/parceiros" className="block" onClick={() => setMenuOpen(false)}>Parceiros</Link>
+            <Link to="/marketye" className="block" onClick={() => setMenuOpen(false)}>MarketYE (especialistas)</Link>
             <Link to="/login" className="block text-[#60ABEF] font-semibold" onClick={() => setMenuOpen(false)}>
               Entrar ou cadastrar sua empresa →
             </Link>
@@ -901,7 +923,7 @@ export default function Site() {
         <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-4 gap-10">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <img src={logoAsset.url} alt="YourEyes" className="h-8 w-8 rounded-full" />
+              <img src={logoLocal} alt="YourEyes" className="h-8 w-auto" />
               <div className="font-bold text-white">YourEyes</div>
             </div>
             <p className="text-sm leading-relaxed text-slate-400">
@@ -916,6 +938,8 @@ export default function Site() {
               <li><a href="#plataforma" className="hover:text-white">Plataforma</a></li>
               <li><a href="#planos" className="hover:text-white">Planos</a></li>
               <li><a href="#seguranca" className="hover:text-white">Segurança</a></li>
+              <li><Link to="/parceiros" className="hover:text-white">Programa de Parceiros</Link></li>
+              <li><Link to="/marketye" className="hover:text-white">MarketYE · marketplace de serviços</Link></li>
             </ul>
           </div>
           <div>

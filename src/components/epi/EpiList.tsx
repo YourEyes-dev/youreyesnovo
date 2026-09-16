@@ -64,7 +64,12 @@ export function EpiList({
       epi.tipo.categoria?.toLowerCase().includes(search.toLowerCase()) ||
       epi.marca?.toLowerCase().includes(search.toLowerCase()) ||
       epi.modelo?.toLowerCase().includes(search.toLowerCase()) ||
-      epi.codigo?.toLowerCase().includes(search.toLowerCase())
+      epi.codigo?.toLowerCase().includes(search.toLowerCase()) ||
+      // O campo de busca sempre prometeu "nome, categoria, CA, marca ou
+      // modelo" (placeholder abaixo), mas o CA nunca esteve no filtro —
+      // procurar pelo número do CA não achava nada.
+      epi.ca?.toLowerCase().includes(search.toLowerCase()) ||
+      epi.tipo?.ca_numero?.toLowerCase().includes(search.toLowerCase())
   );
 
   const isVencido = (dataValidade: string | null) => {
@@ -152,7 +157,12 @@ export function EpiList({
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {epi.ca || "-"}
+                    {/* O cadastro grava o CA em epi_tipos.ca_numero, mas esta
+                        lista sempre leu epis.ca — coluna que nenhuma tela
+                        escrevia. Por isso o CA aparecia vazio mesmo tendo sido
+                        digitado. Lê epis.ca primeiro para preservar as linhas
+                        antigas que já o têm preenchido. */}
+                    {epi.ca || epi.tipo?.ca_numero || "-"}
                   </TableCell>
                   <TableCell>
                     {epi.marca || "-"}

@@ -6,6 +6,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { usePontoAlertas, ALERTA_TIPOS } from "@/hooks/usePontoAlertas";
 import { Bell, CheckCircle, AlertTriangle, AlertOctagon, Info, Sparkles } from "lucide-react";
 import { CriarAcaoAlertaModal } from "@/components/shared/CriarAcaoAlertaModal";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { abreviacaoDiaSemana } from "@/lib/ponto/diaSemana";
 
 const SEVERIDADE_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -19,6 +25,81 @@ export function PontoAlertasTab() {
   const { alertas, loadingAlertas, resolverAlerta } = usePontoAlertas();
   const [filtroTipo, setFiltroTipo] = useState<string>("all");
   const [acaoModal, setAcaoModal] = useState<{ open: boolean; titulo: string; descricao: string; id?: string }>({ open: false, titulo: "", descricao: "" });
+  const { tenantId, user, profile } = useAuth();
+  const qc = useQueryClient();
+  const [gerando, setGerando] = useState<string | null>(null);
+  // Análise da IA: sugestão em tela, decisão do humano registrada. A IA nunca
+  // decide sozinha nada que afete direito do trabalhador (LGPD art. 20).
+  const [analise, setAnalise] = useState<any>(null);
+  const [obsDecisao, setObsDecisao] = useState("");
+  const [decidindo, setDecidindo] = useState(false);
+
+  /** Converte o alerta em ação 5W2H no Plano de Ação, pela ponte do banco —
+   *  que preenche a origem e deixa o alerta vinculado à ação gerada. */
+  const gerarAcao = async (alertaId: string) => {
+    if (!tenantId) return;
+    setGerando(alertaId);
+    try {
+      const { error } = await (supabase.rpc as any)("ponto_alerta_gerar_acao", {
+        p_tenant_id: tenantId,
+        p_alerta_id: alertaId,
+        p_responsavel_id: user?.id || null,
+        p_responsavel_nome: profile?.nome_completo || null,
+        p_prazo_dias: 15,
+      });
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["ponto-alertas"] });
+      qc.invalidateQueries({ queryKey: ["plano-acao"] });
+      toast.success("Ação criada no Plano de Ação, ligada a este alerta.");
+    } catch (e: any) {
+      toast.error("Não foi possível gerar a ação: " + (e?.message || ""));
+    } finally {
+      setGerando(null);
+    }
+  };
+
+  const analisarComIa = async (alertaId: string) => {
+    if (!tenantId) return;
+    try {
+      const { data: id, error } = await (supabase.rpc as any)("ponto_ia_analisar_alerta", {
+        p_tenant_id: tenantId,
+        p_alerta_id: alertaId,
+      });
+      if (error) throw error;
+      const { data } = await supabase
+        .from("ponto_ia_analises" as any)
+        .select("*")
+        .eq("id", id as string)
+        .maybeSingle() as { data: any };
+      setObsDecisao("");
+      setAnalise({ ...data, alerta_id: alertaId });
+    } catch (e: any) {
+      toast.error("Não foi possível analisar: " + (e?.message || ""));
+    }
+  };
+
+  const decidir = async (decisao: "aceito" | "rejeitado") => {
+    if (!analise || !user) return;
+    setDecidindo(true);
+    try {
+      const { error } = await (supabase.rpc as any)("ponto_ia_registrar_decisao", {
+        p_analise_id: analise.id,
+        p_decisao: decisao,
+        p_decidido_por: user.id,
+        p_decidido_por_nome: profile?.nome_completo || null,
+        p_observacao: obsDecisao || null,
+      });
+      if (error) throw error;
+      // Aceitar a sugestão é o gesto que vira ação — e é humano, não da IA.
+      if (decisao === "aceito") await gerarAcao(analise.alerta_id);
+      setAnalise(null);
+      toast.success(decisao === "aceito" ? "Sugestão aceita e ação criada." : "Sugestão rejeitada. A decisão fica registrada.");
+    } catch (e: any) {
+      toast.error("Não foi possível registrar a decisão: " + (e?.message || ""));
+    } finally {
+      setDecidindo(false);
+    }
+  };
 
   const alertasFiltrados = filtroTipo === "all" ? alertas : alertas.filter(a => a.tipo === filtroTipo);
 
@@ -127,13 +208,27 @@ export function PontoAlertasTab() {
                       <Button size="sm" variant="outline" onClick={() => resolverAlerta(a.id)}>
                         <CheckCircle className="w-3 h-3 mr-1" /> Resolver
                       </Button>
+                      {(a as any).plano_acao_id ? (
+                        <Badge variant="outline" className="border-emerald-400 text-emerald-700">
+                          Ação criada
+                        </Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={gerando === a.id}
+                          onClick={() => gerarAcao(a.id)}
+                        >
+                          {gerando === a.id ? "Gerando..." : "Gerar ação"}
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
                         className="text-primary"
-                        onClick={() => setAcaoModal({ open: true, titulo: a.titulo, descricao: a.descricao || `${a.colaborador_nome || "Geral"} - ${a.titulo}`, id: a.id })}
+                        onClick={() => analisarComIa(a.id)}
                       >
-                        <Sparkles className="w-3 h-3 mr-1" /> Ação
+                        <Sparkles className="w-3 h-3 mr-1" /> Analisar com IA
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -143,6 +238,48 @@ export function PontoAlertasTab() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Sugestão da IA + decisão humana registrada (LGPD art. 20) */}
+      <Dialog open={!!analise} onOpenChange={(o) => !o && setAnalise(null)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Sugestão da análise automática</DialogTitle>
+            <DialogDescription>
+              A análise <strong>sugere</strong>; quem decide é você. Nada aqui é aplicado sozinho —
+              e a sua decisão fica registrada, aceitando ou recusando.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground">Causa provável</p>
+              <p>{analise?.causa_provavel || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Impacto se persistir</p>
+              <p>{analise?.impacto || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Ação sugerida</p>
+              <p>{analise?.acao_sugerida || "—"}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Observação da sua decisão (opcional)</p>
+              <Textarea rows={3} value={obsDecisao} onChange={(e) => setObsDecisao(e.target.value)}
+                placeholder="Ex: já tratamos com o gestor da área; a causa aqui é outra." />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => decidir("rejeitado")} disabled={decidindo}>
+              Recusar sugestão
+            </Button>
+            <Button onClick={() => decidir("aceito")} disabled={decidindo}>
+              {decidindo ? "Registrando..." : "Aceitar e criar ação"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <CriarAcaoAlertaModal
         open={acaoModal.open}

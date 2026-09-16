@@ -21,6 +21,7 @@ const TIPOS_RESCISAO = [
   { value: "PEDIDO_DEMISSAO", label: "Pedido de Demissão" },
   { value: "DISPENSA_SEM_JUSTA_CAUSA", label: "Dispensa sem Justa Causa" },
   { value: "DISPENSA_COM_JUSTA_CAUSA", label: "Dispensa com Justa Causa" },
+  { value: "CULPA_RECIPROCA", label: "Culpa Recíproca (metade das verbas)" },
   { value: "TERMINO_EXPERIENCIA", label: "Término de Experiência" },
   { value: "RESCISAO_INDIRETA", label: "Rescisão Indireta" },
   { value: "ACORDO_484A", label: "Acordo (Art. 484-A)" },

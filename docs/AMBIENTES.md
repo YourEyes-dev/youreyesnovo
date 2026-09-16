@@ -7,16 +7,42 @@ são injetadas no build pelo Vite conforme o `--mode`.
 | | TESTE (staging) | HOMOLOGAÇÃO | PRODUÇÃO |
 |---|---|---|---|
 | Como recebe mudança | esteira automática, a cada merge | **o mesmo script colado à mão** | script colado à mão |
-| Estrutura | a do repositório | **cópia fiel da produção**, drift incluído | a real |
+| Estrutura | a do repositório | forward-only (ver decisão 09/2026 abaixo) | a real |
 | Dados | fictícios | fictícios | reais |
-| Responde a | "a mudança funciona?" | **"o script aplica na estrutura real?"** | — |
+| Responde a | "a mudança funciona?" | "o script aplica sem quebrar?" | — |
 
-A homologação existe por causa de uma diferença que custou caro duas vezes: o teste
+> **Decisão 09/2026 — a homologação deixou de ser recriada.** O fluxo passou a ser
+> `desenvolvimento → homologação → produção`, forward-only: todo script de entrega
+> é aplicado primeiro na homologação e depois, o MESMO, na produção. A homologação
+> **não é mais recriada a partir da produção** (o RECRIAR abaixo está **suspenso**,
+> não apagado). Motivo: recriar apagava a estrutura de testes já montada na tela do
+> SuperAdmin — casos documentados, cobertura e mobiliário de QA (`qa_casos_teste`,
+> `qa_cobertura_e2e`, `qa_implementacoes`, `qa_modulos`, agendamentos).
+>
+> **O que se perde com isso, e o que fica.** A homologação deixa de ser espelho
+> fiel da produção e passa a divergir dela — some a garantia original de "o script
+> aplica na estrutura REAL da produção?". O colchão que resta é a disciplina do
+> próprio script de entrega (idempotente, `IF NOT EXISTS`, blocos `DO` com
+> `EXCEPTION` por item). Nem tudo se perde num eventual recriar: **Cypress** vive no
+> repositório (`cypress/e2e/*.cy.ts`, fora do banco) e o **motor de QA** vem das
+> migrations; só os **casos documentados** (dados nas tabelas acima) seriam
+> sobrescritos, porque hoje o `PRESERVAR_TABELAS` do gerador copia esses dados **da
+> produção**, não mantém os da homologação.
+>
+> **Para voltar a poder recriar sem perder testes** (anotado, não implementado):
+> **(A)** mudar o recriar para PRESERVAR as linhas dessas tabelas que já estão na
+> homologação (dump antes de dropar o schema, restaura depois), em vez de copiá-las
+> da produção; e/ou **(B)** tornar os casos parte do repositório — um helper que
+> exporta `qa_casos_teste`/cobertura para uma migration-seed, fazendo do repo a
+> fonte da verdade (aí recriar volta a ser seguro de graça). A casa já faz a B em
+> parte, nas migrations `qa_*_casos_tela.sql`.
+
+A homologação nasceu por causa de uma diferença que custou caro duas vezes: o teste
 recebe tudo automaticamente e a produção só recebe o que é colado, então os dois se
 afastam. Um script de entrega já abortou na produção por uma coluna que existia no
-teste, e uma rotina de QA quebrou por funções auxiliares que nunca chegaram lá. A
-homologação é onde o script encontra a estrutura real **antes** de a produção
-encontrá-lo.
+teste, e uma rotina de QA quebrou por funções auxiliares que nunca chegaram lá. Com
+a decisão 09/2026 a homologação não é mais espelho da produção; a proteção contra
+esse tipo de erro passa a depender da disciplina do script de entrega.
 
 ## Arquivos de ambiente
 
@@ -63,6 +89,13 @@ npm run build:production
 > Os scripts usam apenas `--mode`: nenhum deles sobrescreve o `.env`.
 
 ## Criar a homologação
+
+> ⚠️ **SUSPENSO desde 09/2026 (ver "Decisão 09/2026" no topo).** Recriar a
+> homologação a partir da produção APAGA a estrutura de testes já montada nela.
+> O fluxo atual é forward-only (`desenvolvimento → homologação → produção`), e a
+> homologação não é mais recriada. O roteiro abaixo fica registrado para o caso de
+> um dia se implementar a preservação dos casos (opções A/B no topo); até lá, não
+> use o RECRIAR numa homologação que já tenha testes montados.
 
 Roteiro completo, na ordem. Só o passo 1 depende do painel do Supabase; o resto é
 linha de comando e cópia de arquivo.
@@ -200,13 +233,118 @@ O que ela faz, e o que impede:
    chamam ninguém);
 8. **publica as Edge Functions** no projeto da homologação (mesmo padrão da
    esteira do staging: CLI fixada + link + deploy com 3 tentativas). Roda
-   também no modo `so_finalizar`, que vira o jeito barato (~min) de
-   atualizar functions sem refazer a cópia. As chaves de plataforma o
+   também no modo `so_finalizar`. **Para só atualizar functions, porém, prefira
+   o botão dedicado `homologacao-funcoes.yml`** (sem `RECRIAR`; ver **Manter a
+   homologação em dia**) — este passo aqui existe porque a recriação também
+   precisa dele. As chaves de plataforma o
    Supabase injeta sozinho; chaves de recurso (`OPENAI_API_KEY`,
    `RESEND_API_KEY`, `GITHUB_DISPATCH_TOKEN`...) são segredos do projeto,
    configurados no painel por quem decidir usar o recurso na homologação —
    sem elas, a function correspondente recusa com mensagem clara;
 9. guarda o retrato e o log como anexo da corrida, por 7 dias.
+
+> **Modo `mascarar = um_cliente` (o recomendado quando o embaralhamento
+> atrapalha).** O formulário tem os campos `mascarar` e `cliente_real`. Em
+> `um_cliente` + o `tenant_id` de um cliente, **só aquele cliente vem com
+> dados reais**; os outros continuam embaralhados como sempre. Foi a escolha
+> do dono do produto (08/2026) para o cliente SUDOMED ITAPEJARA
+> (`83f1b040-c857-45a4-b71d-506e2a32d527`, 4 empresas), que é a própria
+> operação da casa — não dado de terceiro.
+>
+> O recorte é por **cliente (tenant)**, e não por empresa, porque é o que o
+> schema permite: `usuarios_base` — onde moram nome e CPF — tem `tenant_id` e
+> **não** tem `empresa_id`. As pessoas pertencem ao cliente; a ligação com a
+> empresa só existe via `admissoes`. Medido: 311 das 354 tabelas têm
+> `tenant_id`, 86 têm `empresa_id`, e as 39 sem vínculo nenhum são catálogos
+> públicos, motor de QA e configuração de plataforma — seguem 100%
+> mascaradas.
+>
+> Três detalhes que o modo exige, e que só apareceram ao construir:
+>
+> - a trava de vazamento **exclui as linhas do cliente escolhido** da
+>   medição. Sem isso ela leria os CPFs reais dele como fuga e apagaria a
+>   cópia inteira — o oposto do pedido. Para todos os outros clientes o rigor
+>   continua igual: máscara que falhar em qualquer um deles dispara o
+>   apaga-tudo;
+> - **superadmins ficam sem a senha compartilhada**, mesmo tendo e-mail
+>   mascarado. Superadmin enxerga todos os clientes, então uma conta dessas
+>   com `123456` seria a porta dos fundos para o dado real, anulando a
+>   proteção;
+> - colunas do tipo `json` (não `jsonb`) precisaram de tratamento separado:
+>   com o embrulho condicional, os dois ramos do `CASE` têm que ter o mesmo
+>   tipo, e a máscara devolvia `jsonb` (`CASE/WHEN could not convert type
+>   json to jsonb`). Enquanto a máscara era a expressão inteira, isso passava
+>   despercebido.
+>
+> **Modo `mascarar = nao` (cópia crua total).** Em `nao`, a cópia sai
+> **idêntica à produção** — nome, CPF, e-mail e atestado reais de **todos**
+> os clientes. Existe, mas o `um_cliente` cobre o mesmo caso de uso com uma
+> fração da exposição.
+
+### Sincronizar um cliente sem refazer a cópia
+
+O botão RECRIAR resolve trazendo tudo de novo: apaga a homologação inteira e
+reconstrói em ~40 minutos. Quem tem ensaio em andamento ou cadastro de teste
+lá dentro perde tudo.
+
+O workflow **`homologacao-sincronizar-cliente`** é o reparo no lugar da
+demolição: lê da produção só as linhas de UM cliente, sem máscara, e
+**atualiza só essas linhas** na homologação. Poucos minutos, e o resto do
+ambiente fica exatamente como estava.
+
+Formulário: `confirmar` = `SINCRONIZAR`, `cliente_real` = o `tenant_id`, e os
+dois hosts de pooler. Exige o secret `HOMOLOGACAO_TESTADORES`, pelo mesmo
+motivo do modo `um_cliente`.
+
+**O que torna isso possível:** as chaves nunca são embaralhadas (a máscara só
+toca texto, json e listas), então cada linha da homologação sabe qual linha
+da produção é a dela. Medido: 353 das 354 tabelas têm chave primária de uma
+coluna — a única sem chave (`ponto_entrega_conferencia`) fica de fora, e o
+passo diz isso em voz alta.
+
+**O que ela NÃO faz, de propósito: não insere linhas novas.** Registro criado
+na produção depois da última cópia não existe na homologação, e criá-lo
+exigiria respeitar a ordem das 627 chaves estrangeiras — o problema que a
+cópia completa resolve derrubando todas elas. Em vez de inserir em silêncio,
+a esteira **conta** quantas linhas não acharam par e avisa. Número relevante
+= hora de rodar o RECRIAR completo com `mascarar=um_cliente`.
+
+Dois cuidados que o desenho embute: os gatilhos são desligados durante a
+sincronia (senão a auditoria grava um histórico que nunca houve e o
+`atualizado_em` reescreve as datas), e `auth.users` é tratado à parte — mexer
+no e-mail sem acertar a identidade junto deixa o login aceitando a senha e
+devolvendo para a tela de entrada, sem erro claro.
+
+Ao final, a esteira **prova que não passou do recorte**: conta as empresas de
+outros clientes cujo nome não começa com `anon-` e reprova a corrida se
+achar alguma.
+>
+> Isso muda a natureza do ambiente: ele passa a conter **dado pessoal e dado
+> de saúde** (LGPD art. 11), num endereço que é página pública e num projeto
+> fora do Brasil (`us-east-1`). Por isso a esteira **recusa** rodar sem
+> máscara enquanto o ambiente não estiver fechado, e "fechado" tem
+> significado verificável:
+>
+> - o secret **`HOMOLOGACAO_TESTADORES`** (e-mails reais de quem vai testar,
+>   separados por vírgula) é **obrigatório** — sem ele a corrida aborta;
+> - o secret `HOMOLOGACAO_SENHA_USUARIOS` **não pode valer `123456`** — com
+>   e-mail real no banco, senha compartilhada conhecida transformaria a base
+>   de clientes em base de credenciais. A corrida aborta se ele ainda existir
+>   com esse valor;
+> - **toda** conta recebe primeiro uma senha aleatória de 32 bytes que
+>   ninguém vê; só depois os e-mails da lista recebem uma senha utilizável,
+>   também sorteada, impressa **uma vez** no log da corrida e apagada do
+>   banco em seguida.
+>
+> As conferências de máscara (CPF começando com 9, e-mail `.invalid`) são
+> puladas nesse modo — elas provam que a máscara agiu, e não há máscara;
+> mantidas, disparariam o apaga-tudo justamente porque o dado real chegou.
+> No lugar delas o log registra quantas contas com e-mail real existem.
+>
+> **Decisões que continuam com o dono do produto**, e que a esteira não pode
+> tomar: desligar o envio de e-mail do Auth no projeto de homologação (com
+> e-mails reais na base, um "esqueci minha senha" ali alcançaria o cliente de
+> verdade) e decidir sobre a região fora do Brasil.
 
 > **O motor de QA atravessa intacto.** As tabelas `qa_modulos`,
 > `qa_casos_teste`, `qa_implementacoes`, `qa_cobertura_e2e` e afins são
@@ -302,16 +440,102 @@ produção com a operação parada.
 A homologação envelhece igual à produção — e pelo mesmo motivo, se alguém colar um
 script só na produção e esquecer dela.
 
-- **Sempre que colar na produção, cole na homologação primeiro.** É a regra que
-  mantém as duas iguais sem nenhum trabalho extra.
-- **A cada trimestre, ou depois de qualquer trabalho manual feito direto na
-  produção**, aperte de novo o botão da esteira `homologacao` (Actions → Run
-  workflow → `RECRIAR`). Ela refaz o retrato do zero e zera a distância. Como o
-  schema é recriado, não há resíduo de execuções anteriores.
+- **Todo script de entrega passa pela homologação ANTES da produção.** É a ordem
+  do fluxo forward-only (`desenvolvimento → homologação → produção`) e a regra que
+  mantém a homologação à frente da produção sem nenhum trabalho extra. Nunca cole
+  algo só na produção.
+- ~~**A cada trimestre, aperte de novo o botão `RECRIAR`.**~~ **SUSPENSO desde
+  09/2026** (ver "Decisão 09/2026" no topo): recriar apagaria a estrutura de testes
+  da homologação. Enquanto a preservação dos casos (opções A/B) não estiver
+  implementada, a homologação **não** é recriada — ela só anda para frente, pelos
+  próprios scripts de entrega.
+- **Cada tipo de mudança chega por um caminho diferente** (é o que substitui o
+  antigo "recria tudo"):
+  - **Telas** (o que se vê e clica): sozinhas, a cada merge — a esteira reconstrói
+    e republica o site da homologação (`.../homologacao/`) junto com o de teste.
+  - **Banco** (estrutura/dados): pelo **script de entrega** colado no SQL Editor da
+    homologação, ANTES da produção (o fluxo forward-only).
+  - **Funções de servidor** (Edge Functions): pelo botão **`homologacao-funcoes.yml`**
+    (Actions → `homologacao-funcoes` → **Run workflow**, ~2 min). Ele republica as
+    functions do repositório na homologação **sem `RECRIAR`** — não lê a produção,
+    não recria o schema, não copia/apaga dados, não toca na estrutura de QA
+    acumulada; alvo fixo na homologação, com aborto se o ref apontar para a
+    produção. Reusa o mesmo passo de deploy provado no `homologacao.yml` e os
+    mesmos secrets (`SUPABASE_ACCESS_TOKEN`, `HOMOLOGACAO_DB_PASSWORD`). É a porta a
+    usar sempre que uma função nova/alterada precisar ir para a homologação (foi o
+    que fechou os testes do Portal do Parceiro, presos em "sem rotina" porque a
+    `seed-e2e-user` da homologação estava desatualizada).
 - **Confira quando desconfiar:** os scripts
   `docs/script_divergencia_producao_parte*.sql` comparam qualquer ambiente com o
   repositório. Rodando os mesmos na produção e na homologação, a diferença entre
   os dois resultados é exatamente o quanto elas se afastaram.
+
+### Casos de tela da homologação — fechados (09/2026)
+
+Ao trazer o MarketYE e as fixtures profundas (Metas, Plano de Ação, GHE) para a
+homologação, os casos verdes no teste passaram a rodar lá também. Restaram alguns
+vermelhos **só na homologação**; todos investigados e fechados. Resultado final:
+a bateria `cypress-homologacao` **#45** (commit `c41a2db`, PR #519) fechou
+**37/37 specs verdes**. O que cada um era:
+
+- **`PGP-031` (portal-parceiro — "copiar o link de indicação") — era DADO, não
+  bug.** O `portal-link-principal` vinha vazio porque o parceiro-robô estava com
+  **contrato de parceria pendente** (`parceiro_contrato_situacao().pendente=true`),
+  e a tela só popula o link com contrato aceito. Corrigido no **seed** (andaime):
+  `seed-e2e-user > semearRoboParceiro` passou a registrar o **aceite** da versão
+  vigente do contrato (`parceiro_contratos_aceites`, idempotente por
+  `UNIQUE(parceiro_id, versao)`). Hoje **3/3**.
+- **`TRILHA-010` (trilhas — "cria uma trilha na Gestão") — era INSTABILIDADE, não
+  bug.** O `[DIAG] [FALHA]` era só a **1ª tentativa**; o Cypress repetiu e a
+  criação passou. Um diagnóstico temporário (`cy.intercept` no POST de
+  `/rest/v1/trilhas`) confirmou que o **INSERT responde 2xx** na homologação — a
+  trilha grava normalmente. O diagnóstico foi removido depois. Hoje **4/4**.
+  - Achado colateral (código de produto, corrigido **com autorização do dono**):
+    `TrilhaForm.handleSubmit` engolia a exceção num `catch {}` vazio. O usuário até
+    via o toast de erro (vem do `onError` da mutation em `useTrilhas`), mas a falha
+    não deixava rastro no console/telemetria nem era vista pelos testes. Trocado por
+    `catch (e) { console.error(...) }`; comportamento preservado (diálogo segue
+    aberto na falha). **Não era a causa** da falha do TRILHA-010.
+- **`cargos.cy.ts` (CARGO-TELA-07 — "estado vazio ao buscar cargo inexistente") —
+  era TESTE, não bug.** O registro de humor **"Como você está hoje?"** (psicossocial)
+  abria durante o spec e travava o body (`data-scroll-locked` / `pointer-events:none`
+  do Radix); o `cy.type()` na busca era recusado (falha intermitente, 1 de 7). Com
+  um modal aberto o fundo fica inerte **de propósito** — comportamento correto do
+  produto. Corrigido no teste com `{force:true}` nos `type()` da busca (mesmo padrão
+  de `trilhas`/`mural`/`swot`/`incidentes`). **Risco latente global:** esse modal de
+  humor pode abrir em qualquer página após o login e travar outros specs; se voltar a
+  incomodar, vale um fechamento global do modal no login dos testes.
+
+Aprendizado geral: a homologação também fica atrás da **base de dados de
+referência**, não só do esquema recente. Ex.: as categorias-raiz do marketplace
+(Fev/2026) nunca haviam sido semeadas ali — o que quebrava o MarketYE (MKY-021).
+Corrigido por scripts de entrega (`docs/script_marketye_homologacao.sql` e
+`docs/script_marketye_categorias_homologacao.sql`).
+
+### Cobertura nova de tela — Férias (09/2026, doc-first)
+
+O módulo **Férias** (`jornada-rotina/ferias`) tinha forte cobertura de MOTOR
+(fracionamento, concessivo, saldo, encargos…) e **zero tela**. Documentamos os
+casos primeiro (fonte da verdade) e só então implementamos os `it()`:
+
+- **10 casos `e2e` FERIAS-TELA-01..10** em `qa_casos_teste` — o módulo monta com
+  cabeçalho/abas, o modal **Nova Solicitação** abre/fecha, o filtro de status
+  abre, e as abas Solicitações/Calendário/Saldos/Financeiro/INR™/Vencimentos/
+  Coletivas abrem sem erro. Todos **data-independentes** (valem na ilha vazia,
+  sem fixtures).
+- **`cypress/e2e/ferias.cy.ts`** — os 10 `it()`, ligados aos casos pela ponte
+  `qa_cobertura_e2e`. Robustos ao scroll-lock do Radix e ao registro de humor
+  (`{force:true}` + fechamento best-effort do modal).
+- Duas entregas: migration `20260915210000_qa_ferias_casos_tela.sql` (aplica no
+  teste pela esteira) e `docs/script_ferias_casos_tela_homologacao.sql` (colado
+  no SQL Editor da homologação — **necessário antes da corrida**, senão a guarda
+  reprova os `it()` como "inventados").
+
+Validação: teste `ferias` 10/10; homologação (bateria #47, `81c05c7`) **38 specs /
+322 testes, tudo verde**, guarda incluída. Fica registrado que o módulo Férias
+mantém **1 caso `e2e` anterior sem teste** (FERIAS-055, "aviso sem ciência não
+conclui a concessão") — só gera aviso na guarda, nunca reprova; candidato a
+implementação futura (precisa de fixtures de solicitação).
 
 ## Testes de tela (Cypress) na homologação
 
@@ -321,22 +545,43 @@ raia de tela na homologação foi montada **por decisão explícita da equipe**,
 quando se quiser exercitar as telas contra o banco cópia-da-produção (volume e
 estrutura reais). Ela **não roda sozinha**: é um botão.
 
-**Como rodar:** Actions → `cypress-homologacao` → **Run workflow**. O workflow
-semeia a conta-robô e a ilha de fixtures na homologação, roda a suíte contra
-`https://ustudy123.github.io/youreyesnovo/homologacao/` e devolve o resultado
-ao painel de QA **da homologação**.
+**Como rodar (dois caminhos, mesmo resultado):**
 
-**Pré-requisito (uma vez, depois de mesclar):** as Edge Functions precisam estar
-publicadas na homologação com a versão nova (a `seed-e2e-user` passou a aceitar o
-ref da homologação). Rode o workflow `homologacao` no modo **`so_finalizar`**
-(~2 min) — ele republica as functions sem refazer a cópia.
+1. **Pelo app:** homologação → **Testes automatizados → Cypress → "Rodar testes"**.
+   O botão pede à Edge Function `qa-disparar-cypress`, que detecta o ambiente e
+   dispara a esteira **da homologação** (`cypress-homologacao.yml`). Exige o
+   secret `GITHUB_DISPATCH_TOKEN` no projeto Supabase da homologação (ver abaixo).
+2. **Pela esteira:** Actions → `cypress-homologacao` → **Run workflow**.
 
-**Segredos (Settings → Secrets and variables → Actions):**
+Nos dois, o workflow semeia a conta-robô e a ilha de fixtures na homologação,
+roda a suíte contra `https://ustudy123.github.io/youreyesnovo/homologacao/` e
+devolve o resultado ao painel de QA **da homologação** (aba Cypress → "Corridas").
 
-| Secret | Valor |
-|---|---|
-| `QA_E2E_TOKEN_HOMOLOGACAO` | o **mesmo** valor do segredo `QA_E2E_TOKEN` das Edge Functions do projeto Supabase de homologação (`fgsblefvdabgdouipigz`). Sem ele, o seed e o relatório não funcionam. |
-| `CYPRESS_EMAIL` / `CYPRESS_PASSWORD` | opcionais; sem eles usa a conta padrão `teste@lucas.com` / `7654321`, que é a que o seed cria. |
+**O resultado no painel do app:** funciona porque a camada de QA e2e (tabela
+`qa_cobertura_e2e`, coluna `qa_resultados.evidencia_png`, as funções de registro
+e o valor `'e2e'` no enum `qa_disparo`) foi entregue à **produção**
+(`docs/script_qa_e2e_camada.sql`). Como a homologação copia a estrutura da
+produção, toda cópia futura já nasce com a camada — o painel sobrevive ao
+`RECRIAR`, e a fidelidade continua batendo (as duas têm a camada). A
+`qa_cobertura_e2e` está na lista de tabelas preservadas da máscara, então a
+ponte caso↔teste atravessa a cópia intacta.
+
+**Pré-requisito (depois de mesclar função nova):** as Edge Functions precisam estar
+publicadas na homologação com a versão nova (a `seed-e2e-user` que semeia a conta-robô,
+a `qa-disparar-cypress` que detecta o ambiente etc.). Rode o botão
+**`homologacao-funcoes.yml`** (Actions → `homologacao-funcoes` → **Run workflow**,
+~2 min) — a porta sancionada que republica só as functions, sem `RECRIAR`. (O modo
+`so_finalizar` do `homologacao.yml` faz o mesmo deploy, mas passa pelo gate do
+`RECRIAR` e pela conferência de fidelidade, que pós-09/2026 pode não fechar — prefira
+a porta dedicada.)
+
+**Segredos:**
+
+| Onde | Secret | Valor |
+|---|---|---|
+| GitHub (Actions) | `QA_E2E_TOKEN_HOMOLOGACAO` | o **mesmo** valor do `QA_E2E_TOKEN` das Edge Functions do projeto Supabase de homologação (`fgsblefvdabgdouipigz`). Sem ele, o seed e o relatório não funcionam. |
+| GitHub (Actions) | `CYPRESS_EMAIL` / `CYPRESS_PASSWORD` | opcionais; sem eles usa `teste@lucas.com` / `7654321`, a conta que o seed cria. |
+| Supabase homologação | `GITHUB_DISPATCH_TOKEN` | token do GitHub com permissão **Actions: write** no repositório. Só é preciso para o **botão** do app; a aba Actions não depende dele. |
 
 **Travas de ambiente (produção inalcançável):** o `cypress.config.ts` só aceita
 host da lista (`ustudy123.github.io`) e aborta se a app falar com o ref da
@@ -344,10 +589,8 @@ produção; a `seed-e2e-user` recusa qualquer ref fora do teste e da homologaç�
 
 **Sobre a ilha e a fidelidade:** a suíte roda numa ilha isolada (tenant fixo
 `Empresa Staging LTDA`), invisível às contas mascaradas da produção porque a RLS
-separa por tenant. Ela é replantada a cada corrida e some no próximo `RECRIAR`.
-A conferência de fidelidade do `RECRIAR` roda **antes** de qualquer seed, então a
-ilha não a afeta; um `SELECT` de contagem rodado à mão depois de uma corrida de
-tela mostrará essas linhas a mais — é esperado.
+separa por tenant. Ela é replantada a cada corrida e some no próximo `RECRIAR`
+(o próprio workflow a replanta antes de rodar, então não precisa sobreviver).
 
 ## Rodar a homologação localmente
 
@@ -460,9 +703,12 @@ O workflow tem trava contra apontar para a produção e pode ser disparado manua
 
 Outros workflows do repositório:
 
-- `homologacao.yml` — recria a homologação a partir da estrutura da produção (por botão, digitando `RECRIAR`). Ver **Manter a homologação em dia**.
-- `cypress.yml` — dispara a suíte de tela contra o **teste**, sob demanda (é o que o botão "Rodar testes" da tela de QA aciona).
-- `cypress-homologacao.yml` — dispara a suíte de tela contra a **homologação**, por botão. Ver **Testes de tela (Cypress) na homologação**.
+- `homologacao.yml` — recria a homologação a partir da estrutura da produção (por botão, digitando `RECRIAR`). **SUSPENSO desde 09/2026.** Ver **Manter a homologação em dia**.
+- `homologacao-funcoes.yml` — **publica só as Edge Functions na homologação** (por botão, sem `RECRIAR`, ~2 min). É a porta sancionada para levar função nova/alterada à homologação no fluxo forward-only. Ver **Manter a homologação em dia**.
+- `cypress.yml` — dispara a suíte de tela contra o **teste**, sob demanda.
+- `cypress-homologacao.yml` — dispara a suíte de tela contra a **homologação**. Ver **Testes de tela (Cypress) na homologação**.
+
+O botão **"Rodar testes"** (tela de QA de cada ambiente) aciona a `qa-disparar-cypress`, que **detecta o ambiente pelo projeto Supabase** e dispara a esteira certa: `cypress.yml` no teste, `cypress-homologacao.yml` na homologação. Precisa do secret `GITHUB_DISPATCH_TOKEN` no projeto Supabase daquele ambiente.
 
 ## Verificação de ambiente
 

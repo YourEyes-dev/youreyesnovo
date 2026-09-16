@@ -547,23 +547,33 @@ export function calcularRescisao(params: {
   const dispSemJusta = ["DISPENSA_SEM_JUSTA_CAUSA", "RESCISAO_INDIRETA"].includes(tipoRescisao);
   const acordo484A = tipoRescisao === "ACORDO_484A";
 
-  if (temDireitoAviso && avisoTipo === "indenizado" && (dispSemJusta || acordo484A)) {
+  // Culpa recíproca (CLT, art. 484; Súmula 14 do TST): reconhecida a culpa
+  // de ambas as partes, as verbas devidas na dispensa sem justa causa são
+  // pagas pela METADE — aviso prévio, 13º proporcional, férias
+  // proporcionais e multa do FGTS (que cai de 40% para 20%). Não é zero
+  // (isso é justa causa) nem inteiro (isso é dispensa comum): errar para
+  // qualquer lado custa caro.
+  const culpaReciproca = tipoRescisao === "CULPA_RECIPROCA";
+  const fatorReciproca = culpaReciproca ? 0.5 : 1;
+
+  if (temDireitoAviso && avisoTipo === "indenizado" && (dispSemJusta || acordo484A || culpaReciproca)) {
     const diasAviso = Math.min(90, 30 + anosTrabalhados * 3);
-    avisoPrevioValor = +((salarioBase / 30) * diasAviso * (acordo484A ? 0.5 : 1)).toFixed(2);
+    avisoPrevioValor = +((salarioBase / 30) * diasAviso
+      * (acordo484A ? 0.5 : 1) * fatorReciproca).toFixed(2);
   }
 
   // 13º proporcional
   const meses13 = desligamento.getMonth() + 1; // meses no ano
   const direito13 = vinculoConfig?.direito_13 ?? true;
   const decimo13Prop = direito13 && tipoRescisao !== "DISPENSA_COM_JUSTA_CAUSA"
-    ? +((salarioBase * meses13) / 12).toFixed(2)
+    ? +(((salarioBase * meses13) / 12) * fatorReciproca).toFixed(2)
     : 0;
 
   // Férias proporcionais
   const direitoFerias = vinculoConfig?.direito_ferias ?? true;
   const mesesFerias = mesesTrabalhados % 12;
   const feriasProporcionais = direitoFerias && tipoRescisao !== "DISPENSA_COM_JUSTA_CAUSA"
-    ? +((salarioBase / 12) * mesesFerias).toFixed(2)
+    ? +(((salarioBase / 12) * mesesFerias) * fatorReciproca).toFixed(2)
     : 0;
 
   // Férias vencidas
@@ -591,9 +601,20 @@ export function calcularRescisao(params: {
   const valorFGTS = (!vinculoConfig || vinculoConfig.fgts) ? calcularFGTS(baseFGTS, aliqFGTS) : 0;
 
   // Multa FGTS (estimativa simplificada)
-  const aliqMulta = acordo484A ? 20 : (vinculoConfig?.multa_fgts_dispensa ?? 40);
-  const multaFGTS = dispSemJusta || acordo484A
-    ? +(baseFGTS * mesesTrabalhados * (aliqFGTS / 100) * (aliqMulta / 100)).toFixed(2)
+  // Na culpa recíproca a multa cai pela metade — 20% onde seriam 40%
+  // (CLT, art. 484 com a Súmula 14 do TST). A REDUÇÃO É SÓ NA ALÍQUOTA:
+  // a multa incide sobre o saldo da conta vinculada do FGTS, que não
+  // encolhe porque as verbas da rescisão foram pela metade. Por isso a
+  // base aqui é a INTEGRAL — aplicar a metade nos dois lados pagaria um
+  // quarto do devido.
+  const aliqMulta = (acordo484A || culpaReciproca)
+    ? (vinculoConfig?.multa_fgts_dispensa ?? 40) / 2
+    : (vinculoConfig?.multa_fgts_dispensa ?? 40);
+  const baseFGTSIntegral = saldoSalario
+    + avisoPrevioValor / fatorReciproca
+    + decimo13Prop / fatorReciproca;
+  const multaFGTS = dispSemJusta || acordo484A || culpaReciproca
+    ? +(baseFGTSIntegral * mesesTrabalhados * (aliqFGTS / 100) * (aliqMulta / 100)).toFixed(2)
     : 0;
 
   const totalDescontos = +(valorINSS + valorIRRF).toFixed(2);

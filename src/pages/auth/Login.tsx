@@ -18,6 +18,7 @@ import {
 import { useAuthContext } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Logo } from "@/components/ui/Logo";
+import { useCadastroLivre } from "@/hooks/useCadastroLivre";
 
 const loginSchema = z.object({
   email: z.string().email("E-mail inválido"),
@@ -26,13 +27,16 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export default function Login() {
+// `destino`/`variante`: a Área do Parceiro reaproveita este formulário em
+// /parceiros/entrar, só trocando texto e para onde ir depois de entrar.
+export default function Login({ destino, variante }: { destino?: string; variante?: "parceiro" | "especialista" } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn, loading } = useAuthContext();
   const [showPassword, setShowPassword] = useState(false);
 
-  const from = location.state?.from?.pathname || "/";
+  const from = destino || location.state?.from?.pathname || "/";
+  const { livre: cadastroLivre } = useCadastroLivre();
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -64,9 +68,9 @@ export default function Login() {
       </div>
 
       <div className="text-center space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Login</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{variante === "parceiro" ? "Área do Parceiro" : variante === "especialista" ? "MarketYE · Portal do especialista" : "Login"}</h1>
         <p className="text-sm text-muted-foreground">
-          Entre com suas credenciais para acessar
+          {variante === "parceiro" ? "Entre com a conta do seu cadastro de parceiro" : variante === "especialista" ? "Entre com a conta do seu cadastro de especialista" : "Entre com suas credenciais para acessar"}
         </p>
       </div>
 
@@ -165,9 +169,15 @@ export default function Login() {
       <div className="text-center">
         <p className="text-sm text-muted-foreground">
           Ainda não tem uma conta?{" "}
-          <Link to="/register" className="text-primary font-medium hover:underline">
-            Cadastre sua empresa
-          </Link>
+          {cadastroLivre ? (
+            <Link to="/register" className="text-primary font-medium hover:underline">
+              Cadastre sua empresa
+            </Link>
+          ) : (
+            <a href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/#planos`} className="text-primary font-medium hover:underline">
+              Conheça os planos e contrate
+            </a>
+          )}
         </p>
       </div>
     </div>

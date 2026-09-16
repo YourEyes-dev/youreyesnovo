@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Building2, Search, Filter, Download, Plus, ToggleLeft, ToggleRight, Edit, Eye, CheckSquare, Square, AlertTriangle, Layers, GitBranch, Upload, FileSpreadsheet, FileText, ChevronDown, Trash2, Users } from 'lucide-react';
+import { Building2, Search, Filter, Download, Plus, ToggleLeft, ToggleRight, Edit, Eye, CheckSquare, Square, AlertTriangle, Layers, GitBranch, Upload, FileSpreadsheet, FileText, ChevronDown, Trash2, Users, Clock } from 'lucide-react';
 import { formatCnpj } from '@/lib/cnpj';
 import { formatCpf } from '@/lib/cpf';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -533,10 +533,25 @@ export function EmpresaList({ empresas, isLoading, onEdit, onNew, onToggleAtivo,
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant="secondary" className="gap-1 px-2">
-                      <Users className="w-3 h-3 text-muted-foreground" />
-                      {(counts as any)[emp.id] || 0}
-                    </Badge>
+                    <div className="flex flex-col items-center gap-1">
+                      <Badge variant="secondary" className="gap-1 px-2">
+                        <Users className="w-3 h-3 text-muted-foreground" />
+                        {(counts as any)[emp.id] || 0}
+                      </Badge>
+                      {/* CLT art. 74, §2º: estabelecimento com mais de 20
+                          empregados é OBRIGADO a manter controle de jornada.
+                          Quem marca isso é a rotina do banco (que conta os
+                          vínculos ativos); aqui só se mostra o resultado. */}
+                      {(emp as any).controle_ponto_obrigatorio && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-400 text-amber-800 text-[10px] gap-1"
+                          title="Mais de 20 empregados: o controle de jornada é obrigatório neste estabelecimento (CLT art. 74, §2º)."
+                        >
+                          <Clock className="w-3 h-3" /> ponto obrigatório
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">{grauRiscoBadge(emp.grau_risco)}</TableCell>
                   <TableCell>

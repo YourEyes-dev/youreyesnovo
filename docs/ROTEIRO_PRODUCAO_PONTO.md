@@ -123,6 +123,8 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
 | 50 | Onda 11 (parte 1) — atestado acima de 15 dias encaminha ao INSS (Lei 8.213) | `docs/script_ponto_onda11_atestado_encaminha_inss.sql` | — | ⏳ | ⬜ |
 | 51 | Onda 11 (parte 2) — atestados sobrepostos detectados, não abonados em dobro | `docs/script_ponto_onda11_atestados_sobrepostos.sql` | — | ⏳ | ⬜ |
 | 52 | Onda 11 (parte 3) — ausência do art. 473 sem documento fica pendente (não abona por fé) | `docs/script_ponto_onda11_comprovacao_art473.sql` | — | ⏳ | ⬜ |
+| 53 | Vigilâncias do ponto — rotina diária que faz as monitorias rodarem | `docs/script_ponto_vigilancias_diarias.sql` | **#23 #38 #39 #44 #46 #47 #48** | ⏳ | ⬜ |
+| 54 | Comprovantes — extração restrita ao dono do CPF (correção de segurança) | `docs/script_ponto_comprovantes_extrair_dono.sql` | **#32** | ⏳ | ⬜ |
 
 > Quando eu validar cada onda com você no teste e você aprovar, marque a coluna
 > **Teste** como ✅. A coluna **Produção** só vira ✅ depois que você colar o
@@ -782,9 +784,16 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   comprovante (não duplica); a vigilância gera 1 alerta crítico numa marcação
   vencida e 0 na 2ª rodada (idempotente); a extração devolve 1 para o próprio CPF
   (mesmo com máscara) e 0 para outro CPF.
-- **Tela (Publicar no Lovable):** a emissão do comprovante ao registrar o ponto e
-  o "extrair meus comprovantes" do trabalhador chamam essas funções; o documento,
-  o hash e a extração já estão no banco.
+- **Tela — FEITO (28/08/2026):** registrar ponto passou a chamar
+  `ponto_gerar_comprovante` logo após gravar a marcação (falha ali não desfaz a
+  batida — a vigilância de 48h cobra o comprovante que faltar), e o cartão "Meus
+  comprovantes de ponto" no Meu Perfil extrai por período pelo
+  `ponto_comprovantes_extrair`, com download. Entra em produção por Publicar no
+  Lovable.
+- **Correção de segurança junto (item 54):** `ponto_comprovantes_extrair` é
+  SECURITY DEFINER e recebia o CPF por parâmetro sem conferir quem chamava —
+  qualquer usuário autenticado lia os comprovantes de um colega (LGPD arts. 6º,
+  46 e 47). Ver o item 54: sem ele, **não publique a tela**.
 
 ### 33 · Onda 7 (parte 2) — AEJ (Arquivo Eletrônico de Jornada, Portaria 671)
 - **Arquivo:** `docs/script_ponto_onda7_aej.sql`
@@ -813,8 +822,12 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   o registro de apuração da competência e o trailer com as contagens; assina com
   hash sha256; regerar **não duplica** (um arquivo por competência); a extração
   devolve o arquivo assinado.
-- **Tela (Publicar no Lovable):** o botão "gerar/baixar AEJ" da competência chama
-  essas funções; o arquivo, a assinatura e a extração já estão no banco.
+- **Tela — FEITO (28/08/2026):** o botão "gerar AEJ" passou a chamar
+  `ponto_gerar_aej` (arquiva e assina a versão tratada) antes de baixar o arquivo
+  no leiaute oficial, e a aba mostra o cartão "Cópia arquivada e assinada desta
+  competência" (data, contagens, hash e download da cópia tratada), lendo
+  `ponto_aej_extrair`. Se o arquivamento falhar, o arquivo oficial sai mesmo
+  assim e a tela avisa. Entra em produção por Publicar no Lovable.
 
 ### 34 · Onda 7 (parte 3) — importação de AFD que confere
 - **Arquivo:** `docs/script_ponto_onda7_afd_importacao.sql`
@@ -849,8 +862,16 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   guarda os eventos do equipamento; **lacuna** de NSR (falta o 101 entre 100 e
   102) manda o arquivo **inteiro** para a quarentena e **nenhum evento** entra;
   registro com CRC errado também vai para a quarentena, com o rejeitado contado.
-- **Tela (Publicar no Lovable):** a tela de importação de AFD passa a chamar o
-  validador e a mostrar a quarentena e o relatório; a conferência já está no banco.
+- **Tela — FEITO (28/08/2026):** a importação de AFD passa por
+  `ponto_afd_validar_importacao` ANTES de gravar qualquer marcação. A tela lê o
+  arquivo (leiaute 671 ou 1510, detectado pelo cabeçalho) em registros tipados
+  com a linha crua, calcula o hash da remessa (trava de reimportação), chama o
+  validador e só grava se o arquivo for aprovado — com `nsr_origem` e
+  `equipamento`, que impedem entrada em dobro. Reprovado, aparece o painel de
+  quarentena explicando o que falhou (CRC, assinatura, lacuna de NSR,
+  reimportação) e nada entra. O histórico ganhou a coluna "Conferência".
+  Leitura coberta por `src/test/afdImportacao.test.ts`. Entra em produção por
+  Publicar no Lovable.
 
 ### 35 · Onda 7 (parte 4) — gestão do certificado digital (ICP-Brasil)
 - **Arquivo:** `docs/script_ponto_onda7_certificado_digital.sql`
@@ -876,8 +897,14 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   e ignora o vencido; a vigilância gera **alta** para o que está perto de vencer e
   **crítica** para o vencido, e **nada** para o de validade longa; rodar de novo
   não duplica.
-- **Tela (Publicar no Lovable):** a tela de cadastro do certificado e o painel de
-  alertas chamam essas funções; o cadastro, a vigência e o alerta já estão no banco.
+- **Tela — FEITO (28/08/2026):** nova aba **Ponto › Configurações › Certificado
+  digital**: cadastro (tipo A1/A3, ICP-Brasil, titular, emissor, nº de série,
+  vigência e antecedência do aviso), cartão "Certificado em uso hoje" — que
+  avisa quando NÃO há vigente, porque sem ele o AFD/AEJ não têm com que ser
+  assinados — e situação por linha (Vigente / Vence em N dias / VENCIDO). A tela
+  guarda só metadados: **a chave privada não entra no sistema**. O alerta de
+  vencimento passou a rodar sozinho (item 53, agora com oito rotinas). Entra em
+  produção por Publicar no Lovable.
 
 ### 36 · Onda 7 (parte 5) — dossiê de fiscalização + arquivamento (fecha a onda 7)
 - **Arquivo:** `docs/script_ponto_onda7_dossie_fiscalizacao.sql`
@@ -908,9 +935,18 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   hash por tipo e o hash do pacote, e **arquiva** o dossiê no módulo Documentos
   (tipo, classificação, vínculo à empresa, "Ponto (automático)"); regerar **não
   duplica** nem o dossiê nem o documento.
-- **Tela (Publicar no Lovable):** o botão "gerar dossiê / modo fiscalização" e a
-  lista de documentos do ponto chamam essas funções; o pacote, o índice, os hashes
-  e o arquivamento já estão no banco.
+- **Tela — FEITO (28/08/2026):** nova aba **Ponto › Compliance › Dossiê fiscal**:
+  escolhe a competência, monta o dossiê (`ponto_gerar_dossie_fiscalizacao`), mostra
+  o índice peça a peça (AEJ, comprovantes, espelhos, AFD importado) com contagem e
+  hash, a assinatura do pacote, e permite baixar o índice para conferência. Peça
+  com quantidade zero fica visível de propósito — é o que falta reunir antes da
+  fiscalização. Remontar a mesma competência não duplica o dossiê (provado em
+  réplica: 3 comprovantes → `comprovantes: 3`; segunda montagem mantém 1 dossiê).
+  Entra em produção por Publicar no Lovable.
+- **Onda 7 fechada nas telas (28/08/2026):** partes 1 a 5 agora têm ponto de
+  acesso — comprovante, AEJ, importação de AFD conferida, certificado digital e
+  dossiê. Em produção, o item 54 (correção de segurança dos comprovantes) entra
+  ANTES do Publicar no Lovable.
 
 ### 37 · Onda 8 (parte 1) — enquadramento do art. 62 (dispensa) + teletrabalho
 - **Arquivo:** `docs/script_ponto_onda8_enquadramento_art62.sql`
@@ -935,8 +971,16 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   **produção** (III) ficam **dispensados** e sem bater ponto; teletrabalho por
   **jornada** (III) **continua controlado** (não é dispensado); enquadrar um
   controlado depois já zera o `bate_ponto`.
-- **Tela (Publicar no Lovable):** os campos de enquadramento entram na ficha do
-  colaborador; a regra e a coerência já estão no banco.
+- **Tela — FEITO (28/08/2026):** a ficha do colaborador ganhou o bloco **"Dispensa
+  de controle de jornada (art. 62 da CLT)"**: enquadramento (não se enquadra / I
+  externa / II gestão / III teletrabalho por produção), modalidade de teletrabalho
+  e o documento que sustenta o enquadramento. Quando alguém marca um inciso com
+  teletrabalho **por jornada**, a tela avisa que a dispensa não se aplica — a
+  regra do banco mantém o colaborador marcando ponto. A lista de colaboradores
+  passou a carregar esses campos para a edição. Provado em réplica: gestor
+  (inciso II) grava `dispensado_ponto = true` e `bate_ponto = false`;
+  teletrabalhista por jornada com inciso III fica `dispensado_ponto = false` e
+  segue batendo ponto. Entra em produção por Publicar no Lovable.
 
 ### 38 · Onda 8 (parte 2) — controle de fato descaracteriza a dispensa (art. 62)
 - **Arquivo:** `docs/script_ponto_onda8_descaracterizacao_art62.sql`
@@ -977,7 +1021,13 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   Provado em transação (dados fictícios): um estabelecimento com 21 trabalhadores
   ativos vira **obrigado** e, por não usar controle, recebe um alerta; um com 5
   trabalhadores **não**; rodar de novo não duplica.
-- **Tela (Publicar no Lovable):** a sinalização e o alerta aparecem no cadastro do
+- **Tela — FEITO (28/08/2026):** a lista de empresas mostra o selo **"ponto
+  obrigatório"** ao lado da contagem de colaboradores quando
+  `controle_ponto_obrigatorio` está marcado, com a explicação legal no título.
+  Quem marca é a rotina do banco (que agora roda sozinha, item 53). Provado em
+  réplica: 26 vínculos ativos → contagem 26, monitor gera 1 alerta e a empresa
+  fica sinalizada. Entra em produção por Publicar no Lovable.
+- **Restante (Publicar no Lovable):** o alerta aparece no cadastro do
   estabelecimento; a contagem e a regra já estão no banco.
 
 ### 40 · Onda 8 (parte 4) — sistema alternativo (REP-A) só com instrumento coletivo
@@ -1001,8 +1051,14 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   recusado; **com** o documento anexado é aceito; **com** um acordo coletivo
   vigente é aceito; um acordo **individual** é recusado (exige coletivo); e o modo
   `interno` passa normalmente.
-- **Tela (Publicar no Lovable):** a tela de configuração passa a pedir o
-  instrumento coletivo ao ativar o modo por link; a trava já está no banco.
+- **Tela — FEITO (28/08/2026):** ao escolher "link externo" (ou "ambos") em
+  Ponto › Configurações › Geral, aparece o campo **"Instrumento que autoriza o
+  registro por link (REP-A)"**, com a explicação legal — junto da escolha, não
+  escondido em outra tela. Se o banco recusar, a mensagem técnica vira uma frase
+  que o RH resolve ("informe o instrumento ou cadastre um acordo vigente em
+  Compliance › Acordos"). Provado em réplica: ativar `link_externo` sem
+  instrumento é recusado pelo gatilho; com o instrumento informado, grava.
+  Entra em produção por Publicar no Lovable.
 
 ### 41 · Onda 8 (parte 5) — LGPD: trilha de acesso a dado sensível + enumeração
 - **Arquivo:** `docs/script_ponto_onda8_lgpd_trilha_e_enumeracao.sql`
@@ -1026,9 +1082,20 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   exportação de AFD gravam no log; o log **recusa** UPDATE e DELETE (imutável); no
   link, cinco tentativas frustradas **bloqueiam** o link e geram um evento de
   enumeração na trilha, e um acesso bem-sucedido **zera** o contador.
-- **Tela (Publicar no Lovable):** a tela que serve a selfie/geolocalização e os
-  botões de exportação passam a chamar o registro; a contenção do link também. A
-  trilha, a imutabilidade e a contagem já estão no banco.
+- **Tela — FEITO (28/08/2026):** três frentes.
+  (1) **Selfie**: deixou de ser servida a quem apenas abre o espelho — vem coberta
+  por um botão de câmera, e revelar chama `ponto_log_acesso_sensivel`
+  (`visualizou_selfie`, com a marcação e o CPF). O gesto deliberado é o que a
+  trilha registra.
+  (2) **Exportações**: AFD, AEJ (inclusive a cópia arquivada), PDFs e planilhas do
+  módulo passam a chamar `ponto_log_exportacao` com competência, empresa e tipo de
+  relatório no escopo. Falha no registro **não** impede a exportação.
+  (3) **Link compartilhado**: cada identificação por CPF chama
+  `ponto_link_registrar_tentativa`; ao estourar o limite o link fica bloqueado por
+  alguns minutos, com mensagem em português e o evento na trilha. Acerto zera o
+  contador. Provado em réplica: 5 tentativas frustradas → `bloqueado: true` e uma
+  linha `enumeracao_cpf_link` na trilha; acerto seguinte zera `tentativas_frustradas`
+  e libera o link. Entra em produção por Publicar no Lovable.
 
 ### 42 · Onda 8 (parte 6) — Plano de Ação (fecha a onda 8 no banco)
 - **Arquivo:** `docs/script_ponto_onda8_plano_de_acao.sql`
@@ -1056,8 +1123,22 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   concluir sem recorrência **encerra** o alerta, com recorrência **gera** alerta de
   eficácia; a IA sugere, a decisão **sem humano é recusada** e **com humano** fica
   registrada.
-- **Tela (Publicar no Lovable):** o botão "gerar ação do alerta", a conclusão com
-  eficácia e o "Analisar com IA" chamam essas funções; a integração já está no banco.
+- **Tela — FEITO (28/08/2026):** no painel de Alertas CLT, cada alerta ganhou
+  **"Gerar ação"** (chama `ponto_alerta_gerar_acao`, que cria a 5W2H com a origem
+  e deixa o alerta vinculado — alerta já convertido mostra o selo "Ação criada")
+  e **"Analisar com IA"**, que abre a sugestão (causa provável, impacto, ação) com
+  os botões *Aceitar e criar ação* / *Recusar sugestão*: a decisão humana fica
+  registrada por `ponto_ia_registrar_decisao` nos dois casos, e só o aceite gera a
+  ação. O diálogo diz na abertura que a análise **sugere** e quem decide é a
+  pessoa (LGPD art. 20).
+  Concluir uma ação de origem `ponto` passa por `ponto_acao_concluir_com_eficacia`:
+  se a ocorrência persiste, a tela avisa que um alerta de eficácia foi aberto em
+  vez de dar baixa cega. A falha na reavaliação não impede a conclusão.
+  Provado em réplica: gerar ação vincula o alerta e cria a ação com
+  `origem_modulo = ponto`; a análise nasce `sugerido` e só vira `decidido_aceito`
+  depois da decisão humana, com o nome de quem decidiu e a observação. Entra em
+  produção por Publicar no Lovable.
+- **Onda 8 fechada nas telas (28/08/2026):** partes 1 a 6 com ponto de acesso.
 
 ### 43 · Onda 8 (correção) — competência fechada bloqueia até para gestão
 - **Arquivo:** `docs/script_ponto_onda8_competencia_fechada.sql`
@@ -1149,9 +1230,11 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   (113→114 verdes). Provado em transação (dados fictícios): 12x36 sem acordo →
   status `pendente` e 1 pendência; 12x36 com acordo anexado → `regular`, 0
   pendência; segunda rodada do monitor não duplica.
-- **Tela (Publicar no Lovable):** o aviso de "escala 12x36 sem acordo" no cadastro
-  e o anexo do acordo no módulo Documentos são de tela; a verificação e a pendência
-  já estão no banco.
+- **Tela — FEITO (28/08/2026):** a lista de escalas ganhou a coluna
+  **Formalização** ("Falta acordo" / "Em ordem"), lida de
+  `ponto_escala_formalizacao_status`, e um cartão de aviso no topo reúne as
+  escalas pendentes com a explicação legal e o caminho para regularizar. Entra em
+  produção por Publicar no Lovable.
 
 ### 47 · Onda 10 (parte 2) — revezamento: jornada de 6h, salvo coletivo (ESC-031)
 - **Arquivo:** `docs/script_ponto_onda10_escala_revezamento.sql`
@@ -1173,8 +1256,14 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   (114→115 verdes). Provado em transação (dados fictícios): revezamento de 8h sem
   coletivo → `pendente` e 1 alerta; de 6h → `regular`; de 8h com CCT anexada →
   `regular`; segunda rodada do monitor não duplica.
-- **Tela (Publicar no Lovable):** a opção "revezamento" no cadastro da escala e o
-  aviso de jornada acima de 6h sem coletivo são de tela; a tipificação, a
+- **Tela — FEITO (28/08/2026):** o cadastro da escala ganhou a modalidade
+  **"Turno ininterrupto de revezamento"** (que usa o formulário de dias da semana,
+  não o de ciclo móvel) e um aviso explicando que acima de 6h só com instrumento
+  coletivo. A pendência aparece na coluna Formalização. Provado em réplica:
+  revezamento de 8h fica "pendente", **continua pendente com acordo individual**
+  (só o coletivo autoriza) e vira "regular" com CCT anexada; revezamento de 6h já
+  nasce regular. Entra em produção por Publicar no Lovable.
+- **Restante (Publicar no Lovable):** a tipificação, a
   verificação e a pendência já estão no banco.
 
 ### 48 · Onda 10 (parte 3) — radar de cobertura de turno (ESC-021)
@@ -1196,8 +1285,10 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   (115→116 verdes). Provado em transação (dados fictícios): escala cujo único
   colaborador está afastado nos próximos dias → 7 dias descobertos e 7 alertas;
   escala com colaborador disponível → 0; segunda rodada do monitor não duplica.
-- **Tela (Publicar no Lovable):** o painel de "turnos a descoberto" e a ação de
-  cobertura no Plano de Ação são de tela; o radar e o alerta já estão no banco.
+- **Tela — FEITO (28/08/2026):** cartão **"Turnos a descoberto nos próximos 14
+  dias"** no topo da aba Escalas, lendo `ponto_escala_cobertura_listar` (escala,
+  dia e o porquê). Só aparece quando há algo a mostrar. A ação de cobertura no
+  Plano de Ação segue pendente. Entra em produção por Publicar no Lovable.
 
 ### 49 · Onda 10 (parte 4) — troca de turno com aprovação e recálculo (ESC-020)
 - **Arquivo:** `docs/script_ponto_onda10_troca_turno.sql` — **fecha a onda 10.**
@@ -1222,8 +1313,17 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
   virada de 8h marca **risco de interjornada**; efetivar **antes** de aprovar é
   recusado; após aprovar, a efetivação cruza as escalas dos dois a partir da data
   e **mantém as atribuições antigas** encerradas na véspera (história preservada).
-- **Tela (Publicar no Lovable):** a solicitação, a aprovação do gestor e o aviso de
-  risco de interjornada são de tela; o fluxo, a simulação e a efetivação já estão
+- **Tela — FEITO (28/08/2026):** nova sub-aba **Ponto › Escalas › Troca de turno**
+  com o fluxo inteiro: solicitar (escolhendo as duas atribuições vigentes, período
+  e motivo), aprovar/recusar e efetivar. O aviso de interjornada aparece por linha
+  ("abaixo de 11h", com o detalhe da simulação) e aprovar uma troca com risco pede
+  confirmação por palavra-chave — o gestor pode assumir, mas não sem ver. Só
+  aparece "Efetivar" depois de aprovada, e a efetivação avisa que o histórico
+  anterior é preservado. Provado em réplica: escala 15–23 trocando com 07–15
+  acusa "interjornada de 8.0h"; efetivar sem aprovar é recusado pelo banco; após
+  efetivar, cada colaborador fica com a atribuição antiga encerrada na véspera e a
+  nova a partir do dia da troca. Entra em produção por Publicar no Lovable.
+- **Restante (Publicar no Lovable):** o fluxo, a simulação e a efetivação já estão
   no banco.
 
 ### 50 · Onda 11 (parte 1) — atestado acima de 15 dias encaminha ao INSS (ESC-010)
@@ -1305,6 +1405,61 @@ Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no tes
 - **Encerramento:** com este pacote, a fila legal do Ponto fica **inteira verde** —
   restam apenas o **rural (PONTO-113)**, parado por decisão, e os **casos de tela**
   (e2e, cobertos pelo Cypress).
+
+### 53 · Vigilâncias do ponto — rotina diária que faz as monitorias rodarem
+- **Arquivo:** `docs/script_ponto_vigilancias_diarias.sql`
+- **Depende de:** #23 (alertas do banco), #38 (art. 62), #39 (estabelecimento),
+  #44 (CCT), #46/#47 (formalização de escala), #48 (cobertura de turno).
+- **O que faz:** as ondas 5, 7, 8, 9 e 10 criaram rotinas de vigilância que geram
+  alerta no painel de Alertas CLT. **Nenhuma tem gatilho nem agendamento** — são
+  funções que alguém precisa chamar, e nenhuma tela chama. Na prática, **oito**
+  famílias de alerta nunca foram emitidas (as seis primeiras mais, desde
+  28/08, o **vencimento do certificado digital** e o **prazo de 48h do
+  comprovante**, encontrados ao ligar as telas da onda 7; a migration
+  `20260828150000` acrescentou as duas, e o script de entrega já sai completo). Este pacote cria
+  `ponto_vigilancias_diarias()`, que percorre os tenants ativos e executa cada
+  monitoria **isolando erro por tenant/rotina** (uma falha não impede as demais),
+  e a agenda no `pg_cron` para rodar 1x/dia às **03:37 UTC** (minuto livre entre
+  as rotinas já existentes do módulo: 03:17 links, 04:41 expurgo, 05:23 faltas).
+- **Não altera dado existente:** só cria a função e o agendamento. As rotinas
+  chamadas apenas INSEREM alerta e todas já se protegem contra duplicidade
+  (`NOT EXISTS` por tipo/escopo/data) — rodar todo dia não repete alerta. Nenhuma
+  toca marcação, apuração, saldo ou espelho. Por isso **não há cópia de segurança
+  a fazer**.
+- **Conferência esperada:** `t | t | t | 37 3 * * * | <n> | OK`.
+- **Provado em réplica local** (868 migrations aplicadas): com uma CCT vencendo em
+  10 dias, a 1ª execução gera **1 alerta** (`cct_vigencia_vencimento`, severidade
+  alta) e a 2ª execução gera **0** — idempotente. Mesmo resultado com um
+  certificado digital vencendo em 10 dias (`certificado_digital_vencimento`,
+  alta): 1 na primeira execução, 0 na segunda. O reagendamento rodado duas
+  vezes deixa **um único** job. Sem `pg_cron` (réplica), a função é criada e a
+  conferência avisa que nada foi agendado, em vez de falhar.
+- **Tela (Publicar no Lovable):** nenhuma. Os alertas aparecem no painel de
+  Alertas CLT que já existe, porque ele lista a tabela inteira.
+
+### 54 · Comprovantes — extração restrita ao dono do CPF (correção de segurança)
+- **Arquivo:** `docs/script_ponto_comprovantes_extrair_dono.sql`
+- **Depende de:** #32 (comprovante como documento).
+- **O que corrige:** `ponto_comprovantes_extrair()` é `SECURITY DEFINER` e recebe
+  o CPF por parâmetro. O comentário dizia "restrita ao proprio CPF", mas a
+  restrição **não estava escrita**: qualquer usuário autenticado podia chamar a
+  função com o CPF de um colega e receber os comprovantes dele — data, hora e NSR
+  de cada batida. O RLS não protege: `SECURITY DEFINER` passa por cima. Dado
+  pessoal de terceiro (LGPD arts. 6º, 46 e 47).
+- **O que passa a valer:** mesma assinatura e mesmo retorno; antes de devolver
+  qualquer linha, confere quem chama — o **dono** do CPF
+  (`usuarios_base.auth_user_id = auth.uid()`), quem tem **papel de gestão**
+  (`has_minimum_role >= manager`) ou execução **sem sessão** (rotina/SQL Editor).
+  Fora disso devolve **vazio**, sem erro, para não virar oráculo de "este CPF
+  existe".
+- **Não altera dado:** função de leitura, `CREATE OR REPLACE`, idempotente. Sem
+  cópia de segurança a fazer.
+- **Conferência esperada:** `t | t | t | OK`.
+- **Provado em réplica local:** com a versão antiga, um colaborador lia os
+  comprovantes de outro (**1 linha**); com esta, lê **0**. O dono continua lendo
+  os seus, o gestor continua lendo os de terceiros, e a execução sem sessão segue
+  funcionando. Script rodado duas vezes seguidas: `OK` nas duas.
+- **Ordem:** este item entra **antes** de publicar a tela "Meus comprovantes".
 
 ### Item condicional — trabalhador rural (PONTO-113), parado por decisão
 

@@ -96,7 +96,9 @@ const AI_CONTEXT =
   "EPIs, desenvolvimento de funcionalidades, suporte a clientes internos.";
 
 // Cliente admin tipado sem importar o tipo (evita mais um import de esm.sh).
-type Admin = ReturnType<typeof createClient>;
+// Cliente admin sem tipos gerados: o schema do projeto não é conhecido aqui.
+// deno-lint-ignore-next-line no-explicit-any
+type Admin = ReturnType<typeof createClient<any, "public", any>>;
 
 // Planta departamentos, cargos e 20 colaboradores no tenant fixo da ilha.
 // Idempotente (só insere onde ainda não há nada) e chamada de forma NÃO-FATAL:
@@ -184,12 +186,224 @@ async function semearFixturesProfundas(admin: Admin, userId: string) {
   if (aiErr) console.error("ai_context:", aiErr.message);
 }
 
+// Semeia 3 metas fictícias no tenant fixo da ilha — uma por nível relevante
+// (estratégica, setor, individual). Serve aos casos e2e "profundos" de Metas
+// (METAS-TELA-10/11/12), que precisam de metas JÁ EXISTENTES para conferir
+// listagem, filtro por nível e consolidação. Também sustenta o vazio-por-busca
+// de METAS-TELA-09 (com metas na base, buscar texto inexistente esvazia a lista).
+// Idempotente: só insere se o tenant ainda não tiver nenhuma meta. NÃO-FATAL.
+const META_SENTINELA = "Reduzir índice de acidentes em 20% (QA)";
+async function semearMetas(admin: Admin, userId: string) {
+  // Guarda pela MINHA meta-sentinela (não por "qualquer meta"): o tenant da
+  // ilha pode já ter metas de outra origem (ex.: demo) com empresa_id que não
+  // é o da ilha — invisíveis na lista filtrada por empresa, mas presentes na
+  // tabela. Checar "qualquer meta" faria o seed pular e as minhas nunca
+  // entrariam (foi o que quebrou METAS-TELA-09/10/11 no teste). Idempotente.
+  const { data: metaExist } = await admin
+    .from("metas").select("id")
+    .eq("tenant_id", TENANT_ID).eq("titulo", META_SENTINELA).limit(1);
+  if (metaExist && metaExist.length > 0) return; // minhas metas já semeadas
+
+  // Departamento de RH para a meta de setor (setor_id -> departamentos).
+  const { data: deptRH } = await admin
+    .from("departamentos").select("id")
+    .eq("tenant_id", TENANT_ID).eq("nome", "Recursos Humanos").limit(1);
+  const setorId = deptRH && deptRH.length > 0 ? deptRH[0].id : null;
+
+  // Campos comuns às três metas. workflow_status 'ativa' e ano 2026 para
+  // aparecerem tanto na lista quanto na consolidação (que filtra pelo ano atual).
+  const comum = {
+    tenant_id: TENANT_ID,
+    empresa_id: EMPRESA_ID,
+    ano: 2026,
+    periodo: "trimestral",
+    trimestre: 1,
+    peso: 1,
+    data_inicio: "2026-01-01",
+    data_fim: "2026-12-31",
+    workflow_status: "ativa",
+    criado_por: userId,
+    criado_por_nome: "Robô de Testes",
+  };
+
+  const linhas = [
+    {
+      ...comum,
+      nivel: "estrategica",
+      titulo: META_SENTINELA,
+      descricao: "Meta fictícia de QA — reduzir acidentes de trabalho no ano.",
+      status: "em_andamento",
+      progresso: 40,
+      responsavel_nome: "Robô de Testes",
+    },
+    {
+      ...comum,
+      nivel: "setor",
+      titulo: "Concluir treinamentos NR obrigatórios (QA)",
+      descricao: "Meta fictícia de QA — treinamentos NR do setor de RH.",
+      status: "em_andamento",
+      progresso: 60,
+      setor_id: setorId,
+      setor_nome: "Recursos Humanos",
+      departamento_id: setorId,
+      departamento_nome: "Recursos Humanos",
+    },
+    {
+      ...comum,
+      nivel: "individual",
+      titulo: "Registrar 100% dos EPIs entregues (QA)",
+      descricao: "Meta fictícia de QA — registro de entrega de EPIs.",
+      status: "nao_iniciada",
+      progresso: 0,
+      colaborador_nome: "Colaborador 1",
+    },
+  ];
+
+  const { error } = await admin.from("metas").insert(linhas);
+  if (error) console.error("metas (fixtures):", error.message);
+}
+
+// Ação-sentinela do Plano de Ação: mesma ideia da meta-sentinela. A ilha pode
+// já ter ações de outra origem; guardar por "qualquer ação" pularia o seed.
+const PACAO_SENTINELA = "Instalar guarda-corpo na plataforma de carga (QA)";
+// Semeia 3 ações fictícias de Plano de Ação na ilha, com situação e prioridade
+// variadas, para os casos e2e profundos (listagem, filtro por situação, filtro
+// por prioridade). Idempotente pela ação-sentinela; NÃO-FATAL.
+async function semearPlanoAcao(admin: Admin, userId: string) {
+  const { data: existe } = await admin
+    .from("plano_acoes").select("id")
+    .eq("tenant_id", TENANT_ID).eq("titulo", PACAO_SENTINELA).limit(1);
+  if (existe && existe.length > 0) return; // minhas ações já semeadas
+
+  // Campos comuns. codigo:"" deixa o trigger gerar ACO-NNNNN. prazo no futuro
+  // para nenhuma cair como "atrasada". tipo/origem dentro dos domínios válidos.
+  const comum = {
+    tenant_id: TENANT_ID,
+    empresa_id: EMPRESA_ID,
+    codigo: "",
+    origem_modulo: "manual",
+    tipo: "corretiva",
+    prazo: "2026-12-31",
+    criado_por: userId,
+    criado_por_nome: "Robô de Testes",
+  };
+
+  const linhas = [
+    {
+      ...comum,
+      titulo: PACAO_SENTINELA,
+      descricao: "Ação fictícia de QA — instalar guarda-corpo na plataforma.",
+      status: "pendente",
+      prioridade: "imediato",
+      gravidade: 5, urgencia: 5, tendencia: 4,
+      progresso: 0,
+    },
+    {
+      ...comum,
+      titulo: "Revisar extintores vencidos (QA)",
+      descricao: "Ação fictícia de QA — revisão dos extintores vencidos.",
+      status: "em_andamento",
+      prioridade: "urgente",
+      gravidade: 4, urgencia: 4, tendencia: 3,
+      progresso: 50,
+    },
+    {
+      ...comum,
+      titulo: "Treinar brigada de incêndio (QA)",
+      descricao: "Ação fictícia de QA — treinamento da brigada de incêndio.",
+      status: "concluida",
+      prioridade: "medio",
+      gravidade: 3, urgencia: 2, tendencia: 2,
+      progresso: 100,
+    },
+  ];
+
+  const { error } = await admin.from("plano_acoes").insert(linhas);
+  if (error) console.error("plano_acoes (fixtures):", error.message);
+}
+
+// Semeia UM GHE (Grupo Homogêneo de Exposição) ativo na empresa da ilha. Sem
+// GHE ativo, a criação de campanha psicossocial mostra "Nenhum GHE ativo
+// cadastrado para esta empresa" e o teste TC-01 não fecha. Nada semeava GHE
+// (nem staging.sql, nem migration) — o teste só passava no ambiente de teste
+// por GHEs deixados por corridas anteriores. Idempotente pelo código; NÃO-FATAL.
+async function semearGhe(admin: Admin, _userId: string) {
+  const { data: existe } = await admin
+    .from("psicossocial_ghe").select("id")
+    .eq("tenant_id", TENANT_ID).eq("codigo", "GHE-001").limit(1);
+  if (existe && existe.length > 0) return; // GHE já semeado
+
+  const { error } = await admin.from("psicossocial_ghe").insert({
+    tenant_id: TENANT_ID,
+    empresa_id: EMPRESA_ID,
+    codigo: "GHE-001",
+    nome: "Administrativo (QA)",
+    descricao: "GHE fictício de QA para campanhas psicossociais.",
+    ativo: true,
+  });
+  if (error) console.error("psicossocial_ghe (fixtures):", error.message);
+}
+
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-qa-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// Conta do parceiro de teste. Mesma senha do robô principal (a suíte só
+// conhece uma), e-mail fixo fictício. Sem profile: ela deve cair na Área do
+// Parceiro, nunca no sistema — é exatamente o que PGP-030 confere.
+const EMAIL_PARCEIRO_ROBO = "parceiro.robo@youreyes.local";
+// deno-lint-ignore no-explicit-any
+async function semearRoboParceiro(admin: any, senha: string) {
+  const { data: lista } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  // deno-lint-ignore no-explicit-any
+  const existente = lista?.users?.find((u: any) => (u.email ?? "").toLowerCase() === EMAIL_PARCEIRO_ROBO);
+  let uid: string;
+  if (existente) {
+    uid = existente.id;
+    await admin.auth.admin.updateUserById(uid, { password: senha, email_confirm: true });
+  } else {
+    const { data: novo, error } = await admin.auth.admin.createUser({
+      email: EMAIL_PARCEIRO_ROBO, password: senha, email_confirm: true,
+      user_metadata: { nome_completo: "Robô Parceiro (Cypress)" },
+    });
+    if (error) throw new Error("createUser parceiro: " + error.message);
+    uid = novo.user!.id;
+  }
+  // Garante o parceiro fictício e o vínculo. Se a Onda 1 ainda não semeou
+  // a Clínica Staging (banco sem Empresa Staging), cria aqui.
+  let { data: parc } = await admin.from("parceiros").select("id").eq("codigo", "CLINICASTAGING").maybeSingle();
+  if (!parc) {
+    const { data: criado, error } = await admin.from("parceiros").insert({
+      codigo: "CLINICASTAGING", nome: "Clínica Staging SST", tipo_pessoa: "pj", tipo_parceiro: "clinica",
+      email: "clinica.staging@exemplo.test", cidade: "Pato Branco", uf: "PR", status: "ativo",
+    }).select("id").single();
+    if (error) throw new Error("parceiros: " + error.message);
+    parc = criado;
+  }
+  const { error: vErr } = await admin.from("parceiro_usuarios")
+    .upsert({ parceiro_id: parc.id, user_id: uid, papel: "dono" }, { onConflict: "user_id" });
+  if (vErr) throw new Error("parceiro_usuarios: " + vErr.message);
+  // A carteira precisa ter ao menos a Empresa Staging como cliente originado.
+  await admin.from("tenants").update({ parceiro_id: parc.id, originado_em: new Date().toISOString() })
+    .eq("id", TENANT_ID).is("parceiro_id", null);
+  // Registra o ACEITE do Contrato de Parceria (versão vigente) para o parceiro-robô.
+  // Sem aceite, parceiro_contrato_situacao().pendente=true e o Portal TRAVA o link
+  // de indicação (portal-link-principal não é renderizado) — o que quebrava o
+  // PGP-031. Idempotente pela UNIQUE(parceiro_id, versao). NÃO-FATAL: se o
+  // ambiente não tiver versão vigente do contrato, apenas segue.
+  const { data: versaoVigente } = await admin
+    .from("parceiro_contratos_versoes").select("versao, hash_texto").eq("vigente", true).maybeSingle();
+  if (versaoVigente) {
+    const { error: acErr } = await admin.from("parceiro_contratos_aceites").upsert({
+      parceiro_id: parc.id, versao: versaoVigente.versao, user_id: uid,
+      hash_texto: versaoVigente.hash_texto,
+    }, { onConflict: "parceiro_id,versao" });
+    if (acErr) console.error("parceiro_contratos_aceites (aceite robô):", acErr.message);
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -263,7 +477,8 @@ serve(async (req) => {
   const email = (body.email || EMAIL_PADRAO).trim();
   const senha = body.senha || SENHA_PADRAO;
 
-  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  // deno-lint-ignore-next-line no-explicit-any
+  const admin = createClient<any, "public", any>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
@@ -440,11 +655,60 @@ serve(async (req) => {
       console.error("Fixtures profundas (nao-fatal):", (e as Error).message);
     }
 
+    // 7b) Metas fictícias da ilha — habilitam os casos e2e profundos de Metas
+    //     (listagem, filtro por nível, consolidação). NÃO-FATAL, mesma razão.
+    try {
+      await semearMetas(admin, userId);
+    } catch (e) {
+      console.error("Metas (fixtures, nao-fatal):", (e as Error).message);
+    }
+
+    // 7c) Ações fictícias de Plano de Ação — habilitam os casos e2e profundos
+    //     (listagem, filtro por situação, filtro por prioridade). NÃO-FATAL.
+    try {
+      await semearPlanoAcao(admin, userId);
+    } catch (e) {
+      console.error("Plano de Ação (fixtures, nao-fatal):", (e as Error).message);
+    }
+
+    // 7d) GHE fictício — sem ele a criação de campanha psicossocial trava em
+    //     "Nenhum GHE ativo cadastrado". NÃO-FATAL, mesma razão.
+    try {
+      await semearGhe(admin, userId);
+    } catch (e) {
+      console.error("GHE (fixtures, nao-fatal):", (e as Error).message);
+    }
+
+    // 6) Robô-PARCEIRO: conta sem perfil de tenant, vinculada ao parceiro
+    //    fictício "Clínica Staging SST" (semeado pela migration da Onda 1).
+    //    É com ela que o spec portal-parceiro.cy.ts entra em /parceiros/entrar.
+    try {
+      await semearRoboParceiro(admin, senha);
+    } catch (e) {
+      console.error("Robô-parceiro (nao-fatal):", (e as Error).message);
+    }
+
+    // 8) Mobiliário do MarketYE ("Especialista Staging (QA)" com 2 anúncios
+    //    publicados): o teste de tela MKY-021 precisa de ao menos um anúncio
+    //    em Segurança do Trabalho. A função do banco semeia ou repara e
+    //    devolve um diagnóstico; ele vai na resposta para aparecer no log da
+    //    esteira (a migration que semeava engolia o erro). NÃO-FATAL.
+    let marketye: unknown = null;
+    try {
+      const { data: mky, error: mkyErr } = await admin.rpc("marketye_semear_ilha_teste");
+      marketye = mkyErr ? { ok: false, erro: mkyErr.message } : mky;
+      console.log("MarketYE (mobiliário):", JSON.stringify(marketye));
+    } catch (e) {
+      marketye = { ok: false, erro: (e as Error).message };
+      console.error("MarketYE (mobiliário, nao-fatal):", (e as Error).message);
+    }
+
     return json({
       ok: true,
       email,
       user_id: userId,
       tenant_id: TENANT_ID,
+      marketye,
       mensagem: "Conta-robô pronta para a suíte Cypress entrar.",
     });
   } catch (erro) {

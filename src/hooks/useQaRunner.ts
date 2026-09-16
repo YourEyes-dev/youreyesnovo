@@ -87,6 +87,24 @@ export function useQaRunner() {
       if (error) throw error;
       return (data || []) as QaBateria[];
     },
+    // Enquanto uma corrida do Cypress foi disparada e ainda não voltou, a lista
+    // se atualiza sozinha (a cada 15s, por até 50 min — a suíte leva ~33 min)
+    // para o resultado aparecer sem o usuário precisar recarregar. O marcador é
+    // gravado pelo painel do Cypress ao disparar (localStorage "qa_cypress_run").
+    refetchInterval: () => {
+      try {
+        const raw =
+          typeof localStorage !== "undefined"
+            ? localStorage.getItem("qa_cypress_run")
+            : null;
+        if (!raw) return false;
+        const at = (JSON.parse(raw) as { at?: string })?.at;
+        if (!at) return false;
+        return Date.now() - new Date(at).getTime() < 50 * 60 * 1000 ? 15000 : false;
+      } catch {
+        return false;
+      }
+    },
   });
 
   /** Dispara uma bateria e espera ela terminar (roda no banco, síncrona). */

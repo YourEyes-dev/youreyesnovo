@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useCadastroLivre } from "@/hooks/useCadastroLivre";
 import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -81,6 +82,16 @@ const registerSchema = z.object({
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function Register() {
+  // Porta livre fechada: quem cai aqui vai para os planos do site (a empresa
+  // nasce pelo checkout). Quando a casa reabrir a porta (período de teste), a
+  // tela volta a funcionar sem mudança de código.
+  const { livre: cadastroLivre, carregando: portaCarregando } = useCadastroLivre();
+  useEffect(() => {
+    if (!portaCarregando && !cadastroLivre) {
+      toast.info("O cadastro de empresa é feito pela contratação de um plano.", { description: "Escolha o plano ideal e a sua conta é criada na sequência." });
+      window.location.replace(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/#planos`);
+    }
+  }, [portaCarregando, cadastroLivre]);
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);

@@ -13,7 +13,9 @@ import { usePontoEscalas, ESCALA_TIPOS, type PontoEscala } from "@/hooks/usePont
 import { useEscalaDetalhes, DIAS_SEMANA_LABEL, ORDINAL_MES_LABEL } from "@/hooks/useEscalaDetalhes";
 import { useColaboradores } from "@/hooks/useColaboradores";
 import { fromTable } from "@/integrations/supabase/untypedClient";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { PontoEscalaAvisos } from "@/components/ponto/PontoEscalaAvisos";
 import { Plus, Calendar, Clock, Users, Settings, Sparkles, Pencil, Power, Trash2, CalendarDays, Repeat, Copy, Search, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { confirm } from "@/components/ui/confirm-dialog";
@@ -181,6 +183,41 @@ export function PontoEscalasTab() {
     return { diaria: ht * 60, semanal: semanalMin };
   };
   const queryClient = useQueryClient();
+
+  // Formalização exigida por lei (ESC-001 / ESC-031): a regra vive no banco —
+  // aqui só se pergunta o status de cada escala e se mostra o selo.
+  const { data: statusFormalizacao = {} } = useQuery({
+    queryKey: ["ponto-escala-formalizacao-mapa", escalas.map(e => e.id).join(",")],
+    queryFn: async (): Promise<Record<string, string>> => {
+      const mapa: Record<string, string> = {};
+      await Promise.all(
+        escalas.map(async (e) => {
+          const { data, error } = await (supabase.rpc as any)("ponto_escala_formalizacao_status", {
+            p_escala_id: e.id,
+          });
+          if (!error && data) mapa[e.id] = data as string;
+        }),
+      );
+      return mapa;
+    },
+    enabled: escalas.length > 0,
+  });
+
+  const selo_formalizacao = (escalaId: string) => {
+    const st = statusFormalizacao[escalaId];
+    if (st === "pendente") {
+      return (
+        <Badge
+          variant="destructive"
+          title="Escala 12x36 sem acordo (CLT art. 59-A) ou revezamento acima de 6h sem instrumento coletivo (CF art. 7º, XIV). Anexe o acordo na escala ou cadastre o coletivo vigente em Compliance › Acordos."
+        >
+          Falta acordo
+        </Badge>
+      );
+    }
+    if (st === "regular") return <Badge variant="outline" className="border-emerald-400 text-emerald-700">Em ordem</Badge>;
+    return <span className="text-xs text-muted-foreground">—</span>;
+  };
   const [atribuicaoForm, setAtribuicaoForm] = useState<{
     escala_id: string;
     colaborador_ids: string[];
@@ -201,7 +238,7 @@ export function PontoEscalasTab() {
   const handleSalvar = async () => {
     if (!escalaForm.nome) { toast.error("Nome obrigatório"); return; }
     let payload: any = { ...escalaForm };
-    if (escalaForm.modalidade === "fixa") {
+    if (escalaForm.modalidade !== "movel") {
       const { diaria, semanal } = calcularJornadasFixa(escalaForm.dias_config);
       const compMin = calcularCompensacaoSemanal(escalaForm.compensacoes_mensais || []);
       payload.jornada_diaria_minutos = diaria;
@@ -486,6 +523,9 @@ export function PontoEscalasTab() {
         </div>
       </div>
 
+      {/* Avisos: escala sem o acordo exigido e turnos a descoberto */}
+      <PontoEscalaAvisos escalas={escalas as any} />
+
       {/* Escalas Table */}
       <Card>
         <CardContent className="p-0">
@@ -500,14 +540,15 @@ export function PontoEscalasTab() {
                 <TableHead>Tolerância</TableHead>
                 <TableHead>Horário</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-center">Formalização</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadingEscalas ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8">Carregando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center py-8">Carregando...</TableCell></TableRow>
               ) : escalas.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhuma escala cadastrada.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Nenhuma escala cadastrada.</TableCell></TableRow>
               ) : escalas.map(e => {
                 const emUso = atribuicoes.some(a => a.escala_id === e.id);
                 return (
@@ -520,6 +561,7 @@ export function PontoEscalasTab() {
                   <TableCell>{e.tolerancia_minutos}min / {e.tolerancia_diaria_minutos}min</TableCell>
                   <TableCell className="font-mono text-sm">{e.hora_entrada_padrao?.substring(0,5)} - {e.hora_saida_padrao?.substring(0,5)}</TableCell>
                   <TableCell><Badge className={e.ativa ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>{e.ativa ? "Ativa" : "Inativa"}</Badge></TableCell>
+                  <TableCell className="text-center">{selo_formalizacao(e.id)}</TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <Button size="icon" variant="ghost" title="Editar" onClick={() => abrirEditar(e)}>
@@ -613,12 +655,26 @@ export function PontoEscalasTab() {
                   <SelectContent>
                     <SelectItem value="fixa">Fixa (dias da semana definidos)</SelectItem>
                     <SelectItem value="movel">Móvel (12x36, 24x72, etc.)</SelectItem>
+                    <SelectItem value="revezamento">Turno ininterrupto de revezamento</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            {escalaForm.modalidade === "fixa" ? (
+            {/* CF art. 7º, XIV: revezamento tem jornada de 6h; ampliar exige
+                instrumento COLETIVO (acordo individual não serve). */}
+            {escalaForm.modalidade === "revezamento" && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <p>
+                  Turno ininterrupto de revezamento tem jornada de <strong>6 horas</strong> pela
+                  Constituição (art. 7º, XIV). Acima disso, só com <strong>acordo coletivo ou
+                  convenção</strong> — acordo individual não autoriza. Se passar de 6h sem o
+                  instrumento coletivo, a escala aparece como "Falta acordo" na lista.
+                </p>
+              </div>
+            )}
+
+            {escalaForm.modalidade !== "movel" ? (
               <>
               <div className="rounded-lg border p-3 space-y-2 bg-muted/20">
                 <div className="flex items-center justify-between flex-wrap gap-2">

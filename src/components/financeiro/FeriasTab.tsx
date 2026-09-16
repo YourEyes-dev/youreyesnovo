@@ -12,10 +12,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Sun, Eye } from "lucide-react";
+import { Plus, Sun, Eye, Calculator, AlertTriangle } from "lucide-react";
 import { useFolhaCalculo } from "@/hooks/useFolhaCalculo";
 import { useColaboradores } from "@/hooks/useColaboradores";
 import { toast } from "sonner";
+import {
+  useFeriasMediaVariaveis, descreverMedia, type MediaVariaveis, type MediaCompetencia,
+} from "@/hooks/useFeriasMediaVariaveis";
+import { FeriasEsocialEventos } from "@/components/ferias/FeriasEsocialEventos";
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 
@@ -25,6 +29,11 @@ export function FeriasTab() {
   const { colaboradores } = useColaboradores();
   const [showModal, setShowModal] = useState(false);
   const [showDetalhe, setShowDetalhe] = useState<any>(null);
+  const { apurar, apurando } = useFeriasMediaVariaveis();
+  // Memória da média apurada. Fica ao lado do valor para o DP conferir de
+  // onde ele saiu antes de fechar o cálculo (art. 142 / RNF-008).
+  const [media, setMedia] = useState<MediaVariaveis | null>(null);
+  const [mediaEditada, setMediaEditada] = useState(false);
 
   const [form, setForm] = useState({
     colaborador_id: "",
@@ -42,15 +51,42 @@ export function FeriasTab() {
     dependentes_irrf: 0,
   });
 
+  const limparMedia = () => { setMedia(null); setMediaEditada(false); };
+
+  const handleApurarMedia = async () => {
+    if (!form.colaborador_cpf) return toast.error("Selecione o colaborador");
+    if (!form.periodo_aquisitivo_inicio || !form.periodo_aquisitivo_fim) {
+      return toast.error("Informe o período aquisitivo para apurar a média");
+    }
+    try {
+      const r = await apurar({
+        cpf: form.colaborador_cpf,
+        aquisitivoInicio: form.periodo_aquisitivo_inicio,
+        aquisitivoFim: form.periodo_aquisitivo_fim,
+        inicioGozo: form.data_inicio_gozo || undefined,
+      });
+      if (!r) return;
+      setMedia(r);
+      setMediaEditada(false);
+      setForm(p => ({ ...p, media_variaveis: r.media }));
+      if (r.avisos.length > 0) toast.warning(r.avisos[0]);
+      else toast.success(`Média apurada: R$ ${fmtMoeda(r.media)}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível apurar a média");
+    }
+  };
+
   const handleColabSelect = (id: string) => {
     const c = colaboradores.find((c: any) => c.id === id) as any;
     if (c) {
+      limparMedia();
       setForm(p => ({
         ...p,
         colaborador_id: c.id,
         colaborador_nome: c.nome_completo,
         colaborador_cpf: c.cpf,
         remuneracao_base: c.salario || 0,
+        media_variaveis: 0,
       }));
     }
   };
@@ -60,8 +96,12 @@ export function FeriasTab() {
     await criarFeriasCalculo({
       ...form,
       remuneracao_base: form.remuneracao_base, // fix naming
+      // Origem da média + memória do art. 142, para o valor se reproduzir depois.
+      media_origem: !media ? "manual" : mediaEditada ? "apurada_ajustada" : "apurada",
+      media_memoria: media,
     });
     setShowModal(false);
+    limparMedia();
   };
 
   return (
@@ -145,11 +185,11 @@ export function FeriasTab() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Início Per. Aquisitivo</Label>
-                <Input type="date" value={form.periodo_aquisitivo_inicio} onChange={e => setForm(p => ({ ...p, periodo_aquisitivo_inicio: e.target.value }))} />
+                <Input type="date" value={form.periodo_aquisitivo_inicio} onChange={e => { limparMedia(); setForm(p => ({ ...p, periodo_aquisitivo_inicio: e.target.value })); }} />
               </div>
               <div className="space-y-2">
                 <Label>Fim Per. Aquisitivo</Label>
-                <Input type="date" value={form.periodo_aquisitivo_fim} onChange={e => setForm(p => ({ ...p, periodo_aquisitivo_fim: e.target.value }))} />
+                <Input type="date" value={form.periodo_aquisitivo_fim} onChange={e => { limparMedia(); setForm(p => ({ ...p, periodo_aquisitivo_fim: e.target.value })); }} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -176,6 +216,78 @@ export function FeriasTab() {
                 <Input type="number" step="0.01" value={form.remuneracao_base} onChange={e => setForm(p => ({ ...p, remuneracao_base: Number(e.target.value) }))} />
               </div>
             </div>
+            {/* Média das variáveis — art. 142 */}
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-end gap-3">
+                <div className="flex-1 space-y-2">
+                  <Label>Média de variáveis (art. 142)</Label>
+                  <Input
+                    type="number" step="0.01" value={form.media_variaveis}
+                    onChange={e => {
+                      if (media) setMediaEditada(true);
+                      setForm(p => ({ ...p, media_variaveis: Number(e.target.value) }));
+                    }}
+                  />
+                </div>
+                <Button type="button" variant="outline" onClick={handleApurarMedia} disabled={apurando}>
+                  <Calculator className="w-4 h-4 mr-2" />
+                  {apurando ? "Apurando..." : "Apurar da folha"}
+                </Button>
+              </div>
+
+              {!media && (
+                <p className="text-xs text-muted-foreground">
+                  Horas extras, comissões e adicionais habituais entram nas férias pela média.
+                  Apure da folha para o valor sair com memória — ou digite, se a apuração for feita fora.
+                </p>
+              )}
+
+              {media && (
+                <div className="space-y-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={mediaEditada ? "outline" : "secondary"}>
+                      {mediaEditada ? "Apurada e ajustada à mão" : "Apurada da folha"}
+                    </Badge>
+                    <span className="text-muted-foreground">{descreverMedia(media)}</span>
+                  </div>
+
+                  {media.avisos.map((a, i) => (
+                    <p key={i} className="flex items-start gap-1.5 text-amber-600 dark:text-amber-500">
+                      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {a}
+                    </p>
+                  ))}
+
+                  {media.rubricas.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground">Rubricas somadas:</p>
+                      {media.rubricas.map((r, i) => (
+                        <div key={i} className="flex justify-between">
+                          <span>{r.descricao}</span>
+                          <span className="tabular-nums">R$ {fmtMoeda(r.valor)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {media.competencias.length > 0 && (
+                    <details>
+                      <summary className="cursor-pointer text-muted-foreground">
+                        Ver competência a competência ({media.competencias.length})
+                      </summary>
+                      <div className="mt-1 space-y-1">
+                        {media.competencias.map((c, i) => (
+                          <div key={i} className="flex justify-between">
+                            <span>{c.competencia}</span>
+                            <span className="tabular-nums">R$ {fmtMoeda(c.valor)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center gap-2">
               <Switch checked={form.em_dobro} onCheckedChange={v => setForm(p => ({ ...p, em_dobro: v }))} />
               <Label>Férias em dobro (período concessivo vencido)</Label>
@@ -216,6 +328,36 @@ export function FeriasTab() {
                   <div className="border-t pt-2 flex justify-between font-bold text-lg"><span>Líquido</span><span className="text-primary">R$ {fmtMoeda(showDetalhe.total_liquido)}</span></div>
                 </CardContent>
               </Card>
+
+              {/* Memória da média — de onde saiu o valor das variáveis */}
+              {showDetalhe.memoria_calculo?.media_variaveis && (
+                <Card>
+                  <CardContent className="pt-4 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm">Média de variáveis (art. 142)</span>
+                      <Badge variant="secondary">
+                        {showDetalhe.media_origem === "apurada" ? "Apurada da folha"
+                          : showDetalhe.media_origem === "apurada_ajustada" ? "Apurada e ajustada"
+                          : "Informada à mão"}
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground">
+                      {descreverMedia(showDetalhe.memoria_calculo.media_variaveis)}
+                    </p>
+                    {(showDetalhe.memoria_calculo.media_variaveis.competencias || []).map((c: MediaCompetencia, i: number) => (
+                      <div key={i} className="flex justify-between">
+                        <span>{c.competencia}</span>
+                        <span className="tabular-nums">R$ {fmtMoeda(c.valor)}</span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Eventos do eSocial desta concessão (RF-008) */}
+              <div className="border-t pt-3">
+                <FeriasEsocialEventos calculoId={showDetalhe.id} />
+              </div>
             </div>
           )}
         </DialogContent>

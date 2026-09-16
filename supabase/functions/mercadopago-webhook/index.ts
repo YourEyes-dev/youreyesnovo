@@ -1,7 +1,10 @@
 // Webhook do Mercado Pago — recebe notificações de pagamento, atualiza assinaturas
 // e, quando aprovado, provisiona tenant + cliente e envia e-mail de ativação.
 // Público (verify_jwt=false). MP não envia JWT; validação por consulta autenticada à API do MP.
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const STATUS_MAP: Record<string, string> = {
@@ -136,7 +139,15 @@ async function provisionAccount(supabase: any, params: {
 
     if (tenantErr) {
       console.error("[mp-webhook] erro criar tenant:", tenantErr);
-      return { ok: false, error: tenantErr.message };
+      return { ok: false, error: tenantErr.message }
+
+    // Programa de Parceiros: o ?ref= que veio da landing/checkout grava a origem no tenant
+    try {
+      const { data: assRef } = await supabase.from("assinaturas").select("ref_codigo, raw_payload").eq("id", assinaturaId).maybeSingle();
+      const refCodigo = (assRef?.ref_codigo as string | null) || ((assRef?.raw_payload as { metadata?: { ref_codigo?: string } } | null)?.metadata?.ref_codigo ?? null);
+      if (refCodigo) await supabase.rpc("parceiro_atribuir_tenant_por_ref", { p_tenant_id: tenant.id, p_codigo: refCodigo });
+    } catch (e) { console.error("[mp-webhook] origem do parceiro (nao-fatal):", (e as Error).message); }
+;
     }
     tenantId = tenant.id;
 

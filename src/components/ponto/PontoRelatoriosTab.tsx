@@ -12,13 +12,13 @@ import { usePontoBancoHoras } from "@/hooks/usePontoBancoHoras";
 import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/integrations/supabase/untypedClient";
 import { format } from "date-fns";
-import { FileDown, FileText, Download } from "lucide-react";
+import { FileDown, FileText, Download, Archive } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatarHoraMinuto } from "@/lib/ponto/formatoHoras";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import {
@@ -51,7 +51,7 @@ export function PontoRelatoriosTab() {
 
   const { usePontoDiario } = usePonto();
   const { useEspelhos } = usePontoFechamento();
-  const { useBancoHorasPorCompetencia } = usePontoBancoHoras();
+  const { useBancoHorasPorCompetencia, useBancoHorasOficial } = usePontoBancoHoras();
 
   const year = parseInt(competencia.split("-")[0]);
   const month = parseInt(competencia.split("-")[1]);
@@ -59,6 +59,35 @@ export function PontoRelatoriosTab() {
   const endDate = new Date(year, month, 0);
 
   const { tenantId } = useAuth();
+  const qc = useQueryClient();
+
+  /**
+   * LGPD arts. 11 e 46 (PONTO-397): exportar ponto tira dado pessoal de dentro
+   * do sistema — e era a única operação sensível que não deixava rastro algum.
+   * Cada exportação registra quem exportou, o quê e com que escopo. Falha no
+   * registro não impede a exportação: o arquivo é o trabalho do RH; o log é
+   * garantia, não obstáculo.
+   */
+  const registrarExportacao = async (
+    acao: "exportou_afd" | "exportou_aej" | "exportou_relatorio",
+    descricao: string,
+  ) => {
+    if (!tenantId) return;
+    try {
+      await (supabase.rpc as any)("ponto_log_exportacao", {
+        p_tenant_id: tenantId,
+        p_acao: acao,
+        p_escopo: {
+          competencia,
+          empresa_id: empresaAtivaId || null,
+          tipo_relatorio: tipoRelatorio,
+        },
+        p_descricao: descricao,
+      });
+    } catch {
+      // ver comentário acima
+    }
+  };
   const { empresaAtivaId } = useEmpresaAtiva();
 
   // Nome das empresas: o relatório de Banco de Horas mistura filiais e o RH
@@ -68,7 +97,7 @@ export function PontoRelatoriosTab() {
     enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await fromTable("empresa_cadastro")
-        .select("id, razao_social, nome_fantasia, cnpj, endereco, numero, bairro, cidade, estado, cnae_descricao")
+        .select("id, razao_social, nome_fantasia, cnpj, endereco, numero, bairro, cidade, estado")
         .eq("tenant_id", tenantId) as { data: any[] | null; error: Error | null };
       if (error) throw error;
       return data || [];
@@ -100,7 +129,46 @@ export function PontoRelatoriosTab() {
 
   const { data: espelhos = [] } = useEspelhos(competencia);
   const { data: bancosHorasTodos = [] } = useBancoHorasPorCompetencia(competencia);
+  // Fonte única do banco de horas: é dela que saem os números impressos, para
+  // o espelho e o relatório de banco de horas não discordarem entre si.
+  const { data: bancoOficial = [] } = useBancoHorasOficial(competencia);
   const { colaboradores } = useColaboradores();
+
+  const oficialPorCpf = useMemo(() => {
+    const m = new Map<string, any>();
+    (bancoOficial as any[]).forEach((o) => {
+      const cpf = soDigitos(o.colaborador_cpf);
+      if (cpf) m.set(cpf, o);
+    });
+    return m;
+  }, [bancoOficial]);
+
+  /**
+   * A linha de banco de horas de um colaborador com os números oficiais.
+   * Quando a fotografia da tabela está atrasada em relação à apuração, é o
+   * número oficial que vale — a fotografia é que envelheceu.
+   */
+  const linhaOficial = (b: any) => {
+    const o = oficialPorCpf.get(soDigitos(b.colaborador_cpf));
+    if (!o) return b;
+    return {
+      ...b,
+      saldo_anterior_minutos: o.saldo_anterior_min,
+      creditos_minutos: o.creditos_min,
+      debitos_minutos: o.debitos_min,
+      compensados_minutos: o.compensados_min,
+      saldo_atual_minutos: o.saldo_atual_min,
+    };
+  };
+
+  // Quantos colaboradores têm a fotografia desatualizada. Serve para avisar
+  // o RH de que a apuração precisa ser rodada de novo — o documento sai com
+  // o número certo de qualquer jeito, mas a tela do banco de horas ainda
+  // mostra o antigo até a próxima apuração.
+  const desatualizados = useMemo(
+    () => (bancoOficial as any[]).filter((o) => (o.divergencia_min ?? 0) !== 0).length,
+    [bancoOficial],
+  );
 
   // Demitido não entra no relatório de Banco de Horas: o saldo dele é
   // quitado na rescisão, não na conferência mensal do RH.
@@ -145,6 +213,23 @@ export function PontoRelatoriosTab() {
     equalizacao: boolean;
     excedente_retido_min: number;
     marcacoes: MarcacaoDia[];
+    // Súmula 338/TST: intervalo declarado (pré-assinalado) em vez de batido.
+    intervalo_origem?: "marcado" | "pre_assinalado" | null;
+    intervalo_pre_assinalado_min?: number | null;
+    /**
+     * Dia com marcação sem par (ou com ajuste em aberto). A apuração não
+     * gera débito nesses dias — a falha de registro é do empregador (CLT
+     * art. 74, §2º; Súmula 338) —, então o documento precisa dizer que o dia
+     * está pendente, em vez de imprimir um zero silencioso.
+     */
+    pendencia?: boolean;
+    /**
+     * Dia declarado como folga compensatória. O débito dele vem da
+     * compensação registrada no banco, não de uma ausência inferida — e o
+     * documento precisa dizer isso: é o que distingue, para quem assina,
+     * folga acordada de falta (Súmula 338 do TST).
+     */
+    folga_compensatoria?: boolean;
   };
 
   const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
@@ -161,6 +246,10 @@ export function PontoRelatoriosTab() {
 
   /** RN25 — rótulo de ocorrência do dia. */
   const situacaoDia = (d: DiaEspelho) => {
+    if (d.folga_compensatoria) return d.trabalhado_min > 0
+      ? "Folga compensatória (meio período)"
+      : "Folga compensatória";
+    if (d.pendencia) return "Pendência — marcação incompleta";
     if (d.equalizacao) return "Equalização";
     if (d.excedente_retido_min > 0) return "Excede limite diário";
     if (d.protegido) return d.trabalhado_min > 0 ? "Justificado (com trabalho)" : "Justificado";
@@ -168,7 +257,7 @@ export function PontoRelatoriosTab() {
     if (d.trabalhado_min === 0) return ehDomingo(d.dia) ? "DSR" : ehSabado(d.dia) ? "Sábado" : "Sem jornada";
     if (d.jornada_min === 0) return ehDomingo(d.dia) ? "DSR trabalhado" : "Trabalho fora da escala";
     if (d.saldo_min < 0) return "Atraso / débito";
-    if (d.saldo_min > 0) return "Trabalhando (crédito)";
+    if (d.saldo_min > 0) return "Trabalhando (crédito 1:1)";
     return "Trabalhando";
   };
 
@@ -216,6 +305,40 @@ export function PontoRelatoriosTab() {
     }
 
 
+    // Súmula 338/TST — origem do intervalo de cada dia (batido x declarado em
+    // pré-assinalação). Vive em ponto_diario, não no resumo de saldo; sem isso
+    // o cartão não consegue declarar o intervalo previsto.
+    const intervaloPorCpfDia = new Map<string, { origem: string | null; minutos: number | null }>();
+    // Dias em que a marcação ficou sem par (ou têm ajuste em aberto): a
+    // apuração não debita esses dias, e o documento tem de mostrar a
+    // pendência em vez de um zero sem explicação.
+    const pendenciaPorCpfDia = new Set<string>();
+    const folgaPorCpfDia = new Set<string>();
+    {
+      const { data: diarios, error: errDia } = await fromTable("ponto_diario")
+        .select("colaborador_cpf, data, status, tipo_dia, intervalo_origem, intervalo_pre_assinalado_minutos")
+        .eq("tenant_id", tenantId)
+        .or("intervalo_origem.eq.pre_assinalado,status.in.(incompleto,ajuste_pendente),tipo_dia.eq.folga_compensatoria")
+        .gte("data", `${competencia}-01`)
+        .lte("data", `${competencia}-${String(ultimoDia).padStart(2, "0")}`) as { data: any[] | null; error: any };
+      if (errDia) throw errDia;
+      (diarios || []).forEach((d: any) => {
+        const chave = `${soDigitos(d.colaborador_cpf)}|${d.data}`;
+        if (d.intervalo_origem === "pre_assinalado") {
+          intervaloPorCpfDia.set(chave, {
+            origem: d.intervalo_origem ?? null,
+            minutos: d.intervalo_pre_assinalado_minutos ?? null,
+          });
+        }
+        if (d.status === "incompleto" || d.status === "ajuste_pendente") {
+          pendenciaPorCpfDia.add(chave);
+        }
+        if (d.tipo_dia === "folga_compensatoria") {
+          folgaPorCpfDia.add(chave);
+        }
+      });
+    }
+
     const porCpfDia = new Map<string, MarcacaoDia[]>();
     (marcacoesMes || []).forEach((m: any) => {
       const chave = `${soDigitos(m.colaborador_cpf)}|${m.data_marcacao}`;
@@ -256,6 +379,12 @@ export function PontoRelatoriosTab() {
         marcacoes: (porCpfDia.get(`${c.cpf}|${String(d.dia)}`) || [])
           .slice()
           .sort((a, b) => a.hora.localeCompare(b.hora)),
+        intervalo_origem: (intervaloPorCpfDia.get(`${c.cpf}|${String(d.dia)}`)?.origem ?? null) as
+          | "marcado" | "pre_assinalado" | null,
+        intervalo_pre_assinalado_min:
+          intervaloPorCpfDia.get(`${c.cpf}|${String(d.dia)}`)?.minutos ?? null,
+        pendencia: pendenciaPorCpfDia.has(`${c.cpf}|${String(d.dia)}`),
+        folga_compensatoria: folgaPorCpfDia.has(`${c.cpf}|${String(d.dia)}`),
       })).sort((a, b) => a.dia.localeCompare(b.dia));
 
       resultado.push({
@@ -388,6 +517,7 @@ export function PontoRelatoriosTab() {
     a.download = `AFD_${soDigitos(empresa?.cnpj) || "EMPRESA"}_${competencia.replace("-", "")}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+    await registrarExportacao("exportou_afd", `AFD da competência ${competencia}: ${totais.marcacoes} marcações, ${totais.empregados} empregados.`);
     toast.success(
       `AFD gerado: ${totais.marcacoes} marcações, ${totais.empregados} empregados (${totais.registros} registros).`,
     );
@@ -551,6 +681,30 @@ export function PontoRelatoriosTab() {
       dataFinal: fim,
     });
 
+    // Portaria MTP 671/2021 — além do arquivo entregue, o AEJ TRATADO é
+    // arquivado e assinado (hash) no banco: é a prova de que a jornada
+    // apurada não mudou depois da geração. O download abaixo continua sendo
+    // o arquivo no leiaute oficial; a cópia arquivada guarda o conteúdo
+    // tratado com a assinatura, e aparece no cartão "AEJ arquivado".
+    let assinatura: string | null = null;
+    try {
+      await (supabase.rpc as any)("ponto_gerar_aej", {
+        p_tenant_id: tenantId,
+        p_empresa_id: empresaAtivaId || null,
+        p_competencia: competencia,
+      });
+      qc.invalidateQueries({ queryKey: ["ponto-aej-arquivado"] });
+      const { data: arq } = await (supabase.rpc as any)("ponto_aej_extrair", {
+        p_tenant_id: tenantId,
+        p_empresa_id: empresaAtivaId || null,
+        p_competencia: competencia,
+      });
+      assinatura = (arq || [])[0]?.hash_arquivo || null;
+    } catch (e: any) {
+      // O arquivo oficial continua saindo; só o arquivamento falhou.
+      toast.warning("AEJ gerado, mas não foi possível arquivar a cópia assinada: " + (e?.message || ""));
+    }
+
     const blob = new Blob([conteudo], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -558,9 +712,40 @@ export function PontoRelatoriosTab() {
     a.download = `AEJ_${soDigitos(empresa?.cnpj) || "EMPRESA"}_${competencia.replace("-", "")}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+    await registrarExportacao("exportou_aej", `AEJ da competência ${competencia}: ${totais.marcacoes} marcações, ${totais.empregados} empregados.`);
     toast.success(
-      `AEJ gerado: ${totais.marcacoes} marcações (${totais.ajustes} ajustes aprovados), ${totais.ocorrencias} ocorrências, ${totais.empregados} empregados.`,
+      `AEJ gerado: ${totais.marcacoes} marcações (${totais.ajustes} ajustes aprovados), ${totais.ocorrencias} ocorrências, ${totais.empregados} empregados.`
+      + (assinatura ? ` Cópia arquivada e assinada (${assinatura.slice(0, 12)}...).` : ""),
     );
+  };
+
+  // Cópia tratada e assinada da competência (Portaria 671). Só leitura: mostra
+  // o que já foi arquivado, sem gerar nada.
+  const { data: aejArquivado } = useQuery({
+    queryKey: ["ponto-aej-arquivado", tenantId, empresaAtivaId, competencia],
+    queryFn: async () => {
+      if (!tenantId) return null;
+      const { data, error } = await (supabase.rpc as any)("ponto_aej_extrair", {
+        p_tenant_id: tenantId,
+        p_empresa_id: empresaAtivaId || null,
+        p_competencia: competencia,
+      });
+      if (error) throw error;
+      return ((data || []) as any[])[0] || null;
+    },
+    enabled: !!tenantId && !!competencia && tipoRelatorio === "aej",
+  });
+
+  const baixarAejArquivado = () => {
+    if (!aejArquivado?.conteudo) return;
+    const blob = new Blob([aejArquivado.conteudo], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `AEJ_TRATADO_${competencia.replace("-", "")}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    void registrarExportacao("exportou_aej", `Cópia arquivada e assinada do AEJ da competência ${competencia}.`);
   };
 
 
@@ -609,7 +794,6 @@ export function PontoRelatoriosTab() {
           empregador: {
             razaoSocial: empresaDoRelatorio || "—",
             cnpj: cnpjDoRelatorio,
-            atividade: emp.cnae_descricao || null,
             endereco: enderecoCompleto,
             cidade: emp.cidade || null,
             uf: emp.estado || null,
@@ -629,20 +813,35 @@ export function PontoRelatoriosTab() {
           periodo,
           emissao: geradoEm,
           dias: c.dias,
-          // Crédito/débito do período vêm SEMPRE da apuração (mesma fonte da
-          // tabela dia a dia). A linha de ponto_banco_horas é zerada no
-          // fechamento, o que fazia o espelho mostrar crédito 0 e saldo
-          // divergente do resumo diário.
-          banco: {
-            saldoAnterior: banco?.saldo_anterior_minutos ?? 0,
-            creditos: c.creditos,
-            debitos: c.debitos,
-            compensados: banco?.compensados_minutos ?? 0,
-            saldoAtual:
-              (banco?.saldo_anterior_minutos ?? 0) +
-              c.saldo -
-              (banco?.compensados_minutos ?? 0),
-          },
+          // Crédito/débito/saldo vêm da FONTE ÚNICA do banco de horas, a
+          // mesma que o relatório de Banco de Horas imprime: competência
+          // fechada devolve a apuração congelada (Súmula 338), competência
+          // aberta devolve a apuração de agora somada aos lançamentos
+          // manuais e compensações. Antes cada documento fazia a própria
+          // conta e os dois podiam discordar no mesmo dia.
+          banco: (() => {
+            const of = oficialPorCpf.get(c.cpf);
+            if (of) {
+              return {
+                saldoAnterior: of.saldo_anterior_min,
+                creditos: of.creditos_min,
+                debitos: of.debitos_min,
+                compensados: of.compensados_min,
+                saldoAtual: of.saldo_atual_min,
+                temRegime: of.tem_regime !== false,
+              };
+            }
+            return {
+              saldoAnterior: banco?.saldo_anterior_minutos ?? 0,
+              creditos: c.creditos,
+              debitos: c.debitos,
+              compensados: banco?.compensados_minutos ?? 0,
+              saldoAtual:
+                (banco?.saldo_anterior_minutos ?? 0) +
+                c.saldo -
+                (banco?.compensados_minutos ?? 0),
+            };
+          })(),
 
           logoDataUrl: logo,
         });
@@ -650,6 +849,7 @@ export function PontoRelatoriosTab() {
 
       const nomeArq = tipoRelatorio === "espelho" ? "espelho-ponto" : "cartao-ponto";
       doc.save(`${nomeArq}-${competencia}.pdf`);
+      void registrarExportacao("exportou_relatorio", `PDF: ${nomeArq} da competência ${competencia}.`);
       toast.success(tipoRelatorio === "espelho" ? "Espelho de ponto gerado!" : "Cartão ponto gerado!");
       return;
     }
@@ -716,7 +916,8 @@ export function PontoRelatoriosTab() {
       bancosHoras.forEach(b => {
         const chave = nomeEmpresa((b as any).empresa_id);
         if (!porEmpresa.has(chave)) porEmpresa.set(chave, []);
-        porEmpresa.get(chave)!.push(b);
+        // Números da fonte única: o mesmo que o espelho imprime.
+        porEmpresa.get(chave)!.push(linhaOficial(b));
       });
 
       const body: any[] = [];
@@ -787,6 +988,7 @@ export function PontoRelatoriosTab() {
     }
 
     doc.save(`${titulo.replace(/\s/g, "_")}_${competencia}.pdf`);
+    void registrarExportacao("exportou_relatorio", `PDF: ${titulo} da competência ${competencia}.`);
     toast.success("PDF gerado!");
   };
 
@@ -816,6 +1018,9 @@ export function PontoRelatoriosTab() {
         Data: dataBr(d.dia),
         "Dia da semana": diaDaSemana(d.dia),
         "Marcações (O=original, A=ajuste)": marcacoesTexto(d),
+        // Súmula 338/TST: intervalo declarado, não batido.
+        "Intervalo pré-assinalado (min)":
+          d.intervalo_origem === "pre_assinalado" ? (d.intervalo_pre_assinalado_min ?? "") : "",
         Entrada: d.entrada || "",
         Saída: d.saida || "",
         "Trabalhado (min)": d.trabalhado_min,
@@ -831,6 +1036,7 @@ export function PontoRelatoriosTab() {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumoFinal), "Resumo");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(diario), "Dia a dia");
       XLSX.writeFile(wb, `Espelho_de_Ponto_${competencia}.xlsx`);
+      void registrarExportacao("exportou_relatorio", `Planilha: espelho de ponto da competência ${competencia}.`);
       toast.success("Excel gerado!");
       return;
     }
@@ -838,7 +1044,7 @@ export function PontoRelatoriosTab() {
     let dados: any[] = [];
 
     if (tipoRelatorio === "banco_horas") {
-      dados = bancosHoras.map(b => ({
+      dados = bancosHoras.map(linhaOficial).map(b => ({
         Empresa: nomeEmpresa((b as any).empresa_id),
         Colaborador: b.colaborador_nome,
         CPF: b.colaborador_cpf,
@@ -866,6 +1072,7 @@ export function PontoRelatoriosTab() {
     const ws = XLSX.utils.json_to_sheet(dados);
     XLSX.utils.book_append_sheet(wb, ws, titulo);
     XLSX.writeFile(wb, `${titulo.replace(/\s/g, "_")}_${competencia}.xlsx`);
+    void registrarExportacao("exportou_relatorio", `Planilha: ${titulo} da competência ${competencia}.`);
     toast.success("Excel gerado!");
   };
 
@@ -878,6 +1085,18 @@ export function PontoRelatoriosTab() {
         </h3>
         <p className="text-sm text-muted-foreground">Gere relatórios legais e gerenciais</p>
       </div>
+
+      {desatualizados > 0 && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <span className="font-medium">
+            {desatualizados} colaborador(es) com apuração de banco de horas desatualizada nesta
+            competência.
+          </span>{" "}
+          Algo mudou depois da última apuração — um ajuste aprovado, um atestado ou uma marcação
+          que chegou depois. Os relatórios já saem com o número correto; para a tela de Banco de
+          Horas mostrar o mesmo, rode a apuração da competência.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
@@ -954,6 +1173,55 @@ export function PontoRelatoriosTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* AEJ tratado e assinado, já arquivado (Portaria MTP 671/2021) */}
+      {tipoRelatorio === "aej" && aejArquivado && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Archive className="w-4 h-4 text-primary" />
+              Cópia arquivada e assinada desta competência
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0 space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">Gerada em</p>
+                <p className="font-medium">
+                  {aejArquivado.gerado_em
+                    ? format(new Date(aejArquivado.gerado_em), "dd/MM/yyyy 'às' HH:mm")
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Trabalhadores</p>
+                <p className="font-medium">{aejArquivado.total_trabalhadores ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Marcações</p>
+                <p className="font-medium">{aejArquivado.total_marcacoes ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Registros</p>
+                <p className="font-medium">{aejArquivado.total_registros ?? "—"}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Assinatura (hash) do conteúdo tratado</p>
+              <p className="font-mono text-[11px] break-all">{aejArquivado.hash_arquivo || "—"}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={baixarAejArquivado}>
+                <Download className="w-4 h-4 mr-2" /> Baixar cópia tratada
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Guarda a jornada tratada como estava na geração. O arquivo entregue à
+                fiscalização é o do botão de gerar, no leiaute oficial.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <IncluirBancoHorasDialog
         open={perguntandoBanco}

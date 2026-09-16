@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "test:e2e": "cypress run",
     "test:e2e:abrir": "cypress open",
-    "qa:cobertura-e2e": "node scripts/verificar-cobertura-e2e.mjs"
+    "qa:cobertura-e2e": "node scripts/verificar-cobertura-e2e.mjs",
+    "qa:carimbos": "node scripts/verificar-carimbos.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

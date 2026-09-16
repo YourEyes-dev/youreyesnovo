@@ -234,7 +234,7 @@ export function HubServicos() {
             )}
           </TabsContent>
 
-          {/* ── Profissionais (Rede de Parceiros – dados reais) ── */}
+          {/* ── Profissionais (MarketYE – dados reais) ── */}
           <TabsContent value="profissionais" className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
@@ -249,7 +249,7 @@ export function HubServicos() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Profissionais ativos na Rede de Parceiros com atuação em Fisioterapia, Ergonomia, SST, Saúde Ocupacional e Saúde Mental.
+              Especialistas ativos no MarketYE com atuação em Fisioterapia, Ergonomia, SST, Saúde Ocupacional e Saúde Mental.
             </p>
 
             {loadingProf ? (
@@ -261,7 +261,7 @@ export function HubServicos() {
               <div className="text-center py-12 text-muted-foreground">
                 <UserX className="h-12 w-12 mx-auto mb-3 opacity-40" />
                 <p className="font-medium">Nenhum profissional cadastrado</p>
-                <p className="text-xs mt-1">Cadastre profissionais no módulo <strong>Rede de Parceiros</strong> para que apareçam aqui.</p>
+                <p className="text-xs mt-1">Especialistas cadastrados no <strong>MarketYE</strong> aparecem aqui assim que verificados.</p>
               </div>
             ) : (
               <div className="space-y-3">

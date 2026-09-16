@@ -45,7 +45,7 @@ interface HeaderProps {
 
 
 export const Header = ({ onMenuToggle, isMobile, isSidebarCollapsed, onSidebarToggle }: HeaderProps) => {
-  const { profile, signOut, isSuperAdmin, user, roles } = useAuthContext();
+  const { profile, signOut, isSuperAdmin, user, roles, parceiroId, especialistaId } = useAuthContext();
   const { tenant } = useTenant();
   const { humorHoje } = useHumorDiario();
   const navigate = useNavigate();
@@ -100,20 +100,21 @@ export const Header = ({ onMenuToggle, isMobile, isSidebarCollapsed, onSidebarTo
           </Button>
         )}
 
-        {/* Rede de Parceiros - acesso global */}
+        {/* MarketYE (marketplace de serviços) - acesso global; antigo "Rede de Parceiros".
+            Laranja da paleta (--brand-orange), para se destacar do azul do cabeçalho. */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.open("/marketplace", "_blank", "noopener,noreferrer")}
-              className="flex items-center gap-2 text-white/90 hover:text-white hover:bg-white/15"
+              onClick={() => window.open(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/marketplace`, "_blank", "noopener,noreferrer")}
+              className="flex items-center gap-2 bg-[hsl(var(--brand-orange))] text-white hover:bg-[hsl(var(--brand-orange)/0.85)] hover:text-white font-semibold shadow-sm"
             >
               <Store className="w-5 h-5" />
-              <span className="hidden lg:inline text-sm font-medium">Rede de Parceiros</span>
+              <span className="hidden lg:inline text-sm font-medium" data-testid="header-marketye">MarketYE</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Rede de Parceiros</TooltipContent>
+          <TooltipContent>MarketYE — marketplace de serviços</TooltipContent>
         </Tooltip>
 
         {/* Empresa Selector */}
@@ -192,6 +193,18 @@ export const Header = ({ onMenuToggle, isMobile, isSidebarCollapsed, onSidebarTo
               <User className="w-4 h-4 mr-2" />
               Perfil
             </DropdownMenuItem>
+            {parceiroId && (
+              <DropdownMenuItem onClick={() => navigate("/parceiro")}>
+                <Store className="w-4 h-4 mr-2" />
+                Área do Parceiro
+              </DropdownMenuItem>
+            )}
+            {especialistaId && (
+              <DropdownMenuItem onClick={() => navigate("/marketye/portal")}>
+                <Store className="w-4 h-4 mr-2" />
+                Portal do Especialista (MarketYE)
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
               <LogOut className="w-4 h-4 mr-2" />

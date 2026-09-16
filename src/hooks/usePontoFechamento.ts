@@ -105,6 +105,27 @@ export function usePontoFechamento() {
     mutationFn: async ({ competencia, observacoes }: { competencia: string; observacoes?: string }) => {
       if (!tenantId || !user) throw new Error("Não autenticado");
 
+      // PORTÃO DO FECHAMENTO (PONTO-387/388): o banco recusa fechar a
+      // competência com pendência crítica aberta — ajuste pendente de
+      // aprovação, dia incompleto sem tratamento ou espelho sem ciência do
+      // colaborador (Súmula 338 do TST). Fechar por cima manda dado errado
+      // para a folha e, depois de fechada, a competência não se mexe.
+      const { error: portaoErr } = await (supabase.rpc as any)(
+        "ponto_fechar_competencia_verificar",
+        {
+          p_tenant_id: tenantId,
+          p_empresa_id: empresaAtivaId || null,
+          p_competencia: competencia,
+        }
+      );
+      if (portaoErr) {
+        throw new Error(
+          "Não é possível fechar esta competência: há pendências que precisam ser tratadas antes. " +
+            "Veja a lista em \"Pendências que impedem o fechamento\". " +
+            `(Detalhe técnico: ${portaoErr.message})`
+        );
+      }
+
       // A MESMA fonte da pré-visualização que aparece acima do botão:
       // ponto_espelho_resumo_empresa já vem filtrada pela empresa
       // selecionada na barra do topo. Antes daqui saía uma leitura de
@@ -256,6 +277,7 @@ export function usePontoFechamento() {
       queryClient.invalidateQueries({ queryKey: ["ponto-fechamentos"] });
       queryClient.invalidateQueries({ queryKey: ["ponto-espelhos"] });
       queryClient.invalidateQueries({ queryKey: ["ponto-espelhos-preview"] });
+      queryClient.invalidateQueries({ queryKey: ["ponto-fechamento-pendencias"] });
       toast.success("Período reaberto — pode corrigir e fechar novamente.");
     },
     onError: (e: Error) => toast.error("Erro ao reabrir período: " + e.message),
@@ -276,6 +298,7 @@ export function usePontoFechamento() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ponto-espelhos"] });
+      queryClient.invalidateQueries({ queryKey: ["ponto-fechamento-pendencias"] });
       toast.success("Espelho confirmado!");
     },
     onError: handleMutationError,

@@ -22,6 +22,9 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
   email?: string;
   telefone?: string;
   cnpj?: string;
+  // Plano vigente no motor de entitlements (subscriptions -> plans.code).
+  // É a fonte da verdade do plano; `plano` (enum) é o rótulo legado.
+  plano_atual?: string | null;
 }
  
  export interface SuperAdmin {
@@ -57,12 +60,13 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
         .insert({
           nome: data.nome,
           slug: data.slug,
-          plano: data.plano || 'starter',
+          // O plano real vive no motor (subscriptions), definido logo abaixo.
+          // `tenants.plano` (enum legado) fica no default do banco.
           ativo: true,
         })
         .select()
         .single();
- 
+
       if (tenantError) throw tenantError;
 
       // Step 1.5: Create the Matriz unit in empresa_cadastro
@@ -113,6 +117,16 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
         throw new Error(result.error);
       }
 
+      // Define o plano da nova empresa no motor de entitlements.
+      // Sem clientes pagantes ainda, o padrão é 'tester' (acesso total).
+      // Falha aqui não desfaz a empresa: ela fica sem assinatura e o
+      // superadmin ajusta o plano na tela "Assinatura e teste".
+      const { error: planoError } = await supabase.rpc(
+        'superadmin_set_tenant_plan' as any,
+        { _tenant_id: tenant.id, _plan_code: data.planoCode || 'tester' }
+      );
+      if (planoError) console.error('Erro ao definir plano da empresa:', planoError);
+
       return { tenant, inviteSent: result?.inviteSent };
      },
      onSuccess: () => {
@@ -122,7 +136,9 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
  
     // Atualizar tenant
     const updateTenantMutation = useMutation({
-     mutationFn: async ({ id, email, telefone, cnpj, ...updateData }: { id: string; nome?: string; slug?: string; plano?: TenantPlan; ativo?: boolean; email?: string; telefone?: string; cnpj?: string }) => {
+     mutationFn: async ({ id, email, telefone, cnpj, ...updateData }: { id: string; nome?: string; slug?: string; ativo?: boolean; email?: string; telefone?: string; cnpj?: string }) => {
+        // Obs.: o plano NÃO é editado aqui — ele vive no motor e é definido
+        // pela tela "Assinatura e teste" (setTenantPlano).
         // Atualiza a tabela principal
         const { error: tenantError } = await supabase
           .from('tenants')
@@ -277,13 +293,27 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
     },
   });
 
+  // Definir o plano da empresa no motor de entitlements (subscriptions).
+  const setTenantPlanoMutation = useMutation({
+    mutationFn: async ({ tenantId, planoCode }: { tenantId: string; planoCode: string }) => {
+      const { error } = await supabase.rpc('superadmin_set_tenant_plan' as any, {
+        _tenant_id: tenantId,
+        _plan_code: planoCode,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants'] });
+    },
+  });
+
   return {
      // Estado
      isSuperAdmin,
      tenants,
      superadmins,
      isLoading: isLoadingTenants || isLoadingSuperadmins,
- 
+
      // Mutations
      createTenant: createTenantMutation.mutateAsync,
      updateTenant: updateTenantMutation.mutateAsync,
@@ -291,10 +321,12 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
       deleteTenant: deleteTenantMutation.mutateAsync,
       createTenantOwner: createTenantOwnerMutation.mutateAsync,
       setPrincipalEmpresa: setPrincipalEmpresaMutation.mutateAsync,
+      setTenantPlano: setTenantPlanoMutation.mutateAsync,
       getTenantUsers,
- 
+
      // Status
      isCreatingTenant: createTenantMutation.isPending,
      isUpdatingTenant: updateTenantMutation.isPending,
+     isSettingPlano: setTenantPlanoMutation.isPending,
    };
  }

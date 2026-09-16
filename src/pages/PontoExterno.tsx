@@ -215,7 +215,34 @@ const PontoExterno = () => {
       return;
     }
     const r = data as any;
-    if (!r || r.error) {
+    const encontrou = !!r && !r.error;
+
+    // LGPD arts. 46-49 (PONTO-362): o link identifica por CPF, então tentar CPFs
+    // em sequência é uma forma de descobrir quem trabalha aqui — e de marcar
+    // ponto por terceiros. Cada tentativa é contada no próprio link; ao estourar
+    // o limite, o link fica bloqueado por alguns minutos e o evento vai para a
+    // trilha. Acerto zera o contador.
+    let bloqueio: any = null;
+    try {
+      const { data: tent } = await supabasePublic.rpc("ponto_link_registrar_tentativa" as any, {
+        p_token: token,
+        p_cpf_tentado: digits,
+        p_sucesso: encontrou,
+      });
+      bloqueio = tent as any;
+    } catch {
+      // A contenção não pode impedir quem é legítimo de bater o ponto.
+    }
+
+    if (bloqueio?.bloqueado) {
+      setError(
+        "Muitas tentativas com CPF que não confere. Por segurança, este link ficou bloqueado " +
+        "por alguns minutos. Procure o RH se precisar registrar agora.",
+      );
+      return;
+    }
+
+    if (!encontrou) {
       setError(r?.error || "CPF não encontrado. Confira os números e tente novamente.");
       return;
     }

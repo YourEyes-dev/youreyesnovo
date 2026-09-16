@@ -11,7 +11,7 @@ import {
   History, FileText, Shield, UserCheck, Wallet, BarChart3,
   Bell, Lock, FileDown, Settings, HardDrive, FileSpreadsheet, Scale,
   MapPin, Loader2, Link2, HelpCircle, Search, Paperclip, Eye, Image as ImageIcon, CalendarDays,
-  AlertTriangle, ShieldAlert,
+  AlertTriangle, ShieldAlert, ShieldCheck, FolderArchive, ArrowLeftRight,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
@@ -51,6 +51,10 @@ import { PontoFechamentoTab } from "@/components/ponto/PontoFechamentoTab";
 import { PontoAlertasTab } from "@/components/ponto/PontoAlertasTab";
 import { PontoRelatoriosTab } from "@/components/ponto/PontoRelatoriosTab";
 import { PontoRepCTab } from "@/components/ponto/PontoRepCTab";
+import { PontoPreAssinalacaoTab } from "@/components/ponto/PontoPreAssinalacaoTab";
+import { PontoCertificadoTab } from "@/components/ponto/PontoCertificadoTab";
+import { PontoDossieTab } from "@/components/ponto/PontoDossieTab";
+import { PontoTrocaTurnoTab } from "@/components/ponto/PontoTrocaTurnoTab";
 import { PontoFolhaTab } from "@/components/ponto/PontoFolhaTab";
 import { PontoAjustesTab } from "@/components/ponto/PontoAjustesTab";
 import { PontoCCTTab } from "@/components/ponto/PontoCCTTab";
@@ -470,6 +474,7 @@ const Ponto = () => {
           status: "pendente",
           observacao: null,
           tipo_dia: null, feriado_nome: null, feriado_trabalhado: null,
+          intervalo_origem: null, intervalo_pre_assinalado_minutos: null,
           created_at: "", updated_at: "",
           __virtual: true,
         });
@@ -898,6 +903,19 @@ const Ponto = () => {
                     const tooltip = `Atestado${label ? ` (${label})` : ""}: ${di}${df && df !== di ? ` a ${df}` : ""}`;
                     return { label, tooltip };
                   })() : null;
+                  // Súmula 338/TST — o intervalo do dia veio de declaração formal
+                  // (pré-assinalação), não de batida. Precisa aparecer no espelho:
+                  // é o que sustenta a validade da jornada de duas batidas.
+                  const preAssinalado = ponto.intervalo_origem === "pre_assinalado"
+                    ? {
+                        minutos: ponto.intervalo_pre_assinalado_minutos || 0,
+                        tooltip:
+                          "Intervalo declarado em pré-assinalação (Súmula 338, III do TST; " +
+                          "Portaria MTP 671/2021) — não foi batido, e conta como gozado. " +
+                          "Cadastro em Configurações › Intervalo pré-assinalado.",
+                      }
+                    : null;
+
                   // Calcula total a partir dos pares (entrada → saída), independente do label
                   let totalMin = 0;
                   let pendingEntry: string | null = null;
@@ -1048,6 +1066,15 @@ const Ponto = () => {
                                   <FileText className="w-3 h-3" /> ATESTADO{atestadoInfo.label ? ` · ${atestadoInfo.label}` : ""}
                                 </span>
                               )}
+                              {preAssinalado && (
+                                <span
+                                  className="inline-flex items-center gap-1 self-start rounded-md bg-cyan-100 text-cyan-900 px-2 py-0.5 text-[11px] font-semibold"
+                                  title={preAssinalado.tooltip}
+                                >
+                                  <Coffee className="w-3 h-3" /> INTERVALO PRÉ-ASSINALADO
+                                  {preAssinalado.minutos ? ` · ${formatarMinutosCurto(preAssinalado.minutos)}` : ""}
+                                </span>
+                              )}
                               {excedeLimiteDiario && (
                                 <span
                                   className="inline-flex items-center gap-1 self-start rounded-md bg-red-100 text-red-800 px-2 py-0.5 text-[11px] font-semibold"
@@ -1138,6 +1165,8 @@ const Ponto = () => {
                                             tipo={m.tipo}
                                             distanciaMetros={m.distanciaMetros ?? null}
                                             dentroCerca={m.dentroCerca ?? null}
+                                            tenantId={tenantIdAtivo}
+                                            colaboradorCpf={ponto.colaborador_cpf}
                                           />
 
                                         );
@@ -1226,7 +1255,20 @@ const Ponto = () => {
 
 
         {/* Escalas */}
-        <TabsContent value="escalas"><PontoEscalasTab /></TabsContent>
+        <TabsContent value="escalas">
+          <Tabs defaultValue="escalas_lista" className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+              <TabsTrigger value="escalas_lista" className="text-xs">
+                <CalendarDays className="h-3.5 w-3.5 mr-1" />Escalas
+              </TabsTrigger>
+              <TabsTrigger value="troca_turno" className="text-xs">
+                <ArrowLeftRight className="h-3.5 w-3.5 mr-1" />Troca de turno
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="escalas_lista"><PontoEscalasTab /></TabsContent>
+            <TabsContent value="troca_turno"><PontoTrocaTurnoTab /></TabsContent>
+          </Tabs>
+        </TabsContent>
 
         {/* Apuração */}
         <TabsContent value="apuracao">
@@ -1249,31 +1291,37 @@ const Ponto = () => {
         {/* Compliance */}
         <TabsContent value="compliance">
           <Tabs value={complianceTab} onValueChange={setComplianceTab} className="w-full">
-            <TabsList className="grid w-full max-w-2xl grid-cols-4 mb-4">
+            <TabsList className="grid w-full max-w-3xl grid-cols-5 mb-4">
               <TabsTrigger value="alertas" className="text-xs"><Bell className="h-3.5 w-3.5 mr-1" />Alertas CLT</TabsTrigger>
               <TabsTrigger value="auditoria" className="text-xs"><ShieldAlert className="h-3.5 w-3.5 mr-1" />Auditoria de ajustes</TabsTrigger>
               <TabsTrigger value="acordos" className="text-xs"><FileText className="h-3.5 w-3.5 mr-1" />Acordos</TabsTrigger>
               <TabsTrigger value="cct" className="text-xs"><Scale className="h-3.5 w-3.5 mr-1" />CCT</TabsTrigger>
+              <TabsTrigger value="dossie" className="text-xs"><FolderArchive className="h-3.5 w-3.5 mr-1" />Dossiê fiscal</TabsTrigger>
             </TabsList>
             <TabsContent value="alertas"><PontoAlertasTab /></TabsContent>
             <TabsContent value="acordos"><PontoAcordosTab /></TabsContent>
             <TabsContent value="auditoria"><PontoAuditoriaAjustesTab /></TabsContent>
             <TabsContent value="cct"><PontoCCTTab /></TabsContent>
+            <TabsContent value="dossie"><PontoDossieTab /></TabsContent>
           </Tabs>
         </TabsContent>
 
         {/* Configurações */}
         <TabsContent value="configuracoes">
           <Tabs value={configTab} onValueChange={setConfigTab} className="w-full">
-            <TabsList className="grid w-full max-w-xl grid-cols-4 mb-4">
+            <TabsList className="grid w-full max-w-3xl grid-cols-6 mb-4">
               <TabsTrigger value="config" className="text-xs"><Settings className="h-3.5 w-3.5 mr-1" />Geral</TabsTrigger>
               <TabsTrigger value="links" className="text-xs"><Link2 className="h-3.5 w-3.5 mr-1" />Links</TabsTrigger>
               <TabsTrigger value="repc" className="text-xs"><HardDrive className="h-3.5 w-3.5 mr-1" />REP-C</TabsTrigger>
               <TabsTrigger value="feriados" className="text-xs"><CalendarDays className="h-3.5 w-3.5 mr-1" />Feriados</TabsTrigger>
+              <TabsTrigger value="pre_assinalacao" className="text-xs"><Coffee className="h-3.5 w-3.5 mr-1" />Intervalo pré-assinalado</TabsTrigger>
+              <TabsTrigger value="certificado" className="text-xs"><ShieldCheck className="h-3.5 w-3.5 mr-1" />Certificado digital</TabsTrigger>
             </TabsList>
             <TabsContent value="config"><PontoConfigTab /></TabsContent>
             <TabsContent value="links"><PontoLinksTab /></TabsContent>
             <TabsContent value="repc"><PontoRepCTab /></TabsContent>
+            <TabsContent value="pre_assinalacao"><PontoPreAssinalacaoTab /></TabsContent>
+            <TabsContent value="certificado"><PontoCertificadoTab /></TabsContent>
             <TabsContent value="feriados">
               <Tabs defaultValue="lista" className="w-full">
                 <TabsList className="mb-4">

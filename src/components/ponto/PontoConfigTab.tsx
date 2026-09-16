@@ -27,6 +27,12 @@ interface PontoConfig {
   tolerancia_hora_extra: number;
   permitir_registro_fora_horario: boolean;
   bloquear_dispositivo_nao_autorizado: boolean;
+  /**
+   * Portaria 671 / CLT art. 74, §4º: o registro por link externo é sistema
+   * ALTERNATIVO (REP-A) e só é autorizado por acordo ou instrumento coletivo.
+   * O banco recusa ativar o modo sem isso.
+   */
+  link_externo_acordo_url: string;
 }
 
 export function PontoConfigTab() {
@@ -55,6 +61,7 @@ export function PontoConfigTab() {
 
   const [form, setForm] = useState({
     modo_registro: "ambos",
+    link_externo_acordo_url: "",
     exigir_selfie_link: true,
     exigir_selfie_interno: false,
     exigir_localizacao: true,
@@ -68,6 +75,7 @@ export function PontoConfigTab() {
     if (config) {
       setForm({
         modo_registro: config.modo_registro || "ambos",
+        link_externo_acordo_url: (config as any).link_externo_acordo_url || "",
         exigir_selfie_link: config.exigir_selfie_link ?? true,
         exigir_selfie_interno: config.exigir_selfie_interno ?? false,
         exigir_localizacao: config.exigir_localizacao ?? true,
@@ -99,7 +107,23 @@ export function PontoConfigTab() {
       queryClient.invalidateQueries({ queryKey: ["ponto-config"] });
       toast({ title: "Configurações salvas com sucesso!" });
     },
-    onError: (e: any) => toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+    onError: (e: any) => {
+      // A trava do REP-A vem do banco com o texto legal completo; na tela ela
+      // vira uma frase que o RH entende e sabe resolver.
+      const msg = String(e?.message || "");
+      if (msg.includes("REP-A") || msg.includes("alternativo")) {
+        toast({
+          title: "Falta o instrumento coletivo",
+          description:
+            "O registro por link é sistema alternativo e precisa estar autorizado em acordo ou " +
+            "convenção coletiva. Informe o instrumento no campo acima, ou cadastre um acordo " +
+            "vigente em Compliance › Acordos, e salve de novo.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" });
+    },
   });
 
   const MODOS = [
@@ -172,6 +196,30 @@ export function PontoConfigTab() {
               </label>
             ))}
           </RadioGroup>
+
+          {/* CLT art. 74, §4º / Portaria 671: o link externo é sistema
+              ALTERNATIVO de registro (REP-A) — só vale autorizado por acordo
+              ou instrumento coletivo. O banco recusa salvar o modo sem isso,
+              então o campo aparece junto da escolha, não escondido em outra
+              tela. */}
+          {(form.modo_registro === "link_externo" || form.modo_registro === "ambos") && (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2">
+              <Label className="text-sm font-medium text-amber-900">
+                Instrumento que autoriza o registro por link (REP-A)
+              </Label>
+              <Input
+                value={form.link_externo_acordo_url}
+                onChange={(e) => setForm((f) => ({ ...f, link_externo_acordo_url: e.target.value }))}
+                placeholder="Link ou referência do acordo/convenção coletiva"
+              />
+              <p className="text-xs text-amber-900">
+                O registro pelo celular do colaborador é <strong>sistema alternativo</strong> e
+                depende de autorização em acordo ou convenção coletiva (CLT art. 74, §4º; Portaria
+                MTP 671/2021). Informe aqui o instrumento — ou cadastre um acordo coletivo vigente
+                em Compliance › Acordos. Sem um dos dois, o sistema não deixa ativar este modo.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

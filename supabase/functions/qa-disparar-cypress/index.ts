@@ -14,7 +14,9 @@
 //   1) JWT válido do chamador (Authorization: Bearer ...);
 //   2) o chamador é superadmin ativo (tabela `superadmins`);
 //   3) o token do GitHub está configurado.
-// Só então dispara o workflow `cypress.yml` na branch alvo (default: main).
+// Só então dispara o workflow certo na branch alvo (default: main) — o da
+// homologação (cypress-homologacao.yml) ou o do teste (cypress.yml), escolhido
+// pelo ambiente do próprio projeto Supabase (ver WORKFLOW_FILE abaixo).
 //
 // verify_jwt = false no config.toml: o JWT é validado aqui dentro (para
 // devolver 401/403 claros e tratar o preflight OPTIONS), não pelo gateway.
@@ -30,8 +32,23 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GITHUB_TOKEN = (Deno.env.get("GITHUB_DISPATCH_TOKEN") ?? "").trim();
 // Configuráveis por ambiente; default aponta para este repositório.
 const GITHUB_REPO = (Deno.env.get("GITHUB_REPO") ?? "ustudy123/youreyesnovo").trim();
-const WORKFLOW_FILE = (Deno.env.get("GITHUB_CYPRESS_WORKFLOW") ?? "cypress.yml").trim();
 const WORKFLOW_REF = (Deno.env.get("GITHUB_CYPRESS_REF") ?? "main").trim();
+
+// Ref do projeto de HOMOLOGAÇÃO. O botão de cada ambiente deve disparar a
+// esteira DAQUELE ambiente: a homologação tem esteira própria
+// (cypress-homologacao.yml, contra o site e o banco da homologação); o teste
+// usa a sua (cypress.yml). Antes o botão da homologação disparava a suíte do
+// TESTE — resultado no painel errado, confusão sobre qual ambiente foi testado.
+const HOMOLOGACAO_REF = "fgsblefvdabgdouipigz";
+
+// Workflow alvo: um override explícito por env vence (escape hatch); senão,
+// detecta o ambiente pela URL do próprio projeto. Assim o MESMO deploy serve
+// os dois projetos Supabase, e o botão de cada um mira a esteira certa sem
+// configuração extra — só o GITHUB_DISPATCH_TOKEN precisa existir em cada um.
+const WORKFLOW_FILE = (
+  (Deno.env.get("GITHUB_CYPRESS_WORKFLOW") ?? "").trim() ||
+  (SUPABASE_URL.includes(HOMOLOGACAO_REF) ? "cypress-homologacao.yml" : "cypress.yml")
+);
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",

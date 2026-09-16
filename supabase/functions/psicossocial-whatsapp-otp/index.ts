@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("Erro OTP:", err);
     return new Response(
-      JSON.stringify({ erro: err.message || "Erro interno" }),
+      JSON.stringify({ erro: (err as Error).message || "Erro interno" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

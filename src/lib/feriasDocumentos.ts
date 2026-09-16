@@ -378,3 +378,44 @@ ${linhaAbono}
 </body></html>`;
 }
 
+
+/**
+ * Aviso de Férias em HTML — versão para arquivar em Documentos e colher a
+ * ciência do colaborador (art. 135 da CLT, antecedência de 30 dias). Espelha
+ * o gerarReciboFeriasHTML: mesmo esqueleto, texto do aviso.
+ */
+export function gerarAvisoFeriasHTML(data: FeriasDocData): string {
+  const infoAbono = data.abonoPecuniario
+    ? `<tr><td><strong>Abono Pecuniário:</strong></td><td>${data.diasAbono} dias</td></tr>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Aviso de Férias — ${data.colaboradorNome}</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;max-width:780px;margin:24px auto;padding:24px;color:#1f2937;}
+h1{text-align:center;font-size:20px;margin:0 0 4px;}
+h2{font-size:14px;margin:24px 0 8px;border-bottom:2px solid #333;padding-bottom:4px;}
+.sub{text-align:center;color:#666;font-size:12px;margin-bottom:24px;}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;}
+td{padding:6px 4px;vertical-align:top;}
+.decl{margin-top:32px;font-size:13px;line-height:1.5;}
+.sig{margin-top:60px;display:flex;justify-content:space-around;font-size:12px;text-align:center;}
+.sig div{width:45%;border-top:1px solid #000;padding-top:4px;}
+.foot{margin-top:40px;text-align:center;font-size:10px;color:#888;}
+</style></head><body>
+<h1>AVISO DE FÉRIAS</h1>
+<p class="sub">Art. 135 da CLT — Comunicação com no mínimo 30 dias de antecedência, mediante recibo</p>
+<h2>Identificação</h2>
+<table>
+<tr><td><strong>Colaborador:</strong></td><td>${data.colaboradorNome}</td></tr>
+<tr><td><strong>CPF:</strong></td><td>${data.colaboradorCpf || "—"}</td></tr>
+<tr><td><strong>Departamento:</strong></td><td>${data.departamento || "—"}</td></tr>
+<tr><td><strong>Período de gozo:</strong></td><td>${formatDate(data.dataInicio)} a ${formatDate(data.dataFim)}</td></tr>
+<tr><td><strong>Dias de gozo:</strong></td><td>${data.diasSolicitados} dias</td></tr>
+${infoAbono}
+</table>
+<p class="decl">Comunicamos que suas férias foram concedidas para o período acima. Declaro estar ciente da data de início e do período de gozo das minhas férias, nos termos do art. 135 da CLT.</p>
+<div class="sig"><div>Data</div><div>Assinatura do Colaborador (ciência)</div></div>
+<p class="foot">Documento gerado automaticamente pelo sistema YourEyes</p>
+</body></html>`;
+}

@@ -33,12 +33,33 @@ export interface CartaoDia {
   equalizacao: boolean;
   excedente_retido_min: number;
   marcacoes: CartaoMarcacao[];
+  /**
+   * Súmula 338, III do TST / Portaria MTP 671/2021: quando o intervalo do dia
+   * não foi batido e existe pré-assinalação vigente, o espelho precisa dizer
+   * isso — é o que sustenta a validade da jornada de duas batidas. Opcional:
+   * dia sem declaração não traz nada.
+   */
+  intervalo_origem?: "marcado" | "pre_assinalado" | null;
+  intervalo_pre_assinalado_min?: number | null;
+  /**
+   * Dia com marcação sem par (ou com ajuste em aberto). A apuração não gera
+   * débito nesses dias — a falha de registro é responsabilidade do empregador
+   * (CLT art. 74, §2º; Súmula 338 do TST) —, então o cartão precisa dizer que
+   * o dia está pendente em vez de imprimir um zero sem explicação.
+   */
+  pendencia?: boolean;
+  /**
+   * Dia declarado como folga compensatória. O débito vem da compensação
+   * registrada no banco, não de uma ausência inferida — e o cartão precisa
+   * dizer isso: é o que distingue, para quem assina, folga acordada de falta
+   * (Súmula 338 do TST).
+   */
+  folga_compensatoria?: boolean;
 }
 
 export interface CartaoEmpregador {
   razaoSocial: string;
   cnpj?: string | null;
-  atividade?: string | null;
   endereco?: string | null;
   cidade?: string | null;
   uf?: string | null;
@@ -61,6 +82,14 @@ export interface CartaoBanco {
   debitos: number;
   compensados: number;
   saldoAtual: number;
+  /**
+   * Existe instrumento de compensação vigente? Com ele, a sobra do dia vai
+   * para o banco e vale 1 por 1 (CLT art. 59, §2º). Sem ele não há banco: as
+   * horas são devidas em dinheiro, com adicional (§1º). É o que decide o
+   * rótulo impresso em cada dia. Ausente = trata como banco, que é o
+   * comportamento de quem usa o módulo.
+   */
+  temRegime?: boolean;
 }
 
 export interface CartaoPontoInput {
@@ -97,19 +126,45 @@ const hm = (min: number) => {
  * o dia tem 5+ batidas — assim cada dia ocupa uma única linha da tabela e o
  * cartão inteiro cabe em uma página.
  */
-const marcacoesTexto = (marcacoes: CartaoMarcacao[]) => {
+const marcacoesTexto = (marcacoes: CartaoMarcacao[], d?: CartaoDia) => {
   const tokens = marcacoes.map((m) => `${m.hora}-${m.origem === "A" ? "I" : "O"}`);
-  if (tokens.length <= 4) return tokens.join(" ");
   const linhas: string[] = [];
-  for (let i = 0; i < tokens.length; i += 4) {
-    linhas.push(tokens.slice(i, i + 4).join(" "));
+  if (tokens.length <= 4) {
+    linhas.push(tokens.join(" "));
+  } else {
+    for (let i = 0; i < tokens.length; i += 4) {
+      linhas.push(tokens.slice(i, i + 4).join(" "));
+    }
+  }
+  // Pré-assinalação: o intervalo não foi batido, foi declarado. O espelho
+  // precisa dizer isso (Súmula 338, III do TST), e diz ao LADO das marcações
+  // do dia — não numa linha própria.
+  //
+  // A linha própria custava uma linha extra em CADA dia do mês: num mês de 31
+  // dias, dobrava a altura da tabela e estourava o espaço reservado para o
+  // rodapé, que só previa a linha extra da legenda. O resultado era o bloco de
+  // legenda e assinaturas impresso POR CIMA do resumo de horas. O sentido é o
+  // mesmo; o custo de espaço, um quinto.
+  if (d?.intervalo_origem === "pre_assinalado") {
+    const min = d.intervalo_pre_assinalado_min || 0;
+    const nota = `Int. ${min ? `${hm(min)} ` : ""}(P)`;
+    const ultima = linhas.length > 0 ? linhas[linhas.length - 1] : "";
+    // Dia sem batida (sábado, DSR) traz só a nota, sem separador solto.
+    if (ultima === "") linhas[linhas.length > 0 ? linhas.length - 1 : 0] = nota;
+    else linhas[linhas.length - 1] = `${ultima}  ·  ${nota}`;
+    if (linhas.length === 0) linhas.push(nota);
   }
   return linhas.join("\n");
 };
 
 
-/** Colunas H.C./H.A./F.N./F.J. e o rótulo da ocorrência, na lógica do modelo. */
-function classificarDia(d: CartaoDia) {
+/**
+ * Colunas H.C./H.A./F.N./F.J. e o rótulo da ocorrência, na lógica do modelo.
+ * `temRegimeBanco` diz se existe instrumento de compensação vigente: com ele a
+ * sobra vai para o banco (1:1); sem ele não há banco, e as horas são devidas
+ * em dinheiro, com adicional.
+ */
+function classificarDia(d: CartaoDia, temRegimeBanco: boolean) {
   const domingo = diaSemana(d.dia) === "DOM";
   const semJornada = d.jornada_min === 0;
   const semTrabalho = d.trabalhado_min === 0;
@@ -121,7 +176,18 @@ function classificarDia(d: CartaoDia) {
   let fj = 0;
   let he = 0;
 
-  if (d.equalizacao) {
+  if (d.folga_compensatoria) {
+    // A folga já debitou o banco pela compensação registrada; contar de novo
+    // aqui debitaria a mesma tarde duas vezes.
+    ocorrencia = d.trabalhado_min > 0
+      ? "Folga compensatória (meio período)"
+      : "Folga compensatória";
+  } else if (d.pendencia) {
+    // Nem crédito nem débito: o dia não fecha enquanto a marcação não for
+    // completada. Imprimir horas aqui daria ares de conta fechada a um
+    // registro que o próprio sistema sabe estar pela metade.
+    ocorrencia = "Pendência — marcação incompleta";
+  } else if (d.equalizacao) {
     ocorrencia = "Compensado";
     hc = d.trabalhado_min;
   } else if (d.protegido && semTrabalho) {
@@ -136,10 +202,25 @@ function classificarDia(d: CartaoDia) {
     ocorrencia = semJornada ? "Sem jornada" : "";
   } else if (d.saldo_min > 0) {
     he = d.saldo_min;
-    ocorrencia = `Soma Banco Horas ${domingo || semJornada ? "100%" : "50%"}`;
+    // CLT art. 59: a hora COMPENSADA no banco é trocada na exata medida, uma
+    // por uma (§2º); o adicional de no mínimo 50% pertence à hora PAGA (§1º),
+    // e 100% em domingo e feriado (Súmula 146 do TST). Escrever um percentual
+    // ao lado de um crédito de 1 por 1 promete no documento o que a conta não
+    // faz — e é o documento que o trabalhador assina.
+    ocorrencia = temRegimeBanco
+      ? "Soma Banco Horas (1:1)"
+      : `Hora extra ${domingo || semJornada ? "100%" : "50%"}`;
   } else if (d.saldo_min < 0) {
     ha = -d.saldo_min;
-    ocorrencia = "Diminui Banco Horas";
+    // A mesma moeda do lado positivo: com regime de banco vigente, o déficit
+    // diminui o banco; SEM regime não há banco a diminuir — é atraso ou saída
+    // antecipada a descontar (ou a compensar num acordo). Dizer "Diminui Banco
+    // Horas" quando o resumo do banco mostra débito 0:00 afirma no documento um
+    // movimento que não aconteceu, e o documento é o que o trabalhador assina
+    // (Súmula 338 do TST: o controle tem de sustentar o que declara).
+    ocorrencia = temRegimeBanco
+      ? "Diminui Banco Horas"
+      : "Atraso / saída antecipada";
   } else {
     ocorrencia = "Trabalhando";
   }
@@ -233,15 +314,25 @@ function blocoIdentificacao(doc: jsPDF, input: CartaoPontoInput) {
     });
   };
 
+  // A TERCEIRA COLUNA É DO EMPREGADO, não da empresa.
+  //
+  // "Atividade" (o CNAE da empresa) era o único item de empresa nessa coluna,
+  // enquanto cargo e departamento — que quem lê o cartão procura primeiro —
+  // ficavam numa linha cinza de 6,4pt FORA da caixa. Agora a coluna 3 é
+  // uniforme: Cargo / Departamento / Admissão.
+  //
+  // A geometria não muda (mesma altura, três linhas, mesmo fio separador),
+  // então o cálculo de compressão da tabela mais abaixo não é afetado e o
+  // cartão não corre risco de virar duas páginas.
   linha(topo + 4, [
     ["Empregador", er.razaoSocial],
     ["CNPJ", er.cnpj],
-    ["Atividade", er.atividade],
+    ["Cargo", eo.cargo],
   ]);
   linha(topo + 12, [
     ["Endereço", er.endereco],
     ["Cidade / UF", [er.cidade, er.uf].filter(Boolean).join(" - ") || null],
-    ["Categoria", eo.categoria || "Mensalista"],
+    ["Departamento", eo.setor],
   ]);
 
   doc.setDrawColor(226, 232, 240);
@@ -257,9 +348,11 @@ function blocoIdentificacao(doc: jsPDF, input: CartaoPontoInput) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.4);
   doc.setTextColor(...MARCA.cinza);
+  // Cargo e Setor saíram daqui: subiram para a caixa. Categoria desceu para
+  // cá, no lugar deles — continua sendo informação útil, só não é a primeira
+  // que se procura.
   const rodapeIdent = [
-    eo.cargo ? `Cargo: ${eo.cargo}` : null,
-    eo.setor ? `Setor: ${eo.setor}` : null,
+    eo.categoria ? `Categoria: ${eo.categoria}` : null,
     eo.matricula ? `Matrícula: ${eo.matricula}` : null,
     eo.horarios ? `Horários: ${eo.horarios}` : null,
   ].filter(Boolean).join("   ·   ");
@@ -281,7 +374,7 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
 
   const totais = { hd: 0, hn: 0, he: 0, hc: 0, ha: 0, fn: 0, fj: 0 };
   const corpo = input.dias.map((d) => {
-    const k = classificarDia(d);
+    const k = classificarDia(d, input.banco?.temRegime !== false);
     totais.hd += d.trabalhado_min;
     totais.hn += d.jornada_min;
     totais.he += k.he;
@@ -292,7 +385,7 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
     return [
       dataCurta(d.dia),
       diaSemana(d.dia),
-      marcacoesTexto(d.marcacoes),
+      marcacoesTexto(d.marcacoes, d),
       k.ocorrencia,
       hm(d.trabalhado_min),
       hm(d.jornada_min),
@@ -309,9 +402,10 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
 
   // Espaço reservado abaixo da tabela para que o cartão de cada colaborador
   // caiba em UMA única página: painel de horas (30,4) + faixa de banco (17)
-  // + legenda (14) + declaração e assinaturas (30) + rodapé institucional
-  // (14). A tabela se comprime para caber no que sobra — nunca o contrário.
-  const RESERVA_RODAPE = 108;
+  // + legenda (17 — três linhas, com a do intervalo pré-assinalado) +
+  // declaração e assinaturas (30) + rodapé institucional (14). A tabela se
+  // comprime para caber no que sobra — nunca o contrário.
+  const RESERVA_RODAPE = 111;
   const espacoTabela = pageH - 14 - inicio - RESERVA_RODAPE;
 
 
@@ -378,6 +472,8 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
       const texto = String(dados.row.raw?.[3] ?? "");
       if (texto === "DSR" || texto === "Feriado") dados.cell.styles.fillColor = [237, 242, 249];
       if (texto === "Falta") dados.cell.styles.textColor = MARCA.vermelho;
+      if (texto.startsWith("Pendência")) dados.cell.styles.textColor = [180, 83, 9];
+      if (texto.startsWith("Folga")) dados.cell.styles.textColor = [29, 78, 216];
       if (texto.startsWith("Soma")) dados.cell.styles.textColor = [22, 101, 52];
     },
     margin: { left: 12, right: 12, top: ALTURA_FAIXA + 5 },
@@ -433,7 +529,12 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
   const fim1 = painel("Resumo de horas do mês", [
     ["Horas normais", hm(totais.hn) || "00:00"],
     ["Horas trabalhadas", hm(totais.hd) || "00:00"],
-    ["Horas extras", hm(totais.he) || "00:00"],
+    [
+      // O mesmo cuidado do rótulo do dia: com banco vigente estas horas vão
+      // para o banco, uma por uma; sem banco elas serão pagas, com adicional.
+      input.banco?.temRegime !== false ? "Horas p/ o banco (1:1)" : "Horas extras (a pagar)",
+      hm(totais.he) || "00:00",
+    ],
     ["Horas compensadas", hm(totais.hc) || "00:00"],
     ["Horas de ausência", hm(totais.ha) || "00:00"],
     ["Adicional noturno", "n/a"],
@@ -486,12 +587,23 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
 
   y += 5;
 
-  // Um colaborador = uma página. Nada aqui quebra: se a tabela empurrou o
-  // bloco final para baixo, ele é ancorado ao limite útil da página (acima
-  // do rodapé institucional) em vez de gerar uma segunda folha.
-  const ALTURA_BLOCO_FINAL = 44;
+  // Um colaborador = uma página, e a tabela se comprime para isso (ver
+  // RESERVA_RODAPE). Mas "ancorar" o bloco final ao limite da página com um
+  // Math.min era uma âncora para CIMA: quando a tabela passava do espaço
+  // reservado, o bloco subia e era impresso POR CIMA do resumo de horas —
+  // legenda, declaração de acordo e assinaturas em cima dos totais do mês,
+  // num documento feito para ser assinado.
+  //
+  // Agora o bloco nunca recua sobre o que já foi desenhado. Se não couber,
+  // abre folha — uma segunda página é um defeito de estética; texto sobre
+  // texto num cartão de ponto é um defeito de prova.
+  const ALTURA_BLOCO_FINAL = 32;
   const LIMITE_UTIL = pageH - 16;
-  y = Math.min(y, LIMITE_UTIL - ALTURA_BLOCO_FINAL);
+  if (y + ALTURA_BLOCO_FINAL > LIMITE_UTIL) {
+    doc.addPage();
+    faixaTitulo(doc, input, doc.getCurrentPageInfo().pageNumber);
+    y = ALTURA_FAIXA + 8;
+  }
 
   // Legenda
   doc.setFont("helvetica", "bold");
@@ -504,6 +616,7 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
   [
     "H.D. = Total de horas do dia   H.N. = Hora normal (prevista)   H.E. = Hora extra   A.N. = Adicional noturno   H.C. = Hora compensada",
     "H.A. = Hora de ausência   F.N. = Falta não justificada   F.J. = Falta justificada   O = Marcação original   I = Marcação incluída pelo RH",
+    "(P) = Intervalo pré-assinalado: intervalo declarado formalmente, não batido (Súmula 338, III do TST; Portaria MTP 671/2021)",
   ].forEach((linha, i) => doc.text(linha, 12, y + 3.2 + i * 2.8));
 
   y += 11;

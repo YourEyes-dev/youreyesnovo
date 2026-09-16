@@ -28,6 +28,30 @@ em PDFs de devolutiva ou em documentos que circulam. Dados de saúde são
 sensíveis (LGPD art. 11). CPFs fictícios da casa: faixa 900.000.0XX com
 dígito verificador válido (o sistema valida DV).
 
+**Decisão 09/2026 — a homologação deixou de ser recriada.** O fluxo passou a ser
+`desenvolvimento → homologação → produção`, forward-only: tudo entra por script
+de entrega (o MESMO em homologação e depois em produção), nunca mais por cópia da
+produção para baixo. Motivo: recriar apagava a estrutura de testes já montada na
+tela do SuperAdmin (casos documentados, cobertura, mobiliário de QA). Consequência
+a ter em mente: a homologação **deixa de ser espelho fiel da produção** e passa a
+divergir dela — some a garantia que ela dava de "o script aplica na estrutura REAL
+da produção?". O que protege a produção do drift vira a disciplina do próprio
+script (idempotente, `IF NOT EXISTS`, blocos `DO` com `EXCEPTION` por item). O
+RECRIAR abaixo NÃO foi apagado, mas está **suspenso**: só voltar a usar depois de
+resolver a preservação dos casos (opções anotadas em `docs/AMBIENTES.md`).
+
+**Exceção única, e só na homologação (quando o RECRIAR estava em uso):** o botão RECRIAR tem os campos
+`mascarar` e `cliente_real`. Em `um_cliente`, só o cliente informado vem com
+dado real e todos os outros seguem embaralhados (decisão do dono do produto,
+08/2026, para a própria operação da casa — SUDOMED ITAPEJARA); em `nao`, a
+cópia inteira sai crua. Prefira sempre `um_cliente`: cobre o mesmo caso de
+uso com uma fração da exposição. A esteira recusa os dois modos sem o secret
+`HOMOLOGACAO_TESTADORES`, e no modo cru também recusa a senha compartilhada
+`123456`; superadmins nunca ficam com senha compartilhada quando há dado real
+na base. Detalhes em `docs/AMBIENTES.md`. **Isso não afrouxa nada fora dali**:
+staging, seeds, PDFs e qualquer documento que circule seguem sem dado real,
+sem exceção.
+
 ## Mudanças de banco: migration + script de entrega
 
 Toda mudança de banco vira DUAS entregas:
@@ -54,6 +78,18 @@ Regras dos scripts de entrega (aprendidas a caro preço):
   resultado. Inclua colunas de erro (ex.: `erro_tecnico`) quando houver.
 - Existe statement timeout: updates linha a linha com função por registro
   estouram tempo em tabelas grandes — prefira UPDATE com JOIN/CTE.
+- **Script que ALTERA ou APAGA dado existente guarda as linhas antes.** A
+  produção NÃO tem Point-in-Time Recovery (conferido no painel em 08/2026: o
+  PITR aparece como add-on não contratado); o único resgate é o backup diário,
+  e restaurá-lo custa o dia inteiro de todos os clientes. Como o SQL Editor
+  roda em UMA transação, script que dá erro se desfaz sozinho — o risco real é
+  o script que roda com SUCESSO e faz a coisa errada. Então, antes do
+  `UPDATE`/`DELETE`, copie o que será tocado:
+  `CREATE TABLE IF NOT EXISTS backup_<assunto>_<aaaammdd> AS SELECT * FROM <tabela> WHERE <mesmo filtro do update>;`
+  e deixe no comentário final o `UPDATE ... FROM backup_...` que desfaz. Isso
+  é mais cirúrgico que PITR (devolve só as linhas afetadas, sem descartar o
+  trabalho legítimo dos outros clientes no período) e não depende de add-on.
+  Não vale para script que só CRIA coisa nova (tabela, função, política).
 - DDL em tabela movimentada: `SET lock_timeout = '10s'`; nunca crie triggers
   em DUAS tabelas movimentadas na mesma transação (deadlock real já ocorrido)
   — divida em scripts parte1/parte2.
@@ -63,7 +99,21 @@ Regras dos scripts de entrega (aprendidas a caro preço):
 
 Regras das migrations:
 - Carimbo (timestamp do nome) ÚNICO — carimbos duplicados quebram o registro
-  do CLI. Confira antes de criar.
+  do CLI. **Gere o carimbo com `date -u +%Y%m%d%H%M%S`; não escolha um número
+  redondo.** Em 16/09/2026 a esteira quebrou QUATRO vezes no mesmo dia porque
+  sessões diferentes, trabalhando em paralelo, escolheram `20260916180000`,
+  depois `20260916181000` — cada uma sem saber da outra. O `db push` indexa
+  pelo carimbo: a primeira a mesclar registra a versão e TODAS as entregas
+  seguintes, de todo mundo, ficam vermelhas até alguém investigar. O segundo
+  de um carimbo real quase nunca colide; um número redondo colide sempre.
+  `npm run qa:carimbos` (e a esteira, antes do `db push`) confere e nomeia os
+  arquivos em colisão. **E confira a ORDEM, não só a unicidade:** se uma
+  migration anterior do mesmo dia usou um carimbo à frente do relógio (é
+  comum), o `date -u` devolve um número MENOR e a sua roda ANTES da que ela
+  depende — em banco novo, quebra. Ordem manda mais que relógio: olhe o último
+  carimbo da pasta antes de escolher. (Aconteceu em 16/09/2026: uma Etapa 2
+  carimbada às 19:14 rodava antes da Etapa 1 carimbada às 23:00, e só a
+  réplica em banco vazio pegou.)
 - NUNCA URL/chave de projeto no código (nem produção nem staging). Config por
   ambiente vive na tabela `app_config` (`supabase_url`, `supabase_anon_key`);
   sem valores, rotinas de disparo não chamam ninguém (proteção de ambiente).

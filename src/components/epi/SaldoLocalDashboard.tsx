@@ -54,6 +54,10 @@ interface EstoqueLocalRow {
       categoria: string | null;
       unidade_medida: string | null;
       controla_tamanho: boolean | null;
+      // O CA vive em epi_tipos.ca_numero; epis.ca ficou vazio porque nenhuma
+      // tela o escrevia. Sem declarar aqui, o campo chega undefined mesmo
+      // vindo no select.
+      ca_numero: string | null;
     } | null;
   } | null;
 }
@@ -70,7 +74,7 @@ export function SaldoLocalDashboard() {
       if (!tenantId) return [];
       const { data, error } = await supabase
         .from("epi_estoque_local")
-        .select("*, epi:epis(id, ca, quantidade_estoque, tipo:epi_tipos(nome, categoria, unidade_medida, controla_tamanho))")
+        .select("*, epi:epis(id, ca, quantidade_estoque, tipo:epi_tipos(nome, categoria, unidade_medida, controla_tamanho, ca_numero))")
         .eq("tenant_id", tenantId)
         .order("quantidade", { ascending: false });
       if (error) throw error;
@@ -300,7 +304,7 @@ export function SaldoLocalDashboard() {
                             {row.tamanho || "—"}
                           </TableCell>
                           <TableCell className="text-sm">
-                            {row.epi?.ca || "—"}
+                            {row.epi?.ca || row.epi?.tipo?.ca_numero || "—"}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 text-sm">

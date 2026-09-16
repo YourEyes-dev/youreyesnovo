@@ -237,6 +237,21 @@ type TenantPlan = Database['public']['Enums']['tenant_plan'];
  
     // Buscar usuários de um tenant específico
     const getTenantUsers = async (tenantId: string) => {
+      // Travessia de LEITURA: o superadmin está abrindo a lista de pessoas de
+      // OUTRO cliente. O banco não dispara gatilho em consulta, então o rastro
+      // nasce aqui, no ponto onde a travessia é intencional. O registro é
+      // acessório: se ele falhar, a tela não pode parar de funcionar — quem
+      // decide se grava é o banco, que só registra superadmin fora da própria
+      // casa.
+      try {
+        await supabase.rpc('registrar_acesso_cross_tenant' as never, {
+          p_tenant_id: tenantId,
+          p_recurso: 'superadmin_list_tenant_users',
+        } as never);
+      } catch (e) {
+        console.warn('[Auditoria] travessia não registrada:', e);
+      }
+
       const { data, error } = await supabase.rpc('superadmin_list_tenant_users', {
         _tenant_id: tenantId
       });

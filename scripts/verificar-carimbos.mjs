@@ -30,6 +30,30 @@ for (const arquivo of readdirSync(PASTA)) {
   porCarimbo.set(carimbo, [...(porCarimbo.get(carimbo) ?? []), arquivo]);
 }
 
+// Aviso (não reprova): a MESMA migration aparecendo sob dois carimbos.
+// Acontece quando duas frentes desfazem a mesma colisão ao mesmo tempo, cada
+// uma escolhendo um carimbo. As duas aplicam, e como o conteúdo costuma ser
+// idempotente nada quebra — mas fica uma cópia a mais para sempre, e quem ler
+// depois não sabe qual vale. Não reprova porque, quando as duas já foram
+// aplicadas, apagar uma é decisão de quem conhece o histórico.
+const porNome = new Map();
+for (const [carimbo, arquivos] of porCarimbo) {
+  for (const a of arquivos) {
+    const nome = a.slice(15);
+    porNome.set(nome, [...(porNome.get(nome) ?? []), a]);
+  }
+}
+const repetidas = [...porNome.entries()].filter(([, arquivos]) => arquivos.length > 1);
+if (repetidas.length > 0) {
+  console.warn("[carimbos] aviso: a mesma migration aparece sob mais de um carimbo:");
+  for (const [nome, arquivos] of repetidas) {
+    console.warn(`  ${nome}`);
+    for (const a of arquivos) console.warn(`    · ${a}`);
+  }
+  console.warn("  Se as duas ja foram aplicadas, nao ha o que consertar no banco —");
+  console.warn("  mas vale apagar a redundante para quem ler depois saber qual vale.\n");
+}
+
 const colisoes = [...porCarimbo.entries()].filter(([, arquivos]) => arquivos.length > 1);
 
 if (colisoes.length === 0) {

@@ -27562,6 +27562,31 @@ export type Database = {
         Args: { p_colaborador_id: string; p_data: string }
         Returns: Json
       }
+      central_incidentes: {
+        Args: { p_limite?: number }
+        Returns: {
+          clientes_afetados: number
+          fingerprint: string
+          modulo: string
+          ocorrencias: number
+          primeiro_visto: string
+          severidade: string
+          status: string
+          titulo: string
+          ultimo_visto: string
+        }[]
+      }
+      central_resumo: { Args: never; Returns: Json }
+      central_situacao_clientes: {
+        Args: never
+        Returns: {
+          colaboradores: number
+          erros_24h: number
+          nome: string
+          situacao: string
+          tenant_id: string
+        }[]
+      }
       check_ntep_relationship: {
         Args: { p_cid: string; p_cnae: string }
         Returns: string
@@ -33333,6 +33358,7 @@ export type Database = {
             }
             Returns: Json
           }
+      registrar_evento_erro: { Args: { p_evento: Json }; Returns: Json }
       registrar_ponto_externo:
         | {
             Args: {

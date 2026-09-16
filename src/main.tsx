@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { instalarCapturaDeErros } from "./lib/telemetriaErros";
 
 const abortMessagePattern = /signal is aborted without reason|AbortError/i;
 
@@ -25,6 +26,10 @@ if (typeof window !== "undefined") {
     }
   });
 }
+
+// Captura de erros da Central de Controle de Clientes: liga cedo, para
+// pegar também o que quebra antes da primeira tela aparecer.
+instalarCapturaDeErros();
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

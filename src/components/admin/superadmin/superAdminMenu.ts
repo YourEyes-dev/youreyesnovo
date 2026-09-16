@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, Activity, Building2, Users, FileSignature, Target, TrendingUp,
-  CreditCard, Handshake, FileText, Brain, Store, Landmark, Bug, Eye, BookOpen,
+  CreditCard, Handshake, FileText, Brain, Store, Landmark, Bug, Radar, BookOpen,
 } from "lucide-react";
 
 // Menu lateral do Painel Super Admin, agrupado por área de trabalho.
@@ -85,10 +85,10 @@ export const SUPER_ADMIN_MENU: SuperAdminMenuArea[] = [
   {
     id: "qualidade",
     label: "Qualidade e suporte",
-    descricao: "Testes, agentes de IA e o manual do sistema.",
+    descricao: "Testes, acompanhamento dos clientes e o manual do sistema.",
     items: [
       { id: "qa", label: "QA e testes", descricao: "Bateria de testes, documentação de casos e varredura de integridade.", icon: Bug, path: "/admin/qa", match: ["/admin/qa/"] },
-      { id: "central-testes", label: "Central de Testes", descricao: "Equipe de agentes de IA com execuções agendadas por módulo.", icon: Eye, path: "/admin/youreyes" },
+      { id: "controle-clientes", label: "Central de Controle de Clientes", descricao: "Erros, uso e saúde dos clientes em tempo real.", icon: Radar, path: "/admin/controle-clientes" },
       { id: "manual", label: "Manual do sistema", descricao: "Manual completo, pesquisável e imprimível.", icon: BookOpen, path: "/admin/manual" },
     ],
   },

@@ -212,6 +212,7 @@ export const ROTAS_SUPERADMIN = new Set<string>([
   "/admin/qa",
   "/admin/qa/docs",
   "/admin/qa/runner",
+  "/admin/controle-clientes",
   "/admin/youreyes",
 ]);
 

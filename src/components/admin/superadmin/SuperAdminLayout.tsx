@@ -14,7 +14,7 @@ import { SUPER_ADMIN_MENU, localizarItemDoMenu, type SuperAdminMenuItem } from "
 // suporte) + barra superior com o caminho atual e o atalho "Nova Empresa".
 // Todas as rotas /admin/* abrem dentro dela (ver App.tsx), então o menu
 // permanece à vista ao trocar de seção — inclusive nas páginas que já
-// tinham endereço próprio (QA, Blog, Contratos, Manual, Central de Testes).
+// tinham endereço próprio (QA, Blog, Contratos, Manual, Controle de Clientes).
 
 function ItemDoMenu({ item, ativo }: { item: SuperAdminMenuItem; ativo: boolean }) {
   const { isMobile, setOpenMobile } = useSidebar();

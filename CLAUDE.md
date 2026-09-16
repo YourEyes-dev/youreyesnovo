@@ -107,7 +107,13 @@ Regras das migrations:
   seguintes, de todo mundo, ficam vermelhas até alguém investigar. O segundo
   de um carimbo real quase nunca colide; um número redondo colide sempre.
   `npm run qa:carimbos` (e a esteira, antes do `db push`) confere e nomeia os
-  arquivos em colisão.
+  arquivos em colisão. **E confira a ORDEM, não só a unicidade:** se uma
+  migration anterior do mesmo dia usou um carimbo à frente do relógio (é
+  comum), o `date -u` devolve um número MENOR e a sua roda ANTES da que ela
+  depende — em banco novo, quebra. Ordem manda mais que relógio: olhe o último
+  carimbo da pasta antes de escolher. (Aconteceu em 16/09/2026: uma Etapa 2
+  carimbada às 19:14 rodava antes da Etapa 1 carimbada às 23:00, e só a
+  réplica em banco vazio pegou.)
 - NUNCA URL/chave de projeto no código (nem produção nem staging). Config por
   ambiente vive na tabela `app_config` (`supabase_url`, `supabase_anon_key`);
   sem valores, rotinas de disparo não chamam ninguém (proteção de ambiente).

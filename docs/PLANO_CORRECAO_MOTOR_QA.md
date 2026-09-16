@@ -11,7 +11,43 @@
 
 ---
 
-## 0. Progresso (atualizado 13/09/2026)
+## 0. Progresso (atualizado 16/09/2026) — CONCLUÍDO
+
+**As 170 falhas originais do Motor foram zeradas no ambiente de teste.** O trabalho
+correu módulo a módulo, cada mudança validada em réplica local (diff caso a caso contra
+o "antes" para provar que não há regressão) e confirmada na bateria do staging a cada
+lote. Resumo por frente:
+
+- **Fases 0–3** (regressões, guardas de integridade, perfil/LGPD, Férias, EPI/SST
+  vencimentos, Admissão/Cota + Benefícios operações básicas).
+- **Conformidade (REGRA-001..006)** — obrigações automáticas por gatilho.
+- **Admissão** (021/022/050/051/052/071/072/073/107) e **ADM-031** (idade×risco),
+  **ADM-040/041** (cotas), **ADM-070** (assinatura na conclusão).
+- **EPI** — ciclo físico e prova de entrega (021/040/042/044/051), **EPI-010** (CAEPI),
+  e **EPI-043 (modelo de reserva)** com o EPI-001 ajustado junto (decisão de produto).
+- **Afastamentos** (010/021/030/032/040/050/070) — efeitos legais e prazos.
+- **Desligamento** (015/025/093/105/106) — prazos e ritos.
+- **Folha** (001/002/030/070/071/081) — rubricas classificadas e fechamento imutável.
+- **Férias** (003/004/024/051/053/070/071/090 + estrutura) e **FERIAS-015** (falso-
+  positivo do caso corrigido; sistema já estava correto).
+- **SST** — extração estruturada (SST-002, fundação) + motores (003/010/030/031/040/
+  050/060/070).
+- **Benefícios** — operações básicas + subsistemas estruturais (030/040/042/070/071).
+- **Marketplace (MarketYE)** — lógica de anúncio/perfil, RLS de vitrine/avaliação,
+  moderação, isolamento de conversas, LGPD e conflitos de produto.
+- **Avulsos** — MCHK-002, MWKF-011 (banco grava a trilha, com o MWKF-001 ajustado),
+  PONTO-113 (regime rural), PERFIL-003, PGP-014 (isolamento da fixture).
+
+**Decisões de produto registradas:** EPI-001×EPI-043 → modelo de reserva; MWKF-001×
+MWKF-011 → o banco grava a trilha do workflow. Em ambos, o caso-par foi ajustado junto.
+
+**Pendências de tela (Publicar no Lovable):** popular o cache CAEPI por edge function
+(EPI-010); capturar a assinatura do contrato no onboarding (ADM-070); remover o INSERT
+manual em `metas_workflow_log` (MWKF-011, agora redundante).
+
+---
+
+### Histórico (atualizado 13/09/2026)
 
 Ambiente de desenvolvimento (migrations no repositório, validadas em réplica local
 com as 1009 migrations e cada caso isolado como o motor real faz — `qa_executar_descartavel`

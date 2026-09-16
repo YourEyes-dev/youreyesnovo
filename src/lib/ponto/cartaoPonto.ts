@@ -136,12 +136,23 @@ const marcacoesTexto = (marcacoes: CartaoMarcacao[], d?: CartaoDia) => {
       linhas.push(tokens.slice(i, i + 4).join(" "));
     }
   }
-  // Pré-assinalação: o intervalo não foi batido, foi declarado. Sai como uma
-  // linha própria da célula, para o espelho declarar o intervalo previsto
-  // (Súmula 338, III do TST).
+  // Pré-assinalação: o intervalo não foi batido, foi declarado. O espelho
+  // precisa dizer isso (Súmula 338, III do TST), e diz ao LADO das marcações
+  // do dia — não numa linha própria.
+  //
+  // A linha própria custava uma linha extra em CADA dia do mês: num mês de 31
+  // dias, dobrava a altura da tabela e estourava o espaço reservado para o
+  // rodapé, que só previa a linha extra da legenda. O resultado era o bloco de
+  // legenda e assinaturas impresso POR CIMA do resumo de horas. O sentido é o
+  // mesmo; o custo de espaço, um quinto.
   if (d?.intervalo_origem === "pre_assinalado") {
     const min = d.intervalo_pre_assinalado_min || 0;
-    linhas.push(`Interv. pré-assinalado${min ? ` ${hm(min)}` : ""} (P)`);
+    const nota = `Int. ${min ? `${hm(min)} ` : ""}(P)`;
+    const ultima = linhas.length > 0 ? linhas[linhas.length - 1] : "";
+    // Dia sem batida (sábado, DSR) traz só a nota, sem separador solto.
+    if (ultima === "") linhas[linhas.length > 0 ? linhas.length - 1 : 0] = nota;
+    else linhas[linhas.length - 1] = `${ultima}  ·  ${nota}`;
+    if (linhas.length === 0) linhas.push(nota);
   }
   return linhas.join("\n");
 };
@@ -576,12 +587,23 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
 
   y += 5;
 
-  // Um colaborador = uma página. Nada aqui quebra: se a tabela empurrou o
-  // bloco final para baixo, ele é ancorado ao limite útil da página (acima
-  // do rodapé institucional) em vez de gerar uma segunda folha.
-  const ALTURA_BLOCO_FINAL = 44;
+  // Um colaborador = uma página, e a tabela se comprime para isso (ver
+  // RESERVA_RODAPE). Mas "ancorar" o bloco final ao limite da página com um
+  // Math.min era uma âncora para CIMA: quando a tabela passava do espaço
+  // reservado, o bloco subia e era impresso POR CIMA do resumo de horas —
+  // legenda, declaração de acordo e assinaturas em cima dos totais do mês,
+  // num documento feito para ser assinado.
+  //
+  // Agora o bloco nunca recua sobre o que já foi desenhado. Se não couber,
+  // abre folha — uma segunda página é um defeito de estética; texto sobre
+  // texto num cartão de ponto é um defeito de prova.
+  const ALTURA_BLOCO_FINAL = 32;
   const LIMITE_UTIL = pageH - 16;
-  y = Math.min(y, LIMITE_UTIL - ALTURA_BLOCO_FINAL);
+  if (y + ALTURA_BLOCO_FINAL > LIMITE_UTIL) {
+    doc.addPage();
+    faixaTitulo(doc, input, doc.getCurrentPageInfo().pageNumber);
+    y = ALTURA_FAIXA + 8;
+  }
 
   // Legenda
   doc.setFont("helvetica", "bold");

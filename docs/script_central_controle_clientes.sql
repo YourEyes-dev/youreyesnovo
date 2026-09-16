@@ -18,7 +18,7 @@
 --   SELECT cron.schedule('youreyes-dispatch-agentes', '* * * * *',
 --                        'SELECT public.youreyes_dispatch_agentes()');
 --
--- Conteúdo igual ao da migration 20260916180000_central_testes_aposentada.sql.
+-- Conteúdo igual ao da migration 20260916185000_central_testes_aposentada.sql.
 -- =====================================================================
 
 DO $aposenta$

@@ -3,7 +3,7 @@
 --
 -- Cole este arquivo INTEIRO no SQL Editor da HOMOLOGAÇÃO (e, depois de
 -- aprovado, no da PRODUÇÃO). Espelha a migration
--- 20260916180000_qa_colaboradores_casos_tela.sql: documenta os 9 casos
+-- 20260916180500_qa_colaboradores_casos_tela.sql: documenta os 9 casos
 -- COLAB-TELA-01..09 no módulo estrutura-organizacional/colaboradores e liga
 -- cada um ao it() de cypress/e2e/colaboradores.cy.ts na tabela qa_cobertura_e2e.
 --

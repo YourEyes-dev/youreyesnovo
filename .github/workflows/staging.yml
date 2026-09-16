@@ -56,6 +56,13 @@ jobs:
           if [ "$STAGING_REF" = "diayjpsrcerycycyaxst" ]; then
             echo "::error::Alvo aponta para a producao — abortando."; exit 1
           fi
+      - name: Conferir que nao ha carimbo de migration repetido
+        # Duas migrations com o mesmo carimbo quebram o db push com um erro de
+        # chave duplicada que nao diz QUAIS arquivos colidiram — e a esteira
+        # fica vermelha para todo mundo ate alguem descobrir. Esta conferencia
+        # falha antes, dizendo os nomes.
+        run: node scripts/verificar-carimbos.mjs
+
       - name: Aplicar migrations
         run: |
           supabase link --project-ref "$STAGING_REF"

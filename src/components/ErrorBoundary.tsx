@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { registrarErro } from "@/lib/telemetriaErros";
 
 interface Props {
   children: React.ReactNode;
@@ -46,6 +47,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[ErrorBoundary]", error, errorInfo);
+    // Tela que quebrou na cara do cliente é o caso mais grave: vai para a
+    // Central como crítico. O envio nunca lança (ver telemetriaErros).
+    void registrarErro({
+      mensagem: error.message,
+      stack: `${error.stack ?? ""}\n${errorInfo.componentStack ?? ""}`,
+      tipo: error.name || "Error",
+      acao: "tela quebrou (ErrorBoundary)",
+      severidade: "critica",
+    });
   }
 
   handleReset = () => {

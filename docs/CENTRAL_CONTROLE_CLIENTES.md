@@ -26,21 +26,49 @@ Base: documento de requisitos "YourEyes — Central de Controle de Clientes
     meio): o que está no miolo é o que dói mais quando quebra;
   - abaixo do desenho, a mesma informação em lista, com o nome de cada cliente.
 
-  **Hoje todo ponto sai cinza, de propósito.** Sem captura de erro, pintar de
-  verde seria afirmar "está tudo certo" sem ter conferido. O verde e o vermelho
-  acendem sozinhos assim que a captura entrar: é só a situação do cliente deixar
-  de ser `sem_sinal`.
+  Com a captura ligada (09/2026), o radar acende de verdade: verde é cliente
+  sem nenhum erro nas últimas 24 horas; vermelho é cliente com erro no período,
+  e a lista ao lado mostra quantos.
+
+- **Captura de erros (eixo técnico) — no ar desde 09/2026.**
+  - O que é capturado: tela que quebra (ErrorBoundary), erro não tratado da
+    janela e promessa rejeitada. Cada evento leva empresa, área, tela, ação,
+    horário, versão, navegador e a trilha dos últimos passos do usuário.
+  - **Mascaramento antes de gravar** (`mascarar_pii`): CPF, CNPJ, e-mail,
+    telefone, sequência longa de dígitos e valores de campo de segredo viram
+    `[cpf]`, `[email]`, `[oculto]`… O navegador já mascara antes de enviar, e o
+    servidor mascara de novo antes de gravar.
+  - **Usuário pseudonimizado** (`pseudonimo_usuario`): dá para dizer "o mesmo
+    usuário de novo" sem guardar quem ele é. O sal vive no `app_config` de cada
+    ambiente, nunca no código.
+  - **Uma única porta de escrita** (`registrar_evento_erro`): a tabela não tem
+    política de INSERT, o papel `authenticated` não tem GRANT de escrita, a
+    chamada sem sessão é recusada e há limite de 60 eventos por usuário por
+    minuto.
+  - **Agrupamento**: erros iguais (ignorando números e endereços) viram um
+    incidente com contador; incidente resolvido que volta a acontecer reabre.
+  - **Retenção**: evento bruto vive 90 dias, com expurgo agendado. Prazo a
+    confirmar com o DPO.
+  - **Leitura**: só superadmin, por RLS e por funções dedicadas
+    (`central_incidentes`, `central_situacao_clientes`, `central_resumo`).
+  - **Provas**: casos CENTRAL-001 a CENTRAL-005 na Documentação de Testes, com
+    rotina no motor para cada um.
 
 ## O que falta (próximas entregas, na ordem sugerida)
 
-1. **Captura de erros** no frontend e no backend, com identificação do cliente,
-   módulo, tela e ação — e **mascaramento de dados pessoais na entrada**
-   (LGPD; sem isso a Central vira um problema de privacidade, não uma solução).
-2. **Ingestão segura**: toda gravação por função do servidor, nunca escrita
-   direta a partir da tela do cliente.
-3. Agrupamento de erros por causa e a lista de incidentes por impacto.
-4. Atividade por módulo (derivada das tabelas que já existem) e health score.
-5. Motor de regras, fila de alertas, prazos e canais (in-app, WhatsApp, e-mail).
+1. **Erro de servidor**: hoje a captura cobre a tela. Falha dentro de Edge
+   Function e de rotina do banco ainda não vira evento — entra com o mesmo
+   caminho (`registrar_evento_erro`, origem `backend`) e com o número de
+   correlação entre a tela e o servidor.
+2. **Triagem na tela**: abrir o incidente, ver o detalhe técnico e a trilha do
+   usuário, marcar em análise/resolvido, e "revelar" dado mascarado só com
+   registro de quem revelou e por quê (RN-003/004).
+3. **Atividade e inatividade por módulo** (derivadas das tabelas que já
+   existem) e **health score** do cliente.
+4. **Motor de regras e alertas**: limiares configuráveis sem publicação nova,
+   prazos, escalonamento e canais (in-app, WhatsApp, e-mail) — sem dado pessoal
+   nas mensagens externas.
+5. **Gatilhos de cross-sell/upsell** a partir do uso contra o plano contratado.
 
-Enquanto (1) não existir, nenhum número da tela pode ser inventado: indicador
-sem fonte fica em "—" e cliente sem monitoramento fica cinza.
+Regra que continua valendo: indicador sem fonte fica em "—". Nada na tela é
+simulado.

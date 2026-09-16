@@ -15,16 +15,15 @@ import {
 //   vermelho → há erro registrado
 //   cinza    → ainda sem monitoramento
 //
-// Hoje TODO cliente sai cinza, e isso é proposital: a captura de erros ainda
-// não existe: pintar de verde quem ninguém está olhando seria dizer "está tudo
-// certo" sem ter conferido. Quando a captura entrar, a mesma tela acende sozinha
-// — é só a situação deixar de ser 'sem_sinal'.
+// Com a captura de erros ligada, o verde passou a significar algo: o cliente
+// está sendo observado e não teve erro registrado nas últimas 24 horas. O
+// cinza ficou para quando não há sinal nenhum daquele cliente.
 //
 // Distância do centro = porte do cliente (mais colaboradores, mais perto do
 // meio): o que está no miolo do radar é o que dói mais quando quebra.
 
 const CORES: Record<SituacaoCliente, { ponto: string; texto: string; rotulo: string }> = {
-  ok:        { ponto: 'fill-emerald-500', texto: 'text-emerald-600', rotulo: 'Sem erro' },
+  ok:        { ponto: 'fill-emerald-500', texto: 'text-emerald-600', rotulo: 'Sem erro (24h)' },
   erro:      { ponto: 'fill-red-500',     texto: 'text-red-600',     rotulo: 'Com erro' },
   sem_sinal: { ponto: 'fill-muted-foreground/40', texto: 'text-muted-foreground', rotulo: 'Sem monitoramento' },
 };
@@ -63,9 +62,9 @@ export function RadarClientes({ aberto, aoFechar }: { aberto: boolean; aoFechar:
         <DialogHeader>
           <DialogTitle>Radar dos clientes</DialogTitle>
           <DialogDescription>
-            Todos os clientes ativos em uma imagem só. Verde é cliente sem erro; vermelho é
-            cliente com erro; cinza é cliente que ainda ninguém está observando. Quem está mais
-            perto do centro tem mais colaboradores.
+            Todos os clientes ativos em uma imagem só, atualizada a cada minuto. Verde é
+            cliente sem nenhum erro nas últimas 24 horas; vermelho é cliente com erro no
+            período. Quem está mais perto do centro tem mais colaboradores.
           </DialogDescription>
         </DialogHeader>
 
@@ -145,16 +144,19 @@ export function RadarClientes({ aberto, aoFechar }: { aberto: boolean; aoFechar:
                   />
                   <span className="truncate flex-1">{c.nome}</span>
                   <span className={`text-xs ${CORES[c.situacao].texto}`}>
-                    {CORES[c.situacao].rotulo}
+                    {c.situacao === 'erro'
+                      ? `${c.erros24h} ${c.erros24h === 1 ? 'erro' : 'erros'} em 24h`
+                      : CORES[c.situacao].rotulo}
                   </span>
                 </div>
               ))}
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Todo cliente aparece cinza porque o sistema ainda não registra os erros que
-              acontecem nas telas dos clientes. Assim que essa captura entrar, este mesmo radar
-              passa a acender verde e vermelho sozinho — nada aqui é simulado.
+              O radar mostra o que foi capturado nas telas dos clientes nas últimas 24 horas.
+              Um cliente recém-cadastrado, ou que não abriu o sistema no período, aparece verde
+              por não ter erro — ausência de erro não é o mesmo que uso intenso. A leitura de
+              uso e inatividade entra na próxima etapa.
             </p>
           </div>
         )}

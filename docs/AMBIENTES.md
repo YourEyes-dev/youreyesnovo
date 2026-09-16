@@ -512,6 +512,31 @@ referência**, não só do esquema recente. Ex.: as categorias-raiz do marketpla
 Corrigido por scripts de entrega (`docs/script_marketye_homologacao.sql` e
 `docs/script_marketye_categorias_homologacao.sql`).
 
+### Cobertura nova de tela — Férias (09/2026, doc-first)
+
+O módulo **Férias** (`jornada-rotina/ferias`) tinha forte cobertura de MOTOR
+(fracionamento, concessivo, saldo, encargos…) e **zero tela**. Documentamos os
+casos primeiro (fonte da verdade) e só então implementamos os `it()`:
+
+- **10 casos `e2e` FERIAS-TELA-01..10** em `qa_casos_teste` — o módulo monta com
+  cabeçalho/abas, o modal **Nova Solicitação** abre/fecha, o filtro de status
+  abre, e as abas Solicitações/Calendário/Saldos/Financeiro/INR™/Vencimentos/
+  Coletivas abrem sem erro. Todos **data-independentes** (valem na ilha vazia,
+  sem fixtures).
+- **`cypress/e2e/ferias.cy.ts`** — os 10 `it()`, ligados aos casos pela ponte
+  `qa_cobertura_e2e`. Robustos ao scroll-lock do Radix e ao registro de humor
+  (`{force:true}` + fechamento best-effort do modal).
+- Duas entregas: migration `20260915210000_qa_ferias_casos_tela.sql` (aplica no
+  teste pela esteira) e `docs/script_ferias_casos_tela_homologacao.sql` (colado
+  no SQL Editor da homologação — **necessário antes da corrida**, senão a guarda
+  reprova os `it()` como "inventados").
+
+Validação: teste `ferias` 10/10; homologação (bateria #47, `81c05c7`) **38 specs /
+322 testes, tudo verde**, guarda incluída. Fica registrado que o módulo Férias
+mantém **1 caso `e2e` anterior sem teste** (FERIAS-055, "aviso sem ciência não
+conclui a concessão") — só gera aviso na guarda, nunca reprova; candidato a
+implementação futura (precisa de fixtures de solicitação).
+
 ## Testes de tela (Cypress) na homologação
 
 Por padrão a suíte Cypress roda só no **teste** (é lá que a tela nasce, e as duas

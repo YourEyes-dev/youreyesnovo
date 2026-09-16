@@ -35,8 +35,11 @@ describe("menu do Painel Super Admin", () => {
   it("não marca nada para rotas fora do painel ou desconhecidas", () => {
     expect(localizarItemDoMenu("/")).toBeUndefined();
     expect(localizarItemDoMenu("/admin/nao-existe")).toBeUndefined();
-    // "/admin/youreyes" é a Central de Testes; não pode ser confundida com "/admin/youreyes-x"
-    expect(localizarItemDoMenu("/admin/youreyes-x")).toBeUndefined();
+    // "/admin/controle-clientes" é a Central de Controle de Clientes; não pode ser
+    // confundida com um vizinho de nome parecido
+    expect(localizarItemDoMenu("/admin/controle-clientes-x")).toBeUndefined();
+    // o endereço antigo saiu do menu (virou redirecionamento)
+    expect(localizarItemDoMenu("/admin/youreyes")).toBeUndefined();
   });
 
   it("converte toda aba antiga (?aba=) para uma rota que existe no menu", () => {

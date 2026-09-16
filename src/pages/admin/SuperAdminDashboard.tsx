@@ -18,7 +18,7 @@ import { SUPER_ADMIN_MENU, localizarItemDoMenu, rotaDaAbaLegada } from "@/compon
 // agora cada seção tem endereço próprio (/admin/<secao>) e é escolhida pelo
 // menu lateral agrupado por área (SuperAdminLayout). Esta página só resolve
 // qual seção renderizar a partir da rota. As páginas que já tinham endereço
-// próprio (QA, Blog, Contratos, Manual, Central de Testes) continuam com
+// próprio (QA, Blog, Contratos, Manual, Controle de Clientes) continuam com
 // seus componentes; o roteador as atende antes de cair aqui.
 
 /** Cartões de atalho por área, mostrados na Visão geral (útil no celular, onde o menu fica recolhido). */

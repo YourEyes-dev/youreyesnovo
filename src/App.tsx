@@ -112,7 +112,7 @@ const QADashboard = lazy(() => import("./pages/admin/QADashboard"));
 const QADocs = lazy(() => import("./pages/admin/QADocs"));
 const QARunner = lazy(() => import("./pages/admin/QARunner"));
 const TenantAssinatura = lazy(() => import("./pages/admin/TenantAssinatura"));
-const YourEyesDashboard = lazy(() => import("./pages/admin/YourEyesDashboard"));
+const ControleClientesDashboard = lazy(() => import("./pages/admin/ControleClientesDashboard"));
 const BlogAdmin = lazy(() => import("./pages/admin/BlogAdmin"));
 const ContratosAceite = lazy(() => import("./pages/admin/ContratosAceite"));
 const AssinarContrato = lazy(() => import("./pages/AssinarContrato"));
@@ -239,7 +239,9 @@ const App = () => (
                 <Route path="/admin/qa" element={<QADashboard />} />
                 <Route path="/admin/qa/docs" element={<QADocs />} />
                 <Route path="/admin/qa/runner" element={<QARunner />} />
-                <Route path="/admin/youreyes" element={<YourEyesDashboard />} />
+                <Route path="/admin/controle-clientes" element={<ControleClientesDashboard />} />
+                {/* Endereço antigo da Central de Testes, hoje Central de Controle de Clientes. */}
+                <Route path="/admin/youreyes" element={<Navigate to="/admin/controle-clientes" replace />} />
                 <Route path="/admin/blog" element={<BlogAdmin />} />
                 <Route path="/admin/contratos" element={<ContratosAceite />} />
                 <Route path="/admin/:secao" element={<SuperAdminDashboard />} />

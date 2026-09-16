@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -44,6 +44,9 @@ function posicionar(cliente: ClienteNoRadar, indice: number, maiorPorte: number)
 
 export function RadarClientes({ aberto, aoFechar }: { aberto: boolean; aoFechar: () => void }) {
   const { data: clientes = [], isLoading, error } = useClientesRadar(aberto);
+  // Ponto sob o cursor: o nome da empresa precisa aparecer na hora, e não
+  // depois do atraso do balãozinho do navegador.
+  const [emFoco, setEmFoco] = useState<string | null>(null);
 
   const pontos = useMemo(() => {
     const maiorPorte = clientes.reduce((m, c) => Math.max(m, c.colaboradores), 0);
@@ -120,21 +123,74 @@ export function RadarClientes({ aberto, aoFechar }: { aberto: boolean; aoFechar:
               <line x1={CENTRO} y1={CENTRO - RAIO_MAX} x2={CENTRO} y2={CENTRO + RAIO_MAX}
                     className="stroke-border" strokeWidth={1} />
 
-              {pontos.map(({ cliente, x, y }) => (
-                <g key={cliente.id}>
-                  <circle cx={x} cy={y} r={9} className={CORES[cliente.situacao].ponto}>
-                    <title>
-                      {`${cliente.nome} · ${cliente.colaboradores} colaborador(es) · ${CORES[cliente.situacao].rotulo}`}
-                    </title>
-                  </circle>
-                </g>
-              ))}
+              {pontos.map(({ cliente, x, y }) => {
+                const focado = emFoco === cliente.id;
+                return (
+                  <g
+                    key={cliente.id}
+                    onMouseEnter={() => setEmFoco(cliente.id)}
+                    onMouseLeave={() => setEmFoco((atual) => (atual === cliente.id ? null : atual))}
+                    style={{ cursor: 'default' }}
+                  >
+                    {/* alvo invisível: facilita acertar o ponto com o mouse */}
+                    <circle cx={x} cy={y} r={20} className="fill-transparent" />
+                    <circle
+                      cx={x} cy={y} r={focado ? 12 : 9}
+                      className={`${CORES[cliente.situacao].ponto} transition-all`}
+                    >
+                      <title>
+                        {`${cliente.nome} · ${cliente.colaboradores} colaborador(es)`}
+                      </title>
+                    </circle>
+                  </g>
+                );
+              })}
+
+              {/* Etiqueta do ponto sob o cursor, desenhada por último para
+                  ficar por cima de tudo. */}
+              {pontos
+                .filter(({ cliente }) => cliente.id === emFoco)
+                .map(({ cliente, x, y }) => {
+                  const texto = `${cliente.nome} · ${cliente.colaboradores} colab. · ${
+                    cliente.situacao === 'erro'
+                      ? `${cliente.erros24h} ${cliente.erros24h === 1 ? 'erro' : 'erros'} em 24h`
+                      : 'sem erro em 24h'
+                  }`;
+                  const largura = Math.min(360, 8 * texto.length + 20);
+                  // A etiqueta vira para dentro quando o ponto está na borda.
+                  const paraEsquerda = x + largura + 18 > TAMANHO;
+                  const ex = paraEsquerda ? x - largura - 16 : x + 16;
+                  const ey = Math.min(Math.max(y - 14, 4), TAMANHO - 32);
+                  return (
+                    <g key={`etiqueta-${cliente.id}`} pointerEvents="none">
+                      <rect
+                        x={ex} y={ey} width={largura} height={28} rx={6}
+                        className="fill-popover stroke-border"
+                        strokeWidth={1}
+                      />
+                      <text
+                        x={ex + 10} y={ey + 18}
+                        className="fill-popover-foreground"
+                        style={{ fontSize: 13 }}
+                      >
+                        {texto}
+                      </text>
+                    </g>
+                  );
+                })}
             </svg>
 
             {/* A mesma informação em lista — o radar mostra o conjunto, a lista dá o nome. */}
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
               {clientes.map((c) => (
-                <div key={c.id} className="flex items-center gap-2 text-sm py-1 border-b border-border/50">
+                <div
+                  key={c.id}
+                  onMouseEnter={() => setEmFoco(c.id)}
+                  onMouseLeave={() => setEmFoco((atual) => (atual === c.id ? null : atual))}
+                  className={`flex items-center gap-2 text-sm py-1 border-b border-border/50 rounded px-1 ${
+                    emFoco === c.id ? 'bg-accent' : ''
+                  }`}
+                >
                   <span
                     className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                       c.situacao === 'ok' ? 'bg-emerald-500'

@@ -99,7 +99,15 @@ Regras dos scripts de entrega (aprendidas a caro preço):
 
 Regras das migrations:
 - Carimbo (timestamp do nome) ÚNICO — carimbos duplicados quebram o registro
-  do CLI. Confira antes de criar.
+  do CLI. **Gere o carimbo com `date -u +%Y%m%d%H%M%S`; não escolha um número
+  redondo.** Em 16/09/2026 a esteira quebrou QUATRO vezes no mesmo dia porque
+  sessões diferentes, trabalhando em paralelo, escolheram `20260916180000`,
+  depois `20260916181000` — cada uma sem saber da outra. O `db push` indexa
+  pelo carimbo: a primeira a mesclar registra a versão e TODAS as entregas
+  seguintes, de todo mundo, ficam vermelhas até alguém investigar. O segundo
+  de um carimbo real quase nunca colide; um número redondo colide sempre.
+  `npm run qa:carimbos` (e a esteira, antes do `db push`) confere e nomeia os
+  arquivos em colisão.
 - NUNCA URL/chave de projeto no código (nem produção nem staging). Config por
   ambiente vive na tabela `app_config` (`supabase_url`, `supabase_anon_key`);
   sem valores, rotinas de disparo não chamam ninguém (proteção de ambiente).

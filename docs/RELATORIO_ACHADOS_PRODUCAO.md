@@ -71,10 +71,15 @@ função, CIPA pelo Quadro I, enquadramento×adicional, PPP e coerência documen
 
 ## 🟠 TEMA 3 — Segregação de função / aprovação sem rito (controle interno)
 
-- `PONTO-252` — 🟢 **76 de 1.709 ajustes de ponto aprovados pelo próprio colaborador**.
-- `FERIAS-056` — 🟢 férias **aprovadas pelo próprio solicitante** (sem segregação).
-- `DESL-002` — 🟢 **desligamento sobrescrito sem trilha** (pedido→sem justa causa, sem histórico/aprovação).
-- `DESL-106` — reversão de desligamento por UPDATE simples, sem aprovação/motivo.
+### ✅ RESOLVIDOS (17/09/2026) — entrega `script_t3_segregacao_funcao.sql`
+
+- `DESL-002` — ✅ **desligamento vira trilha de eventos**: regravar por cima de desligamento já registrado é barrado (`unique_violation`); correção só por `desligamento_retificar` (com justificativa, gestor/RH), tudo em `desligamento_eventos`.
+- `DESL-106` — ✅ **reversão exige rito**: sair de `desligado` por UPDATE cru sem `reversao_desligamento_justificativa` é bloqueado (gatilho `trg_admissao_bloqueia_reversao_desligamento`).
+- `FERIAS-056` — ✅ **trava de autoaprovação** em `ferias_solicitacoes` (CHECK `aprovado_por <> colaborador_id`, entregue `NOT VALID` para não reprovar legado).
+- `PONTO-252` — ⚠️ **trava instalada** (`chk_ajuste_sem_autoaprovacao`, `NOT VALID`) barra novas autoaprovações. **Continua vermelho na produção** enquanto existirem os ~76 ajustes históricos autoaprovados — esses exigem **decisão de produto à parte** (o que fazer com o passado; a trava não reescreve histórico).
+
+### ⏳ Pendentes
+
 - `DESL-025` — justa causa (art. 482) entra **sem rito** (sem quem aprovou).
 - `FOLHA-071` — fechamento de folha **decorativo**: lançamento em competência fechada é aceito; reabertura sem trilha.
 - `FOLHA-030` — desconto em folha **sem amparo** (texto livre, sem rubrica/teto).

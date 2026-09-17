@@ -1,19 +1,20 @@
 -- ============================================================================
 -- EMP-020/021/070/071 — unicidade de documento (CNPJ E CPF) entre empresas
--- ATIVAS no mesmo tenant. ENTREGA producao.
+-- ATIVAS no mesmo tenant. ENTREGA producao — SO DDL (parte de aplicar).
 --
--- O gatilho prevent_duplicate_active_cnpj so olhava a coluna cnpj: empresa PF
--- (documento em cpf) passava sem verificacao (EMP-070/071). Agora cobre CNPJ E
--- CPF, no INSERT e no UPDATE (ativar duplicata tambem e barrado), levantando
--- unique_violation. Duplicata INATIVA continua permitida.
+-- IMPORTANTE (deadlock): esta parte e SO o DDL (funcao + gatilho + indices),
+-- curta e com lock minimo, para nao cruzar com a atividade concorrente da base.
+-- A CONFERENCIA (que roda as rotinas de QA e conta o legado) esta em arquivo
+-- separado — docs/conferencia_emp_unicidade.sql — para rodar DEPOIS, em
+-- transacao propria. Nao junte os dois: foi a juncao (DDL segurando lock
+-- exclusivo + conferencia pesada na mesma transacao) que causou o deadlock.
 --
--- Seguranca do legado: o gatilho barra gravacoes NOVAS sem validar a tabela
--- inteira (seguro mesmo com duplicatas ativas historicas). Os indices unicos
--- parciais entram como reforco so quando a base esta limpa (bloco DO que cai em
--- NOTICE se houver duplicata no legado). So cria/atualiza 1 funcao, 1 gatilho e
--- (quando possivel) 2 indices — nao altera nem apaga dado. Idempotente. Uma
--- transacao. A conferencia final mostra tambem quantas duplicatas ativas ja
--- existem (leitura), para decidir a limpeza a parte se houver.
+-- O gatilho passa a cobrir CNPJ E CPF (normalizados), no INSERT e no UPDATE
+-- (ativar duplicata tambem e barrado), levantando unique_violation. Duplicata
+-- INATIVA continua permitida. Barra gravacoes NOVAS sem validar a tabela
+-- inteira — seguro mesmo com duplicatas ativas historicas. Os indices unicos
+-- parciais entram como reforco so onde a base esta limpa (bloco DO que cai em
+-- NOTICE no legado). So cria/atualiza — nao altera dado. Idempotente.
 -- ============================================================================
 
 SET lock_timeout = '10s';
@@ -76,21 +77,16 @@ EXCEPTION WHEN unique_violation THEN
   RAISE NOTICE 'uq_empresa_cpf_ativa nao criado: ha CPF ativo duplicado no legado. O gatilho protege as gravacoes novas.';
 END $do$;
 
--- Conferencia (leve) + diagnostico do legado (read-only) ---------------------
-SELECT 'EMP-020' AS caso, (public.qa_executar_descartavel('qa_caso_emp_020')).situacao::text AS situacao
-UNION ALL SELECT 'EMP-021', (public.qa_executar_descartavel('qa_caso_emp_021')).situacao::text
-UNION ALL SELECT 'EMP-070', (public.qa_executar_descartavel('qa_caso_emp_070')).situacao::text
-UNION ALL SELECT 'EMP-071', (public.qa_executar_descartavel('qa_caso_emp_071')).situacao::text
+-- Confirmacao leve (so catalogo — nao toca empresa_cadastro) ------------------
+SELECT 'gatilho' AS objeto,
+       CASE WHEN EXISTS (SELECT 1 FROM pg_trigger
+                          WHERE tgname='trg_prevent_duplicate_active_cnpj'
+                            AND tgrelid='public.empresa_cadastro'::regclass)
+            THEN 'instalado' ELSE 'AUSENTE' END AS estado
 UNION ALL
-SELECT 'LEGADO: grupos de CNPJ ativo duplicado', count(*)::text FROM (
-  SELECT tenant_id, regexp_replace(cnpj,'[^0-9]','','g') AS d
-  FROM public.empresa_cadastro WHERE ativo AND cnpj IS NOT NULL
-    AND regexp_replace(cnpj,'[^0-9]','','g') <> ''
-  GROUP BY 1,2 HAVING count(*) > 1) g
+SELECT 'indice CNPJ',
+       COALESCE((SELECT 'presente' FROM pg_class WHERE relname='uq_empresa_cnpj_ativa'), 'ausente (legado ou a criar)')
 UNION ALL
-SELECT 'LEGADO: grupos de CPF ativo duplicado', count(*)::text FROM (
-  SELECT tenant_id, regexp_replace(cpf,'[^0-9]','','g') AS d
-  FROM public.empresa_cadastro WHERE ativo AND cpf IS NOT NULL
-    AND regexp_replace(cpf,'[^0-9]','','g') <> ''
-  GROUP BY 1,2 HAVING count(*) > 1) g
-ORDER BY caso;
+SELECT 'indice CPF',
+       COALESCE((SELECT 'presente' FROM pg_class WHERE relname='uq_empresa_cpf_ativa'), 'ausente (legado ou a criar)')
+ORDER BY objeto;

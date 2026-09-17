@@ -603,13 +603,38 @@ incluída (usuarios 7/7). Confirmação na homologação: `casos_usr_tela=7`,
 motor pré-existentes — CTX/USR/PER). Esses 5 seguem como casos `e2e` documentados
 sem teste de tela (só aviso na guarda).
 
+### Cobertura nova de tela — Aprendizado & Papéis (09/2026, doc-first)
+
+Caso diferente: o módulo **Aprendizado & Papéis**
+(`desenvolvimento-performance/aprendizado-competencias`, rota `/aprendizado-papeis`)
+já tinha os **13 casos `e2e` documentados** (APR-*, migration `20260901130500`),
+mas **nenhum teste de tela nem ponte** — a documentação existia, o teste não (só
+aviso na guarda). Aqui implementamos o subconjunto **data-independente** e ligamos
+cada `it()` ao caso já documentado:
+
+- **5 `it()` em `cypress/e2e/aprendizado-papeis.cy.ts`** — APR-001 (as 4 abas),
+  APR-002 (Funções lista + busca), APR-010 (abrir o detalhe da função e voltar),
+  APR-040 (Assinaturas orienta no vazio), APR-050 (Indicadores monta os cartões).
+  A ilha de QA (`seed-e2e-user`) planta 4 cargos fixos (mesmos no teste e na
+  homologação), então APR-002/APR-010 contam com "Analista Financeiro"; os vazios
+  são forçados via busca (robustos com ou sem dados).
+- Entregas: migration `20260917164458_qa_aprendizado_papeis_ponte_e2e.sql`
+  (garante os 5 casos + a ponte, idempotente) e
+  `docs/script_aprendizado_papeis_ponte_homologacao.sql`. As duas **garantem os 5
+  casos ligados** para não depender de o Item 2 (`docs/script_qa_casos_modulos_item2.sql`)
+  já ter chegado na homologação.
+
+Validação: homologação (bateria #51, `e4492a7c`) **tudo verde**, guarda incluída
+(aprendizado 5/5). Confirmação na homologação: `casos_apr_ligados=5`,
+`pontes_apr_tela=5`, `e2e_no_modulo_aprendizado=13`. Os outros **8 casos APR**
+(adicionar atividade/competência, gerar manual por IA, assinaturas com envios,
+salvar config, isolamento) exigem fixtures e seguem como documentados-sem-teste
+(só aviso na guarda).
+
 **Nota de cobertura (evitar retrabalho):** o módulo **Atestados/GAF** (`/atestados`,
 tela "MOD-GAF") **já tem cobertura** pelo spec `afastamentos.cy.ts` (Central GAF,
-casos AFAST-TELA-*) — não é lacuna. O **Aprendizado & Papéis**
-(`/aprendizado-papeis`) tinha os casos `e2e` **documentados** (APR-*, migration
-`20260901130500`) mas **sem teste de tela nem ponte** — em implementação agora
-(ver abaixo). Módulos ainda sem tela documentada (candidatos futuros):
-Pendências (`/pendencias`) e Feed (`/feed`).
+casos AFAST-TELA-*) — não é lacuna. Módulos ainda sem tela: **Pendências**
+(`/pendencias`) — em implementação — e **Feed** (`/feed`).
 
 ## Testes de tela (Cypress) na homologação
 

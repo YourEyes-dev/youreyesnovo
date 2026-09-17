@@ -18,6 +18,16 @@ fora de propósito e como conferir no ambiente de teste.
 > vezes (idempotente). **Colar SÓ este script; não reaplicar nenhuma versão
 > antiga depois — uma versão antiga reabriria o D-18.** O texto abaixo, quando
 > fala em "64 passou / 16 falhou", descreve o estado **antes** dessas correções.
+>
+> **Reparo 17/09 (banco real da homologação).** A 1ª aplicação na homologação
+> acusou 3 rotinas em `erro` (MKY-058/063/123) — coisas que a réplica não pegava:
+> o bucket privado `marketplace-docs` só era criado por uma migration antiga
+> alheia ao módulo (some no fluxo forward-only), e o `empresa_cadastro` do
+> cercado tinha filhos (admissões), que travam o `DELETE`. Corrigido na migration
+> `20260917005941`: o script garante o bucket `marketplace-docs` (idempotente) e
+> as rotinas 058/063/123 passaram a ser robustas (garantem os buckets sozinhas e
+> deixam a geo do cercado determinística por `UPDATE`, sem apagar). Revalidado
+> reproduzindo exatamente essas condições: `OK`, 82 passou / 0 falhou / 0 erro.
 
 ## O que entrou
 

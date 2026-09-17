@@ -18,6 +18,16 @@
 
 SET lock_timeout = '10s';
 
+-- 0) Colunas que o dev tem e a producao/homologacao podem nao ter (drift) ----
+--    ADD IF NOT EXISTS e no-op onde ja existem; nullable, sem default (rapido).
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS empresa_id uuid;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS origem_modulo text;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS origem_id uuid;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS colaborador_cpf text;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS competencia text;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS data_limite date;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS leiaute_versao text;
+
 -- 1) Idempotencia
 CREATE UNIQUE INDEX IF NOT EXISTS uq_esocial_s2200_admissao
   ON public.esocial_transmissoes (tenant_id, origem_id, tipo_evento)

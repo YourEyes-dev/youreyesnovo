@@ -12,6 +12,15 @@
 -- 'pendente_assinatura' para o fluxo normal de assinatura/envio.
 -- ============================================================================
 
+-- 0) Colunas que podem faltar em ambientes com drift (no-op onde ja existem) -
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS empresa_id uuid;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS origem_modulo text;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS origem_id uuid;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS colaborador_cpf text;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS competencia text;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS data_limite date;
+ALTER TABLE public.esocial_transmissoes ADD COLUMN IF NOT EXISTS leiaute_versao text;
+
 -- 1) Idempotencia: um S-2200 por admissao ---------------------------------
 CREATE UNIQUE INDEX IF NOT EXISTS uq_esocial_s2200_admissao
   ON public.esocial_transmissoes (tenant_id, origem_id, tipo_evento)

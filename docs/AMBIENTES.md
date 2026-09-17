@@ -657,8 +657,8 @@ falha pré-existente e não relacionada** — `trilhas.cy.ts › "cria uma trilh
 Gestão"` (`AssertionError: Expected to find content: 'Trilha criada!' but never
 did`, `trilhas.cy.ts:71`; modal não fechou, campo de nome da campanha ausente).
 Esse teste **passou** nas baterias #50 e #51 e está **fora do escopo** desta
-entrega (não toca Trilhas nem `TrilhaForm`) — em aberto para investigação (flake
-ou mudança recente no fluxo de criação de trilha).
+entrega (não toca Trilhas nem `TrilhaForm`). **Resolvido: era flake** — passou na
+re-rodada #53 (`a84f549e`), com a **suíte inteira verde (43/43)**.
 
 **Nota de cobertura (evitar retrabalho):** dois "candidatos" que **não são
 lacuna** — já têm tela coberta por specs existentes:
@@ -671,13 +671,15 @@ lacuna** — já têm tela coberta por specs existentes:
 
 Com isso, a rodada doc-first de tela cobriu os módulos que faltavam
 (Férias, Colaboradores, Financeiro, Usuários, Aprendizado & Papéis, Pendências);
-Atestados/GAF e Feed(=Mural) já estavam cobertos.
+Atestados/GAF e Feed(=Mural) já estavam cobertos. A suíte da homologação voltou a
+**43/43 verde** na bateria #53 (`a84f549e`).
 
-**Em aberto (não é lacuna de tela nova):** `trilhas.cy.ts › "cria uma trilha na
-Gestão"` falhou na bateria #52 (`AssertionError: 'Trilha criada!' but never did`,
-`trilhas.cy.ts:71`; modal não fechou). **Passou** nas #50 e #51 e não foi tocado
-por estas entregas — flake ou mudança recente no fluxo de criação de trilha, a
-investigar.
+**Nota de flake (para o histórico):** `trilhas.cy.ts › "cria uma trilha na Gestão"`
+falhou **apenas** na #52 (`'Trilha criada!' never did`, `trilhas.cy.ts:71`; modal
+não fechou) e passou nas #50, #51 e na re-rodada #53. Foi **instabilidade**, não
+regressão — nenhuma entrega tocou Trilhas/`TrilhaForm`. Se voltar a piscar, é
+candidato a endurecer o `it()` (esperar o fechamento do modal / o toast com mais
+tolerância).
 
 ## Testes de tela (Cypress) na homologação
 

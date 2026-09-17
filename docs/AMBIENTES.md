@@ -444,10 +444,22 @@ Faltam nos dois: `ponto_adicional_noturno_rural` (PONTO-113, regime rural),
 `ponto_expurgar_geolocalizacao` e `ponto_expurgo_eventos`. Só na homologação faltam
 também `ponto_banco_horas_oficial` e `ponto_reprocessar_pre_assinalacao`.
 
-> **Pendência de LGPD.** `ponto_expurgar_geolocalizacao` e `ponto_expurgo_eventos` são a
-> rotina de descarte da geolocalização das marcações. Não estão em **nenhum** dos dois
-> ambientes: a geolocalização não está sendo expurgada no prazo (LGPD art. 15 e 16).
-> Existe script de entrega pronto.
+> **Pendência de LGPD — RESOLVIDA em 17/09/2026.** `ponto_expurgar_geolocalizacao` e
+> `ponto_expurgo_eventos` são a rotina de descarte da geolocalização das marcações. Não
+> estavam em **nenhum** dos dois ambientes: a geolocalização era guardada sem prazo
+> (LGPD art. 15 e 16). Entregue em dois passos —
+> `docs/script_ponto_lgpd_geo_medicao.sql` (só leitura, mede e confere a pré-condição do
+> hash) e `docs/script_ponto_lgpd_geo_instalacao.sql` (instala e agenda). Aplicado na
+> homologação e na produção, conferência `OK` nos dois. Prazo de 180 dias por cliente,
+> passada semanal aos domingos às 04:41.
+>
+> **A armadilha que esse script achou, e que vale para qualquer entrega futura:**
+> `ponto_retencao_config` já existia nos dois ambientes **sem a chave única em
+> `tenant_id`**. `CREATE TABLE IF NOT EXISTS` garante que a tabela EXISTA, não que ela
+> tenha a FORMA esperada — e o `ON CONFLICT (tenant_id)` que vinha depois derrubou o
+> arquivo inteiro. Em banco com deriva, script de entrega precisa **reconciliar forma**
+> (`ADD COLUMN IF NOT EXISTS`, criar a constraint que faltar) e evitar `ON CONFLICT`
+> onde a chave pode não existir — `WHERE NOT EXISTS` funciona nos dois casos.
 
 **O registro de migrations da produção** (`supabase_migrations.schema_migrations`):
 534 carimbos, o mais recente de 02/09/2026. Comparado com o repositório, mês a mês:

@@ -76,7 +76,7 @@ função, CIPA pelo Quadro I, enquadramento×adicional, PPP e coerência documen
 - `DESL-002` — ✅ **desligamento vira trilha de eventos**: regravar por cima de desligamento já registrado é barrado (`unique_violation`); correção só por `desligamento_retificar` (com justificativa, gestor/RH), tudo em `desligamento_eventos`.
 - `DESL-106` — ✅ **reversão exige rito**: sair de `desligado` por UPDATE cru sem `reversao_desligamento_justificativa` é bloqueado (gatilho `trg_admissao_bloqueia_reversao_desligamento`).
 - `FERIAS-056` — ✅ **trava de autoaprovação** em `ferias_solicitacoes` (CHECK `aprovado_por <> colaborador_id`, entregue `NOT VALID` para não reprovar legado).
-- `PONTO-252` — ⚠️ **trava instalada** (`chk_ajuste_sem_autoaprovacao`, `NOT VALID`) barra novas autoaprovações. **Continua vermelho na produção** enquanto existirem os ~76 ajustes históricos autoaprovados — esses exigem **decisão de produto à parte** (o que fazer com o passado; a trava não reescreve histórico).
+- `PONTO-252` — ✅ **controle efetivo + medição corrigida** (`script_ponto252_controle_efetivo_e_medicao.sql`). Duas descobertas: (a) a CHECK `chk_ajuste_sem_autoaprovacao` é **cosmética** (compara `aprovado_por`=auth_user_id com `colaborador_id`=usuarios_base.id — espaços de ID diferentes); o controle **efetivo** é o gatilho `trg_ponto_ajuste_autoaprovacao`, que resolve o aprovador em `usuarios_base` (por id ou CPF) e barra a autoaprovação real — entregue agora. (b) A rotina foi remedida: passa quando o **controle efetivo** existe (novas autoaprovações impossíveis); os ~76 autoaprovados **anteriores ao controle** viram informação (*grandfather*), não falha — história não se reescreve. Decisão do dono do produto (17/09/2026): ajustar a medição.
 
 ### ⏳ Pendentes
 

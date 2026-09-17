@@ -561,6 +561,30 @@ esta migration foi re-carimbada para `…180500` para desbloquear — conteúdo
 intacto. Reforço do costume: conferir o carimbo livre **no momento da mescla**,
 não só ao criar.
 
+### Cobertura nova de tela — Financeiro (09/2026, doc-first)
+
+O módulo **Financeiro** (`financeiro`) — folha, benefícios, provisões, eSocial —
+não tinha tela documentada. Mesmo padrão:
+
+- **10 casos `e2e` FINAN-TELA-01..10** em `qa_casos_teste` — o módulo monta com
+  as 13 abas; o **Painel** mostra KPIs e cards; a aba **Folha** abre com **Novo
+  Período** (+ modal); a aba **Benefícios** com **Novo Benefício**/**Vincular**
+  (+ modal Novo Tipo de Benefício); e as abas Rubricas/Provisões/eSocial/Tabelas
+  abrem sem erro. Data-independentes (sem fixtures).
+- **`cypress/e2e/financeiro.cy.ts`** — os 10 `it()`, ligados pela ponte.
+- Entregas: migration `20260917120000_qa_financeiro_casos_tela.sql` e
+  `docs/script_financeiro_casos_tela_homologacao.sql` (colado no SQL Editor da
+  homologação antes da corrida).
+
+Validação: homologação (bateria #49, `967e7d5`) **40 specs, tudo verde**, guarda
+incluída (financeiro 10/10; sem casos `e2e` pré-existentes no módulo).
+
+**Nota de cobertura (evitar retrabalho):** o módulo **Atestados/GAF** (`/atestados`,
+tela "MOD-GAF") **já tem cobertura** pelo spec `afastamentos.cy.ts` (Central GAF,
+casos AFAST-TELA-*) — não é lacuna. Módulos ainda sem tela documentada (candidatos
+futuros): Usuários (`/usuarios`), Pendências (`/pendencias`), Feed (`/feed`) e
+Aprendizado & Papéis (`/aprendizado-papeis`).
+
 ## Testes de tela (Cypress) na homologação
 
 Por padrão a suíte Cypress roda só no **teste** (é lá que a tela nasce, e as duas

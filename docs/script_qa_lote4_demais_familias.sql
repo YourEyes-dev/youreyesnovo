@@ -5754,13 +5754,12 @@ INSERT INTO public.qa_implementacoes (codigo, funcao_sql, ativo) VALUES
   ('SST-080','qa_caso_sst_080', true)
 ON CONFLICT (codigo) DO UPDATE SET funcao_sql = EXCLUDED.funcao_sql, ativo = true;
 
--- Conferencia: familia x situacao (so as familias deste lote) ────────────────
-WITH alvo AS (
-  SELECT codigo, funcao_sql FROM public.qa_implementacoes
-  WHERE ativo AND split_part(codigo,'-',1) IN
-    ('AFAST','BEN','COLAB','DADO','DESL','EMP','ENQ','EPI','ESC','FOLHA','HCAL','HCAT','HIER','HTPL','JOR','OUV','REGRA','SST')
-)
-SELECT split_part(a.codigo,'-',1) AS familia,
-       (public.qa_executar_descartavel(a.funcao_sql)).situacao::text AS situacao,
-       count(*) AS qtd
-FROM alvo a GROUP BY 1,2 ORDER BY familia, qtd DESC;
+-- Conferencia LEVE (so conta; NAO executa a bateria — evita timeout/rollback) -
+SELECT split_part(i.codigo,'-',1) AS familia,
+       count(*) AS rotinas_esperadas,
+       count(*) FILTER (WHERE p.oid IS NOT NULL) AS funcoes_presentes
+FROM public.qa_implementacoes i
+LEFT JOIN pg_proc p ON p.proname = i.funcao_sql AND p.pronamespace = 'public'::regnamespace
+WHERE i.ativo AND split_part(i.codigo,'-',1) IN
+  ('AFAST','BEN','COLAB','DADO','DESL','EMP','ENQ','EPI','ESC','FOLHA','HCAL','HCAT','HIER','HTPL','JOR','OUV','REGRA','SST')
+GROUP BY 1 ORDER BY familia;

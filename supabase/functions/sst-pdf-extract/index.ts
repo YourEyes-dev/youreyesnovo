@@ -9,12 +9,16 @@ const corsHeaders = {
 // Hard cap to prevent memory/CPU exhaustion on edge runtime (status 546)
 const MAX_PDF_BYTES = 50 * 1024 * 1024; // 50 MB
 
-// Teto para a extração de melhor qualidade (unpdf). Ela monta o documento
-// inteiro em memória; acima deste tamanho o worker morre por estouro de
-// recursos e a plataforma devolve 546 — que chega ao usuário como erro cru,
-// sem chance de cair nas tentativas seguintes. Acima do teto usamos o parser
-// em blocos, que é mais pobre mas entrega o texto em vez de falhar tudo.
+// Tetos para a extração de melhor qualidade (unpdf). Ela é encerrada pela
+// plataforma com o status 546 quando estoura memória ou tempo de CPU, e worker
+// encerrado não responde nada — o número chega cru ao usuário.
+//
+// São DOIS tetos porque o custo tem duas fontes independentes. O caso que
+// motivou isto (PGR da VOE MIDIA, importado pela Barros) tinha só 2,5MB e
+// ~92 páginas: passava folgado em qualquer teto de bytes e estourava pelo
+// número de páginas. PDF de texto comprime muito, então byte não mede custo.
 const MAX_UNPDF_BYTES = 8 * 1024 * 1024; // 8 MB
+const MAX_UNPDF_PAGINAS = 120;           // acima disto, parser leve
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -110,24 +114,56 @@ async function extractPdfText(bytes: Uint8Array): Promise<string> {
 
   // Tentativa 1: unpdf (pdfjs leve, otimizado para edge/serverless).
   //
-  // É a de melhor qualidade, e também a mais cara: monta o documento inteiro
-  // em memória e junta o texto de todas as páginas de uma vez. Num PGR de
-  // muitas páginas é justamente ela quem derruba o worker — e worker derrubado
-  // não responde nada, então o erro chega ao usuário como o cru "Erro 546",
-  // sem passar pelas tentativas seguintes.
+  // É a de melhor qualidade e a mais cara. O que a encarece NÃO é o tamanho do
+  // arquivo, é a QUANTIDADE DE PÁGINAS: o PGR que derrubou a importação tinha
+  // 2,5MB e ~92 páginas de tabela. PDF de texto comprime muito, então poucos
+  // megabytes viram dezenas de MB de estruturas de fonte e página na memória,
+  // e o tempo de CPU estoura. Worker estourado não responde nada — daí o "Erro
+  // 546" cru na tela, sem chance de cair nas tentativas seguintes.
   //
-  // Acima do limite abaixo ela é PULADA de propósito: é melhor entregar o
-  // texto com o parser leve do que falhar o documento inteiro.
-  if (bytes.length <= MAX_UNPDF_BYTES) {
+  // Por isso aqui:
+  //   1. abre o documento (barato) e olha quantas páginas tem;
+  //   2. extrai PÁGINA POR PÁGINA, liberando cada uma com cleanup() — em vez
+  //      de pedir o texto das 92 de uma vez, que é o que estourava;
+  //   3. documento com páginas demais vai direto ao parser leve.
+  const tamanhoOk = bytes.length <= MAX_UNPDF_BYTES;
+  if (tamanhoOk) {
     try {
       // @ts-ignore
-      const { extractText, getDocumentProxy } = await import("https://esm.sh/unpdf@0.12.1");
-      const pdf = await getDocumentProxy(bytes);
-      const { text } = await extractText(pdf, { mergePages: true });
-      const joined = Array.isArray(text) ? text.join("\n") : String(text || "");
-      if (joined.trim().length > 100) {
-        console.log(`unpdf extraction: ${joined.length} chars (${mb}MB)`);
-        return joined;
+      const { getDocumentProxy } = await import("https://esm.sh/unpdf@0.12.1");
+      // A CÓPIA é obrigatória, não zelo: o pdfjs assume a posse do array que
+      // recebe e deixa o ArrayBuffer "detached" — depois dele, ler `bytes`
+      // lança TypeError. Como as tentativas 2 e 3 recebem o MESMO `bytes`, a
+      // rede de segurança inteira estava morta: sempre que o unpdf falhava sem
+      // derrubar o worker, os dois fallbacks quebravam junto e a extração
+      // voltava vazia. Medido: com o array direto o fallback não consegue ler
+      // nada; com a cópia ele lê normalmente.
+      const pdf = await getDocumentProxy(bytes.slice());
+      const paginas = Number(pdf?.numPages || 0);
+
+      if (paginas > 0 && paginas <= MAX_UNPDF_PAGINAS) {
+        const partes: string[] = [];
+        for (let i = 1; i <= paginas; i++) {
+          const page = await pdf.getPage(i);
+          const conteudo = await page.getTextContent();
+          const linha = (conteudo?.items || [])
+            .map((it: any) => (typeof it?.str === "string" ? it.str : ""))
+            .join(" ");
+          if (linha.trim()) partes.push(linha);
+          // Devolve a memória da página antes de abrir a próxima. Sem isto o
+          // consumo cresce página a página até derrubar o worker.
+          try { page.cleanup(); } catch { /* cleanup é best-effort */ }
+        }
+        const joined = partes.join("\n");
+        if (joined.trim().length > 100) {
+          console.log(`unpdf extraction: ${joined.length} chars, ${paginas} paginas (${mb}MB)`);
+          return joined;
+        }
+      } else {
+        console.log(
+          `PDF com ${paginas} paginas acima do teto de ${MAX_UNPDF_PAGINAS}: ` +
+          `indo ao parser em blocos para nao estourar o tempo de CPU.`
+        );
       }
     } catch (e: any) {
       console.warn("unpdf falhou:", e?.message || e);

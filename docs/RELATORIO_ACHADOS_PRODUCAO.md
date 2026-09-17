@@ -33,21 +33,22 @@ O sistema não gerava os eventos do eSocial na linha da vida do vínculo.
 | **Qualificação cadastral** | `ADM-092` | ✅ `admissao_qualificacao_cadastral` (CPF×nome×nascimento antes do envio) |
 | **Tradução de rejeição** | `ADM-093` | ✅ `esocial_rejeicao_traduzir` (código → instrução; conduz retificação) |
 | **S-2299** desligamento | `DESL-091` | ✅ gerador + gatilho (novos desligamentos geram S-2299; históricos registrados sem transmitir) |
+| **S-2230** afastamento | `AFAST-060` | ✅ prazo por duração + gerador + gatilho blindado + backfill `historico` |
+| **S-2210** CAT (acidente) | `AFAST-030` | ✅ gatilho preenche o prazo = 1º dia útil seguinte (art. 22, Lei 8.213); função de calendário entregue junto (drift) |
+| **S-2220** monitoramento saúde | `SST-030` | ✅ prazo do S-2220 (dia 15 do mês seguinte ao ASO) — camada fase-4 SST entregue |
+| **S-2240** cond. ambientais | `SST-031` | ✅ histórico de exposição estruturado + geração do S-2240; coerência documental `SST-070` (PGR×PCMSO×LTCAT×S-2240) |
 | Gatilhos de eSocial | — | ✅ **blindados** (nunca travam a operação) |
 
 > Decisão de compliance aplicada: os eventos **históricos** entram como `historico`
 > (contam, mas **não transmitem** ao governo); só os **novos** transmitem.
 
-### ⏳ Pendentes — eventos "sem relógio" de outros módulos
+### ✅ Frente eSocial "sem relógio" — fechada
 
-| Evento | Código | Evidência |
-|---|---|---|
-| **S-2230** afastamento | `AFAST-060` | pendência criada, mas sem data-limite e sem evento |
-| **S-2210** CAT (acidente) | `AFAST-030` | pendência disparada, sem relógio nem evento |
-| **S-2220** monitoramento saúde | `SST-030` | fila aceita quando a tela monta, sem projetar prazo (dia 15) |
-| **S-2240** cond. ambientais | `SST-070` | documentos não se cruzam (PGR×PCMSO×LTCAT×S-2240) |
-
-Mesmo padrão dos resolvidos: falta o gerador/gatilho e o **relógio** (prazo/data-limite).
+Todos os eventos da linha da vida do vínculo agora carregam relógio (prazo/
+data-limite), gerador e gatilho blindado. A entrega da **camada fase-4 de SST**
+(`script_fase4_sst_extracao_e_motores.sql`) fechou de quebra a família SST
+inteira (15/15 casos verdes): extração estruturada, PGR→plano de ação, OS por
+função, CIPA pelo Quadro I, enquadramento×adicional, PPP e coerência documental.
 
 ---
 

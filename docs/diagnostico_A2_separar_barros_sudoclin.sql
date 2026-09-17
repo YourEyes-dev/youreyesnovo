@@ -56,7 +56,8 @@ adm AS MATERIALIZED (
 grp AS MATERIALIZED (
   SELECT tenant_id, cpfn,
          count(DISTINCT COALESCE(empresa_id,'00000000-0000-0000-0000-000000000000'::uuid)) AS n_emp,
-         min(COALESCE(empresa_id,'00000000-0000-0000-0000-000000000000'::uuid))             AS emp_key
+         -- min(uuid) nao existe no Postgres; comparamos como texto e devolvemos texto.
+         min(COALESCE(empresa_id,'00000000-0000-0000-0000-000000000000'::uuid)::text)       AS emp_key
   FROM adm GROUP BY tenant_id, cpfn HAVING count(*) > 1
 ),
 dup_mesma AS MATERIALIZED (
@@ -64,7 +65,7 @@ dup_mesma AS MATERIALIZED (
          e.usa_controle_ponto AS emp_ponto,
          (regexp_replace(COALESCE(e.cnpj,''),'[^0-9]','','g') IN (SELECT cnpjn FROM alvo)) AS emp_do_grupo
   FROM grp g
-  LEFT JOIN public.empresa_cadastro e ON e.id = g.emp_key
+  LEFT JOIN public.empresa_cadastro e ON e.id = g.emp_key::uuid
   WHERE g.n_emp = 1
 ),
 dup_por_conta AS MATERIALIZED (

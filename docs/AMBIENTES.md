@@ -579,11 +579,37 @@ não tinha tela documentada. Mesmo padrão:
 Validação: homologação (bateria #49, `967e7d5`) **40 specs, tudo verde**, guarda
 incluída (financeiro 10/10; sem casos `e2e` pré-existentes no módulo).
 
+### Cobertura nova de tela — Usuários (09/2026, doc-first)
+
+O módulo **Usuários** (`infraestrutura-auth/usuarios-permissoes`, rota `/usuarios`)
+— identidades, vínculos e ciclo de vida — já tinha forte cobertura de **MOTOR**
+(59 casos api de permissão/isolamento: CTX/ISOL/USR/PER/VIN) e nenhuma **tela**.
+Mesmo padrão:
+
+- **7 casos `e2e` USR-TELA-01..07** em `qa_casos_teste` — o módulo monta com
+  cabeçalho/métricas (Ativos/Com convite/Multiempresa/Alertas IA) e a ação **Novo
+  Usuário**; os filtros de busca/empresa/status/tipo aparecem; o modal **Novo
+  Usuário** abre ("Dados Básicos"); e a busca por termo inexistente mostra o vazio
+  orientativo. Data-independentes (sem fixtures).
+- **`cypress/e2e/usuarios.cy.ts`** — os 7 `it()`, ligados pela ponte.
+- Entregas: migration `20260917144156_qa_usuarios_casos_tela.sql` e
+  `docs/script_usuarios_casos_tela_homologacao.sql`. As duas **garantem a linha do
+  módulo** (idempotente, sob `infraestrutura-auth`) para não depender da ordem de
+  outra sessão.
+
+Validação: homologação (bateria #50, `f1d6d39`) **41 specs, tudo verde**, guarda
+incluída (usuarios 7/7). Confirmação na homologação: `casos_usr_tela=7`,
+`pontes_usr_tela=7`, `e2e_no_modulo_usuarios=12` (os 7 de tela + 5 casos `e2e` de
+motor pré-existentes — CTX/USR/PER). Esses 5 seguem como casos `e2e` documentados
+sem teste de tela (só aviso na guarda).
+
 **Nota de cobertura (evitar retrabalho):** o módulo **Atestados/GAF** (`/atestados`,
 tela "MOD-GAF") **já tem cobertura** pelo spec `afastamentos.cy.ts` (Central GAF,
-casos AFAST-TELA-*) — não é lacuna. Módulos ainda sem tela documentada (candidatos
-futuros): Usuários (`/usuarios`), Pendências (`/pendencias`), Feed (`/feed`) e
-Aprendizado & Papéis (`/aprendizado-papeis`).
+casos AFAST-TELA-*) — não é lacuna. O **Aprendizado & Papéis**
+(`/aprendizado-papeis`) tinha os casos `e2e` **documentados** (APR-*, migration
+`20260901130500`) mas **sem teste de tela nem ponte** — em implementação agora
+(ver abaixo). Módulos ainda sem tela documentada (candidatos futuros):
+Pendências (`/pendencias`) e Feed (`/feed`).
 
 ## Testes de tela (Cypress) na homologação
 

@@ -7,7 +7,35 @@
 -- gatilho preenche o prazo = proximo dia util (reusa afastamento_proximo_dia_util,
 -- que ja conhece o calendario de feriados). Em obito o prazo e imediato (a
 -- pendencia especifica cuida). Read-only por natureza (so completa o prazo).
+--
+-- DRIFT: afastamento_proximo_dia_util existe no desenvolvimento, mas nao na
+-- homologacao/producao. A migration cria/atualiza a funcao antes de usa-la
+-- (CREATE OR REPLACE = no-op onde ja existe igual) para atravessar banco novo.
 -- ============================================================================
+
+-- Calendario: proximo dia util (pula fim de semana e feriados cadastrados).
+CREATE OR REPLACE FUNCTION public.afastamento_proximo_dia_util(p_tenant uuid, p_data date)
+RETURNS date LANGUAGE plpgsql STABLE SET search_path TO 'public'
+AS $fn$
+DECLARE
+  v_dia date := p_data + 1;
+  v_i   int := 0;
+BEGIN
+  WHILE v_i < 30 LOOP
+    IF EXTRACT(DOW FROM v_dia) NOT IN (0, 6)
+       AND NOT EXISTS (
+         SELECT 1 FROM public.feriados f
+          WHERE f.ativo
+            AND (f.tenant_id = p_tenant OR f.tenant_id IS NULL)
+            AND f.data = v_dia
+       ) THEN
+      RETURN v_dia;
+    END IF;
+    v_dia := v_dia + 1;
+    v_i := v_i + 1;
+  END LOOP;
+  RETURN v_dia;
+END $fn$;
 
 CREATE OR REPLACE FUNCTION public.trg_cat_pendencia_prazo()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'

@@ -68,6 +68,35 @@ BEGIN
     updated_at timestamptz NOT NULL DEFAULT now()
   );
 
+  -- (1b) A tabela pode JA EXISTIR com outra forma — foi o que aconteceu na
+  --      homologacao e na producao, onde ela nasceu sem chave unica em
+  --      tenant_id. O CREATE ... IF NOT EXISTS acima nao corrige forma: ele so
+  --      nao faz nada. Entao aqui a forma e reconciliada, para o arquivo valer
+  --      tanto em banco novo quanto em banco que ja tinha a tabela torta.
+  ALTER TABLE public.ponto_retencao_config
+    ADD COLUMN IF NOT EXISTS geolocalizacao_dias integer NOT NULL DEFAULT 180;
+  ALTER TABLE public.ponto_retencao_config
+    ADD COLUMN IF NOT EXISTS ativo boolean NOT NULL DEFAULT true;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+     WHERE c.conrelid = 'public.ponto_retencao_config'::regclass
+       AND c.contype IN ('p', 'u')
+       AND array_length(c.conkey, 1) = 1
+       AND (SELECT a.attname FROM pg_attribute a
+             WHERE a.attrelid = c.conrelid AND a.attnum = c.conkey[1]) = 'tenant_id'
+  ) THEN
+    BEGIN
+      EXECUTE 'ALTER TABLE public.ponto_retencao_config
+                 ADD CONSTRAINT ponto_retencao_config_tenant_uk UNIQUE (tenant_id)';
+      RAISE NOTICE 'Chave unica por tenant criada (a tabela existia sem ela).';
+    EXCEPTION WHEN OTHERS THEN
+      -- Ha tenant repetido, ou falta permissao. Nao e impeditivo: a matricula
+      -- abaixo nao depende de chave unica.
+      RAISE NOTICE 'Sem chave unica por tenant (%). A matricula segue mesmo assim, e a conferencia acusa.', SQLERRM;
+    END;
+  END IF;
+
   -- (2) Registro do expurgo — o art. 37 da LGPD exige poder demonstrar o que
   --     foi feito. Apagar sem registrar troca um problema por outro.
   CREATE TABLE IF NOT EXISTS public.ponto_expurgo_eventos (
@@ -172,9 +201,13 @@ BEGIN
     RETURN;
   END IF;
 
+  -- Matricula por WHERE NOT EXISTS, e nao por ON CONFLICT: onde a tabela nao
+  -- tem chave unica em tenant_id, o ON CONFLICT derruba o arquivo inteiro.
   INSERT INTO public.ponto_retencao_config (tenant_id)
-  SELECT DISTINCT m.tenant_id FROM public.ponto_marcacoes m
-  ON CONFLICT (tenant_id) DO NOTHING;
+  SELECT DISTINCT m.tenant_id
+    FROM public.ponto_marcacoes m
+   WHERE NOT EXISTS (SELECT 1 FROM public.ponto_retencao_config rc
+                      WHERE rc.tenant_id = m.tenant_id);
   GET DIAGNOSTICS v_novos = ROW_COUNT;
   RAISE NOTICE 'Tenants matriculados agora: % (os ja existentes mantiveram o prazo que tinham).', v_novos;
 
@@ -213,6 +246,13 @@ WITH x AS MATERIALIZED (
     (to_regclass('public.ponto_retencao_config') IS NOT NULL)                 AS tem_config,
     (to_regprocedure('public.ponto_expurgar_geolocalizacao(uuid)') IS NOT NULL) AS tem_rotina,
     (to_regclass('public.ponto_expurgo_eventos') IS NOT NULL)                 AS tem_registro,
+    EXISTS (SELECT 1 FROM pg_constraint c
+             WHERE c.conrelid = to_regclass('public.ponto_retencao_config')
+               AND c.contype IN ('p', 'u')
+               AND array_length(c.conkey, 1) = 1
+               AND (SELECT a.attname FROM pg_attribute a
+                     WHERE a.attrelid = c.conrelid AND a.attnum = c.conkey[1]) = 'tenant_id')
+                                                                              AS chave_unica_ok,
     -- Contas feitas por consulta dinamica: onde a instalacao foi PULADA a
     -- tabela de prazos nao existe, e nomea-la aqui faria o arquivo terminar
     -- num erro de "relation does not exist" em vez do aviso claro.
@@ -230,10 +270,12 @@ WITH x AS MATERIALIZED (
                    FROM public.ponto_retencao_config rc WHERE rc.ativo',
                 false, true, '')))[1]::text::bigint END                       AS alvo_1a_passada
 )
-SELECT projeto, hash_ignora_geo, tem_config, tem_rotina, tem_registro,
+SELECT projeto, hash_ignora_geo, tem_config, tem_rotina, tem_registro, chave_unica_ok,
        tenants_ativos, alvo_1a_passada,
        CASE
          WHEN NOT hash_ignora_geo THEN 'PULADO — o hash usa a coordenada; nada foi instalado'
+         WHEN tem_config AND tem_rotina AND tem_registro AND NOT chave_unica_ok
+           THEN 'OK, com ressalva — a tabela de prazos ficou sem chave unica por cliente'
          WHEN tem_config AND tem_rotina AND tem_registro THEN 'OK'
          ELSE 'CONFERIR'
        END AS erro_tecnico

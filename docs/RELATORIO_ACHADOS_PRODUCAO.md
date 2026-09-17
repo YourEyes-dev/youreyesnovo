@@ -11,27 +11,43 @@ lista mais achados; **produção** confirma um subconjunto contra **dados reais*
 aparece em homologação é igualmente real — só não teve dado que o disparasse na
 produção ainda.
 
-> Severidade é sugestão minha para triar. Ao todo, ~90 achados. **Nada aqui
-> alterou a produção** — tudo foi leitura.
+> Severidade é sugestão minha para triar. Ao todo, ~90 achados.
+>
+> **Progresso (17/09/2026):** ✅ **4 resolvidos em produção** — o eSocial das duas
+> pontas do vínculo (S-2200 admissão `ADM-090`, S-2299 desligamento `DESL-091`),
+> a qualificação cadastral (`ADM-092`) e a tradução de rejeição (`ADM-093`), com
+> os gatilhos blindados. Correções aplicadas com validação prévia e sem tocar em
+> dado existente (só colunas novas + eventos).
 
 ---
 
 ## 🔴 TEMA 1 — eSocial não sai (compliance, o mais grave)
 
-O sistema **não gera os eventos do eSocial**, em toda a linha da vida do vínculo:
+O sistema não gerava os eventos do eSocial na linha da vida do vínculo.
+
+### ✅ RESOLVIDOS (17/09/2026 — em produção)
+
+| Evento | Código | O que entrou |
+|---|---|---|
+| **S-2200** admissão | `ADM-090` | ✅ gerador + gatilho (novas admissões geram S-2200; 10.541 históricas registradas sem transmitir) |
+| **Qualificação cadastral** | `ADM-092` | ✅ `admissao_qualificacao_cadastral` (CPF×nome×nascimento antes do envio) |
+| **Tradução de rejeição** | `ADM-093` | ✅ `esocial_rejeicao_traduzir` (código → instrução; conduz retificação) |
+| **S-2299** desligamento | `DESL-091` | ✅ gerador + gatilho (novos desligamentos geram S-2299; históricos registrados sem transmitir) |
+| Gatilhos de eSocial | — | ✅ **blindados** (nunca travam a operação) |
+
+> Decisão de compliance aplicada: os eventos **históricos** entram como `historico`
+> (contam, mas **não transmitem** ao governo); só os **novos** transmitem.
+
+### ⏳ Pendentes — eventos "sem relógio" de outros módulos
 
 | Evento | Código | Evidência |
 |---|---|---|
-| **S-2200** admissão | `ADM-092` | 🟢 **10.541 admissões, 0 eventos na fila, 0 log** |
-| **S-2190** admissão preliminar | `ADM-093` | decorrência do S-2200 |
-| **S-2299** desligamento | `DESL-091` | 🟢 **24 desligamentos, 9 logs "gerado", 0 eventos na fila** |
 | **S-2230** afastamento | `AFAST-060` | pendência criada, mas sem data-limite e sem evento |
 | **S-2210** CAT (acidente) | `AFAST-030` | pendência disparada, sem relógio nem evento |
 | **S-2220** monitoramento saúde | `SST-030` | fila aceita quando a tela monta, sem projetar prazo (dia 15) |
 | **S-2240** cond. ambientais | `SST-070` | documentos não se cruzam (PGR×PCMSO×LTCAT×S-2240) |
 
-**É o item nº 1.** O padrão é sempre o mesmo: a inteligência cria a *pendência/log*,
-mas **o evento não é enfileirado** e **não há relógio** (prazo/data-limite).
+Mesmo padrão dos resolvidos: falta o gerador/gatilho e o **relógio** (prazo/data-limite).
 
 ---
 

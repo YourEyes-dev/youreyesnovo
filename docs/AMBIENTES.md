@@ -6,6 +6,7 @@ são injetadas no build pelo Vite conforme o `--mode`.
 
 | | TESTE (staging) | HOMOLOGAÇÃO | PRODUÇÃO |
 |---|---|---|---|
+| Projeto Supabase | `bmehdgthciuvdbvutsdv` | `fgsblefvdabgdouipigz` | `diayjpsrcerycycyaxst` |
 | Como recebe mudança | esteira automática, a cada merge | **o mesmo script colado à mão** | script colado à mão |
 | Estrutura | a do repositório | forward-only (ver decisão 09/2026 abaixo) | a real |
 | Dados | fictícios | fictícios | reais |
@@ -419,6 +420,65 @@ produção e viraria um segundo ambiente de teste — inútil, porque já existe
 
 Daqui em diante ela recebe exatamente o que a produção recebe: o script colado no
 SQL Editor. Na mesma ordem, com o mesmo conteúdo.
+
+## Medição de 17/09/2026 — o que cada ambiente realmente tem
+
+Feita com `docs/script_ponto_inventario_ambiente.sql`, `docs/script_ponto_raiox_motor.sql`
+e `docs/script_ponto_registro_migrations.sql` (os três são somente leitura). Vale a pena
+repetir de tempos em tempos: foi ela que mostrou que o roteiro de produção descrevia um
+banco que não existia mais.
+
+**Identidade.** Toda consulta de diagnóstico deve carimbar o projeto lendo
+`app_config.supabase_url` — sem isso, uma tabela colada numa conversa não diz de onde
+veio, e já custou uma conclusão errada aqui.
+
+**Objetos do módulo Ponto** (181 no projeto):
+
+| | tem | falta |
+|---|---|---|
+| Produção | 176 | 5 |
+| Homologação | 174 | 7 |
+
+Faltam nos dois: `ponto_adicional_noturno_rural` (PONTO-113, regime rural),
+`ponto_auditoria_ajustes_motivo`, `ponto_auditoria_motivos_resumo`,
+`ponto_expurgar_geolocalizacao` e `ponto_expurgo_eventos`. Só na homologação faltam
+também `ponto_banco_horas_oficial` e `ponto_reprocessar_pre_assinalacao`.
+
+> **Pendência de LGPD.** `ponto_expurgar_geolocalizacao` e `ponto_expurgo_eventos` são a
+> rotina de descarte da geolocalização das marcações. Não estão em **nenhum** dos dois
+> ambientes: a geolocalização não está sendo expurgada no prazo (LGPD art. 15 e 16).
+> Existe script de entrega pronto.
+
+**O registro de migrations da produção** (`supabase_migrations.schema_migrations`):
+534 carimbos, o mais recente de 02/09/2026. Comparado com o repositório, mês a mês:
+
+| mês | projeto | produção | |
+|---|---|---|---|
+| 2026-01 a 2026-05 | 400 | 399 | praticamente em dia |
+| 2026-06 | 104 | 72 | 69% |
+| 2026-07 | 146 | 24 | 16% |
+| 2026-08 | 233 | 36 | 15% |
+| 2026-09 | 183 | 3 | 2% |
+
+Existe, portanto, **um caminho automático até a produção** — o que a regra da casa nega.
+Ele funcionou até maio, degradou em junho e praticamente morreu em julho. A explicação
+que os dados sustentam: o Lovable aplica na produção as migrations que **ele mesmo**
+gera; migrations escritas direto no repositório por sessões do Claude Code nunca passam
+por ele. À medida que o trabalho migrou do editor do Lovable para as sessões, a produção
+parou de receber.
+
+**Mas isso não explica o módulo Ponto na produção.** Dos 182 objetos do Ponto, **155
+nasceram de julho em diante** — justamente quando o caminho automático já tinha caído
+para 16%. A produção tem 176 deles. Logo, eles chegaram lá pelos **scripts de entrega
+colados à mão**, não pela via automática. A fila da Travessia foi, na prática, aplicada
+na produção; o que não foi feito é **anotar isso no roteiro**, que seguiu marcando tudo
+como pendente.
+
+**O que esta medição ainda NÃO responde.** Inventário confere nome, não versão. Uma
+função pode existir com o nome certo e o corpo antigo — foi exatamente a armadilha do
+pacote 56. O `script_ponto_raiox_motor.sql` olha dentro do corpo de nove funções e
+responde isso; na homologação deu **9 de 9**. Na produção ainda não foi rodado.
+
 
 ## O fluxo de entrega com três ambientes
 

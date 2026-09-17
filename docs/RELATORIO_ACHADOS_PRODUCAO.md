@@ -54,9 +54,18 @@ função, CIPA pelo Quadro I, enquadramento×adicional, PPP e coerência documen
 
 ## 🔴 TEMA 2 — Proteção do menor de idade (jurídico grave)
 
-- `ADM-030` — admissão **comum aceita candidato de 15 anos** (CF art. 7º XXXIII).
-- `ADM-031` — **menor de 17 pode entrar em escala noturna/insalubre**.
-- `DESL-083` — **menor desligado sem assistente/responsável legal** (não há campo).
+### ✅ RESOLVIDOS (17/09/2026 — em produção)
+
+- `ADM-030` — ✅ **trava idade × modalidade na gravação**: menor de 14 barrado; 14–15 só aprendiz (gatilho `trg_admissao_idade_modalidade`, CF art. 7º XXXIII).
+- `ADM-031` — ✅ **trava idade × risco/turno**: menor de 18 barrado em jornada noturna e em função insalubre/perigosa (gatilho `trg_admissao_valida_menor_risco`, CLT arts. 404/405).
+- `DESL-083` — ✅ **quitação de menor exige assistente legal** (nome + CPF do responsável) na rescisão (gatilho `trg_admissao_menor_assistente_quitacao`, CLT art. 439).
+
+> Entrega `script_menor_idade_adm030_031.sql` — só cria colunas/funções/gatilhos,
+> não toca dado existente, gatilhos agem só em gravações futuras. Camada estava
+> no desenvolvimento (migrations fase-1/fase-4) mas nunca fora entregue à produção.
+
+### ⏳ Pendente
+
 - `FERIAS-016` — **estudante menor** não tem como coincidir férias com as escolares (art. 136 §2º).
 
 ---

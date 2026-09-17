@@ -90,14 +90,19 @@ função, CIPA pelo Quadro I, enquadramento×adicional, PPP e coerência documen
 
 Parte liga-se ao **A2** (a limpeza de empresa-CPF e vínculo ficou pendente):
 
-- `EMP-020` / `EMP-021` — 🟢 **duas empresas ativas com o mesmo CNPJ**; a trava `prevent_duplicate_active_cnpj` **não pega o UPDATE** de reativação.
-- `EMP-070` / `EMP-071` — 🟢 **duas empresas PF ativas com o mesmo CPF**: a trava só olha `cnpj`, e o índice de CPF ficou **adiado** (duplicatas não limpas).
-- `COLAB-033` — CPF duplicado separado só pela **pontuação** (índice sobre a coluna crua).
+### ✅ RESOLVIDOS (17/09/2026) — entrega `script_emp_unicidade_documento_ativo.sql`
+
+- `EMP-020` / `EMP-021` — ✅ **duas empresas ativas com o mesmo CNPJ** barradas no INSERT **e** no UPDATE de reativação (gatilho `prevent_duplicate_active_cnpj`, `unique_violation`).
+- `EMP-070` / `EMP-071` — ✅ **CPF de empresa PF** entra na mesma regra: o gatilho passou a cobrir CNPJ **e** CPF (normalizados), no INSERT e no UPDATE; duplicata **inativa** segue permitida.
+
+> Segurança do legado: o gatilho barra gravações novas **sem validar a tabela inteira** (seguro mesmo com duplicatas ativas históricas). Os índices únicos parciais entram como reforço só onde a base está limpa (bloco `DO` que cai em `NOTICE` se houver duplicata). A conferência da entrega **conta as duplicatas ativas já existentes** (CNPJ e CPF) para decidir a limpeza à parte.
+
+### ⏳ Pendentes
+
+- `COLAB-033` — CPF duplicado separado só pela **pontuação** (índice sobre a coluna crua). *(No dev já passa; entra num lote de resíduos.)*
 - `COLAB-021` — 🟢 **CPF inválido aceito** (validação só no front).
 - `FERIAS-091` / `PONTO-394` — período/constraint chaveado por `(tenant, CPF)` **ignora a empresa** (mesma raiz que corrigimos na admissão).
-
-> Ação ligada: falta a **limpeza A2 de empresa-CPF (11 grupos) e vínculo (2)** +
-> estender a trava de CNPJ para o UPDATE e para o CPF de empresa PF.
+- **Limpeza A2 de empresa-CPF/vínculo** e a **decisão sobre duplicatas ativas já existentes** que a conferência da entrega revelar (dado real; à parte).
 
 ---
 

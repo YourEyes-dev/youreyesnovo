@@ -1,154 +1,177 @@
-# Relatório de achados — motor de QA na produção
+# Relatório de achados — motor de QA (auditoria de conformidade)
 
-**Data:** 17/09/2026
-**Origem:** bateria do motor de QA executada **na produção** (só leitura, por
-simulação com descarte). Cada achado tem um **código** rastreável (ex.: `ADM-092`).
-**Este relatório não contém dado pessoal** — só contagens e a natureza do gap.
+**Data:** 17/09/2026 · **Origem:** bateria completa do motor de QA rodada em
+**produção** e **homologação** (só leitura, por simulação com descarte). Cada
+achado tem um **código** rastreável e, quase sempre, a **base legal**.
+**Sem dado pessoal** — só contagens e a natureza do gap.
 
-Estes NÃO são erros do motor nem "drift de teste": são **gaps reais de produto**
-que o motor encontrou porque, na produção, ele roda contra **dados reais** (no
-dev/sandbox davam "nada a auditar" por falta de massa). É o motor virando **radar
-de conformidade**.
+Como ler: **homologação** tem massa de teste rica e exercita mais casos, então
+lista mais achados; **produção** confirma um subconjunto contra **dados reais**
+(marcados com 🟢 **confirmado em produção**, alguns com números). Um gap que só
+aparece em homologação é igualmente real — só não teve dado que o disparasse na
+produção ainda.
+
+> Severidade é sugestão minha para triar. Ao todo, ~90 achados. **Nada aqui
+> alterou a produção** — tudo foi leitura.
 
 ---
 
-## Resumo executivo
+## 🔴 TEMA 1 — eSocial não sai (compliance, o mais grave)
 
-| Severidade | Qtd | Temas |
+O sistema **não gera os eventos do eSocial**, em toda a linha da vida do vínculo:
+
+| Evento | Código | Evidência |
 |---|---|---|
-| 🔴 Crítico (jurídico/compliance) | 5 | eSocial de admissão não sai; menor de idade admitido/em escala noturna; experiência acima do teto |
-| 🟠 Alto (controle/dados) | 4 | Autoaprovação de ajuste de ponto; documentos órfãos; ASO admissional inexistente; admissão concluída com ASO inapto |
-| 🟡 Médio (feature/jurídico) | 10 | Vale-transporte, intermitente, prazo determinado, piso CCT, retenção, retroativa, assinatura, regime rural, fechamento, cota |
-| ⚪ Baixo | 5 | Checklist fixo, folga em minutos, cota PCD parcial, aprendiz, isolamento de expurgo |
-| 🔧 Drift técnico (entrega pendente, não é achado de produto) | 2 | `ponto_diario_status_check` antiga; `converter_banco_horas_vencido` ausente |
+| **S-2200** admissão | `ADM-092` | 🟢 **10.541 admissões, 0 eventos na fila, 0 log** |
+| **S-2190** admissão preliminar | `ADM-093` | decorrência do S-2200 |
+| **S-2299** desligamento | `DESL-091` | 🟢 **24 desligamentos, 9 logs "gerado", 0 eventos na fila** |
+| **S-2230** afastamento | `AFAST-060` | pendência criada, mas sem data-limite e sem evento |
+| **S-2210** CAT (acidente) | `AFAST-030` | pendência disparada, sem relógio nem evento |
+| **S-2220** monitoramento saúde | `SST-030` | fila aceita quando a tela monta, sem projetar prazo (dia 15) |
+| **S-2240** cond. ambientais | `SST-070` | documentos não se cruzam (PGR×PCMSO×LTCAT×S-2240) |
 
-> Severidade é **sugestão minha** para ajudar a triar — a palavra final é sua.
-
----
-
-## 🔴 Críticos (risco jurídico/compliance)
-
-### 1. eSocial S-2200 não é gerado — `ADM-092`
-**10.541 admissões concluídas, 0 eventos S-2200 na fila de transmissão e 0
-registro de log mencionando 2200.** O evento de admissão do eSocial simplesmente
-não aparece. Isso é o coração da obrigação acessória da admissão.
-**Sugestão:** investigar por que a conclusão da admissão não enfileira o S-2200;
-é provavelmente o gap de maior risco da lista.
-
-### 2. eSocial S-2190 (admissão preliminar) não existe — `ADM-093`
-Decorrência do item 1: sem o caminho do S-2200, não há admissão preliminar
-(S-2190), prevista no MOS para casos de contratação em cima da hora.
-**Sugestão:** tratar junto com o item 1.
-
-### 3. Admissão comum aceita candidato de 15 anos — `ADM-030`
-O banco aceitou admissão **comum** de alguém com 15 anos na data de início —
-**nada valida a idade contra a modalidade**. A CF (art. 7º, XXXIII) veda trabalho
-a menores de 16, salvo aprendiz a partir de 14.
-**Sugestão:** trava de idade mínima por modalidade na conclusão da admissão.
-
-### 4. Menor pode ser alocado em escala noturna / função de risco — `ADM-031`
-Nenhuma função cruza `data_nascimento` com risco da função ou turno — um
-colaborador de 17 anos pode entrar em escala noturna ou insalubre (vedado ao
-menor).
-**Sugestão:** validação de idade × turno/risco.
-
-### 5. Contrato de experiência aceito acima do teto legal — `ADM-041`
-O banco aceitou 100 dias diretos e 60+45=105 dias com prorrogação — ambos acima
-do teto de 90 dias.
-**Sugestão:** validar duração/prorrogação do contrato de experiência.
+**É o item nº 1.** O padrão é sempre o mesmo: a inteligência cria a *pendência/log*,
+mas **o evento não é enfileirado** e **não há relógio** (prazo/data-limite).
 
 ---
 
-## 🟠 Altos (controle interno / integridade de dados)
+## 🔴 TEMA 2 — Proteção do menor de idade (jurídico grave)
 
-### 6. Ajuste de ponto aprovado pelo próprio colaborador — `PONTO-252`
-**76 de 1.709 ajustes aprovados foram aprovados pelo PRÓPRIO colaborador.** O
-ajuste altera a marcação; a autoaprovação anula o controle (quem pede não deveria
-aprovar).
-**Sugestão:** bloquear aprovação pelo mesmo usuário que solicitou; auditar os 76.
-
-### 7. Documentos de admissão órfãos — `ADM-072` / `ADM-073`
-**64 de 255 documentos de admissão (25,1%) estão sem `colaborador_id`** e **sem
-`pasta_id`**, embora existam 14.096 pastas de colaborador na base. Mais: **8 de
-10.541 admissões concluídas têm 60 documentos sem dono/pasta.** Documento de
-pessoa admitida sem vínculo é risco de organização e LGPD.
-**Sugestão:** corrigir o insert em `public.documentos` (grava `colaborador_id`
-nulo) e um reparo dos órfãos existentes (com backup).
-
-### 8. ASO admissional não existe como entidade — `ADM-020`
-O único ASO do sistema é o de **retorno** de afastamento (`afastamentos.aso_retorno_*`).
-Não há ASO **admissional** estruturado — peça central da SST na contratação.
-**Sugestão:** modelar o ASO admissional.
-
-### 9. Admissão concluída com ASO inapto e sem evento eSocial — `ADM-022`
-A admissão concluiu mesmo com ASO **inapto** e sem gerar evento — o gatilho
-`auto_criar_onboarding_admissao` olha só a mudança de status.
-**Sugestão:** bloquear conclusão com ASO inapto.
+- `ADM-030` — admissão **comum aceita candidato de 15 anos** (CF art. 7º XXXIII).
+- `ADM-031` — **menor de 17 pode entrar em escala noturna/insalubre**.
+- `DESL-083` — **menor desligado sem assistente/responsável legal** (não há campo).
+- `FERIAS-016` — **estudante menor** não tem como coincidir férias com as escolares (art. 136 §2º).
 
 ---
 
-## 🟡 Médios (feature / jurídico)
+## 🟠 TEMA 3 — Segregação de função / aprovação sem rito (controle interno)
 
-- **Vale-transporte não existe na admissão** — `ADM-021`. Nenhum campo de opção
-  (trajeto/linhas) nem renúncia (Lei 7.418).
-- **Contrato intermitente não existe** — `ADM-040`. Nenhuma coluna/função trata a
-  modalidade (art. 452-A exige contrato escrito).
-- **Prazo determinado não tem onde viver** — `ADM-107`. `tipo_contrato` é texto
-  livre e não há campo de data de término.
-- **Piso da CCT não é consultado** — `ADM-052`. `folha_cct.piso_salarial` existe e
-  ninguém olha; a admissão grava qualquer salário.
-- **Retenção/descarte de admissão inexistente** — `ADM-050`. O descarte existe no
-  Ponto e no Hub, mas não na admissão (LGPD).
-- **Admissão retroativa entra calada** — `ADM-051`. Sem justificativa (a coluna nem
-  existe), sem marcação de exceção, sem alerta.
-- **Conclusão não confere assinatura** — `ADM-070`. `finalizar_admissao_by_token`
-  só troca o status; nada liga a assinatura.
-- **Cota (recálculo) depende de digitação** — `EMP-050`. O total de empregados não
-  conta das admissões; a cota pode ficar errada.
-- **Regime rural inexistente (noturno)** — `PONTO-113`. O cálculo noturno aplica a
-  regra urbana (22h–5h, 20%, ficta) a todos; o rural tem janela própria.
-- **Falta abaixo da jornada não vira pendência** — `PONTO-477`. Um dia 333 min
-  abaixo da jornada, sem folga/abono/ajuste, não aparece no fechamento.
+- `PONTO-252` — 🟢 **76 de 1.709 ajustes de ponto aprovados pelo próprio colaborador**.
+- `FERIAS-056` — 🟢 férias **aprovadas pelo próprio solicitante** (sem segregação).
+- `DESL-002` — 🟢 **desligamento sobrescrito sem trilha** (pedido→sem justa causa, sem histórico/aprovação).
+- `DESL-106` — reversão de desligamento por UPDATE simples, sem aprovação/motivo.
+- `DESL-025` — justa causa (art. 482) entra **sem rito** (sem quem aprovou).
+- `FOLHA-071` — fechamento de folha **decorativo**: lançamento em competência fechada é aceito; reabertura sem trilha.
+- `FOLHA-030` — desconto em folha **sem amparo** (texto livre, sem rubrica/teto).
 
 ---
 
-## ⚪ Baixos
+## 🟠 TEMA 4 — Duplicidade / unicidade que ainda passa
 
-- **Checklist de documentos fixo no código** — `ADM-090`/`ADM-021` (`ensure_admissao_...`); não é parametrizável por empresa.
-- **Cota PCD — metade boa, metade faltando** — `ADM-050`-família. O gatilho
-  `recalcular_cota_pcd` funciona (2% e 4% nas faixas certas da Lei 8.213), mas há
-  parte não coberta.
-- **Aprendiz** — os campos existem em `empresa_cadastro` (min/max/atual) mas a cota
-  não é calculada da mesma forma.
-- **Folga compensatória não aceita minutos** — `PONTO-476`. Só folga de dia inteiro.
-- **`ponto_expurgo_eventos` sem trava de cercado** — `PONTO-270`. Tabela do módulo
-  sem a proteção de isolamento (relevante para o próprio QA).
-- **`PONTO-HOM-C1`** — uma vigilância acusou "tenant com erro"; investigar.
+Parte liga-se ao **A2** (a limpeza de empresa-CPF e vínculo ficou pendente):
 
----
+- `EMP-020` / `EMP-021` — 🟢 **duas empresas ativas com o mesmo CNPJ**; a trava `prevent_duplicate_active_cnpj` **não pega o UPDATE** de reativação.
+- `EMP-070` / `EMP-071` — 🟢 **duas empresas PF ativas com o mesmo CPF**: a trava só olha `cnpj`, e o índice de CPF ficou **adiado** (duplicatas não limpas).
+- `COLAB-033` — CPF duplicado separado só pela **pontuação** (índice sobre a coluna crua).
+- `COLAB-021` — 🟢 **CPF inválido aceito** (validação só no front).
+- `FERIAS-091` / `PONTO-394` — período/constraint chaveado por `(tenant, CPF)` **ignora a empresa** (mesma raiz que corrigimos na admissão).
 
-## 🔧 Drift técnico (entrega pendente — NÃO é achado de produto)
-
-Estes dois só precisam de entrega/alinhamento com o dev; não são gaps de negócio:
-
-- **`ponto_diario_status_check` desatualizada** (10 rotinas: PONTO-131/300/301/310/
-  311/320/321/322/330/394). A trava de status do `ponto_diario` na produção é mais
-  **antiga** que a do dev — falta um valor de status que a feature passou a usar.
-  **Correção:** alinhar o `CHECK` (entrega pequena, com backup).
-- **`converter_banco_horas_vencido(uuid)` ausente** — `PONTO-354`. Função de feature
-  do banco de horas que nunca chegou à produção. **Correção:** entregar a função.
+> Ação ligada: falta a **limpeza A2 de empresa-CPF (11 grupos) e vínculo (2)** +
+> estender a trava de CNPJ para o UPDATE e para o CPF de empresa PF.
 
 ---
 
-## Como sugiro usar este relatório
+## 🟡 TEMA 5 — Travas legais ausentes, por instituto
 
-1. **Triar por severidade** — o item 1 (eSocial S-2200) é o que eu olharia primeiro.
-2. Cada correção vira **feature real na produção** (muda o app), então segue a
-   disciplina da casa: desenvolver → testar → seu aprovado → produção, uma a uma.
-3. Os dois itens de **drift técnico** eu já consigo preparar como entrega segura
-   assim que você der o ok.
-4. O motor continua rodando as demais famílias — cada uma deve revelar mais alguns
-   achados, que eu acrescento aqui.
+### Férias (CLT 129–149) — ~24 achados
+Fracionamento sem piso/concordância (`FERIAS-010/011/012`), abono acima de 1/3 e
+fora de prazo (`FERIAS-041/042/040`), saldo×solicitado não conferidos
+(`FERIAS-013`), faltas→dias não travado (`FERIAS-001`), início na véspera de
+feriado (`FERIAS-014`), aviso de 30 dias sem relógio (`FERIAS-030/031`), troca
+silenciosa de data confirmada (`FERIAS-052`), colaborador em férias marca ponto
+(`FERIAS-053`), afastamento sobre férias (`FERIAS-024`), cancelamento não devolve
+saldo (`FERIAS-051`), dobra não priorizada (`FERIAS-004`), rescisão não apura
+férias (`FERIAS-090`), art. 133 não cruza afastamento (`FERIAS-003`), prescrição
+inexistente (`FERIAS-008`), encargos Simples (`FERIAS-070`), cobertura de equipe
+(`FERIAS-071`). **FERIAS-015** = trava etária **legada** (a remover na produção).
 
-> Nada neste relatório alterou a produção. Tudo foi leitura. As correções só
-> acontecem quando você decidir, item a item.
+### Afastamentos (CLT / NR-7 / INSS) — ~13
+Sobreposição de dois afastamentos ativos (`AFAST-011`), efeito legal do tipo não
+parametrizado (`AFAST-010`), acumulação/INSS parcial (`AFAST-021`), CAT sem
+relógio (`AFAST-030`), doença única sem pendência (`AFAST-020` — *regressão da
+reescrita de 24/07*), estabilidade do acidente perdida (`AFAST-031` — *regressão*),
+maternidade só como tipo (`AFAST-040`), art. 474 suspensão >30d (`AFAST-051`),
+art. 473 genérico sem prazos (`AFAST-050`), FGTS do afastado (`AFAST-032`), ASO de
+retorno sem trava (`AFAST-070`).
+
+### SST (NR-4/5/6/7, PGR/PCMSO/LTCAT/PPP) — ~15
+**PPP não existe** (`SST-060`), PGR vigência decorativa (`SST-001`), plano de ação
+não vira tarefa (`SST-003`), ASO de mudança de risco (`SST-021`), periodicidade de
+exame sem relógio (`SST-020`), exposição não estruturada (`SST-031`), laudo×adicional
+desligados (`SST-050`), OS manual (`SST-010`), CA sem trava (`SST-011`), documentos
+não se cruzam (`SST-070`), IA sem revisão (`SST-002`), CIPA mandato sem régua
+(`SST-040`), ouvidoria sigilo/prazo (`SST-041`), acervo clínico sem trilha de acesso
+(`SST-080`).
+
+### Benefícios (VT/VR/PAT/planos/PLR) — ~13
+Teto VT 6% ignorado (`BEN-011`), VR sem limite (`BEN-012`), termo de opção VT
+inexistente (`BEN-010/060`), elegibilidade não lida (`BEN-001`), sem ponte com
+Folha (`BEN-020`) nem com Ponto (`BEN-050`), CCT não chega (`BEN-051`),
+**dependentes não existem** (`BEN-030`), operadoras/planos inexistentes (`BEN-042`),
+**PLR inexistente** (`BEN-070`), consignado/margem inexistentes (`BEN-071`), plano
+do demitido art. 30/31 Lei 9.656 (`BEN-040`).
+
+### EPI (NR-6) — ~14
+CA validade decorativa (`EPI-011`), sem consulta CAEPI (`EPI-010`), lote vencido sai
+(`EPI-040`), sem FEFO na saída (`EPI-021`), estoque mínimo sem alerta (`EPI-022`),
+troca sem relógio (`EPI-050`), nota fiscal sem chave única (`EPI-030`), **biometria
+(liveness) aberta a qualquer usuário** (`EPI-041` — LGPD), assinatura sem carimbo do
+tempo (`EPI-042`), devolução solta (`EPI-052`), kit de admissão não gerado
+(`EPI-051`), arquivamento manual (`EPI-044`).
+
+### Desligamento — ~10
+Sobrescrita sem trilha (`DESL-002`), reversão sem aprovação (`DESL-106`), justa
+causa sem rito (`DESL-025`), rescisão complementar sem lar (`DESL-105`), estabilidade
+de CCT (`DESL-074`), "desligamento programado" inexistente (`DESL-013`), S-2299 sem
+relógio (`DESL-093`), exame demissional fora de 10 dias (`DESL-065` — 🟢 1 de 24 sem
+exame), prazo de pagamento não conferido (`DESL-015`).
+
+### Enquadramento & Regras (NR-4/5, FAP, obrigações) — ~11
+SESMT/CIPA por interruptor manual (`ENQ-050/051`), FAP fora da faixa 0,5–2,0
+(`ENQ-010`), grau de risco reduzido sem justificativa (`ENQ-011`), mandato CIPA
+invertido (`ENQ-013`). Obrigações não registradas automaticamente: TAC (`REGRA-005`),
+déficit de PcD (`REGRA-001`), CIPA (`REGRA-002`), SESMT (`REGRA-003`), FAP alto
+(`REGRA-004`), grau elevado (`REGRA-006`).
+
+### Folha — ~7
+Rubrica sem natureza eSocial/incidências (`FOLHA-001`), rubrica sem vigência/versão
+(`FOLHA-002`), fechamento decorativo (`FOLHA-071`), desconto sem amparo (`FOLHA-030`),
+folha complementar sem lar (`FOLHA-070`), sem alerta de variação (`FOLHA-081`),
+leitura de folha aberta (`FOLHA-090` — LGPD).
+
+### Cota PcD/Aprendiz (Lei 8.213 art. 93) — ~6
+Total de empregados por digitação (`EMP-050`), não conta de admissões (`EMP-051`),
+sem laudo ligado a pessoas (`EMP-052`), não agrupa matriz+filiais por raiz do CNPJ
+(`EMP-054`), ignora reabilitado do INSS (`EMP-053`).
+
+---
+
+## 🟡 TEMA 6 — LGPD / acesso a dado sensível
+
+- `EPI-041` — biometria (rosto/liveness) legível por qualquer usuário do tenant.
+- `FOLHA-090` — leitura da folha aberta (escrita é protegida).
+- `AFAST-080` / `SST-080` — CID/atestados com política de perfil, mas **sem trilha de quem acessou**.
+
+---
+
+## 🔧 Resíduos de QA (eu corrijo — não são achados de produto)
+
+Pequenos, do próprio motor:
+- `AFAST-001` — sonda usa **tenant real** (mesmo caso das Férias); corrijo para o cercado.
+- `COLAB-011/023/033` — fixtures de CPF (a sonda esbarra na validação/constraint).
+- `DESL-003` — depende de afastamento com data-fim.
+- `HIER-002` — limpeza de FK do cercado.
+- `DADO-010` / `HCAT-010` / `HTPL-010` — enums abertos (`tipo_pessoa='mei'`, obrigatoriedade/tipo livres) — **na fronteira** entre resíduo e achado; anoto os dois.
+
+---
+
+## Como usar
+
+1. **Prioridade nº 1: eSocial (Tema 1).** É compliance com números reais.
+2. **Temas 2, 3 e 4** (controle interno, duplicidade, menor) — risco alto e correções em geral pequenas.
+3. **Tema 5** é o roadmap de conformidade por módulo — grande, para planejar por trimestre.
+4. Os **resíduos de QA** eu fecho com segurança quando você quiser (começando pela sonda do AFAST, igual às Férias).
+5. Cada correção é **feature real na produção** → disciplina de sempre (dev → teste → seu aprovado → produção), item a item.
+
+> **A produção segue intacta.** Todo o backfill do motor foi rotina de teste; a
+> única mudança de dado que você aprovou foi a limpeza de duplicidade (A2).

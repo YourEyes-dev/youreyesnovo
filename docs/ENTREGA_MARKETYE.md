@@ -5,6 +5,20 @@ Módulo que substitui a antiga "Rede de Parceiros" (`/marketplace`) pelo
 Requisitos v2.0 (11/09/2026). Esta página resume o que entrou, o que ficou de
 fora de propósito e como conferir no ambiente de teste.
 
+> **Atualização 17/09/2026 — pronto para produção.** O script de entrega
+> `docs/script_marketye_fundacao.sql` passou a ser **completo**: além da
+> fundação, já traz as correções da Fase 4 do MarketYE (pesos/autocompra,
+> ciclo e exportação do anúncio, recusa de termos, RLS de vitrine/avaliação,
+> lógica de anúncio/perfil e moderação/isolamento). Com isso os **16 achados**
+> descritos mais abaixo (inclusive o D-18) estão **corrigidos**. A conferência
+> final do script agora dá `resultado = OK`, `83/83` rotinas, **0 falhas e 0
+> erros**, e a bateria pela tela dá **82 passou / 0 falhou / 0 erro**
+> (o restante é caso `e2e`, que roda no navegador). Verificado em base limpa
+> (produção não tem MarketYE ainda), aplicando o script em uma transação, duas
+> vezes (idempotente). **Colar SÓ este script; não reaplicar nenhuma versão
+> antiga depois — uma versão antiga reabriria o D-18.** O texto abaixo, quando
+> fala em "64 passou / 16 falhou", descreve o estado **antes** dessas correções.
+
 ## O que entrou
 
 **Nomenclatura (0.5).** Botão do cabeçalho, menu, busca global, perfis de

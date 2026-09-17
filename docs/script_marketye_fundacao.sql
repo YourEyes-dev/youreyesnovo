@@ -4,16 +4,28 @@
 -- contato mascarado, avaliação bidirecional verificada, reputação em dois
 -- eixos e níveis, relevância personalizada parametrizada, demanda latente,
 -- consentimento LGPD, contestação com decisão humana, trilha de autonomia,
--- painel de liquidez e QA (casos MKY-001 a MKY-161; 80 rotinas do motor).
+-- painel de liquidez e QA (casos MKY-001 a MKY-161; 83 rotinas do motor,
+-- TODOS os achados D-01..D-31 já corrigidos — conferência final dá 83/83,
+-- 0 falhas, 0 erros).
 --
--- Este script é AUTOSSUFICIENTE: inclui também o conteúdo de
--- docs/script_marketye_anexos_fotos.sql e docs/script_marketye_qa_documentacao.sql
--- (idempotentes; rodá-los antes ou depois não muda nada).
+-- Este script é AUTOSSUFICIENTE E COMPLETO: além da fundação, já traz as
+-- correções da Fase 4 do MarketYE (pesos de relevância normalizados + trava de
+-- autocompra; ciclo do anúncio — remoção não volta a publicar — e exportação
+-- com cupons; publicação exige aceite de termos vigentes; RLS de vitrine
+-- pública e de avaliação moderada; lógica de anúncio/perfil; moderação/
+-- visibilidade/isolamento e eficácia de ação de origem MarketYE). Inclui também
+-- o conteúdo de docs/script_marketye_anexos_fotos.sql e
+-- docs/script_marketye_qa_documentacao.sql (idempotentes).
+--
+-- SUBSTITUI as versões anteriores deste arquivo: colar ESTE já entrega o estado
+-- corrigido. NÃO reaplique nenhum script antigo do MarketYE depois deste (uma
+-- versão antiga reabriria achados já fechados, p.ex. o D-18).
 --
 -- Cole no SQL Editor do projeto. Roda em UMA transação; pode ser executado
 -- mais de uma vez (colunas IF NOT EXISTS, políticas recriadas, funções
 -- CREATE OR REPLACE, seeds com ON CONFLICT). É o mesmo conteúdo das
--- migrations 20260911220000..20260912040000, exceto a de mobiliário (a de
+-- migrations 20260911220000..20260916200000 do MarketYE (fundação + correções
+-- da Fase 4), exceto a de mobiliário (a de
 -- mobiliário da ilha de teste NÃO entra: é dado fictício do ambiente de teste).
 --
 -- O QUE MUDA EM DADO EXISTENTE (sem apagar nada): serviços ativos ganham
@@ -3018,7 +3030,7 @@ ON CONFLICT (codigo) DO UPDATE SET funcao_sql = EXCLUDED.funcao_sql, ativo = tru
 
 
 -- ---------------------------------------------------------------------
--- 7) ANEXOS DO ESPECIALISTA: bucket público de fotos, leitura dos documentos pelo superadmin (idem docs/script_marketye_anexos_fotos.sql)
+-- 7) ANEXOS DO ESPECIALISTA: bucket público de fotos, leitura dos documentos pelo superadmin
 -- ---------------------------------------------------------------------
 -- MarketYE: anexos do especialista (documentos comprobatórios e foto de perfil)
 --
@@ -3080,7 +3092,7 @@ COMMENT ON COLUMN public.marketplace_profissional_documentos.arquivo_url IS
 
 
 -- ---------------------------------------------------------------------
--- 8) QA: documentação dos casos MKY-030..161 (idem docs/script_marketye_qa_documentacao.sql)
+-- 8) QA: documentação dos casos MKY-030..161
 -- ---------------------------------------------------------------------
 -- =====================================================================
 -- MARKETYE · DOCUMENTAÇÃO DE TESTES COMPLETA (pacote de QA de 12/09/2026)
@@ -3799,7 +3811,7 @@ END $qa$;
 
 
 -- ---------------------------------------------------------------------
--- 9) SEGURANÇA: superfície de EXECUTE, colunas e políticas (correções D-05/D-15/D-16/D-17) + QA MKY-110..116
+-- 9) SEGURANÇA: superfície de EXECUTE, colunas e políticas (D-05/D-15/D-16/D-17) + QA MKY-110..116
 -- ---------------------------------------------------------------------
 -- =====================================================================
 -- MARKETYE · QA: ROTINAS DA FAMÍLIA DE SEGURANÇA (MKY-110 a MKY-116)
@@ -4366,7 +4378,7 @@ ON CONFLICT (codigo) DO UPDATE SET funcao_sql = EXCLUDED.funcao_sql, ativo = tru
 
 
 -- ---------------------------------------------------------------------
--- 10) QA: rotinas do motor para os 58 casos api documentados (MKY-031..124) + disposição dos achados
+-- 10) QA: rotinas do motor para os casos api documentados + disposição dos achados
 -- ---------------------------------------------------------------------
 -- =====================================================================
 -- MARKETYE · ROTINAS DO MOTOR (banco) PARA OS CASOS DOCUMENTADOS — 12/09/2026
@@ -6690,7 +6702,7 @@ UPDATE public.qa_casos_teste SET disposicao = 'aguardando_construcao', disposica
 
 
 -- ---------------------------------------------------------------------
--- 11) QA: exercer o RLS sem SET ROLE (ajudantes qa_rls.*) — corrige os 24 "erro" do motor pela tela
+-- 11) QA: exercer o RLS sem SET ROLE (ajudantes qa_rls.*)
 -- ---------------------------------------------------------------------
 -- =====================================================================
 -- MARKETYE · QA · EXERCER O RLS SEM SET ROLE (correção dos 24 "erro" do
@@ -7672,7 +7684,7 @@ END $$;
 
 
 -- ---------------------------------------------------------------------
--- 12) QA: rotinas 058/063/123 robustas ao banco real (path_tokens gerada; empresa_cadastro determinístico)
+-- 12) QA: rotinas 058/063/123 robustas ao banco real
 -- ---------------------------------------------------------------------
 -- =====================================================================
 -- MARKETYE · QA · ROTINAS DO MOTOR ROBUSTAS AO AMBIENTE REAL (staging)
@@ -7803,6 +7815,906 @@ END $$;
 
 
 -- ---------------------------------------------------------------------
+-- 13) CORREÇÃO Fase 4: lógica de anúncio/perfil (D — MKY-037/052/054)
+-- ---------------------------------------------------------------------
+-- ============================================================================
+-- Fase 4 (motores) — Marketplace (MarketYE): regras de anúncio e perfil.
+--
+-- Correções de LÓGICA de negócio (não mexem em RLS/moderação):
+-- MKY-037: a apresentação (bio) do especialista é mascarada — telefone/e-mail/
+--          link ocultos até a liberação (a vitrine mostra a bio).
+-- MKY-052: faixa de preço nunca é gravada invertida (mínimo > máximo).
+-- MKY-054: percentual de promoção validado (maior que 0 e no máximo 90%).
+--
+-- Observação: os demais casos do Marketplace (denúncia/moderação/isolamento por
+-- RLS — MKY-042/046/068/071/072/082/087/090/092/093/101/121) dependem do
+-- comportamento de auth/RLS do Supabase e devem ser validados no ambiente de
+-- teste real, não na réplica local. Ficam para um lote com verificação no
+-- staging.
+-- ============================================================================
+
+-- ── MKY-037: mascara o contato na apresentação (bio) ────────────────────────
+CREATE OR REPLACE FUNCTION public.marketye_meu_perfil_salvar(_dados jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_id uuid := public.marketye_meu_id(); v_mod text[];
+BEGIN
+  IF v_id IS NULL THEN RAISE EXCEPTION 'Sem cadastro de especialista'; END IF;
+  IF _dados ? 'modalidades' THEN v_mod := ARRAY(SELECT jsonb_array_elements_text(_dados->'modalidades')); END IF;
+  UPDATE public.marketplace_profissionais SET
+    nome_completo = CASE WHEN status = 'pendente' AND length(COALESCE(_dados->>'nome_completo', '')) >= 3 THEN _dados->>'nome_completo' ELSE nome_completo END,
+    telefone = CASE WHEN _dados ? 'telefone' THEN NULLIF(_dados->>'telefone', '') ELSE telefone END,
+    -- A bio aparece na vitrine pública: contato direto fica oculto ate a liberacao.
+    bio = CASE WHEN _dados ? 'bio' THEN NULLIF(public.marketye_mascarar_contato(_dados->>'bio'), '') ELSE bio END,
+    formacao_academica = CASE WHEN _dados ? 'formacao_academica' THEN NULLIF(_dados->>'formacao_academica', '') ELSE formacao_academica END,
+    registro_profissional = CASE WHEN _dados ? 'registro_profissional' THEN NULLIF(_dados->>'registro_profissional', '') ELSE registro_profissional END,
+    conselho = CASE WHEN _dados ? 'conselho' THEN NULLIF(_dados->>'conselho', '') ELSE conselho END,
+    uf_registro = CASE WHEN _dados ? 'uf_registro' THEN NULLIF(upper(_dados->>'uf_registro'), '') ELSE uf_registro END,
+    registro_validade = CASE WHEN _dados ? 'registro_validade' THEN NULLIF(_dados->>'registro_validade', '')::date ELSE registro_validade END,
+    certificacoes = CASE WHEN _dados ? 'certificacoes' THEN NULLIF(ARRAY(SELECT jsonb_array_elements_text(_dados->'certificacoes')), '{}') ELSE certificacoes END,
+    especialidades = CASE WHEN _dados ? 'especialidades' THEN NULLIF(ARRAY(SELECT jsonb_array_elements_text(_dados->'especialidades')), '{}') ELSE especialidades END,
+    areas_atuacao = CASE WHEN _dados ? 'areas_atuacao' THEN NULLIF(ARRAY(SELECT jsonb_array_elements_text(_dados->'areas_atuacao')), '{}') ELSE areas_atuacao END,
+    modalidades_atendimento = CASE WHEN v_mod IS NOT NULL AND array_length(v_mod, 1) > 0 THEN v_mod::public.marketplace_servico_modalidade[] ELSE modalidades_atendimento END,
+    cidade = CASE WHEN _dados ? 'cidade' THEN NULLIF(_dados->>'cidade', '') ELSE cidade END,
+    estado = CASE WHEN _dados ? 'estado' THEN NULLIF(upper(_dados->>'estado'), '') ELSE estado END,
+    latitude = CASE WHEN _dados ? 'latitude' THEN NULLIF(_dados->>'latitude', '')::double precision ELSE latitude END,
+    longitude = CASE WHEN _dados ? 'longitude' THEN NULLIF(_dados->>'longitude', '')::double precision ELSE longitude END,
+    atende_remoto = CASE WHEN _dados ? 'atende_remoto' THEN (_dados->>'atende_remoto')::boolean ELSE atende_remoto END,
+    raio_atendimento_km = CASE WHEN _dados ? 'raio_atendimento_km' THEN COALESCE(NULLIF(_dados->>'raio_atendimento_km', '')::int, raio_atendimento_km) ELSE raio_atendimento_km END,
+    disponibilidade = CASE WHEN _dados ? 'disponibilidade' THEN COALESCE(_dados->'disponibilidade', '{}'::jsonb) ELSE disponibilidade END,
+    politicas = CASE WHEN _dados ? 'politicas' THEN NULLIF(_dados->>'politicas', '') ELSE politicas END,
+    site_url = CASE WHEN _dados ? 'site_url' THEN NULLIF(_dados->>'site_url', '') ELSE site_url END,
+    video_url = CASE WHEN _dados ? 'video_url' THEN NULLIF(_dados->>'video_url', '') ELSE video_url END,
+    foto_url = CASE WHEN _dados ? 'foto_url' THEN NULLIF(_dados->>'foto_url', '') ELSE foto_url END,
+    tipo_pessoa = CASE WHEN _dados->>'tipo_pessoa' IN ('pf', 'pj') THEN _dados->>'tipo_pessoa' ELSE tipo_pessoa END
+  WHERE id = v_id;
+  RETURN jsonb_build_object('id', v_id, 'ok', true);
+END $mkyfn$;
+
+-- ── MKY-052 / MKY-054: faixa de preço e percentual de promoção ──────────────
+CREATE OR REPLACE FUNCTION public.marketye_anuncio_salvar(_dados jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_prof uuid := public.marketye_meu_id(); v_id uuid := NULLIF(_dados->>'id', '')::uuid; v_cat uuid := NULLIF(_dados->>'categoria_id', '')::uuid; v_obr text[];
+BEGIN
+  IF v_prof IS NULL THEN RAISE EXCEPTION 'Sem cadastro de especialista'; END IF;
+  IF length(trim(COALESCE(_dados->>'nome', ''))) < 5 THEN RAISE EXCEPTION 'Dê um título ao anúncio (mínimo 5 letras)'; END IF;
+  IF length(trim(COALESCE(_dados->>'descricao', ''))) < 20 THEN RAISE EXCEPTION 'Descreva o serviço (mínimo 20 letras)'; END IF;
+  IF COALESCE(_dados->>'tipo_preco', 'sob_orcamento') <> 'sob_orcamento' AND COALESCE(NULLIF(_dados->>'preco_referencia', '')::numeric, 0) <= 0 THEN
+    RAISE EXCEPTION 'Informe um preço-base ou marque "sob orçamento".';
+  END IF;
+
+  -- MKY-054: percentual de promoção deve ser > 0 e no máximo 90%.
+  IF NULLIF(_dados->>'promocao_percentual', '') IS NOT NULL THEN
+    IF (_dados->>'promocao_percentual')::numeric <= 0 OR (_dados->>'promocao_percentual')::numeric > 90 THEN
+      RAISE EXCEPTION 'Percentual de promoção inválido: informe um valor entre 1%% e 90%%.';
+    END IF;
+  END IF;
+
+  -- MKY-052: faixa de preço nunca gravada invertida — normaliza (troca) se vier
+  -- mínimo maior que máximo.
+  IF NULLIF(_dados->>'preco_minimo', '') IS NOT NULL AND NULLIF(_dados->>'preco_maximo', '') IS NOT NULL
+     AND (_dados->>'preco_minimo')::numeric > (_dados->>'preco_maximo')::numeric THEN
+    _dados := _dados || jsonb_build_object(
+      'preco_minimo', _dados->'preco_maximo',
+      'preco_maximo', _dados->'preco_minimo');
+  END IF;
+
+  v_obr := ARRAY(SELECT jsonb_array_elements_text(COALESCE(_dados->'obrigacao_legal', '[]'::jsonb)));
+  IF array_length(v_obr, 1) IS NULL AND v_cat IS NOT NULL THEN
+    SELECT obrigacao_legal INTO v_obr FROM public.marketplace_categorias WHERE id = v_cat;
+  END IF;
+  IF v_id IS NULL THEN
+    INSERT INTO public.marketplace_servicos (profissional_id, categoria_id, nome, descricao, base_legal, modalidade, publico_alvo, evidencia_minima,
+      preco_referencia, tipo_preco, preco_minimo, preco_maximo, duracao_estimada_minutos, tags, obrigacao_legal, area_atendimento, prazo_tipico,
+      politica_cancelamento, midia, gerado_por_ia, promocao_percentual, promocao_inicio, promocao_fim, promocao_descricao, ativo, status, moeda, pais)
+    VALUES (v_prof, v_cat, trim(_dados->>'nome'), trim(_dados->>'descricao'), NULLIF(_dados->>'base_legal', ''),
+      COALESCE(NULLIF(_dados->>'modalidade', ''), 'presencial')::public.marketplace_servico_modalidade, NULLIF(_dados->>'publico_alvo', ''), NULLIF(_dados->>'evidencia_minima', ''),
+      NULLIF(_dados->>'preco_referencia', '')::numeric, COALESCE(NULLIF(_dados->>'tipo_preco', ''), 'sob_orcamento'), NULLIF(_dados->>'preco_minimo', '')::numeric,
+      NULLIF(_dados->>'preco_maximo', '')::numeric, NULLIF(_dados->>'duracao_estimada_minutos', '')::int,
+      ARRAY(SELECT jsonb_array_elements_text(COALESCE(_dados->'tags', '[]'::jsonb))), COALESCE(v_obr, '{}'), COALESCE(_dados->'area_atendimento', '{}'::jsonb),
+      NULLIF(_dados->>'prazo_tipico', ''), NULLIF(_dados->>'politica_cancelamento', ''), COALESCE(_dados->'midia', '[]'::jsonb),
+      COALESCE((_dados->>'gerado_por_ia')::boolean, false), NULLIF(_dados->>'promocao_percentual', '')::numeric, NULLIF(_dados->>'promocao_inicio', '')::date,
+      NULLIF(_dados->>'promocao_fim', '')::date, NULLIF(_dados->>'promocao_descricao', ''), true, 'rascunho',
+      COALESCE(NULLIF(_dados->>'moeda', ''), 'BRL'), COALESCE(NULLIF(_dados->>'pais', ''), 'BR'))
+    RETURNING id INTO v_id;
+  ELSE
+    UPDATE public.marketplace_servicos SET
+      categoria_id = v_cat, nome = trim(_dados->>'nome'), descricao = trim(_dados->>'descricao'), base_legal = NULLIF(_dados->>'base_legal', ''),
+      modalidade = COALESCE(NULLIF(_dados->>'modalidade', ''), modalidade::text)::public.marketplace_servico_modalidade,
+      publico_alvo = NULLIF(_dados->>'publico_alvo', ''), evidencia_minima = NULLIF(_dados->>'evidencia_minima', ''),
+      preco_referencia = NULLIF(_dados->>'preco_referencia', '')::numeric, tipo_preco = COALESCE(NULLIF(_dados->>'tipo_preco', ''), 'sob_orcamento'),
+      preco_minimo = NULLIF(_dados->>'preco_minimo', '')::numeric, preco_maximo = NULLIF(_dados->>'preco_maximo', '')::numeric,
+      duracao_estimada_minutos = NULLIF(_dados->>'duracao_estimada_minutos', '')::int,
+      tags = ARRAY(SELECT jsonb_array_elements_text(COALESCE(_dados->'tags', '[]'::jsonb))), obrigacao_legal = COALESCE(v_obr, '{}'),
+      area_atendimento = COALESCE(_dados->'area_atendimento', '{}'::jsonb), prazo_tipico = NULLIF(_dados->>'prazo_tipico', ''),
+      politica_cancelamento = NULLIF(_dados->>'politica_cancelamento', ''), midia = COALESCE(_dados->'midia', midia),
+      promocao_percentual = NULLIF(_dados->>'promocao_percentual', '')::numeric, promocao_inicio = NULLIF(_dados->>'promocao_inicio', '')::date,
+      promocao_fim = NULLIF(_dados->>'promocao_fim', '')::date, promocao_descricao = NULLIF(_dados->>'promocao_descricao', ''),
+      status = CASE WHEN status = 'removido' THEN 'rascunho' ELSE status END
+    WHERE id = v_id AND profissional_id = v_prof;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Anúncio não encontrado'; END IF;
+  END IF;
+  RETURN jsonb_build_object('id', v_id);
+END $mkyfn$;
+
+
+-- ---------------------------------------------------------------------
+-- 14) CORREÇÃO Fase 4: pesos de relevância normalizados + trava de autocompra (MKY-082/101)
+-- ---------------------------------------------------------------------
+-- ============================================================================
+-- Fase 4 (motores) — Marketplace: pesos de relevância e autocompra.
+--
+-- MKY-101: pesos de relevância normalizados a 100%, chave faltante completada,
+--          peso negativo recusado (marketye_config_salvar).
+-- MKY-082: autocompra bloqueada — a empresa não abre conversa com o próprio
+--          anúncio (marketye_abrir_lead).
+--
+-- Correções de lógica em funções SECURITY DEFINER (não mexem em RLS). Conferir
+-- a família MKY no ambiente de teste (a réplica local não reproduz a RLS de
+-- alguns casos com fidelidade).
+-- ============================================================================
+
+-- ── MKY-101: normalização e validação dos pesos de relevância ───────────────
+CREATE OR REPLACE FUNCTION public.marketye_config_salvar(p_chave text, p_valor jsonb, p_descricao text DEFAULT NULL::text, p_jurisdicao text DEFAULT 'BR'::text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_versao int; v_id uuid; v_soma numeric; v_norm jsonb;
+BEGIN
+  IF NOT public.is_superadmin(auth.uid()) THEN RAISE EXCEPTION 'Acesso negado'; END IF;
+  IF p_chave IS NULL OR p_valor IS NULL THEN RAISE EXCEPTION 'Informe chave e valor'; END IF;
+
+  -- Pesos de relevância: nunca negativos; chaves padrão completadas; soma
+  -- normalizada a 1,00 (o operador digita a intenção, o motor cuida da conta).
+  IF p_chave = 'relevancia_pesos' THEN
+    IF EXISTS (SELECT 1 FROM jsonb_each_text(p_valor) WHERE value::numeric < 0) THEN
+      RAISE EXCEPTION 'Peso de relevância não pode ser negativo';
+    END IF;
+    p_valor := '{"fit":0,"reputacao":0,"saude":0,"proximidade":0,"exploracao":0,"preco":0,"destaque":0}'::jsonb || p_valor;
+    SELECT sum(value::numeric) INTO v_soma FROM jsonb_each_text(p_valor);
+    IF v_soma IS NULL OR v_soma <= 0 THEN RAISE EXCEPTION 'Pesos de relevância inválidos'; END IF;
+    SELECT jsonb_object_agg(key, round(value::numeric / v_soma, 4)) INTO v_norm FROM jsonb_each_text(p_valor);
+    p_valor := v_norm;
+  END IF;
+
+  UPDATE public.marketplace_config SET vigente = false WHERE chave = p_chave AND jurisdicao = p_jurisdicao AND vigente;
+  SELECT COALESCE(max(versao), 0) + 1 INTO v_versao FROM public.marketplace_config WHERE chave = p_chave AND jurisdicao = p_jurisdicao;
+  INSERT INTO public.marketplace_config (chave, versao, valor, descricao, vigente, jurisdicao, criado_por)
+  VALUES (p_chave, v_versao, p_valor, p_descricao, true, p_jurisdicao, auth.uid()) RETURNING id INTO v_id;
+  RETURN jsonb_build_object('id', v_id, 'chave', p_chave, 'versao', v_versao);
+END $mkyfn$;
+
+-- ── MKY-082: autocompra bloqueada ───────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.marketye_abrir_lead(p_profissional_id uuid, p_servico_id uuid, p_mensagem text, p_origem_modulo text DEFAULT NULL::text, p_origem_id uuid DEFAULT NULL::uuid, p_obrigacao text DEFAULT NULL::text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_tenant uuid := public.get_user_tenant_id(); v_lead uuid; v_nome text; v_cupom text; v_mascarar boolean; v_texto text; v_existente uuid;
+BEGIN
+  IF v_tenant IS NULL THEN RAISE EXCEPTION 'Só usuários de uma empresa cliente abrem contato'; END IF;
+  -- Autocompra: quem abre a conversa não pode ser o dono do anúncio (o mesmo
+  -- usuário que é especialista) — infla reputação avaliando a si mesmo.
+  IF p_profissional_id = public.marketye_meu_id() THEN
+    RAISE EXCEPTION 'Você não pode abrir conversa com o seu próprio anúncio';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.marketplace_profissionais WHERE id = p_profissional_id AND status = 'ativo' AND excluido_em IS NULL) THEN
+    RAISE EXCEPTION 'Especialista indisponível no momento';
+  END IF;
+  IF length(trim(COALESCE(p_mensagem, ''))) < 5 THEN RAISE EXCEPTION 'Escreva uma mensagem com o que você precisa'; END IF;
+  SELECT id INTO v_existente FROM public.marketplace_leads WHERE tenant_id = v_tenant AND profissional_id = p_profissional_id
+    AND status IN ('novo', 'respondido', 'qualificado') ORDER BY created_at DESC LIMIT 1;
+  IF v_existente IS NOT NULL THEN
+    PERFORM public.marketye_lead_mensagem(v_existente, p_mensagem);
+    RETURN jsonb_build_object('id', v_existente, 'reaproveitado', true);
+  END IF;
+  SELECT nome_completo INTO v_nome FROM public.profiles WHERE user_id = auth.uid() LIMIT 1;
+  SELECT codigo INTO v_cupom FROM public.marketplace_cupons WHERE profissional_id = p_profissional_id AND ativo
+    AND (validade IS NULL OR validade >= CURRENT_DATE) AND (limite_uso IS NULL OR usos < limite_uso) ORDER BY desconto_percentual DESC LIMIT 1;
+  v_mascarar := COALESCE(public.marketye_config('mascaramento_contato')->>'ate', 'contato_qualificado') <> 'nunca';
+  v_texto := CASE WHEN v_mascarar THEN public.marketye_mascarar_contato(p_mensagem) ELSE p_mensagem END;
+
+  INSERT INTO public.marketplace_leads (tenant_id, profissional_id, servico_id, criado_por, solicitante_nome, origem_modulo, origem_id, obrigacao_legal, cupom_codigo, ultima_mensagem_em)
+  VALUES (v_tenant, p_profissional_id, p_servico_id, auth.uid(), v_nome, p_origem_modulo, p_origem_id, p_obrigacao, v_cupom, now()) RETURNING id INTO v_lead;
+  INSERT INTO public.marketplace_lead_mensagens (lead_id, autor_tipo, autor_id, texto, texto_original, mascarada, sinal_saida)
+  VALUES (v_lead, 'cliente', auth.uid(), v_texto, CASE WHEN v_texto <> p_mensagem THEN p_mensagem END, v_texto <> p_mensagem, public.marketye_texto_tem_contato(p_mensagem));
+  IF v_cupom IS NOT NULL THEN
+    INSERT INTO public.marketplace_lead_mensagens (lead_id, autor_tipo, texto) VALUES (v_lead, 'sistema', format('Este especialista tem o cupom %s ativo para esta conversa.', v_cupom));
+    UPDATE public.marketplace_cupons SET usos = usos + 1 WHERE profissional_id = p_profissional_id AND codigo = v_cupom;
+  END IF;
+  RETURN jsonb_build_object('id', v_lead, 'reaproveitado', false);
+END $mkyfn$;
+
+
+-- ---------------------------------------------------------------------
+-- 15) CORREÇÃO Fase 4: ciclo do anúncio (remoção não volta a publicar) + exportação com cupons (MKY-053/090)
+-- ---------------------------------------------------------------------
+-- ============================================================================
+-- Fase 4 (motores) — Marketplace: ciclo do anúncio removido e exportação LGPD.
+--
+-- MKY-053: anúncio REMOVIDO é terminal — não volta por publicar nem ressuscita
+--          por salvar (precisa de anúncio novo).
+-- MKY-090: exportação de dados do especialista inclui os cupons.
+--
+-- Lógica em funções SECURITY DEFINER. Conferir a família MKY no ambiente de
+-- teste (parte dos casos de RLS não reproduz na réplica local).
+-- ============================================================================
+
+-- ── MKY-053: publicar não ressuscita anúncio removido ───────────────────────
+CREATE OR REPLACE FUNCTION public.marketye_anuncio_publicar(p_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_prof uuid := public.marketye_meu_id(); s record; p record; c record;
+BEGIN
+  IF v_prof IS NULL THEN RAISE EXCEPTION 'Sem cadastro de especialista'; END IF;
+  SELECT * INTO s FROM public.marketplace_servicos WHERE id = p_id AND profissional_id = v_prof;
+  IF s.id IS NULL THEN RAISE EXCEPTION 'Anúncio não encontrado'; END IF;
+  -- Removido é terminal: não volta pela publicação; crie um anúncio novo.
+  IF s.status = 'removido' THEN
+    RAISE EXCEPTION 'Anúncio removido não pode ser republicado. Crie um novo anúncio.';
+  END IF;
+  SELECT * INTO p FROM public.marketplace_profissionais WHERE id = v_prof;
+  IF p.status::text <> 'ativo' THEN
+    RAISE EXCEPTION 'Seu cadastro ainda está em verificação. O anúncio fica salvo e aparece na vitrine assim que a verificação concluir.';
+  END IF;
+  IF p.excluido_em IS NOT NULL THEN RAISE EXCEPTION 'Perfil excluído'; END IF;
+  IF s.categoria_id IS NOT NULL THEN
+    SELECT * INTO c FROM public.marketplace_categorias WHERE id = s.categoria_id;
+    IF c.exige_registro AND (p.registro_profissional IS NULL OR p.conselho IS NULL) THEN
+      RAISE EXCEPTION 'Para publicar em %, informe seu registro profissional (%).', c.nome, COALESCE(array_to_string(c.conselhos_aceitos, '/'), 'conselho');
+    END IF;
+  END IF;
+  IF public.marketye_texto_tem_contato(s.nome) OR public.marketye_texto_tem_contato(s.descricao) THEN
+    RAISE EXCEPTION 'Remova telefones, e-mails ou links do texto — o contato acontece pelo MarketYE.';
+  END IF;
+  UPDATE public.marketplace_servicos SET status = 'publicado', ativo = true, publicado_em = COALESCE(publicado_em, now()) WHERE id = p_id;
+  RETURN jsonb_build_object('id', p_id, 'status', 'publicado');
+END $mkyfn$;
+
+-- ── MKY-053: salvar não ressuscita anúncio removido ─────────────────────────
+-- (Reaplica as travas de preço/promoção de MKY-052/054 e remove a "ressurreição"
+--  removido→rascunho: editar um removido mantém removido.)
+CREATE OR REPLACE FUNCTION public.marketye_anuncio_salvar(_dados jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_prof uuid := public.marketye_meu_id(); v_id uuid := NULLIF(_dados->>'id', '')::uuid; v_cat uuid := NULLIF(_dados->>'categoria_id', '')::uuid; v_obr text[];
+BEGIN
+  IF v_prof IS NULL THEN RAISE EXCEPTION 'Sem cadastro de especialista'; END IF;
+  IF length(trim(COALESCE(_dados->>'nome', ''))) < 5 THEN RAISE EXCEPTION 'Dê um título ao anúncio (mínimo 5 letras)'; END IF;
+  IF length(trim(COALESCE(_dados->>'descricao', ''))) < 20 THEN RAISE EXCEPTION 'Descreva o serviço (mínimo 20 letras)'; END IF;
+  IF COALESCE(_dados->>'tipo_preco', 'sob_orcamento') <> 'sob_orcamento' AND COALESCE(NULLIF(_dados->>'preco_referencia', '')::numeric, 0) <= 0 THEN
+    RAISE EXCEPTION 'Informe um preço-base ou marque "sob orçamento".';
+  END IF;
+  IF NULLIF(_dados->>'promocao_percentual', '') IS NOT NULL THEN
+    IF (_dados->>'promocao_percentual')::numeric <= 0 OR (_dados->>'promocao_percentual')::numeric > 90 THEN
+      RAISE EXCEPTION 'Percentual de promoção inválido: informe um valor entre 1%% e 90%%.';
+    END IF;
+  END IF;
+  IF NULLIF(_dados->>'preco_minimo', '') IS NOT NULL AND NULLIF(_dados->>'preco_maximo', '') IS NOT NULL
+     AND (_dados->>'preco_minimo')::numeric > (_dados->>'preco_maximo')::numeric THEN
+    _dados := _dados || jsonb_build_object('preco_minimo', _dados->'preco_maximo', 'preco_maximo', _dados->'preco_minimo');
+  END IF;
+  v_obr := ARRAY(SELECT jsonb_array_elements_text(COALESCE(_dados->'obrigacao_legal', '[]'::jsonb)));
+  IF array_length(v_obr, 1) IS NULL AND v_cat IS NOT NULL THEN
+    SELECT obrigacao_legal INTO v_obr FROM public.marketplace_categorias WHERE id = v_cat;
+  END IF;
+  IF v_id IS NULL THEN
+    INSERT INTO public.marketplace_servicos (profissional_id, categoria_id, nome, descricao, base_legal, modalidade, publico_alvo, evidencia_minima,
+      preco_referencia, tipo_preco, preco_minimo, preco_maximo, duracao_estimada_minutos, tags, obrigacao_legal, area_atendimento, prazo_tipico,
+      politica_cancelamento, midia, gerado_por_ia, promocao_percentual, promocao_inicio, promocao_fim, promocao_descricao, ativo, status, moeda, pais)
+    VALUES (v_prof, v_cat, trim(_dados->>'nome'), trim(_dados->>'descricao'), NULLIF(_dados->>'base_legal', ''),
+      COALESCE(NULLIF(_dados->>'modalidade', ''), 'presencial')::public.marketplace_servico_modalidade, NULLIF(_dados->>'publico_alvo', ''), NULLIF(_dados->>'evidencia_minima', ''),
+      NULLIF(_dados->>'preco_referencia', '')::numeric, COALESCE(NULLIF(_dados->>'tipo_preco', ''), 'sob_orcamento'), NULLIF(_dados->>'preco_minimo', '')::numeric,
+      NULLIF(_dados->>'preco_maximo', '')::numeric, NULLIF(_dados->>'duracao_estimada_minutos', '')::int,
+      ARRAY(SELECT jsonb_array_elements_text(COALESCE(_dados->'tags', '[]'::jsonb))), COALESCE(v_obr, '{}'), COALESCE(_dados->'area_atendimento', '{}'::jsonb),
+      NULLIF(_dados->>'prazo_tipico', ''), NULLIF(_dados->>'politica_cancelamento', ''), COALESCE(_dados->'midia', '[]'::jsonb),
+      COALESCE((_dados->>'gerado_por_ia')::boolean, false), NULLIF(_dados->>'promocao_percentual', '')::numeric, NULLIF(_dados->>'promocao_inicio', '')::date,
+      NULLIF(_dados->>'promocao_fim', '')::date, NULLIF(_dados->>'promocao_descricao', ''), true, 'rascunho',
+      COALESCE(NULLIF(_dados->>'moeda', ''), 'BRL'), COALESCE(NULLIF(_dados->>'pais', ''), 'BR'))
+    RETURNING id INTO v_id;
+  ELSE
+    UPDATE public.marketplace_servicos SET
+      categoria_id = v_cat, nome = trim(_dados->>'nome'), descricao = trim(_dados->>'descricao'), base_legal = NULLIF(_dados->>'base_legal', ''),
+      modalidade = COALESCE(NULLIF(_dados->>'modalidade', ''), modalidade::text)::public.marketplace_servico_modalidade,
+      publico_alvo = NULLIF(_dados->>'publico_alvo', ''), evidencia_minima = NULLIF(_dados->>'evidencia_minima', ''),
+      preco_referencia = NULLIF(_dados->>'preco_referencia', '')::numeric, tipo_preco = COALESCE(NULLIF(_dados->>'tipo_preco', ''), 'sob_orcamento'),
+      preco_minimo = NULLIF(_dados->>'preco_minimo', '')::numeric, preco_maximo = NULLIF(_dados->>'preco_maximo', '')::numeric,
+      duracao_estimada_minutos = NULLIF(_dados->>'duracao_estimada_minutos', '')::int,
+      tags = ARRAY(SELECT jsonb_array_elements_text(COALESCE(_dados->'tags', '[]'::jsonb))), obrigacao_legal = COALESCE(v_obr, '{}'),
+      area_atendimento = COALESCE(_dados->'area_atendimento', '{}'::jsonb), prazo_tipico = NULLIF(_dados->>'prazo_tipico', ''),
+      politica_cancelamento = NULLIF(_dados->>'politica_cancelamento', ''), midia = COALESCE(_dados->'midia', midia),
+      promocao_percentual = NULLIF(_dados->>'promocao_percentual', '')::numeric, promocao_inicio = NULLIF(_dados->>'promocao_inicio', '')::date,
+      promocao_fim = NULLIF(_dados->>'promocao_fim', '')::date, promocao_descricao = NULLIF(_dados->>'promocao_descricao', '')
+      -- (sem ressurreição: um anúncio removido permanece removido)
+    WHERE id = v_id AND profissional_id = v_prof;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Anúncio não encontrado'; END IF;
+  END IF;
+  RETURN jsonb_build_object('id', v_id);
+END $mkyfn$;
+
+-- ── MKY-090: exportação inclui os cupons ────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.marketye_exportar_meus_dados()
+RETURNS jsonb
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+  SELECT jsonb_build_object(
+    'perfil', (SELECT to_jsonb(p) - 'user_id' FROM public.marketplace_profissionais p WHERE p.id = public.marketye_meu_id()),
+    'anuncios', (SELECT COALESCE(jsonb_agg(to_jsonb(s)), '[]'::jsonb) FROM public.marketplace_servicos s WHERE s.profissional_id = public.marketye_meu_id()),
+    'leads', (SELECT COALESCE(jsonb_agg(to_jsonb(l) - 'criado_por'), '[]'::jsonb) FROM public.marketplace_leads l WHERE l.profissional_id = public.marketye_meu_id()),
+    'avaliacoes', (SELECT COALESCE(jsonb_agg(to_jsonb(a) - 'avaliador_id'), '[]'::jsonb) FROM public.marketplace_avaliacoes a WHERE a.profissional_id = public.marketye_meu_id()),
+    'consentimentos', (SELECT COALESCE(jsonb_agg(to_jsonb(c)), '[]'::jsonb) FROM public.marketplace_consentimentos c WHERE c.profissional_id = public.marketye_meu_id()),
+    'contestacoes', (SELECT COALESCE(jsonb_agg(to_jsonb(c)), '[]'::jsonb) FROM public.marketplace_contestacoes c WHERE c.profissional_id = public.marketye_meu_id()),
+    'cupons', (SELECT COALESCE(jsonb_agg(to_jsonb(cp)), '[]'::jsonb) FROM public.marketplace_cupons cp WHERE cp.profissional_id = public.marketye_meu_id()),
+    'autonomia', (SELECT COALESCE(jsonb_agg(to_jsonb(e)), '[]'::jsonb) FROM public.marketplace_autonomia_eventos e WHERE e.profissional_id = public.marketye_meu_id()),
+    'exportado_em', now());
+$mkyfn$;
+
+
+-- ---------------------------------------------------------------------
+-- 16) CORREÇÃO Fase 4: publicação exige aceite de termos vigentes (MKY-093)
+-- ---------------------------------------------------------------------
+-- ============================================================================
+-- Fase 4 (motores) — Marketplace: recusa como resposta e aceite de termos.
+--
+-- MKY-072: quando o ESPECIALISTA encerra a conversa (recusa "Não vou atender"),
+--          isso conta como RESPOSTA (carimba primeira_resposta_em) e o texto de
+--          sistema reflete que foi o especialista, não a empresa.
+-- MKY-093: publicar exige os termos vigentes aceitos — versão nova pendente
+--          trava a publicação até o aceite.
+--
+-- Lógica em funções SECURITY DEFINER. Conferir a família MKY no ambiente de teste.
+-- ============================================================================
+
+-- ── MKY-072: a recusa do especialista conta como resposta ───────────────────
+CREATE OR REPLACE FUNCTION public.marketye_lead_status(p_lead_id uuid, p_status text, p_motivo text DEFAULT NULL::text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_papel text := public.marketye_lead_papel(p_lead_id); v_prof uuid;
+BEGIN
+  IF v_papel NOT IN ('cliente', 'especialista') THEN RAISE EXCEPTION 'Acesso negado'; END IF;
+  IF p_status NOT IN ('ganho', 'perdido', 'encerrado') THEN RAISE EXCEPTION 'Situação inválida'; END IF;
+  UPDATE public.marketplace_leads SET
+    status = p_status,
+    ganho_em = CASE WHEN p_status = 'ganho' THEN COALESCE(ganho_em, now()) ELSE ganho_em END,
+    contato_liberado = CASE WHEN p_status = 'ganho' THEN true ELSE contato_liberado END,
+    -- Recusar/encerrar pelo especialista É uma resposta: carimba a 1ª resposta.
+    primeira_resposta_em = CASE WHEN v_papel = 'especialista' THEN COALESCE(primeira_resposta_em, now()) ELSE primeira_resposta_em END,
+    ultima_mensagem_em = now()
+  WHERE id = p_lead_id RETURNING profissional_id INTO v_prof;
+  INSERT INTO public.marketplace_lead_mensagens (lead_id, autor_tipo, autor_id, texto)
+  VALUES (p_lead_id, 'sistema', auth.uid(),
+          CASE p_status
+            WHEN 'ganho' THEN 'Serviço combinado. Os dois lados já podem avaliar.'
+            WHEN 'perdido' THEN CASE WHEN v_papel = 'especialista'
+                                     THEN 'O especialista não pôde atender e encerrou esta conversa.'
+                                     ELSE 'A empresa encerrou esta conversa sem contratar.' END
+            ELSE COALESCE('Conversa encerrada. ' || p_motivo, 'Conversa encerrada.') END);
+  IF p_status IN ('ganho', 'perdido', 'encerrado') THEN PERFORM public.marketye_recalcular_reputacao(v_prof); END IF;
+  RETURN jsonb_build_object('id', p_lead_id, 'status', p_status);
+END $mkyfn$;
+
+-- ── MKY-093: publicar exige os termos vigentes aceitos ──────────────────────
+CREATE OR REPLACE FUNCTION public.marketye_anuncio_publicar(p_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_prof uuid := public.marketye_meu_id(); s record; p record; c record; v_versoes jsonb;
+BEGIN
+  IF v_prof IS NULL THEN RAISE EXCEPTION 'Sem cadastro de especialista'; END IF;
+  SELECT * INTO s FROM public.marketplace_servicos WHERE id = p_id AND profissional_id = v_prof;
+  IF s.id IS NULL THEN RAISE EXCEPTION 'Anúncio não encontrado'; END IF;
+  IF s.status = 'removido' THEN
+    RAISE EXCEPTION 'Anúncio removido não pode ser republicado. Crie um novo anúncio.';
+  END IF;
+  SELECT * INTO p FROM public.marketplace_profissionais WHERE id = v_prof;
+  IF p.status::text <> 'ativo' THEN
+    RAISE EXCEPTION 'Seu cadastro ainda está em verificação. O anúncio fica salvo e aparece na vitrine assim que a verificação concluir.';
+  END IF;
+  IF p.excluido_em IS NOT NULL THEN RAISE EXCEPTION 'Perfil excluído'; END IF;
+
+  -- Termos vigentes: versão nova não aceita trava a publicação (aceite no portal).
+  v_versoes := COALESCE(public.marketye_config('termos_versoes'), '{}'::jsonb);
+  IF EXISTS (
+    SELECT 1 FROM (VALUES ('termos_especialista'), ('privacidade_nao_usuario'), ('codigo_etica')) AS t(tipo)
+     WHERE (v_versoes->>t.tipo) IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM public.marketplace_consentimentos co
+                        WHERE co.profissional_id = v_prof AND co.tipo = t.tipo
+                          AND co.versao = v_versoes->>t.tipo)
+  ) THEN
+    RAISE EXCEPTION 'Há novos termos a aceitar antes de publicar. Aceite os termos pendentes no seu portal.';
+  END IF;
+
+  IF s.categoria_id IS NOT NULL THEN
+    SELECT * INTO c FROM public.marketplace_categorias WHERE id = s.categoria_id;
+    IF c.exige_registro AND (p.registro_profissional IS NULL OR p.conselho IS NULL) THEN
+      RAISE EXCEPTION 'Para publicar em %, informe seu registro profissional (%).', c.nome, COALESCE(array_to_string(c.conselhos_aceitos, '/'), 'conselho');
+    END IF;
+  END IF;
+  IF public.marketye_texto_tem_contato(s.nome) OR public.marketye_texto_tem_contato(s.descricao) THEN
+    RAISE EXCEPTION 'Remova telefones, e-mails ou links do texto — o contato acontece pelo MarketYE.';
+  END IF;
+  UPDATE public.marketplace_servicos SET status = 'publicado', ativo = true, publicado_em = COALESCE(publicado_em, now()) WHERE id = p_id;
+  RETURN jsonb_build_object('id', p_id, 'status', 'publicado');
+END $mkyfn$;
+
+
+-- ---------------------------------------------------------------------
+-- 17) CORREÇÃO Fase 4: RLS de vitrine pública e avaliação moderada (MKY-068/087)
+-- ---------------------------------------------------------------------
+-- ============================================================================
+-- Fase 4 (motores) — Marketplace: RLS da vitrine e das avaliações.
+--
+-- MKY-068: anúncio publicado só aparece na leitura pública se o ESPECIALISTA
+--          estiver ativo (pendente/suspenso/bloqueado/excluído não vazam).
+-- MKY-087: avaliação moderada sai da leitura pública (o cálculo já a exclui).
+--
+-- Restrições ADITIVAS (só reduzem o que é visível — nunca expõem mais). Como a
+-- réplica local não reproduz a RLS com fidelidade, o efeito destas políticas é
+-- confirmado na bateria MKY do ambiente de teste.
+-- ============================================================================
+
+-- ── MKY-068: leitura pública de anúncio exige especialista ativo ────────────
+DROP POLICY IF EXISTS "Public can view active services" ON public.marketplace_servicos;
+CREATE POLICY "Public can view active services"
+  ON public.marketplace_servicos
+  FOR SELECT
+  USING (
+    ativo = true
+    AND status = 'publicado'
+    AND EXISTS (
+      SELECT 1 FROM public.marketplace_profissionais p
+       WHERE p.id = marketplace_servicos.profissional_id
+         AND p.status = 'ativo'
+         AND p.excluido_em IS NULL
+    )
+  );
+
+-- ── MKY-087: avaliação moderada não é lida publicamente ─────────────────────
+DROP POLICY IF EXISTS "Tenant members can view reviews" ON public.marketplace_avaliacoes;
+CREATE POLICY "Tenant members can view reviews"
+  ON public.marketplace_avaliacoes
+  FOR SELECT
+  USING (NOT COALESCE(moderada, false));
+
+
+-- ---------------------------------------------------------------------
+-- 18) CORREÇÃO Fase 4: moderação/visibilidade/isolamento + eficácia de ação MarketYE (D-18, MKY-121)
+-- ---------------------------------------------------------------------
+-- ============================================================================
+-- Fase 4 (motores) — Marketplace: leva final (moderação, visibilidade,
+-- isolamento e devido processo). Correções guiadas pelo `obtido` do staging.
+--
+-- MKY-042: denúncia procedente REMOVE o anúncio (takedown) e registra ocorrência
+--          com reflexo na visibilidade.
+-- MKY-046: automação só SINALIZA — registro vencido vira flag (registro_vencido),
+--          nunca muda status sozinho (sem job/gatilho/função que bloqueie).
+-- MKY-068: a vitrine pública conta só anúncios de especialistas ATIVOS.
+-- MKY-071: outro especialista (mesmo no cercado) não vira "cliente" de conversa
+--          alheia — só o dono da conversa ou usuário comum da empresa.
+-- MKY-092: excluir o perfil ENCERRA as conversas abertas com aviso de sistema.
+-- MKY-121: ação de origem MarketYE exige validação de eficácia para concluir.
+-- ============================================================================
+
+-- ── MKY-042: takedown na denúncia procedente ────────────────────────────────
+CREATE OR REPLACE FUNCTION public.marketye_denuncia_decidir(p_id uuid, p_status text, p_acao text DEFAULT NULL::text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE d record;
+BEGIN
+  IF NOT public.is_superadmin(auth.uid()) THEN RAISE EXCEPTION 'Acesso negado'; END IF;
+  IF p_status NOT IN ('em_analise', 'procedente', 'improcedente', 'resolvida') THEN RAISE EXCEPTION 'Situação inválida'; END IF;
+  UPDATE public.marketplace_denuncias SET status = p_status, acao_tomada = COALESCE(p_acao, acao_tomada), analisado_por = auth.uid(), analisado_em = now()
+  WHERE id = p_id RETURNING * INTO d;
+  IF d.id IS NULL THEN RAISE EXCEPTION 'Denúncia não encontrada'; END IF;
+  IF p_status = 'procedente' THEN
+    INSERT INTO public.marketplace_ocorrencias (profissional_id, tipo, descricao, origem_tipo, origem_id, registrado_por, reflexo_visibilidade)
+    VALUES (d.profissional_id, d.tipo, COALESCE(p_acao, d.descricao), 'denuncia', d.id, auth.uid(), true);
+    -- Takedown: os anúncios publicados do denunciado saem da vitrine.
+    UPDATE public.marketplace_servicos SET status = 'removido', ativo = false
+     WHERE profissional_id = d.profissional_id AND status = 'publicado';
+    PERFORM public.marketye_recalcular_reputacao(d.profissional_id);
+  END IF;
+  RETURN jsonb_build_object('id', p_id, 'status', p_status);
+END $mkyfn$;
+
+-- ── MKY-046: automação só sinaliza (registro vencido = flag, não status) ─────
+ALTER TABLE public.marketplace_profissionais
+  ADD COLUMN IF NOT EXISTS registro_vencido boolean NOT NULL DEFAULT false;
+COMMENT ON COLUMN public.marketplace_profissionais.registro_vencido IS
+  'MKY-046: sinaliza registro profissional vencido (fila de revisão humana) — nunca bloqueia sozinho.';
+
+CREATE OR REPLACE FUNCTION public.verificar_registro_profissional()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+BEGIN
+  -- Devido processo (NR/devido processo): a automação apenas SINALIZA; a
+  -- suspensão/bloqueio é decisão humana (superadmin). Aqui só marca o sinal.
+  NEW.registro_vencido := (NEW.registro_validade IS NOT NULL AND NEW.registro_validade < CURRENT_DATE);
+  RETURN NEW;
+END $mkyfn$;
+
+CREATE OR REPLACE FUNCTION public.bloquear_profissionais_expirados()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+BEGIN
+  -- Só SINALIZA (registro_vencido). A decisão de bloquear é do superadmin, na
+  -- fila de moderação — nada muda de status sozinho.
+  UPDATE public.marketplace_profissionais
+     SET registro_vencido = true
+   WHERE registro_validade < CURRENT_DATE
+     AND registro_vencido IS DISTINCT FROM true;
+END $mkyfn$;
+
+-- ── MKY-068: vitrine pública conta só anúncios de especialistas ativos ──────
+CREATE OR REPLACE FUNCTION public.marketye_vitrine_publica()
+RETURNS jsonb
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+  SELECT jsonb_build_object(
+    'empresas_faixa', (SELECT CASE WHEN n >= 100 THEN (floor(n / 100.0) * 100)::int::text || '+' ELSE 'dezenas de' END FROM (SELECT count(*) AS n FROM public.tenants WHERE ativo) t),
+    'especialistas_ativos', (SELECT count(*) FROM public.marketplace_profissionais WHERE status = 'ativo' AND excluido_em IS NULL),
+    'anuncios_publicados', (SELECT count(*) FROM public.marketplace_servicos s
+                              WHERE s.status = 'publicado' AND s.ativo
+                                AND EXISTS (SELECT 1 FROM public.marketplace_profissionais p
+                                             WHERE p.id = s.profissional_id AND p.status = 'ativo' AND p.excluido_em IS NULL)),
+    'categorias', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', c.id, 'nome', c.nome, 'slug', c.slug, 'icone', c.icone, 'obrigacao_legal', to_jsonb(c.obrigacao_legal),
+                                    'filhas', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', s.id, 'nome', s.nome, 'slug', s.slug, 'obrigacao_legal', to_jsonb(s.obrigacao_legal), 'exige_registro', s.exige_registro) ORDER BY s.ordem), '[]'::jsonb)
+                                               FROM public.marketplace_categorias s WHERE s.pai_id = c.id AND s.ativo)) ORDER BY c.ordem), '[]'::jsonb)
+                   FROM public.marketplace_categorias c WHERE c.pai_id IS NULL AND c.ativo),
+    'vagas_demanda', public.marketye_vagas_demanda(NULL),
+    'termos_versoes', public.marketye_config('termos_versoes'));
+$mkyfn$;
+
+-- ── MKY-071: especialista de terceiro não vira "cliente" de conversa alheia ─
+CREATE OR REPLACE FUNCTION public.marketye_lead_papel(p_lead_id uuid)
+RETURNS text
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE l record;
+BEGIN
+  SELECT tenant_id, profissional_id, criado_por INTO l FROM public.marketplace_leads WHERE id = p_lead_id;
+  IF l.tenant_id IS NULL THEN RETURN NULL; END IF;
+  IF l.profissional_id = public.marketye_meu_id() THEN RETURN 'especialista'; END IF;
+  -- Um especialista registrado que NÃO é o profissional do lead não recebe o
+  -- papel de cliente pela simples partilha de tenant (isolamento da conversa);
+  -- só o criador da conversa ou um usuário comum da empresa é 'cliente'.
+  IF l.tenant_id = public.get_user_tenant_id()
+     AND (public.marketye_meu_id() IS NULL OR l.criado_por = auth.uid()) THEN
+    RETURN 'cliente';
+  END IF;
+  IF public.is_superadmin(auth.uid()) THEN RETURN 'moderador'; END IF;
+  RETURN NULL;
+END $mkyfn$;
+
+-- ── MKY-071 (raiz): as travas de papel FALHAVAM ABERTAS com papel NULL ──────
+-- `papel <> 'cliente'` e `papel NOT IN (...)` avaliam para NULL (não TRUE)
+-- quando o papel é NULL — o RAISE não dispara e o terceiro passa. Aqui as
+-- travas passam a recusar NULL explicitamente (IS DISTINCT FROM / COALESCE).
+CREATE OR REPLACE FUNCTION public.marketye_lead_liberar_contato(p_lead_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+BEGIN
+  IF public.marketye_lead_papel(p_lead_id) IS DISTINCT FROM 'cliente' THEN RAISE EXCEPTION 'Só a empresa cliente libera o contato'; END IF;
+  UPDATE public.marketplace_leads SET contato_liberado = true, contato_liberado_em = COALESCE(contato_liberado_em, now()),
+    status = CASE WHEN status IN ('novo', 'respondido') THEN 'qualificado' ELSE status END, ultima_mensagem_em = now() WHERE id = p_lead_id;
+  INSERT INTO public.marketplace_lead_mensagens (lead_id, autor_tipo, texto)
+  VALUES (p_lead_id, 'sistema', 'A empresa liberou o contato direto. Combinem os detalhes e, ao fechar, marquem "serviço combinado" para habilitar a avaliação.');
+  RETURN jsonb_build_object('id', p_lead_id, 'contato_liberado', true);
+END $mkyfn$;
+
+CREATE OR REPLACE FUNCTION public.marketye_lead_status(p_lead_id uuid, p_status text, p_motivo text DEFAULT NULL::text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_papel text := public.marketye_lead_papel(p_lead_id); v_prof uuid;
+BEGIN
+  IF COALESCE(v_papel, '') NOT IN ('cliente', 'especialista') THEN RAISE EXCEPTION 'Acesso negado'; END IF;
+  IF p_status NOT IN ('ganho', 'perdido', 'encerrado') THEN RAISE EXCEPTION 'Situação inválida'; END IF;
+  UPDATE public.marketplace_leads SET
+    status = p_status,
+    ganho_em = CASE WHEN p_status = 'ganho' THEN COALESCE(ganho_em, now()) ELSE ganho_em END,
+    contato_liberado = CASE WHEN p_status = 'ganho' THEN true ELSE contato_liberado END,
+    primeira_resposta_em = CASE WHEN v_papel = 'especialista' THEN COALESCE(primeira_resposta_em, now()) ELSE primeira_resposta_em END,
+    ultima_mensagem_em = now()
+  WHERE id = p_lead_id RETURNING profissional_id INTO v_prof;
+  INSERT INTO public.marketplace_lead_mensagens (lead_id, autor_tipo, autor_id, texto)
+  VALUES (p_lead_id, 'sistema', auth.uid(),
+          CASE p_status
+            WHEN 'ganho' THEN 'Serviço combinado. Os dois lados já podem avaliar.'
+            WHEN 'perdido' THEN CASE WHEN v_papel = 'especialista'
+                                     THEN 'O especialista não pôde atender e encerrou esta conversa.'
+                                     ELSE 'A empresa encerrou esta conversa sem contratar.' END
+            ELSE COALESCE('Conversa encerrada. ' || p_motivo, 'Conversa encerrada.') END);
+  IF p_status IN ('ganho', 'perdido', 'encerrado') THEN PERFORM public.marketye_recalcular_reputacao(v_prof); END IF;
+  RETURN jsonb_build_object('id', p_lead_id, 'status', p_status);
+END $mkyfn$;
+
+CREATE OR REPLACE FUNCTION public.marketye_lead_mensagem(p_lead_id uuid, p_texto text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_papel text := public.marketye_lead_papel(p_lead_id); l record; v_texto text; v_mascarar boolean; v_id uuid;
+BEGIN
+  IF COALESCE(v_papel, '') NOT IN ('cliente', 'especialista') THEN RAISE EXCEPTION 'Acesso negado'; END IF;
+  IF length(trim(COALESCE(p_texto, ''))) = 0 THEN RAISE EXCEPTION 'Mensagem vazia'; END IF;
+  SELECT * INTO l FROM public.marketplace_leads WHERE id = p_lead_id;
+  IF l.status IN ('perdido', 'encerrado') THEN RAISE EXCEPTION 'Esta conversa foi encerrada'; END IF;
+  v_mascarar := NOT l.contato_liberado AND COALESCE(public.marketye_config('mascaramento_contato')->>'ate', 'contato_qualificado') <> 'nunca';
+  v_texto := CASE WHEN v_mascarar THEN public.marketye_mascarar_contato(p_texto) ELSE p_texto END;
+  INSERT INTO public.marketplace_lead_mensagens (lead_id, autor_tipo, autor_id, texto, texto_original, mascarada, sinal_saida)
+  VALUES (p_lead_id, v_papel, auth.uid(), v_texto, CASE WHEN v_texto <> p_texto THEN p_texto END, v_texto <> p_texto, public.marketye_texto_tem_contato(p_texto))
+  RETURNING id INTO v_id;
+  UPDATE public.marketplace_leads SET ultima_mensagem_em = now(),
+    primeira_resposta_em = CASE WHEN v_papel = 'especialista' AND primeira_resposta_em IS NULL THEN now() ELSE primeira_resposta_em END,
+    status = CASE WHEN v_papel = 'especialista' AND status = 'novo' THEN 'respondido' ELSE status END
+  WHERE id = p_lead_id;
+  RETURN jsonb_build_object('id', v_id, 'mascarada', v_texto <> p_texto);
+END $mkyfn$;
+
+CREATE OR REPLACE FUNCTION public.marketye_lead_vincular_documento(p_lead_id uuid, p_documento_id uuid, p_tipo text DEFAULT 'proposta'::text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_id uuid;
+BEGIN
+  IF public.marketye_lead_papel(p_lead_id) IS DISTINCT FROM 'cliente' THEN RAISE EXCEPTION 'Acesso negado'; END IF;
+  INSERT INTO public.marketplace_lead_documentos (lead_id, documento_id, tipo) VALUES (p_lead_id, p_documento_id, COALESCE(p_tipo, 'proposta')) RETURNING id INTO v_id;
+  INSERT INTO public.marketplace_lead_mensagens (lead_id, autor_tipo, autor_id, texto) VALUES (p_lead_id, 'sistema', auth.uid(), 'Documento arquivado no módulo Documentos e vinculado a esta conversa.');
+  RETURN jsonb_build_object('id', v_id);
+END $mkyfn$;
+
+-- ── MKY-092: excluir perfil encerra as conversas abertas ────────────────────
+CREATE OR REPLACE FUNCTION public.marketye_excluir_meu_perfil(p_confirmacao text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $mkyfn$
+DECLARE v_id uuid := public.marketye_meu_id();
+BEGIN
+  IF v_id IS NULL THEN RAISE EXCEPTION 'Sem cadastro de especialista'; END IF;
+  IF COALESCE(p_confirmacao, '') <> 'EXCLUIR' THEN RAISE EXCEPTION 'Digite EXCLUIR para confirmar'; END IF;
+
+  -- Encerra as conversas abertas com aviso de sistema (o especialista saiu).
+  INSERT INTO public.marketplace_lead_mensagens (lead_id, autor_tipo, texto)
+    SELECT id, 'sistema', 'O especialista deixou o MarketYE; esta conversa foi encerrada.'
+      FROM public.marketplace_leads
+     WHERE profissional_id = v_id AND status NOT IN ('ganho', 'perdido', 'encerrado');
+  UPDATE public.marketplace_leads SET status = 'encerrado', ultima_mensagem_em = now()
+   WHERE profissional_id = v_id AND status NOT IN ('ganho', 'perdido', 'encerrado');
+
+  UPDATE public.marketplace_servicos SET status = 'removido', ativo = false WHERE profissional_id = v_id;
+  UPDATE public.marketplace_cupons SET ativo = false WHERE profissional_id = v_id;
+  UPDATE public.marketplace_destaques SET ativo = false WHERE profissional_id = v_id;
+  INSERT INTO public.marketplace_consentimentos (profissional_id, tipo, versao, origem) VALUES (v_id, 'revogacao_exclusao', 'lgpd', 'portal');
+  UPDATE public.marketplace_profissionais SET
+    status = 'bloqueado', excluido_em = now(), nome_completo = 'Especialista removido', email = 'removido+' || v_id::text || '@anonimizado.invalid',
+    telefone = NULL, cpf_cnpj = NULL, foto_url = NULL, bio = NULL, formacao_academica = NULL, registro_profissional = NULL, certificacoes = NULL,
+    especialidades = NULL, areas_atuacao = NULL, latitude = NULL, longitude = NULL, site_url = NULL, video_url = NULL, disponibilidade = '{}'::jsonb,
+    politicas = NULL, link_afiliado = NULL, user_id = NULL
+  WHERE id = v_id;
+  INSERT INTO public.marketplace_audit_log (tenant_id, profissional_id, acao, descricao, usuario_id)
+  VALUES ((SELECT tenant_id FROM public.marketplace_profissionais WHERE id = v_id), v_id, 'exclusao_lgpd', 'Perfil removido a pedido do titular; transações retidas pelo prazo legal', auth.uid());
+  RETURN jsonb_build_object('id', v_id, 'excluido', true);
+END $mkyfn$;
+
+-- ── MKY-121: ação de origem MarketYE exige validação de eficácia ────────────
+ALTER TABLE public.plano_acoes
+  ADD COLUMN IF NOT EXISTS eficacia_validada_em date;
+ALTER TABLE public.plano_acoes
+  ADD COLUMN IF NOT EXISTS eficacia_validada_por text;
+COMMENT ON COLUMN public.plano_acoes.eficacia_validada_em IS
+  'MKY-121: validacao de eficacia (data) exigida para concluir acao de origem marketplace.';
+
+CREATE OR REPLACE FUNCTION public.plano_acao_marketplace_exige_eficacia()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public'
+AS $mkyfn$
+BEGIN
+  IF NEW.status::text = 'concluida'
+     AND COALESCE(OLD.status::text, '') <> 'concluida'
+     AND NEW.origem_modulo = 'marketplace'
+     AND NEW.eficacia_validada_em IS NULL THEN
+    RAISE EXCEPTION 'Acao de origem MarketYE exige validacao de eficacia (data e responsavel) antes de concluir.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END $mkyfn$;
+
+DROP TRIGGER IF EXISTS trg_plano_acao_marketplace_eficacia ON public.plano_acoes;
+CREATE TRIGGER trg_plano_acao_marketplace_eficacia
+  BEFORE UPDATE OF status ON public.plano_acoes
+  FOR EACH ROW EXECUTE FUNCTION public.plano_acao_marketplace_exige_eficacia();
+
+
+-- ---------------------------------------------------------------------
+-- 19) QA: rotinas adicionais do motor (MKY-091/117/131) e registro
+-- ---------------------------------------------------------------------
+-- ============================================================================
+-- Motor de QA — MarketYE: rotinas dos casos api com superfície de banco.
+--
+-- Destes casos, a fatia testável no motor SQL:
+--   MKY-131 — anti-leakage: o filtro de saída mascara telefone/e-mail/link.
+--   MKY-091 — LGPD: excluir o perfil apaga o pessoal e retém o transacional.
+--   MKY-117 — cadastro atômico: entrada inválida é recusada e não deixa conta
+--             órfã (o profissional só nasce inteiro).
+-- (O miolo de IA/HTTP dos demais — 069/104/130/132/133/134 — é de runtime/tela;
+--  fica para cobertura edge/e2e, não para o motor SQL.)
+-- ============================================================================
+
+-- ── MKY-131: anti-leakage na saída (mascaramento de contato) ────────────────
+CREATE OR REPLACE FUNCTION public.qa_caso_mky_131()
+RETURNS public.qa_retorno LANGUAGE plpgsql AS $fn$
+DECLARE r public.qa_retorno; v_in text; v_out text; v_falhas text[] := '{}';
+BEGIN
+  r.passo_ordem := 1;
+  r.passo_acao := 'Passar uma "resposta da IA" com telefone, e-mail e link pelo filtro de saída';
+  r.esperado := 'Telefone, e-mail e link saem mascarados; nenhum chega cru ao usuário';
+
+  v_in := 'Fecho direto: (11) 98888-7777, meu e-mail joao.teste@exemplo.com e o site https://wa.me/5511988887777';
+  v_out := public.marketye_mascarar_contato(v_in);
+
+  IF v_out ~ '\d{4,5}[\s.-]?\d{4}' THEN v_falhas := array_append(v_falhas, 'telefone não mascarado'); END IF;
+  IF v_out ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' THEN v_falhas := array_append(v_falhas, 'e-mail não mascarado'); END IF;
+  IF v_out ~ '(https?://|www\.)' THEN v_falhas := array_append(v_falhas, 'link não mascarado'); END IF;
+
+  IF array_length(v_falhas, 1) IS NULL THEN
+    r.situacao := 'passou';
+    r.obtido := 'Telefone, e-mail e link foram mascarados na saída — a IA não vira canal direto.';
+  ELSE
+    r.situacao := 'falhou';
+    r.obtido := 'ACHADO: ' || array_to_string(v_falhas, '; ') || '. Saída: ' || v_out;
+  END IF;
+  r.detalhe := jsonb_build_object('entrada', v_in, 'saida', v_out);
+  RETURN r;
+EXCEPTION WHEN OTHERS THEN
+  r.situacao := 'erro'; r.obtido := 'A rotina quebrou'; r.erro_tecnico := SQLERRM; RETURN r;
+END $fn$;
+
+-- ── MKY-091: LGPD — exclusão apaga o pessoal e retém o transacional ─────────
+CREATE OR REPLACE FUNCTION public.qa_caso_mky_091()
+RETURNS public.qa_retorno LANGUAGE plpgsql AS $fn$
+DECLARE r public.qa_retorno; v_claims text; a record; v_falhas text[] := '{}';
+        v_prof record; n_audit int;
+BEGIN
+  v_claims := current_setting('request.jwt.claims', true);
+  PERFORM public.qa_mky_limpar();
+
+  r.passo_ordem := 1; r.passo_acao := 'Especialista com foto e dados pessoais pede exclusão';
+  r.esperado := 'Campos pessoais (foto, CPF, e-mail, telefone) anonimizados; auditoria retida';
+
+  SELECT * INTO a FROM public.qa_mky_especialista('091', public.qa_cpf(91));
+  PERFORM public.qa_mky_claims(a.uid);
+  UPDATE public.marketplace_profissionais SET foto_url = 'https://exemplo/foto.jpg', bio = 'bio pessoal' WHERE id = a.prof_id;
+
+  PERFORM public.marketye_excluir_meu_perfil('EXCLUIR');
+
+  SELECT nome_completo, cpf_cnpj, foto_url, telefone, email, bio, status, excluido_em
+    INTO v_prof FROM public.marketplace_profissionais WHERE id = a.prof_id;
+  IF v_prof.cpf_cnpj IS NOT NULL THEN v_falhas := array_append(v_falhas, 'CPF/CNPJ não apagado'); END IF;
+  IF v_prof.foto_url IS NOT NULL THEN v_falhas := array_append(v_falhas, 'foto não apagada'); END IF;
+  IF v_prof.telefone IS NOT NULL THEN v_falhas := array_append(v_falhas, 'telefone não apagado'); END IF;
+  IF v_prof.bio IS NOT NULL THEN v_falhas := array_append(v_falhas, 'bio não apagada'); END IF;
+  IF v_prof.excluido_em IS NULL THEN v_falhas := array_append(v_falhas, 'exclusão não marcada'); END IF;
+
+  -- Transacional retido: o registro de auditoria da exclusão permanece.
+  SELECT count(*) INTO n_audit FROM public.marketplace_audit_log
+   WHERE profissional_id = a.prof_id AND acao = 'exclusao_lgpd';
+  IF n_audit < 1 THEN v_falhas := array_append(v_falhas, 'auditoria da exclusão não retida'); END IF;
+
+  PERFORM set_config('request.jwt.claims', COALESCE(NULLIF(v_claims, ''), '{}'), true);
+  IF array_length(v_falhas, 1) IS NULL THEN
+    r.situacao := 'passou';
+    r.obtido := 'Exclusão apagou o pessoal (CPF, foto, telefone, bio) e marcou a saída; a auditoria transacional ficou retida.';
+  ELSE
+    r.situacao := 'falhou';
+    r.obtido := 'ACHADO: ' || array_to_string(v_falhas, '; ');
+  END IF;
+  PERFORM public.qa_mky_limpar();
+  RETURN r;
+EXCEPTION WHEN OTHERS THEN
+  PERFORM set_config('request.jwt.claims', COALESCE(NULLIF(v_claims, ''), '{}'), true);
+  r.situacao := 'erro'; r.obtido := 'A rotina quebrou'; r.erro_tecnico := SQLERRM; RETURN r;
+END $fn$;
+
+-- ── MKY-117: cadastro atômico — entrada inválida não deixa conta órfã ───────
+CREATE OR REPLACE FUNCTION public.qa_caso_mky_117()
+RETURNS public.qa_retorno LANGUAGE plpgsql AS $fn$
+DECLARE r public.qa_retorno; v_uid uuid := gen_random_uuid(); v_tag text := left(v_uid::text, 8);
+        v_recusou boolean := false; n_orfa int; v_falhas text[] := '{}'; v_res jsonb; v_ok_id uuid;
+BEGIN
+  PERFORM public.qa_mky_limpar();
+  r.passo_ordem := 1; r.passo_acao := 'Cadastrar especialista com entrada inválida (dados vazios)';
+  r.esperado := 'Recusa com erro claro; nenhuma conta parcial criada';
+
+  INSERT INTO auth.users (id, email) VALUES (v_uid, 'qa-mky117-' || v_tag || '@sandbox.invalid');
+  BEGIN
+    PERFORM public.marketye_cadastrar_especialista_para(v_uid, '{}'::jsonb);
+  EXCEPTION WHEN OTHERS THEN v_recusou := true;
+  END;
+  SELECT count(*) INTO n_orfa FROM public.marketplace_profissionais WHERE user_id = v_uid;
+
+  IF NOT v_recusou THEN v_falhas := array_append(v_falhas, 'entrada inválida foi aceita'); END IF;
+  IF n_orfa > 0 THEN v_falhas := array_append(v_falhas, format('sobrou conta órfã (%s linha)', n_orfa)); END IF;
+
+  r.passo_ordem := 2; r.passo_acao := 'Cadastrar com entrada válida'; r.esperado := 'Profissional criado inteiro';
+  v_res := public.marketye_cadastrar_especialista_para(v_uid, jsonb_build_object(
+    'nome_completo', 'QA Cadastro 117', 'email', 'qa-mky117-' || v_tag || '@sandbox.invalid',
+    'cpf_cnpj', public.qa_cpf(117), 'cidade', 'Cidade QA', 'estado', 'QA',
+    'modalidades', '["online"]'::jsonb, 'aceite_termos', true, 'conselho', 'CREA',
+    'registro_profissional', 'QA-117', 'origem', 'qa', 'tenant_origem', public.qa_sandbox_tenant_id()));
+  v_ok_id := (v_res->>'id')::uuid;
+  IF v_ok_id IS NULL THEN v_falhas := array_append(v_falhas, 'entrada válida não criou o profissional'); END IF;
+
+  IF array_length(v_falhas, 1) IS NULL THEN
+    r.situacao := 'passou';
+    r.obtido := 'Entrada inválida recusada sem deixar conta órfã; entrada válida criou o profissional inteiro.';
+  ELSE
+    r.situacao := 'falhou';
+    r.obtido := 'ACHADO: ' || array_to_string(v_falhas, '; ');
+  END IF;
+  r.detalhe := jsonb_build_object('recusou_invalida', v_recusou, 'orfas', n_orfa);
+  PERFORM public.qa_mky_limpar();
+  RETURN r;
+EXCEPTION WHEN OTHERS THEN
+  r.situacao := 'erro'; r.obtido := 'A rotina quebrou'; r.erro_tecnico := SQLERRM; RETURN r;
+END $fn$;
+
+-- ── Ligar caso ↔ rotina ─────────────────────────────────────────────────────
+INSERT INTO public.qa_implementacoes (codigo, funcao_sql, ativo) VALUES
+  ('MKY-131', 'qa_caso_mky_131', true),
+  ('MKY-091', 'qa_caso_mky_091', true),
+  ('MKY-117', 'qa_caso_mky_117', true)
+ON CONFLICT (codigo) DO UPDATE SET funcao_sql = EXCLUDED.funcao_sql, ativo = true;
+
+
+-- ---------------------------------------------------------------------
 -- CONFERÊNCIA (único resultado exibido pelo editor)
 -- ---------------------------------------------------------------------
 WITH f AS MATERIALIZED (
@@ -7826,10 +8738,12 @@ WITH f AS MATERIALIZED (
          (SELECT count(*) FROM public.qa_casos_teste WHERE codigo LIKE 'MKY-%') AS casos_qa,
          (SELECT label FROM public.qa_modulos WHERE path = 'rede-parceiros') AS modulo_qa
 ), q AS MATERIALIZED (
-  SELECT c.codigo, x.situacao, x.erro_tecnico, x.obtido, COALESCE(ct.disposicao, 'em_triagem') AS disposicao
-  FROM unnest(ARRAY['001','002','003','004','005','006','007','008','009','010','011','012','013','014','015','110','111','112','113','114','115','116','031','032','033','034','035','037','038','041','042','043','045','046','051','052','053','054','055','056','057','058','060','061','062','063','064','065','068','071','072','073','074','075','077','080','081','082','083','084','085','086','087','088','090','092','093','094','095','096','100','101','102','103','105','106','121','122','123','124']) AS c(codigo)
-  CROSS JOIN LATERAL public.qa_executar_descartavel('qa_caso_mky_' || c.codigo) x
-  LEFT JOIN public.qa_casos_teste ct ON ct.codigo = 'MKY-' || c.codigo
+  -- roda todas as rotinas MKY registradas e ativas (não uma lista fixa)
+  SELECT i.codigo, x.situacao, x.erro_tecnico, x.obtido, COALESCE(ct.disposicao, 'em_triagem') AS disposicao
+  FROM public.qa_implementacoes i
+  LEFT JOIN public.qa_casos_teste ct ON ct.codigo = i.codigo
+  CROSS JOIN LATERAL public.qa_executar_descartavel(i.funcao_sql) x
+  WHERE i.codigo LIKE 'MKY-%' AND i.ativo
 ), qr AS MATERIALIZED (
   -- OK exige: nenhuma rotina em erro e nenhuma falha em caso em_triagem. Falha em caso com disposição
   -- (bug_confirmado / aguardando_construcao) é achado já conhecido e documentado — aparece em achados_conhecidos.

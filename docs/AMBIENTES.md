@@ -537,6 +537,30 @@ mantém **1 caso `e2e` anterior sem teste** (FERIAS-055, "aviso sem ciência nã
 conclui a concessão") — só gera aviso na guarda, nunca reprova; candidato a
 implementação futura (precisa de fixtures de solicitação).
 
+### Cobertura nova de tela — Colaboradores (09/2026, doc-first)
+
+O módulo **Colaboradores** (`estrutura-organizacional/colaboradores`) — o núcleo
+de gente (admissão, ativos, desligados) — não tinha tela documentada. Mesmo
+padrão do Férias:
+
+- **9 casos `e2e` COLAB-TELA-01..09** em `qa_casos_teste` — o módulo monta com
+  abas (Ativos/Admissões/Desligados) e ações (Novo Cadastro, Importar); a aba
+  Ativos traz busca e filtros; alternância cards/lista; **Novo Cadastro** abre a
+  escolha colaborador×terceiro; **Importar** abre o modal; filtro de Departamento;
+  e o contador "Mostrando X de Y". Data-independentes (sem fixtures).
+- **`cypress/e2e/colaboradores.cy.ts`** — os 9 `it()`, ligados pela ponte.
+- Entregas: migration `20260916180500_qa_colaboradores_casos_tela.sql` e
+  `docs/script_colaboradores_casos_tela_homologacao.sql` (colado no SQL Editor da
+  homologação antes da corrida).
+
+Validação: homologação (bateria #48, `26e816f`) **39 specs, tudo verde**, guarda
+incluída (colaboradores 9/9). O módulo mantém **2 casos `e2e` anteriores sem
+teste** — só geram aviso na guarda, nunca reprovam. Nota de operação: a esteira
+do teste passou por um surto de **colisões de carimbo** entre sessões (09/16);
+esta migration foi re-carimbada para `…180500` para desbloquear — conteúdo
+intacto. Reforço do costume: conferir o carimbo livre **no momento da mescla**,
+não só ao criar.
+
 ## Testes de tela (Cypress) na homologação
 
 Por padrão a suíte Cypress roda só no **teste** (é lá que a tela nasce, e as duas

@@ -631,10 +631,53 @@ Validação: homologação (bateria #51, `e4492a7c`) **tudo verde**, guarda incl
 salvar config, isolamento) exigem fixtures e seguem como documentados-sem-teste
 (só aviso na guarda).
 
-**Nota de cobertura (evitar retrabalho):** o módulo **Atestados/GAF** (`/atestados`,
-tela "MOD-GAF") **já tem cobertura** pelo spec `afastamentos.cy.ts` (Central GAF,
-casos AFAST-TELA-*) — não é lacuna. Módulos ainda sem tela: **Pendências**
-(`/pendencias`) — em implementação — e **Feed** (`/feed`).
+### Cobertura nova de tela — Central de Pendências (09/2026, doc-first)
+
+O módulo **Central de Pendências** (`sistema/pendencias`, rota `/pendencias`) — o
+agregador de ações/providências por perfil (férias, documentos, ajustes,
+avaliações, desligamentos, afastamentos, alertas de saúde) — **não existia no QA**
+(sem módulo, sem casos, sem spec). Padrão doc-first "puro":
+
+- **4 casos `e2e` PEND-TELA-01..04** em `qa_casos_teste` — o módulo monta com
+  cabeçalho + 3 cartões (Urgentes/Em Atenção/Total de Ações); a busca e os 4
+  filtros por perfil (Tudo/Meu Perfil/Minha Equipe/Gestão / RH) aparecem; a busca
+  sem resultado orienta ("Nenhuma pendência encontrada"); selecionar "Gestão / RH"
+  ativa a aba. Data-independentes (o vazio é forçado via busca).
+- **`cypress/e2e/pendencias.cy.ts`** — os 4 `it()`, ligados pela ponte. A Central
+  de Pendências saiu do menu lateral (fica no dashboard); o spec navega direto por
+  `/pendencias`.
+- Entregas: migration `20260917202153_qa_pendencias_casos_tela.sql` e
+  `docs/script_pendencias_casos_tela_homologacao.sql`. As duas **garantem a linha
+  do módulo** `sistema/pendencias` (idempotente, sob a seção `sistema`).
+
+Validação: `pendencias.cy.ts` **passou 4/4** na bateria #52 (`693e15a7`);
+confirmação na homologação `casos_pend_tela=4`, `pontes_pend_tela=4`,
+`e2e_no_modulo_pendencias=4`. **Ressalva:** a bateria #52 fechou **vermelha por 1
+falha pré-existente e não relacionada** — `trilhas.cy.ts › "cria uma trilha na
+Gestão"` (`AssertionError: Expected to find content: 'Trilha criada!' but never
+did`, `trilhas.cy.ts:71`; modal não fechou, campo de nome da campanha ausente).
+Esse teste **passou** nas baterias #50 e #51 e está **fora do escopo** desta
+entrega (não toca Trilhas nem `TrilhaForm`) — em aberto para investigação (flake
+ou mudança recente no fluxo de criação de trilha).
+
+**Nota de cobertura (evitar retrabalho):** dois "candidatos" que **não são
+lacuna** — já têm tela coberta por specs existentes:
+- **Atestados/GAF** (`/atestados`, tela "MOD-GAF") → `afastamentos.cy.ts` (Central
+  GAF, casos AFAST-TELA-*).
+- **Feed** (`/feed`) → é o **Mural Interno** (a página `Feed.tsx` renderiza o h1
+  "Mural Interno"), já coberto por `mural.cy.ts` (7 `it()`: compositor, feed,
+  atualizar, publicar, bloquear vazio, comentar, excluir) + casos MURAL-*
+  (`20260828140400_qa_mural_casos_tela.sql`). Não criar spec de Feed separado.
+
+Com isso, a rodada doc-first de tela cobriu os módulos que faltavam
+(Férias, Colaboradores, Financeiro, Usuários, Aprendizado & Papéis, Pendências);
+Atestados/GAF e Feed(=Mural) já estavam cobertos.
+
+**Em aberto (não é lacuna de tela nova):** `trilhas.cy.ts › "cria uma trilha na
+Gestão"` falhou na bateria #52 (`AssertionError: 'Trilha criada!' but never did`,
+`trilhas.cy.ts:71`; modal não fechou). **Passou** nas #50 e #51 e não foi tocado
+por estas entregas — flake ou mudança recente no fluxo de criação de trilha, a
+investigar.
 
 ## Testes de tela (Cypress) na homologação
 

@@ -197,11 +197,17 @@ sem laudo ligado a pessoas (`EMP-052`), não agrupa matriz+filiais por raiz do C
 
 ## 🔧 Resíduos de QA (eu corrijo — não são achados de produto)
 
-Pequenos, do próprio motor:
+### ✅ RESOLVIDOS (18/09/2026 — em produção) — entrega `script_residuos_prod.sql`
+
+- `COLAB-011` / `COLAB-023` / `COLAB-033` — ✅ o gerador de CPF de teste (`qa_cpf`) estava **stale** na produção (gerava CPF com dígito verificador inválido); reentregue. COLAB-033 ganhou também o **índice único de CPF normalizado**. **Verde em produção.**
+- `HIER-002` — ✅ a FK de grupo econômico recriada com **`ON DELETE SET NULL`** (apagar um grupo preserva as empresas). **Verde em produção.**
+
+> Diagnóstico registrado: checar "objeto existe?" não bastava — os erros eram *runtime* (drift de helper e de ação de FK). O `diag_residuos_runtime.sql` (roda as rotinas e mostra o `erro_tecnico`) foi o que revelou as causas.
+
+### ⏳ Pendente — mergulho à parte
+
+- `DESL-003` — **cadeia de gatilhos stale na tabela `afastamentos`** (validação + derivação de campos): registrar afastamento indeterminado / benefício INSS **sem data de fim** é recusado (bug de produto, não só de QA). O helper `afastamento_sem_prazo_e_legitimo` e o gatilho `afastamento_campos_before` já foram reentregues à homologação, mas ainda há **outra peça stale** na cadeia — precisa instrumentar os valores em runtime para achar. **Não** foi levado à produção (não se leva mudança incompleta de dado real). Fica para uma investigação dedicada.
 - `AFAST-001` — sonda usa **tenant real** (mesmo caso das Férias); corrijo para o cercado.
-- `COLAB-011/023/033` — fixtures de CPF (a sonda esbarra na validação/constraint).
-- `DESL-003` — depende de afastamento com data-fim.
-- `HIER-002` — limpeza de FK do cercado.
 - `DADO-010` / `HCAT-010` / `HTPL-010` — enums abertos (`tipo_pessoa='mei'`, obrigatoriedade/tipo livres) — **na fronteira** entre resíduo e achado; anoto os dois.
 
 ---

@@ -62,6 +62,51 @@ AS $fn$
       OR COALESCE(p_tipo_principal, '') IN ('beneficio_b31', 'beneficio_b91', 'licenca_maternidade');
 $fn$;
 
+-- DESL-003 (parte 2): derivacao de campos do afastamento. O gatilho
+-- afastamento_campos_before (que roda ANTES de afastamento_valida_e_encerra)
+-- estava stale e nao marcava status_geral_new='prazo_indeterminado' para
+-- afastamento indeterminado — entao o afastamento sem data_fim era recusado.
+-- Coluna data_fim_estabilidade referenciada pelo gatilho (drift-safety).
+ALTER TABLE public.afastamentos ADD COLUMN IF NOT EXISTS data_fim_estabilidade date;
+
+CREATE OR REPLACE FUNCTION public.afastamento_campos_before()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $fn$
+DECLARE
+    v_dias integer;
+BEGIN
+    IF COALESCE(NEW.prazo_indeterminado, FALSE) THEN
+        IF NEW.status_geral_new IS NULL
+           OR NEW.status_geral_new NOT IN ('prazo_indeterminado', 'em_beneficio') THEN
+            NEW.status_geral_new := 'prazo_indeterminado';
+        END IF;
+    END IF;
+
+    IF NEW.data_inicio IS NOT NULL AND NEW.data_fim IS NOT NULL THEN
+        v_dias := (NEW.data_fim - NEW.data_inicio) + 1;
+    ELSIF NEW.data_inicio IS NOT NULL THEN
+        v_dias := (CURRENT_DATE - NEW.data_inicio) + 1;
+    ELSE
+        v_dias := 0;
+    END IF;
+
+    IF NOT COALESCE(NEW.prazo_indeterminado, FALSE)
+       AND v_dias > 15
+       AND (NEW.status_geral_new IS NULL
+            OR NEW.status_geral_new NOT IN
+               ('aguardando_inss', 'em_beneficio', 'encerrado', 'cancelado', 'prazo_indeterminado')) THEN
+        NEW.status_geral_new := 'aguardando_inss';
+    END IF;
+
+    IF NEW.tipo_principal_new IN ('acidente_tipico', 'acidente_trajeto', 'doenca_ocupacional')
+       AND NEW.data_fim IS NOT NULL THEN
+        NEW.data_fim_estabilidade := (NEW.data_fim + INTERVAL '12 months')::date;
+    END IF;
+
+    RETURN NEW;
+END;
+$fn$;
+
 -- COLAB-033: indice unico de CPF normalizado (so onde a base esta limpa) ------
 DO $do$
 BEGIN

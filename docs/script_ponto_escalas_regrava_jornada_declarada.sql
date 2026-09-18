@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS public.backup_ponto_escalas_20260916 AS
 
 DO $fix$
 DECLARE
-  v_afetadas int := 0;
+  v_afetadas    int := 0;
+  v_tem_gatilho boolean;
 BEGIN
   -- Zera o recado de erro: a conferencia do rodape le esta chave para saber se
   -- a regravacao passou ou tropecou. Sem isso, um tropeco viraria um "OK"
@@ -76,7 +77,18 @@ BEGIN
   END IF;
 
   -- (2) Suspende o arquivamento de versao: ver "A GUARDA DA VERSAO" no topo.
-  EXECUTE 'ALTER TABLE public.ponto_escalas DISABLE TRIGGER trg_ponto_escala_arquiva_versao';
+  --     Só mexe no gatilho se ele existir: ambiente que ainda nao recebeu o
+  --     versionamento de escala (Onda 1) nao tem esse gatilho, e um ALTER
+  --     TABLE cego derrubaria a regravacao inteira por um detalhe que, ali,
+  --     nem se aplica — sem gatilho nao ha versao falsa a evitar.
+  v_tem_gatilho := EXISTS (
+    SELECT 1 FROM pg_trigger
+     WHERE tgrelid = 'public.ponto_escalas'::regclass
+       AND tgname  = 'trg_ponto_escala_arquiva_versao');
+
+  IF v_tem_gatilho THEN
+    EXECUTE 'ALTER TABLE public.ponto_escalas DISABLE TRIGGER trg_ponto_escala_arquiva_versao';
+  END IF;
 
   -- (3) Regrava jornada diaria e semanal exatamente como a tela passa a
   --     calcular: a janela do dia menos o intervalo que couber (batido tem
@@ -158,7 +170,9 @@ BEGIN
   GET DIAGNOSTICS v_afetadas = ROW_COUNT;
 
   -- (4) Religa o arquivamento de versao para as edicoes de verdade.
-  EXECUTE 'ALTER TABLE public.ponto_escalas ENABLE TRIGGER trg_ponto_escala_arquiva_versao';
+  IF v_tem_gatilho THEN
+    EXECUTE 'ALTER TABLE public.ponto_escalas ENABLE TRIGGER trg_ponto_escala_arquiva_versao';
+  END IF;
 
   IF v_afetadas = 0 THEN
     RAISE NOTICE 'Nada a regravar — nenhuma escala com declaracao vigente estava com a jornada inflada (ou ja foram todas corrigidas).';

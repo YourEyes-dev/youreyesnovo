@@ -754,12 +754,16 @@ Com isso, a rodada doc-first de tela cobriu os módulos que faltavam
 Atestados/GAF e Feed(=Mural) já estavam cobertos. A suíte da homologação voltou a
 **43/43 verde** na bateria #53 (`a84f549e`).
 
-**Nota de flake (para o histórico):** `trilhas.cy.ts › "cria uma trilha na Gestão"`
-falhou **apenas** na #52 (`'Trilha criada!' never did`, `trilhas.cy.ts:71`; modal
-não fechou) e passou nas #50, #51 e na re-rodada #53. Foi **instabilidade**, não
-regressão — nenhuma entrega tocou Trilhas/`TrilhaForm`. Se voltar a piscar, é
-candidato a endurecer o `it()` (esperar o fechamento do modal / o toast com mais
-tolerância).
+**Nota de flake (resolvido + endurecido):** `trilhas.cy.ts › "cria uma trilha na
+Gestão"` falhou **apenas** na #52 (`'Trilha criada!' never did`, `trilhas.cy.ts:71`;
+modal não fechou) e passou nas #50, #51 e na re-rodada #53 — **instabilidade**, não
+regressão (nenhuma entrega tocou Trilhas/`TrilhaForm`). O `it()` foi **endurecido
+de forma preventiva**: em vez de aferir o toast **efêmero** `"Trilha criada!"`
+(sonner some em ~4s), agora (1) confirma que o valor do nome foi **comitado** no
+campo antes de submeter e (2) usa um sinal **durável** de sucesso — o **fechamento
+do diálogo** (o `TrilhaForm` só fecha após `criarTrilha` resolver; no erro o
+`catch` mantém o diálogo aberto). Sem tocar no código de produto; título do `it()`
+inalterado (ponte intacta).
 
 ## Testes de tela (Cypress) na homologação
 

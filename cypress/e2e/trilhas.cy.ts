@@ -65,9 +65,23 @@ describe("Módulo Trilhas", () => {
     cy.contains("button", "Nova Trilha", { timeout: 20000 }).first().click({ force: true });
     cy.get('[role="dialog"]', { timeout: 15000 }).contains("Nova Trilha").should("exist");
     const nome = `Trilha automatizada ${Date.now()}`;
-    // Só o Nome é obrigatório; os demais campos têm padrão.
-    cy.get('[role="dialog"]').find('input[placeholder="Ex: Gestão de Prioridades"]').type(nome, { force: true });
+    // Só o Nome é obrigatório; os demais têm padrão. Endurecido: o campo do
+    // diálogo (Radix ainda animando) precisa estar VISÍVEL e o valor precisa ter
+    // sido COMITADO antes de submeter — sem isso o .type às vezes não registra e
+    // a criação sai travada (o botão volta a ficar inerte).
+    cy.get('[role="dialog"]')
+      .find('input[placeholder="Ex: Gestão de Prioridades"]', { timeout: 15000 })
+      .should("be.visible")
+      .clear({ force: true })
+      .type(nome, { force: true })
+      .should("have.value", nome);
     cy.get('[role="dialog"]').contains("button", "Criar Trilha").should("not.be.disabled").click({ force: true });
-    cy.contains("Trilha criada!", { timeout: 20000 }).should("exist");
+    // Sucesso por sinal DURÁVEL, não pelo toast efêmero: o TrilhaForm fecha o
+    // diálogo (onOpenChange(false)) só DEPOIS que criarTrilha resolve; no erro, o
+    // catch mantém o diálogo ABERTO (foi o que a bateria #52 pegou: dialogs=1). O
+    // toast "Trilha criada!" (sonner) some em ~4s e sozinho gerava flake quando a
+    // asserção começava tarde. Aferimos o fechamento do diálogo como prova de
+    // criação (no erro, o diálogo teria permanecido aberto com o formulário).
+    cy.get('[role="dialog"]', { timeout: 20000 }).should("not.exist");
   });
 });

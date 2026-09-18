@@ -95,7 +95,11 @@ Parte liga-se ao **A2** (a limpeza de empresa-CPF e vínculo ficou pendente):
 - `EMP-020` / `EMP-021` — ✅ **duas empresas ativas com o mesmo CNPJ** barradas no INSERT **e** no UPDATE de reativação (gatilho `prevent_duplicate_active_cnpj`, `unique_violation`).
 - `EMP-070` / `EMP-071` — ✅ **CPF de empresa PF** entra na mesma regra: o gatilho passou a cobrir CNPJ **e** CPF (normalizados), no INSERT e no UPDATE; duplicata **inativa** segue permitida.
 
-> Segurança do legado: o gatilho barra gravações novas **sem validar a tabela inteira** (seguro mesmo com duplicatas ativas históricas). Os índices únicos parciais entram como reforço só onde a base está limpa (bloco `DO` que cai em `NOTICE` se houver duplicata). A conferência da entrega **conta as duplicatas ativas já existentes** (CNPJ e CPF) para decidir a limpeza à parte.
+> Segurança do legado: o gatilho barra gravações novas **sem validar a tabela inteira** (seguro mesmo com duplicatas ativas históricas). Os índices únicos parciais entram como reforço só onde a base está limpa (bloco `DO` que cai em `NOTICE` se houver duplicata). A conferência **conta as duplicatas ativas já existentes** (CNPJ e CPF) para decidir a limpeza à parte.
+>
+> **Dois aprendizados desta entrega:**
+> 1. **DDL ⟂ conferência.** Juntar o DDL (lock exclusivo em `empresa_cadastro`) com a conferência pesada (rotinas que leem `usuarios_base` etc.) na mesma transação causou **deadlock** na base movimentada. Separado em `script_emp_unicidade_documento_ativo.sql` (só DDL) + `conferencia_emp_unicidade.sql` (rodar depois).
+> 2. **A medição também sofre drift.** Na homologação o gatilho já barrava o CNPJ (teste direto: `row2_blocked=t`), mas a **rotina de QA `emp_020/021` era uma versão antiga** que reportava falso-negativo. Corrigido por `script_fix_rotinas_emp020_021.sql`. Lição: ao entregar um controle, **entregar junto a rotina de QA atual** — senão a medição desatualizada acusa falha onde o controle já funciona.
 
 ### ⏳ Pendentes
 

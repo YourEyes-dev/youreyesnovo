@@ -2,7 +2,9 @@
 -- ENTREGA — Aprendizado & Papéis: teste de tela (ponte e2e) + garante os casos
 --
 -- Cole este arquivo INTEIRO no SQL Editor da HOMOLOGAÇÃO (projeto
--- fgsblefvdabgdouipigz) e, depois de aprovado, no da PRODUÇÃO. Espelha a
+-- fgsblefvdabgdouipigz). É infra de TESTE (documentação/ponte do Cypress) e NÃO
+-- vai para a produção — a produção não roda Cypress e a ponte qa_cobertura_e2e
+-- só serve à guarda das esteiras. Espelha a
 -- migration 20260917164458_qa_aprendizado_papeis_ponte_e2e.sql: liga cada it()
 -- de cypress/e2e/aprendizado-papeis.cy.ts ao seu caso APR-* na tabela
 -- qa_cobertura_e2e, e GARANTE os 5 casos ligados (idempotente) — porque a

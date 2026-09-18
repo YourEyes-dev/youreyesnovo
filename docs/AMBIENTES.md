@@ -512,6 +512,14 @@ referência**, não só do esquema recente. Ex.: as categorias-raiz do marketpla
 Corrigido por scripts de entrega (`docs/script_marketye_homologacao.sql` e
 `docs/script_marketye_categorias_homologacao.sql`).
 
+> **Princípio da cobertura de tela (Cypress) — não vai para produção.** Os specs
+> `cypress/e2e/*.cy.ts`, os casos `e2e` em `qa_casos_teste` e a ponte
+> `qa_cobertura_e2e` são **infra de teste**: rodam nas esteiras de **teste** e
+> **homologação** e **não têm passo de produção**. A produção não roda Cypress e a
+> ponte só serve à guarda (`qa-cobertura-e2e`/`verificar-cobertura-e2e.mjs`) das
+> esteiras. Os `docs/script_*_homologacao.sql` desta cobertura são para o SQL
+> Editor da **homologação apenas** — nunca o de produção.
+
 ### Cobertura nova de tela — Férias (09/2026, doc-first)
 
 O módulo **Férias** (`jornada-rotina/ferias`) tinha forte cobertura de MOTOR

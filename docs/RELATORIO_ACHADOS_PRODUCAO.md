@@ -92,8 +92,10 @@ Parte liga-se ao **A2** (a limpeza de empresa-CPF e vínculo ficou pendente):
 
 ### ✅ RESOLVIDOS (17/09/2026) — entrega `script_emp_unicidade_documento_ativo.sql`
 
-- `EMP-020` / `EMP-021` — ✅ **duas empresas ativas com o mesmo CNPJ** barradas no INSERT **e** no UPDATE de reativação (gatilho `prevent_duplicate_active_cnpj`, `unique_violation`).
-- `EMP-070` / `EMP-071` — ✅ **CPF de empresa PF** entra na mesma regra: o gatilho passou a cobrir CNPJ **e** CPF (normalizados), no INSERT e no UPDATE; duplicata **inativa** segue permitida.
+- `EMP-020` / `EMP-021` — ✅ **duas empresas ativas com o mesmo CNPJ** barradas no INSERT **e** no UPDATE de reativação (gatilho `prevent_duplicate_active_cnpj`, `unique_violation`). **Verde em produção (18/09/2026).**
+- `EMP-070` / `EMP-071` — ✅ **CPF de empresa PF** entra na mesma regra: o gatilho passou a cobrir CNPJ **e** CPF (normalizados), no INSERT e no UPDATE; duplicata **inativa** segue permitida. **Verde em produção.**
+
+> **Legado da produção: 0 grupos de CNPJ ativo duplicado e 0 de CPF** (conferido 18/09/2026) — a produção não tinha nenhuma duplicata ativa de empresa; nada a limpar aqui, e os índices únicos entraram normalmente.
 
 > Segurança do legado: o gatilho barra gravações novas **sem validar a tabela inteira** (seguro mesmo com duplicatas ativas históricas). Os índices únicos parciais entram como reforço só onde a base está limpa (bloco `DO` que cai em `NOTICE` se houver duplicata). A conferência **conta as duplicatas ativas já existentes** (CNPJ e CPF) para decidir a limpeza à parte.
 >

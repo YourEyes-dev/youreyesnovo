@@ -1,8 +1,10 @@
 -- =====================================================================
 -- ENTREGA — Férias: documentação de TELA (nível e2e) + ponte de cobertura
 --
--- Cole este arquivo INTEIRO no SQL Editor da HOMOLOGAÇÃO (e, depois de
--- aprovado, no da PRODUÇÃO). Espelha a migration
+-- Cole este arquivo INTEIRO no SQL Editor da HOMOLOGAÇÃO. É infra de TESTE
+-- (documentação/ponte do Cypress) e NÃO vai para a produção — a produção não
+-- roda Cypress e a ponte qa_cobertura_e2e só serve à guarda das esteiras.
+-- Espelha a migration
 -- 20260915190000_qa_ferias_casos_tela.sql: documenta os 10 casos
 -- FERIAS-TELA-01..10 no módulo jornada-rotina/ferias e liga cada um ao
 -- it() de cypress/e2e/ferias.cy.ts na tabela qa_cobertura_e2e.

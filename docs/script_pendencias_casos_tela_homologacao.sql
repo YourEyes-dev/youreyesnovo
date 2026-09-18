@@ -2,7 +2,9 @@
 -- ENTREGA — Central de Pendências: documentação de TELA (nível e2e) + ponte
 --
 -- Cole este arquivo INTEIRO no SQL Editor da HOMOLOGAÇÃO (projeto
--- fgsblefvdabgdouipigz) e, depois de aprovado, no da PRODUÇÃO. Espelha a
+-- fgsblefvdabgdouipigz). É infra de TESTE (documentação/ponte do Cypress) e NÃO
+-- vai para a produção — a produção não roda Cypress e a ponte qa_cobertura_e2e
+-- só serve à guarda das esteiras. Espelha a
 -- migration 20260917202153_qa_pendencias_casos_tela.sql: documenta os 4 casos
 -- PEND-TELA-01..04 no módulo sistema/pendencias e liga cada um ao it() de
 -- cypress/e2e/pendencias.cy.ts na tabela qa_cobertura_e2e.

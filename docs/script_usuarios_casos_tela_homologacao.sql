@@ -1,8 +1,10 @@
 -- =====================================================================
 -- ENTREGA — Usuários: documentação de TELA (nível e2e) + ponte
 --
--- Cole este arquivo INTEIRO no SQL Editor da HOMOLOGAÇÃO (e, depois de
--- aprovado, no da PRODUÇÃO). Espelha a migration
+-- Cole este arquivo INTEIRO no SQL Editor da HOMOLOGAÇÃO. É infra de TESTE
+-- (documentação/ponte do Cypress) e NÃO vai para a produção — a produção não
+-- roda Cypress e a ponte qa_cobertura_e2e só serve à guarda das esteiras.
+-- Espelha a migration
 -- 20260917144156_qa_usuarios_casos_tela.sql: documenta os 7 casos
 -- USR-TELA-01..07 no módulo infraestrutura-auth/usuarios-permissoes e liga
 -- cada um ao it() de cypress/e2e/usuarios.cy.ts na tabela qa_cobertura_e2e.

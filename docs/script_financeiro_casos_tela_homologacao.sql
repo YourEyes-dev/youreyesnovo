@@ -1,8 +1,10 @@
 -- =====================================================================
 -- ENTREGA — Financeiro: documentação de TELA (nível e2e) + ponte
 --
--- Cole este arquivo INTEIRO no SQL Editor da HOMOLOGAÇÃO (e, depois de
--- aprovado, no da PRODUÇÃO). Espelha a migration
+-- Cole este arquivo INTEIRO no SQL Editor da HOMOLOGAÇÃO. É infra de TESTE
+-- (documentação/ponte do Cypress) e NÃO vai para a produção — a produção não
+-- roda Cypress e a ponte qa_cobertura_e2e só serve à guarda das esteiras.
+-- Espelha a migration
 -- 20260917120000_qa_financeiro_casos_tela.sql: documenta os 10 casos
 -- FINAN-TELA-01..10 no módulo financeiro e liga cada um ao it() de
 -- cypress/e2e/financeiro.cy.ts na tabela qa_cobertura_e2e.

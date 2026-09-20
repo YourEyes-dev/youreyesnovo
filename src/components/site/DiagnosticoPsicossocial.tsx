@@ -306,6 +306,11 @@ export function DiagnosticoPsicossocial() {
       if (error) throw error;
 
       setResultado(diag);
+      trackConversion("Lead", {
+        email: email.trim().toLowerCase(),
+        phone: tel,
+        url: typeof window !== "undefined" ? window.location.href : undefined,
+      });
     } catch (e) {
       // O lead é o produto desta tela: se o registro falhar, o visitante não
       // pode ficar sem saída. Mostramos o resultado assim mesmo e deixamos o

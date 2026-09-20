@@ -317,6 +317,11 @@ export function DiagnosticoPsicossocial() {
       // WhatsApp na frente dele — a conversa é o que interessa.
       console.error("Falha ao registrar lead do diagnóstico:", e);
       setResultado(diag);
+      trackConversion("Lead", {
+        email: email.trim().toLowerCase(),
+        phone: tel,
+        url: typeof window !== "undefined" ? window.location.href : undefined,
+      });
 
       // "Não deu certo" sem motivo é o pior aviso possível: quem lê não sabe
       // se tenta de novo, se corrige algo ou se desiste. Traduzimos o que o

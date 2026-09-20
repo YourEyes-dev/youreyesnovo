@@ -889,6 +889,10 @@ export default function Site() {
                   <input type="email" name="email" required className="w-full mt-1 border border-white/15 bg-white/5 text-white placeholder:text-slate-400 rounded-md px-3 py-2 text-sm focus:border-[#60ABEF] focus:ring-1 focus:ring-[#60ABEF] outline-none" />
                 </div>
                 <div>
+                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Telefone / WhatsApp</label>
+                  <input type="tel" name="telefone" className="w-full mt-1 border border-white/15 bg-white/5 text-white placeholder:text-slate-400 rounded-md px-3 py-2 text-sm focus:border-[#60ABEF] focus:ring-1 focus:ring-[#60ABEF] outline-none" placeholder="(00) 00000-0000" />
+                </div>
+                <div>
                   <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Nº de colaboradores</label>
                   <select name="colaboradores" className="w-full mt-1 border border-white/15 bg-white/5 text-white placeholder:text-slate-400 rounded-md px-3 py-2 text-sm focus:border-[#60ABEF] focus:ring-1 focus:ring-[#60ABEF] outline-none">
                     <option>Até 20</option>

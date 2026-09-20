@@ -19,3 +19,16 @@ export function fromTable(table: string): any {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (supabase as any).from(table);
 }
+
+/**
+ * Chama uma função (RPC) que ainda não consta no schema tipado gerado —
+ * por exemplo funções criadas fora das migrations.
+ */
+export function rpcUntyped(
+  fn: string,
+  args?: Record<string, unknown>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<{ data: any; error: any }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (supabase as any).rpc(fn, args);
+}

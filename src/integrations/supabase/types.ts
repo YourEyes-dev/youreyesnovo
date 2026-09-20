@@ -713,6 +713,8 @@ export type Database = {
           agencia: string | null
           art62_documento: string | null
           art62_inciso: string | null
+          assistente_legal_cpf: string | null
+          assistente_legal_nome: string | null
           aviso_previo_cumprido: boolean | null
           bairro: string | null
           banco: string | null
@@ -748,8 +750,10 @@ export type Database = {
           email: string | null
           empresa_id: string | null
           endereco: string | null
+          escala_noturna: boolean
           estado: string | null
           estado_civil: string | null
+          estudante: boolean
           exame_admissional_clinica: string | null
           exame_admissional_crm: string | null
           exame_admissional_data: string | null
@@ -759,6 +763,8 @@ export type Database = {
           exame_admissional_validade: string | null
           filial: string | null
           foto_url: string | null
+          funcao_insalubre: boolean
+          funcao_periculosa: boolean
           genero: string | null
           gestor_imediato: string | null
           id: string
@@ -780,7 +786,9 @@ export type Database = {
           observacoes_desligamento: string | null
           onboarding_status: string | null
           onboarding_token: string | null
+          qualificacao_cadastral: string | null
           resultado_exame_demissional: string | null
+          reversao_desligamento_justificativa: string | null
           rg: string | null
           salario: number | null
           seguro_desemprego_elegivel: boolean | null
@@ -799,6 +807,8 @@ export type Database = {
           agencia?: string | null
           art62_documento?: string | null
           art62_inciso?: string | null
+          assistente_legal_cpf?: string | null
+          assistente_legal_nome?: string | null
           aviso_previo_cumprido?: boolean | null
           bairro?: string | null
           banco?: string | null
@@ -834,8 +844,10 @@ export type Database = {
           email?: string | null
           empresa_id?: string | null
           endereco?: string | null
+          escala_noturna?: boolean
           estado?: string | null
           estado_civil?: string | null
+          estudante?: boolean
           exame_admissional_clinica?: string | null
           exame_admissional_crm?: string | null
           exame_admissional_data?: string | null
@@ -845,6 +857,8 @@ export type Database = {
           exame_admissional_validade?: string | null
           filial?: string | null
           foto_url?: string | null
+          funcao_insalubre?: boolean
+          funcao_periculosa?: boolean
           genero?: string | null
           gestor_imediato?: string | null
           id?: string
@@ -866,7 +880,9 @@ export type Database = {
           observacoes_desligamento?: string | null
           onboarding_status?: string | null
           onboarding_token?: string | null
+          qualificacao_cadastral?: string | null
           resultado_exame_demissional?: string | null
+          reversao_desligamento_justificativa?: string | null
           rg?: string | null
           salario?: number | null
           seguro_desemprego_elegivel?: boolean | null
@@ -885,6 +901,8 @@ export type Database = {
           agencia?: string | null
           art62_documento?: string | null
           art62_inciso?: string | null
+          assistente_legal_cpf?: string | null
+          assistente_legal_nome?: string | null
           aviso_previo_cumprido?: boolean | null
           bairro?: string | null
           banco?: string | null
@@ -920,8 +938,10 @@ export type Database = {
           email?: string | null
           empresa_id?: string | null
           endereco?: string | null
+          escala_noturna?: boolean
           estado?: string | null
           estado_civil?: string | null
+          estudante?: boolean
           exame_admissional_clinica?: string | null
           exame_admissional_crm?: string | null
           exame_admissional_data?: string | null
@@ -931,6 +951,8 @@ export type Database = {
           exame_admissional_validade?: string | null
           filial?: string | null
           foto_url?: string | null
+          funcao_insalubre?: boolean
+          funcao_periculosa?: boolean
           genero?: string | null
           gestor_imediato?: string | null
           id?: string
@@ -952,7 +974,9 @@ export type Database = {
           observacoes_desligamento?: string | null
           onboarding_status?: string | null
           onboarding_token?: string | null
+          qualificacao_cadastral?: string | null
           resultado_exame_demissional?: string | null
+          reversao_desligamento_justificativa?: string | null
           rg?: string | null
           salario?: number | null
           seguro_desemprego_elegivel?: boolean | null
@@ -2485,6 +2509,270 @@ export type Database = {
           },
         ]
       }
+      backup_admissoes_dedup_20260917: {
+        Row: {
+          agencia: string | null
+          art62_documento: string | null
+          art62_inciso: string | null
+          aviso_previo_cumprido: boolean | null
+          bairro: string | null
+          banco: string | null
+          bate_ponto: boolean | null
+          cargo: string | null
+          cbo: string | null
+          celular: string | null
+          centro_custo: string | null
+          cep: string | null
+          chave_conectividade: string | null
+          chave_pix: string | null
+          cidade: string | null
+          classificacao_interna: string | null
+          complemento: string | null
+          conta: string | null
+          cpf: string | null
+          created_at: string | null
+          criado_por: string | null
+          crm_exame_demissional: string | null
+          data_admissao: string | null
+          data_aviso_previo: string | null
+          data_desligamento: string | null
+          data_exame_demissional: string | null
+          data_homologacao: string | null
+          data_nascimento: string | null
+          departamento: string | null
+          dependentes_irrf: number | null
+          desligado_por: string | null
+          desligado_por_nome: string | null
+          desligamento_protocolo: string | null
+          dias_aviso_previo: number | null
+          dispensado_ponto: boolean | null
+          email: string | null
+          empresa_id: string | null
+          endereco: string | null
+          estado: string | null
+          estado_civil: string | null
+          exame_admissional_clinica: string | null
+          exame_admissional_crm: string | null
+          exame_admissional_data: string | null
+          exame_admissional_medico: string | null
+          exame_admissional_observacoes: string | null
+          exame_admissional_resultado: string | null
+          exame_admissional_validade: string | null
+          filial: string | null
+          foto_url: string | null
+          genero: string | null
+          gestor_imediato: string | null
+          id: string | null
+          inativado_em: string | null
+          inativado_por: string | null
+          inativo: boolean | null
+          jornada_trabalho: string | null
+          matricula_esocial: string | null
+          medico_exame_demissional: string | null
+          motivo_desligamento: string | null
+          motivo_inativacao: string | null
+          multa_fgts: boolean | null
+          nacionalidade: string | null
+          naturalidade: string | null
+          nome_completo: string | null
+          nome_mae: string | null
+          nome_pai: string | null
+          numero: string | null
+          observacoes_desligamento: string | null
+          onboarding_status: string | null
+          onboarding_token: string | null
+          resultado_exame_demissional: string | null
+          rg: string | null
+          rn: number | null
+          salario: number | null
+          seguro_desemprego_elegivel: boolean | null
+          sindicato_homologacao: string | null
+          status: Database["public"]["Enums"]["admissao_status"] | null
+          telefone: string | null
+          teletrabalho_modalidade: string | null
+          tenant_id: string | null
+          tipo_aviso_previo: string | null
+          tipo_conta: string | null
+          tipo_contrato: string | null
+          tipo_vinculo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agencia?: string | null
+          art62_documento?: string | null
+          art62_inciso?: string | null
+          aviso_previo_cumprido?: boolean | null
+          bairro?: string | null
+          banco?: string | null
+          bate_ponto?: boolean | null
+          cargo?: string | null
+          cbo?: string | null
+          celular?: string | null
+          centro_custo?: string | null
+          cep?: string | null
+          chave_conectividade?: string | null
+          chave_pix?: string | null
+          cidade?: string | null
+          classificacao_interna?: string | null
+          complemento?: string | null
+          conta?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          criado_por?: string | null
+          crm_exame_demissional?: string | null
+          data_admissao?: string | null
+          data_aviso_previo?: string | null
+          data_desligamento?: string | null
+          data_exame_demissional?: string | null
+          data_homologacao?: string | null
+          data_nascimento?: string | null
+          departamento?: string | null
+          dependentes_irrf?: number | null
+          desligado_por?: string | null
+          desligado_por_nome?: string | null
+          desligamento_protocolo?: string | null
+          dias_aviso_previo?: number | null
+          dispensado_ponto?: boolean | null
+          email?: string | null
+          empresa_id?: string | null
+          endereco?: string | null
+          estado?: string | null
+          estado_civil?: string | null
+          exame_admissional_clinica?: string | null
+          exame_admissional_crm?: string | null
+          exame_admissional_data?: string | null
+          exame_admissional_medico?: string | null
+          exame_admissional_observacoes?: string | null
+          exame_admissional_resultado?: string | null
+          exame_admissional_validade?: string | null
+          filial?: string | null
+          foto_url?: string | null
+          genero?: string | null
+          gestor_imediato?: string | null
+          id?: string | null
+          inativado_em?: string | null
+          inativado_por?: string | null
+          inativo?: boolean | null
+          jornada_trabalho?: string | null
+          matricula_esocial?: string | null
+          medico_exame_demissional?: string | null
+          motivo_desligamento?: string | null
+          motivo_inativacao?: string | null
+          multa_fgts?: boolean | null
+          nacionalidade?: string | null
+          naturalidade?: string | null
+          nome_completo?: string | null
+          nome_mae?: string | null
+          nome_pai?: string | null
+          numero?: string | null
+          observacoes_desligamento?: string | null
+          onboarding_status?: string | null
+          onboarding_token?: string | null
+          resultado_exame_demissional?: string | null
+          rg?: string | null
+          rn?: number | null
+          salario?: number | null
+          seguro_desemprego_elegivel?: boolean | null
+          sindicato_homologacao?: string | null
+          status?: Database["public"]["Enums"]["admissao_status"] | null
+          telefone?: string | null
+          teletrabalho_modalidade?: string | null
+          tenant_id?: string | null
+          tipo_aviso_previo?: string | null
+          tipo_conta?: string | null
+          tipo_contrato?: string | null
+          tipo_vinculo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agencia?: string | null
+          art62_documento?: string | null
+          art62_inciso?: string | null
+          aviso_previo_cumprido?: boolean | null
+          bairro?: string | null
+          banco?: string | null
+          bate_ponto?: boolean | null
+          cargo?: string | null
+          cbo?: string | null
+          celular?: string | null
+          centro_custo?: string | null
+          cep?: string | null
+          chave_conectividade?: string | null
+          chave_pix?: string | null
+          cidade?: string | null
+          classificacao_interna?: string | null
+          complemento?: string | null
+          conta?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          criado_por?: string | null
+          crm_exame_demissional?: string | null
+          data_admissao?: string | null
+          data_aviso_previo?: string | null
+          data_desligamento?: string | null
+          data_exame_demissional?: string | null
+          data_homologacao?: string | null
+          data_nascimento?: string | null
+          departamento?: string | null
+          dependentes_irrf?: number | null
+          desligado_por?: string | null
+          desligado_por_nome?: string | null
+          desligamento_protocolo?: string | null
+          dias_aviso_previo?: number | null
+          dispensado_ponto?: boolean | null
+          email?: string | null
+          empresa_id?: string | null
+          endereco?: string | null
+          estado?: string | null
+          estado_civil?: string | null
+          exame_admissional_clinica?: string | null
+          exame_admissional_crm?: string | null
+          exame_admissional_data?: string | null
+          exame_admissional_medico?: string | null
+          exame_admissional_observacoes?: string | null
+          exame_admissional_resultado?: string | null
+          exame_admissional_validade?: string | null
+          filial?: string | null
+          foto_url?: string | null
+          genero?: string | null
+          gestor_imediato?: string | null
+          id?: string | null
+          inativado_em?: string | null
+          inativado_por?: string | null
+          inativo?: boolean | null
+          jornada_trabalho?: string | null
+          matricula_esocial?: string | null
+          medico_exame_demissional?: string | null
+          motivo_desligamento?: string | null
+          motivo_inativacao?: string | null
+          multa_fgts?: boolean | null
+          nacionalidade?: string | null
+          naturalidade?: string | null
+          nome_completo?: string | null
+          nome_mae?: string | null
+          nome_pai?: string | null
+          numero?: string | null
+          observacoes_desligamento?: string | null
+          onboarding_status?: string | null
+          onboarding_token?: string | null
+          resultado_exame_demissional?: string | null
+          rg?: string | null
+          rn?: number | null
+          salario?: number | null
+          seguro_desemprego_elegivel?: boolean | null
+          sindicato_homologacao?: string | null
+          status?: Database["public"]["Enums"]["admissao_status"] | null
+          telefone?: string | null
+          teletrabalho_modalidade?: string | null
+          tenant_id?: string | null
+          tipo_aviso_previo?: string | null
+          tipo_conta?: string | null
+          tipo_contrato?: string | null
+          tipo_vinculo?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       backup_decimo_terceiro_config_20260904: {
         Row: {
           adiantamento_base: string | null
@@ -3004,6 +3292,255 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_ponto_escalas_20260916: {
+        Row: {
+          acordo_individual_url: string | null
+          adicional_noturno_fim: string | null
+          adicional_noturno_inicio: string | null
+          ativa: boolean | null
+          carga_semanal_contratada_min: number | null
+          cct_act_url: string | null
+          ciclo_horas_descanso: number | null
+          ciclo_horas_trabalho: number | null
+          ciclo_inicio_data: string | null
+          ciclo_inicio_hora: string | null
+          compensacoes_mensais: Json | null
+          comportamento_feriado: string | null
+          created_at: string | null
+          descricao_contratual: string | null
+          descricao_original: string | null
+          dias_config: Json | null
+          dias_semana: Json | null
+          domingo_util: boolean | null
+          empresa_id: string | null
+          equalizacao_mensal_ativa: boolean | null
+          hora_entrada_padrao: string | null
+          hora_saida_padrao: string | null
+          id: string | null
+          intervalo_intrajornada_minutos: number | null
+          janela_flexivel: Json | null
+          jornada_diaria_minutos: number | null
+          jornada_mensal_minutos: number | null
+          jornada_semanal_minutos: number | null
+          modalidade: string | null
+          nivel_confianca: string | null
+          nome: string | null
+          observacoes: string | null
+          origem_input: string | null
+          percentual_adicional_noturno: number | null
+          percentual_hora_extra_100: number | null
+          percentual_hora_extra_50: number | null
+          regras_extras: Json | null
+          sabado_util: boolean | null
+          tenant_id: string | null
+          tipo: string | null
+          tolerancia_diaria_minutos: number | null
+          tolerancia_minutos: number | null
+          updated_at: string | null
+          usa_hora_ficta_noturna: boolean | null
+        }
+        Insert: {
+          acordo_individual_url?: string | null
+          adicional_noturno_fim?: string | null
+          adicional_noturno_inicio?: string | null
+          ativa?: boolean | null
+          carga_semanal_contratada_min?: number | null
+          cct_act_url?: string | null
+          ciclo_horas_descanso?: number | null
+          ciclo_horas_trabalho?: number | null
+          ciclo_inicio_data?: string | null
+          ciclo_inicio_hora?: string | null
+          compensacoes_mensais?: Json | null
+          comportamento_feriado?: string | null
+          created_at?: string | null
+          descricao_contratual?: string | null
+          descricao_original?: string | null
+          dias_config?: Json | null
+          dias_semana?: Json | null
+          domingo_util?: boolean | null
+          empresa_id?: string | null
+          equalizacao_mensal_ativa?: boolean | null
+          hora_entrada_padrao?: string | null
+          hora_saida_padrao?: string | null
+          id?: string | null
+          intervalo_intrajornada_minutos?: number | null
+          janela_flexivel?: Json | null
+          jornada_diaria_minutos?: number | null
+          jornada_mensal_minutos?: number | null
+          jornada_semanal_minutos?: number | null
+          modalidade?: string | null
+          nivel_confianca?: string | null
+          nome?: string | null
+          observacoes?: string | null
+          origem_input?: string | null
+          percentual_adicional_noturno?: number | null
+          percentual_hora_extra_100?: number | null
+          percentual_hora_extra_50?: number | null
+          regras_extras?: Json | null
+          sabado_util?: boolean | null
+          tenant_id?: string | null
+          tipo?: string | null
+          tolerancia_diaria_minutos?: number | null
+          tolerancia_minutos?: number | null
+          updated_at?: string | null
+          usa_hora_ficta_noturna?: boolean | null
+        }
+        Update: {
+          acordo_individual_url?: string | null
+          adicional_noturno_fim?: string | null
+          adicional_noturno_inicio?: string | null
+          ativa?: boolean | null
+          carga_semanal_contratada_min?: number | null
+          cct_act_url?: string | null
+          ciclo_horas_descanso?: number | null
+          ciclo_horas_trabalho?: number | null
+          ciclo_inicio_data?: string | null
+          ciclo_inicio_hora?: string | null
+          compensacoes_mensais?: Json | null
+          comportamento_feriado?: string | null
+          created_at?: string | null
+          descricao_contratual?: string | null
+          descricao_original?: string | null
+          dias_config?: Json | null
+          dias_semana?: Json | null
+          domingo_util?: boolean | null
+          empresa_id?: string | null
+          equalizacao_mensal_ativa?: boolean | null
+          hora_entrada_padrao?: string | null
+          hora_saida_padrao?: string | null
+          id?: string | null
+          intervalo_intrajornada_minutos?: number | null
+          janela_flexivel?: Json | null
+          jornada_diaria_minutos?: number | null
+          jornada_mensal_minutos?: number | null
+          jornada_semanal_minutos?: number | null
+          modalidade?: string | null
+          nivel_confianca?: string | null
+          nome?: string | null
+          observacoes?: string | null
+          origem_input?: string | null
+          percentual_adicional_noturno?: number | null
+          percentual_hora_extra_100?: number | null
+          percentual_hora_extra_50?: number | null
+          regras_extras?: Json | null
+          sabado_util?: boolean | null
+          tenant_id?: string | null
+          tipo?: string | null
+          tolerancia_diaria_minutos?: number | null
+          tolerancia_minutos?: number | null
+          updated_at?: string | null
+          usa_hora_ficta_noturna?: boolean | null
+        }
+        Relationships: []
+      }
+      backup_qa_modulos_desbloqueio_20260916: {
+        Row: {
+          created_at: string | null
+          icone: string | null
+          id: string | null
+          label: string | null
+          motivo_bloqueio: string | null
+          ordem: number | null
+          parent_id: string | null
+          path: string | null
+          prioridade_doc: number | null
+          status_doc: Database["public"]["Enums"]["qa_status_doc"] | null
+        }
+        Insert: {
+          created_at?: string | null
+          icone?: string | null
+          id?: string | null
+          label?: string | null
+          motivo_bloqueio?: string | null
+          ordem?: number | null
+          parent_id?: string | null
+          path?: string | null
+          prioridade_doc?: number | null
+          status_doc?: Database["public"]["Enums"]["qa_status_doc"] | null
+        }
+        Update: {
+          created_at?: string | null
+          icone?: string | null
+          id?: string | null
+          label?: string | null
+          motivo_bloqueio?: string | null
+          ordem?: number | null
+          parent_id?: string | null
+          path?: string | null
+          prioridade_doc?: number | null
+          status_doc?: Database["public"]["Enums"]["qa_status_doc"] | null
+        }
+        Relationships: []
+      }
+      backup_tenant_rename_20260917: {
+        Row: {
+          backup_em: string | null
+          id: string | null
+          nome_antigo: string | null
+        }
+        Insert: {
+          backup_em?: string | null
+          id?: string | null
+          nome_antigo?: string | null
+        }
+        Update: {
+          backup_em?: string | null
+          id?: string | null
+          nome_antigo?: string | null
+        }
+        Relationships: []
+      }
+      backup_tenants_desativados_20260915: {
+        Row: {
+          ativo: boolean | null
+          configuracoes: Json | null
+          created_at: string | null
+          id: string | null
+          implantador_parceiro_id: string | null
+          logo_url: string | null
+          momento_do_retrato: string | null
+          nome: string | null
+          originado_em: string | null
+          parceiro_id: string | null
+          parceiro_link_id: string | null
+          plano: Database["public"]["Enums"]["tenant_plan"] | null
+          slug: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          configuracoes?: Json | null
+          created_at?: string | null
+          id?: string | null
+          implantador_parceiro_id?: string | null
+          logo_url?: string | null
+          momento_do_retrato?: string | null
+          nome?: string | null
+          originado_em?: string | null
+          parceiro_id?: string | null
+          parceiro_link_id?: string | null
+          plano?: Database["public"]["Enums"]["tenant_plan"] | null
+          slug?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          configuracoes?: Json | null
+          created_at?: string | null
+          id?: string | null
+          implantador_parceiro_id?: string | null
+          logo_url?: string | null
+          momento_do_retrato?: string | null
+          nome?: string | null
+          originado_em?: string | null
+          parceiro_id?: string | null
+          parceiro_link_id?: string | null
+          plano?: Database["public"]["Enums"]["tenant_plan"] | null
+          slug?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       backup_usa_controle_ponto_20260901: {
         Row: {
           cnpj: string | null
@@ -3025,6 +3562,124 @@ export type Database = {
           razao_social?: string | null
           tenant_id?: string | null
           usa_controle_ponto?: boolean | null
+        }
+        Relationships: []
+      }
+      backup_usuarios_status_ativacao_20260916: {
+        Row: {
+          alerta_duplicidade: boolean | null
+          autenticacao_2fa: boolean | null
+          auth_user_id: string | null
+          cargo_funcao: string | null
+          convite_aceito_em: string | null
+          convite_enviado_em: string | null
+          convite_expira_em: string | null
+          convite_token: string | null
+          cpf: string | null
+          created_at: string | null
+          criado_por_nome: string | null
+          criado_por_user_id: string | null
+          data_nascimento: string | null
+          duplicidade_nivel: string | null
+          email_principal: string | null
+          email_validado: boolean | null
+          foto_url: string | null
+          id: string | null
+          idioma: string | null
+          matricula: string | null
+          nome_completo: string | null
+          nome_social: string | null
+          observacoes: string | null
+          origem_cadastro: string | null
+          primeiro_acesso_em: string | null
+          qualidade_pct: number | null
+          qualidade_score: Database["public"]["Enums"]["qualidade_score"] | null
+          status: Database["public"]["Enums"]["usuario_status"] | null
+          sugestao_tipo_ia: Database["public"]["Enums"]["usuario_tipo"] | null
+          telefone_principal: string | null
+          telefone_validado: boolean | null
+          tenant_id: string | null
+          tipo_usuario: Database["public"]["Enums"]["usuario_tipo"] | null
+          ultimo_acesso_em: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          alerta_duplicidade?: boolean | null
+          autenticacao_2fa?: boolean | null
+          auth_user_id?: string | null
+          cargo_funcao?: string | null
+          convite_aceito_em?: string | null
+          convite_enviado_em?: string | null
+          convite_expira_em?: string | null
+          convite_token?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          criado_por_nome?: string | null
+          criado_por_user_id?: string | null
+          data_nascimento?: string | null
+          duplicidade_nivel?: string | null
+          email_principal?: string | null
+          email_validado?: boolean | null
+          foto_url?: string | null
+          id?: string | null
+          idioma?: string | null
+          matricula?: string | null
+          nome_completo?: string | null
+          nome_social?: string | null
+          observacoes?: string | null
+          origem_cadastro?: string | null
+          primeiro_acesso_em?: string | null
+          qualidade_pct?: number | null
+          qualidade_score?:
+            | Database["public"]["Enums"]["qualidade_score"]
+            | null
+          status?: Database["public"]["Enums"]["usuario_status"] | null
+          sugestao_tipo_ia?: Database["public"]["Enums"]["usuario_tipo"] | null
+          telefone_principal?: string | null
+          telefone_validado?: boolean | null
+          tenant_id?: string | null
+          tipo_usuario?: Database["public"]["Enums"]["usuario_tipo"] | null
+          ultimo_acesso_em?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          alerta_duplicidade?: boolean | null
+          autenticacao_2fa?: boolean | null
+          auth_user_id?: string | null
+          cargo_funcao?: string | null
+          convite_aceito_em?: string | null
+          convite_enviado_em?: string | null
+          convite_expira_em?: string | null
+          convite_token?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          criado_por_nome?: string | null
+          criado_por_user_id?: string | null
+          data_nascimento?: string | null
+          duplicidade_nivel?: string | null
+          email_principal?: string | null
+          email_validado?: boolean | null
+          foto_url?: string | null
+          id?: string | null
+          idioma?: string | null
+          matricula?: string | null
+          nome_completo?: string | null
+          nome_social?: string | null
+          observacoes?: string | null
+          origem_cadastro?: string | null
+          primeiro_acesso_em?: string | null
+          qualidade_pct?: number | null
+          qualidade_score?:
+            | Database["public"]["Enums"]["qualidade_score"]
+            | null
+          status?: Database["public"]["Enums"]["usuario_status"] | null
+          sugestao_tipo_ia?: Database["public"]["Enums"]["usuario_tipo"] | null
+          telefone_principal?: string | null
+          telefone_validado?: boolean | null
+          tenant_id?: string | null
+          tipo_usuario?: Database["public"]["Enums"]["usuario_tipo"] | null
+          ultimo_acesso_em?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -3622,6 +4277,42 @@ export type Database = {
           codigo?: string
           created_at?: string
           titulo?: string
+        }
+        Relationships: []
+      }
+      cipa_atas: {
+        Row: {
+          created_at: string
+          data_reuniao: string
+          documento_id: string | null
+          empresa_id: string
+          id: string
+          pauta: string | null
+          tenant_id: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_reuniao: string
+          documento_id?: string | null
+          empresa_id: string
+          id?: string
+          pauta?: string | null
+          tenant_id: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_reuniao?: string
+          documento_id?: string | null
+          empresa_id?: string
+          id?: string
+          pauta?: string | null
+          tenant_id?: string
+          tipo?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -4794,6 +5485,62 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      desligamento_eventos: {
+        Row: {
+          admissao_id: string
+          colaborador_cpf: string | null
+          colaborador_nome: string | null
+          data_desligamento_anterior: string | null
+          data_desligamento_nova: string | null
+          evento: string
+          id: string
+          justificativa: string | null
+          motivo_desligamento_anterior: string | null
+          motivo_desligamento_novo: string | null
+          registrado_em: string
+          registrado_por: string | null
+          tenant_id: string
+        }
+        Insert: {
+          admissao_id: string
+          colaborador_cpf?: string | null
+          colaborador_nome?: string | null
+          data_desligamento_anterior?: string | null
+          data_desligamento_nova?: string | null
+          evento: string
+          id?: string
+          justificativa?: string | null
+          motivo_desligamento_anterior?: string | null
+          motivo_desligamento_novo?: string | null
+          registrado_em?: string
+          registrado_por?: string | null
+          tenant_id: string
+        }
+        Update: {
+          admissao_id?: string
+          colaborador_cpf?: string | null
+          colaborador_nome?: string | null
+          data_desligamento_anterior?: string | null
+          data_desligamento_nova?: string | null
+          evento?: string
+          id?: string
+          justificativa?: string | null
+          motivo_desligamento_anterior?: string | null
+          motivo_desligamento_novo?: string | null
+          registrado_em?: string
+          registrado_por?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "desligamento_eventos_admissao_id_fkey"
+            columns: ["admissao_id"]
+            isOneToOne: false
+            referencedRelation: "admissoes"
             referencedColumns: ["id"]
           },
         ]
@@ -6543,6 +7290,7 @@ export type Database = {
           observacoes: string | null
           quantidade_estoque: number
           quantidade_minima: number
+          quantidade_reservada: number
           status: Database["public"]["Enums"]["epi_status"]
           tamanho: string | null
           tenant_id: string
@@ -6565,6 +7313,7 @@ export type Database = {
           observacoes?: string | null
           quantidade_estoque?: number
           quantidade_minima?: number
+          quantidade_reservada?: number
           status?: Database["public"]["Enums"]["epi_status"]
           tamanho?: string | null
           tenant_id: string
@@ -6587,6 +7336,7 @@ export type Database = {
           observacoes?: string | null
           quantidade_estoque?: number
           quantidade_minima?: number
+          quantidade_reservada?: number
           status?: Database["public"]["Enums"]["epi_status"]
           tamanho?: string | null
           tenant_id?: string
@@ -7166,6 +7916,7 @@ export type Database = {
           created_at: string
           criado_por: string | null
           criado_por_nome: string | null
+          data_limite: string | null
           empresa_id: string | null
           evento_sst_id: string | null
           ferias_calculo_id: string | null
@@ -7198,6 +7949,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           criado_por_nome?: string | null
+          data_limite?: string | null
           empresa_id?: string | null
           evento_sst_id?: string | null
           ferias_calculo_id?: string | null
@@ -7230,6 +7982,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           criado_por_nome?: string | null
+          data_limite?: string | null
           empresa_id?: string | null
           evento_sst_id?: string | null
           ferias_calculo_id?: string | null
@@ -9119,6 +9872,10 @@ export type Database = {
           adiantar_13: boolean
           aquisitivo_fim: string
           aquisitivo_inicio: string
+          autorizado_em: string | null
+          autorizado_excecao: boolean
+          autorizado_motivo: string | null
+          autorizado_por: string | null
           colaborador_cpf: string
           colaborador_id: string | null
           colaborador_nome: string
@@ -9149,6 +9906,10 @@ export type Database = {
           adiantar_13?: boolean
           aquisitivo_fim: string
           aquisitivo_inicio: string
+          autorizado_em?: string | null
+          autorizado_excecao?: boolean
+          autorizado_motivo?: string | null
+          autorizado_por?: string | null
           colaborador_cpf: string
           colaborador_id?: string | null
           colaborador_nome: string
@@ -9179,6 +9940,10 @@ export type Database = {
           adiantar_13?: boolean
           aquisitivo_fim?: string
           aquisitivo_inicio?: string
+          autorizado_em?: string | null
+          autorizado_excecao?: boolean
+          autorizado_motivo?: string | null
+          autorizado_por?: string | null
           colaborador_cpf?: string
           colaborador_id?: string | null
           colaborador_nome?: string
@@ -14588,20 +15353,75 @@ export type Database = {
           },
         ]
       }
+      marketplace_autonomia_eventos: {
+        Row: {
+          anterior: Json | null
+          autor_id: string | null
+          created_at: string
+          id: string
+          novo: Json | null
+          profissional_id: string
+          referencia_id: string | null
+          tipo: string
+        }
+        Insert: {
+          anterior?: Json | null
+          autor_id?: string | null
+          created_at?: string
+          id?: string
+          novo?: Json | null
+          profissional_id: string
+          referencia_id?: string | null
+          tipo: string
+        }
+        Update: {
+          anterior?: Json | null
+          autor_id?: string | null
+          created_at?: string
+          id?: string
+          novo?: Json | null
+          profissional_id?: string
+          referencia_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_autonomia_eventos_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_autonomia_eventos_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais_publico"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketplace_avaliacoes: {
         Row: {
           aderencia_escopo: number | null
           avaliador_id: string | null
           clareza: number | null
           comentario: string | null
-          contratacao_id: string
+          contratacao_id: string | null
           created_at: string
+          criterios: Json
+          direcao: string
           id: string
+          lead_id: string | null
+          moderacao_motivo: string | null
+          moderada: boolean
           nota_geral: number | null
           pontualidade: number | null
           profissional_id: string
           profissionalismo: number | null
-          servico_id: string
+          respondido_em: string | null
+          resposta: string | null
+          servico_id: string | null
           tenant_id: string
         }
         Insert: {
@@ -14609,14 +15429,21 @@ export type Database = {
           avaliador_id?: string | null
           clareza?: number | null
           comentario?: string | null
-          contratacao_id: string
+          contratacao_id?: string | null
           created_at?: string
+          criterios?: Json
+          direcao?: string
           id?: string
+          lead_id?: string | null
+          moderacao_motivo?: string | null
+          moderada?: boolean
           nota_geral?: number | null
           pontualidade?: number | null
           profissional_id: string
           profissionalismo?: number | null
-          servico_id: string
+          respondido_em?: string | null
+          resposta?: string | null
+          servico_id?: string | null
           tenant_id: string
         }
         Update: {
@@ -14624,14 +15451,21 @@ export type Database = {
           avaliador_id?: string | null
           clareza?: number | null
           comentario?: string | null
-          contratacao_id?: string
+          contratacao_id?: string | null
           created_at?: string
+          criterios?: Json
+          direcao?: string
           id?: string
+          lead_id?: string | null
+          moderacao_motivo?: string | null
+          moderada?: boolean
           nota_geral?: number | null
           pontualidade?: number | null
           profissional_id?: string
           profissionalismo?: number | null
-          servico_id?: string
+          respondido_em?: string | null
+          resposta?: string | null
+          servico_id?: string | null
           tenant_id?: string
         }
         Relationships: [
@@ -14640,6 +15474,13 @@ export type Database = {
             columns: ["contratacao_id"]
             isOneToOne: false
             referencedRelation: "marketplace_contratacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_avaliacoes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_leads"
             referencedColumns: ["id"]
           },
           {
@@ -14674,36 +15515,212 @@ export type Database = {
       }
       marketplace_categorias: {
         Row: {
+          aliases: string[]
           ativo: boolean | null
+          conselhos_aceitos: string[]
           created_at: string
           descricao: string | null
+          exige_registro: boolean
           icone: string | null
           id: string
+          jurisdicao: string
           nome: string
+          obrigacao_legal: string[]
           ordem: number | null
+          pai_id: string | null
+          slug: string | null
           updated_at: string
+          versao: number
         }
         Insert: {
+          aliases?: string[]
           ativo?: boolean | null
+          conselhos_aceitos?: string[]
           created_at?: string
           descricao?: string | null
+          exige_registro?: boolean
           icone?: string | null
           id?: string
+          jurisdicao?: string
           nome: string
+          obrigacao_legal?: string[]
           ordem?: number | null
+          pai_id?: string | null
+          slug?: string | null
           updated_at?: string
+          versao?: number
         }
         Update: {
+          aliases?: string[]
           ativo?: boolean | null
+          conselhos_aceitos?: string[]
           created_at?: string
           descricao?: string | null
+          exige_registro?: boolean
           icone?: string | null
           id?: string
+          jurisdicao?: string
           nome?: string
+          obrigacao_legal?: string[]
           ordem?: number | null
+          pai_id?: string | null
+          slug?: string | null
           updated_at?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_categorias_pai_id_fkey"
+            columns: ["pai_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_categorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_config: {
+        Row: {
+          chave: string
+          criado_em: string
+          criado_por: string | null
+          descricao: string | null
+          id: string
+          jurisdicao: string
+          valor: Json
+          versao: number
+          vigente: boolean
+        }
+        Insert: {
+          chave: string
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          jurisdicao?: string
+          valor: Json
+          versao?: number
+          vigente?: boolean
+        }
+        Update: {
+          chave?: string
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          jurisdicao?: string
+          valor?: Json
+          versao?: number
+          vigente?: boolean
         }
         Relationships: []
+      }
+      marketplace_consentimentos: {
+        Row: {
+          aceito_em: string
+          id: string
+          ip: string | null
+          origem: string | null
+          profissional_id: string
+          tipo: string
+          user_agent: string | null
+          versao: string
+        }
+        Insert: {
+          aceito_em?: string
+          id?: string
+          ip?: string | null
+          origem?: string | null
+          profissional_id: string
+          tipo: string
+          user_agent?: string | null
+          versao: string
+        }
+        Update: {
+          aceito_em?: string
+          id?: string
+          ip?: string | null
+          origem?: string | null
+          profissional_id?: string
+          tipo?: string
+          user_agent?: string | null
+          versao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_consentimentos_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_consentimentos_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais_publico"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_contestacoes: {
+        Row: {
+          analisado_em: string | null
+          analisado_por: string | null
+          created_at: string
+          decisao_tipo: string
+          evidencias: Json
+          id: string
+          motivo: string
+          profissional_id: string
+          referencia_id: string | null
+          resposta: string | null
+          status: string
+          trilha: Json
+        }
+        Insert: {
+          analisado_em?: string | null
+          analisado_por?: string | null
+          created_at?: string
+          decisao_tipo: string
+          evidencias?: Json
+          id?: string
+          motivo: string
+          profissional_id: string
+          referencia_id?: string | null
+          resposta?: string | null
+          status?: string
+          trilha?: Json
+        }
+        Update: {
+          analisado_em?: string | null
+          analisado_por?: string | null
+          created_at?: string
+          decisao_tipo?: string
+          evidencias?: Json
+          id?: string
+          motivo?: string
+          profissional_id?: string
+          referencia_id?: string | null
+          resposta?: string | null
+          status?: string
+          trilha?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_contestacoes_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_contestacoes_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais_publico"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       marketplace_contratacoes: {
         Row: {
@@ -14816,6 +15833,110 @@ export type Database = {
           },
         ]
       }
+      marketplace_cupons: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          desconto_percentual: number
+          descricao: string | null
+          id: string
+          limite_uso: number | null
+          profissional_id: string
+          usos: number
+          validade: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          desconto_percentual: number
+          descricao?: string | null
+          id?: string
+          limite_uso?: number | null
+          profissional_id: string
+          usos?: number
+          validade?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          desconto_percentual?: number
+          descricao?: string | null
+          id?: string
+          limite_uso?: number | null
+          profissional_id?: string
+          usos?: number
+          validade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_cupons_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_cupons_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais_publico"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_demanda_latente: {
+        Row: {
+          avisar: boolean
+          avisar_email: string | null
+          categoria_id: string | null
+          cidade: string | null
+          created_at: string
+          dia: string
+          id: string
+          resultados: number
+          tenant_id: string
+          termos: string | null
+          uf: string | null
+        }
+        Insert: {
+          avisar?: boolean
+          avisar_email?: string | null
+          categoria_id?: string | null
+          cidade?: string | null
+          created_at?: string
+          dia?: string
+          id?: string
+          resultados?: number
+          tenant_id: string
+          termos?: string | null
+          uf?: string | null
+        }
+        Update: {
+          avisar?: boolean
+          avisar_email?: string | null
+          categoria_id?: string | null
+          cidade?: string | null
+          created_at?: string
+          dia?: string
+          id?: string
+          resultados?: number
+          tenant_id?: string
+          termos?: string | null
+          uf?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_demanda_latente_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_categorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketplace_denuncias: {
         Row: {
           acao_tomada: string | null
@@ -14902,6 +16023,83 @@ export type Database = {
           },
         ]
       }
+      marketplace_destaques: {
+        Row: {
+          ativo: boolean
+          categoria_id: string | null
+          created_at: string
+          criado_por: string | null
+          fim: string
+          id: string
+          inicio: string
+          moeda: string
+          profissional_id: string
+          servico_id: string | null
+          tipo: string
+          uf: string | null
+          valor: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          categoria_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          fim: string
+          id?: string
+          inicio?: string
+          moeda?: string
+          profissional_id: string
+          servico_id?: string | null
+          tipo?: string
+          uf?: string | null
+          valor?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          categoria_id?: string | null
+          created_at?: string
+          criado_por?: string | null
+          fim?: string
+          id?: string
+          inicio?: string
+          moeda?: string
+          profissional_id?: string
+          servico_id?: string | null
+          tipo?: string
+          uf?: string | null
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_destaques_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_destaques_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_destaques_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais_publico"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_destaques_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketplace_escopo_habilitacao: {
         Row: {
           categoria_id: string | null
@@ -14933,6 +16131,231 @@ export type Database = {
             columns: ["categoria_id"]
             isOneToOne: false
             referencedRelation: "marketplace_categorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_lead_documentos: {
+        Row: {
+          created_at: string
+          documento_id: string
+          id: string
+          lead_id: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          documento_id: string
+          id?: string
+          lead_id: string
+          tipo?: string
+        }
+        Update: {
+          created_at?: string
+          documento_id?: string
+          id?: string
+          lead_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_lead_documentos_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_lead_mensagens: {
+        Row: {
+          autor_id: string | null
+          autor_tipo: string
+          created_at: string
+          id: string
+          lead_id: string
+          mascarada: boolean
+          sinal_saida: boolean
+          texto: string
+          texto_original: string | null
+        }
+        Insert: {
+          autor_id?: string | null
+          autor_tipo: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          mascarada?: boolean
+          sinal_saida?: boolean
+          texto: string
+          texto_original?: string | null
+        }
+        Update: {
+          autor_id?: string | null
+          autor_tipo?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          mascarada?: boolean
+          sinal_saida?: boolean
+          texto?: string
+          texto_original?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_lead_mensagens_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_leads: {
+        Row: {
+          canal: string
+          contato_liberado: boolean
+          contato_liberado_em: string | null
+          created_at: string
+          criado_por: string | null
+          cupom_codigo: string | null
+          empresa_id: string | null
+          ganho_em: string | null
+          id: string
+          obrigacao_legal: string | null
+          origem_id: string | null
+          origem_modulo: string | null
+          primeira_resposta_em: string | null
+          profissional_id: string
+          servico_id: string | null
+          solicitante_nome: string | null
+          status: string
+          tenant_id: string
+          ultima_mensagem_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          canal?: string
+          contato_liberado?: boolean
+          contato_liberado_em?: string | null
+          created_at?: string
+          criado_por?: string | null
+          cupom_codigo?: string | null
+          empresa_id?: string | null
+          ganho_em?: string | null
+          id?: string
+          obrigacao_legal?: string | null
+          origem_id?: string | null
+          origem_modulo?: string | null
+          primeira_resposta_em?: string | null
+          profissional_id: string
+          servico_id?: string | null
+          solicitante_nome?: string | null
+          status?: string
+          tenant_id: string
+          ultima_mensagem_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          canal?: string
+          contato_liberado?: boolean
+          contato_liberado_em?: string | null
+          created_at?: string
+          criado_por?: string | null
+          cupom_codigo?: string | null
+          empresa_id?: string | null
+          ganho_em?: string | null
+          id?: string
+          obrigacao_legal?: string | null
+          origem_id?: string | null
+          origem_modulo?: string | null
+          primeira_resposta_em?: string | null
+          profissional_id?: string
+          servico_id?: string | null
+          solicitante_nome?: string | null
+          status?: string
+          tenant_id?: string
+          ultima_mensagem_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_leads_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_leads_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais_publico"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_leads_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_servicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_leads_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_ocorrencias: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          origem_id: string | null
+          origem_tipo: string | null
+          profissional_id: string
+          reflexo_visibilidade: boolean
+          registrado_por: string | null
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          origem_id?: string | null
+          origem_tipo?: string | null
+          profissional_id: string
+          reflexo_visibilidade?: boolean
+          registrado_por?: string | null
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          origem_id?: string | null
+          origem_tipo?: string | null
+          profissional_id?: string
+          reflexo_visibilidade?: boolean
+          registrado_por?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_ocorrencias_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_ocorrencias_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_profissionais_publico"
             referencedColumns: ["id"]
           },
         ]
@@ -15008,16 +16431,21 @@ export type Database = {
           aceite_codigo_etica: boolean | null
           aceite_codigo_etica_data: string | null
           areas_atuacao: string[] | null
+          atende_remoto: boolean
           bio: string | null
           certificacoes: string[] | null
           cidade: string | null
           codigo_afiliado: string | null
           conselho: string | null
+          consentimento_em: string | null
+          consentimento_versao: string | null
           cpf_cnpj: string | null
           created_at: string
+          disponibilidade: Json
           email: string
           especialidades: string[] | null
           estado: string | null
+          excluido_em: string | null
           formacao_academica: string | null
           foto_url: string | null
           id: string
@@ -15027,38 +16455,57 @@ export type Database = {
           modalidades_atendimento:
             | Database["public"]["Enums"]["marketplace_servico_modalidade"][]
             | null
+          moderacao_motivo: string | null
+          moderacao_resultado: string | null
+          moderado_em: string | null
+          moderado_por: string | null
+          moeda: string
           nome_completo: string
           nota_media: number | null
+          origem_cadastro: string
+          pais: string
+          parceiro_id: string | null
           plano: Database["public"]["Enums"]["marketplace_plano_tipo"] | null
+          politicas: string | null
+          raio_atendimento_km: number
           registro_profissional: string | null
           registro_validade: string | null
+          registro_vencido: boolean
           selo_verificado: boolean | null
+          site_url: string | null
           status:
             | Database["public"]["Enums"]["marketplace_profissional_status"]
             | null
           telefone: string | null
           tem_atestado_capacidade: boolean
           tenant_id: string | null
+          tipo_pessoa: string
           total_avaliacoes: number | null
           total_servicos_executados: number | null
           uf_registro: string | null
           updated_at: string
           user_id: string | null
+          video_url: string | null
         }
         Insert: {
           aceite_codigo_etica?: boolean | null
           aceite_codigo_etica_data?: string | null
           areas_atuacao?: string[] | null
+          atende_remoto?: boolean
           bio?: string | null
           certificacoes?: string[] | null
           cidade?: string | null
           codigo_afiliado?: string | null
           conselho?: string | null
+          consentimento_em?: string | null
+          consentimento_versao?: string | null
           cpf_cnpj?: string | null
           created_at?: string
+          disponibilidade?: Json
           email: string
           especialidades?: string[] | null
           estado?: string | null
+          excluido_em?: string | null
           formacao_academica?: string | null
           foto_url?: string | null
           id?: string
@@ -15068,38 +16515,57 @@ export type Database = {
           modalidades_atendimento?:
             | Database["public"]["Enums"]["marketplace_servico_modalidade"][]
             | null
+          moderacao_motivo?: string | null
+          moderacao_resultado?: string | null
+          moderado_em?: string | null
+          moderado_por?: string | null
+          moeda?: string
           nome_completo: string
           nota_media?: number | null
+          origem_cadastro?: string
+          pais?: string
+          parceiro_id?: string | null
           plano?: Database["public"]["Enums"]["marketplace_plano_tipo"] | null
+          politicas?: string | null
+          raio_atendimento_km?: number
           registro_profissional?: string | null
           registro_validade?: string | null
+          registro_vencido?: boolean
           selo_verificado?: boolean | null
+          site_url?: string | null
           status?:
             | Database["public"]["Enums"]["marketplace_profissional_status"]
             | null
           telefone?: string | null
           tem_atestado_capacidade?: boolean
           tenant_id?: string | null
+          tipo_pessoa?: string
           total_avaliacoes?: number | null
           total_servicos_executados?: number | null
           uf_registro?: string | null
           updated_at?: string
           user_id?: string | null
+          video_url?: string | null
         }
         Update: {
           aceite_codigo_etica?: boolean | null
           aceite_codigo_etica_data?: string | null
           areas_atuacao?: string[] | null
+          atende_remoto?: boolean
           bio?: string | null
           certificacoes?: string[] | null
           cidade?: string | null
           codigo_afiliado?: string | null
           conselho?: string | null
+          consentimento_em?: string | null
+          consentimento_versao?: string | null
           cpf_cnpj?: string | null
           created_at?: string
+          disponibilidade?: Json
           email?: string
           especialidades?: string[] | null
           estado?: string | null
+          excluido_em?: string | null
           formacao_academica?: string | null
           foto_url?: string | null
           id?: string
@@ -15109,25 +16575,46 @@ export type Database = {
           modalidades_atendimento?:
             | Database["public"]["Enums"]["marketplace_servico_modalidade"][]
             | null
+          moderacao_motivo?: string | null
+          moderacao_resultado?: string | null
+          moderado_em?: string | null
+          moderado_por?: string | null
+          moeda?: string
           nome_completo?: string
           nota_media?: number | null
+          origem_cadastro?: string
+          pais?: string
+          parceiro_id?: string | null
           plano?: Database["public"]["Enums"]["marketplace_plano_tipo"] | null
+          politicas?: string | null
+          raio_atendimento_km?: number
           registro_profissional?: string | null
           registro_validade?: string | null
+          registro_vencido?: boolean
           selo_verificado?: boolean | null
+          site_url?: string | null
           status?:
             | Database["public"]["Enums"]["marketplace_profissional_status"]
             | null
           telefone?: string | null
           tem_atestado_capacidade?: boolean
           tenant_id?: string | null
+          tipo_pessoa?: string
           total_avaliacoes?: number | null
           total_servicos_executados?: number | null
           uf_registro?: string | null
           updated_at?: string
           user_id?: string | null
+          video_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "marketplace_profissionais_parceiro_id_fkey"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "marketplace_profissionais_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -15185,8 +16672,90 @@ export type Database = {
           },
         ]
       }
+      marketplace_reputacao: {
+        Row: {
+          abaixo_piso: boolean
+          avaliacoes_90d: number
+          calculado_em: string
+          clientes_unicos_90d: number
+          clientes_unicos_total: number
+          media_90d: number | null
+          nivel: string
+          nivel_aviso_em: string | null
+          nivel_aviso_motivo: string | null
+          nivel_desde: string
+          ocorrencias_90d: number
+          profissional_id: string
+          protegido_ate: string | null
+          saude_cor: string
+          saude_score: number
+          servicos_concluidos_total: number
+          taxa_cancelamento_90d: number | null
+          taxa_resposta_90d: number | null
+          tempo_resposta_mediano_min: number | null
+        }
+        Insert: {
+          abaixo_piso?: boolean
+          avaliacoes_90d?: number
+          calculado_em?: string
+          clientes_unicos_90d?: number
+          clientes_unicos_total?: number
+          media_90d?: number | null
+          nivel?: string
+          nivel_aviso_em?: string | null
+          nivel_aviso_motivo?: string | null
+          nivel_desde?: string
+          ocorrencias_90d?: number
+          profissional_id: string
+          protegido_ate?: string | null
+          saude_cor?: string
+          saude_score?: number
+          servicos_concluidos_total?: number
+          taxa_cancelamento_90d?: number | null
+          taxa_resposta_90d?: number | null
+          tempo_resposta_mediano_min?: number | null
+        }
+        Update: {
+          abaixo_piso?: boolean
+          avaliacoes_90d?: number
+          calculado_em?: string
+          clientes_unicos_90d?: number
+          clientes_unicos_total?: number
+          media_90d?: number | null
+          nivel?: string
+          nivel_aviso_em?: string | null
+          nivel_aviso_motivo?: string | null
+          nivel_desde?: string
+          ocorrencias_90d?: number
+          profissional_id?: string
+          protegido_ate?: string | null
+          saude_cor?: string
+          saude_score?: number
+          servicos_concluidos_total?: number
+          taxa_cancelamento_90d?: number | null
+          taxa_resposta_90d?: number | null
+          tempo_resposta_mediano_min?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_reputacao_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: true
+            referencedRelation: "marketplace_profissionais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_reputacao_profissional_id_fkey"
+            columns: ["profissional_id"]
+            isOneToOne: true
+            referencedRelation: "marketplace_profissionais_publico"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketplace_servicos: {
         Row: {
+          area_atendimento: Json
           ativo: boolean | null
           base_legal: string | null
           categoria_id: string | null
@@ -15194,16 +16763,35 @@ export type Database = {
           descricao: string
           duracao_estimada_minutos: number | null
           evidencia_minima: string | null
+          gerado_por_ia: boolean
           id: string
+          impressoes: number
+          midia: Json
           modalidade: Database["public"]["Enums"]["marketplace_servico_modalidade"]
+          moeda: string
           nome: string
+          obrigacao_legal: string[]
+          pais: string
+          politica_cancelamento: string | null
+          prazo_tipico: string | null
+          preco_maximo: number | null
+          preco_minimo: number | null
           preco_referencia: number | null
           profissional_id: string
+          promocao_descricao: string | null
+          promocao_fim: string | null
+          promocao_inicio: string | null
+          promocao_percentual: number | null
+          publicado_em: string | null
           publico_alvo: string | null
+          status: string
+          tags: string[]
+          tipo_preco: string
           updated_at: string
           vinculo_tipo_acao: string | null
         }
         Insert: {
+          area_atendimento?: Json
           ativo?: boolean | null
           base_legal?: string | null
           categoria_id?: string | null
@@ -15211,16 +16799,35 @@ export type Database = {
           descricao: string
           duracao_estimada_minutos?: number | null
           evidencia_minima?: string | null
+          gerado_por_ia?: boolean
           id?: string
+          impressoes?: number
+          midia?: Json
           modalidade?: Database["public"]["Enums"]["marketplace_servico_modalidade"]
+          moeda?: string
           nome: string
+          obrigacao_legal?: string[]
+          pais?: string
+          politica_cancelamento?: string | null
+          prazo_tipico?: string | null
+          preco_maximo?: number | null
+          preco_minimo?: number | null
           preco_referencia?: number | null
           profissional_id: string
+          promocao_descricao?: string | null
+          promocao_fim?: string | null
+          promocao_inicio?: string | null
+          promocao_percentual?: number | null
+          publicado_em?: string | null
           publico_alvo?: string | null
+          status?: string
+          tags?: string[]
+          tipo_preco?: string
           updated_at?: string
           vinculo_tipo_acao?: string | null
         }
         Update: {
+          area_atendimento?: Json
           ativo?: boolean | null
           base_legal?: string | null
           categoria_id?: string | null
@@ -15228,12 +16835,30 @@ export type Database = {
           descricao?: string
           duracao_estimada_minutos?: number | null
           evidencia_minima?: string | null
+          gerado_por_ia?: boolean
           id?: string
+          impressoes?: number
+          midia?: Json
           modalidade?: Database["public"]["Enums"]["marketplace_servico_modalidade"]
+          moeda?: string
           nome?: string
+          obrigacao_legal?: string[]
+          pais?: string
+          politica_cancelamento?: string | null
+          prazo_tipico?: string | null
+          preco_maximo?: number | null
+          preco_minimo?: number | null
           preco_referencia?: number | null
           profissional_id?: string
+          promocao_descricao?: string | null
+          promocao_fim?: string | null
+          promocao_inicio?: string | null
+          promocao_percentual?: number | null
+          publicado_em?: string | null
           publico_alvo?: string | null
+          status?: string
+          tags?: string[]
+          tipo_preco?: string
           updated_at?: string
           vinculo_tipo_acao?: string | null
         }
@@ -17593,6 +19218,7 @@ export type Database = {
           created_by: string | null
           documento: string | null
           email: string | null
+          endereco: string | null
           id: string
           lat: number | null
           lng: number | null
@@ -17629,6 +19255,7 @@ export type Database = {
           created_by?: string | null
           documento?: string | null
           email?: string | null
+          endereco?: string | null
           id?: string
           lat?: number | null
           lng?: number | null
@@ -17665,6 +19292,7 @@ export type Database = {
           created_by?: string | null
           documento?: string | null
           email?: string | null
+          endereco?: string | null
           id?: string
           lat?: number | null
           lng?: number | null
@@ -18879,6 +20507,8 @@ export type Database = {
           data_conclusao: string | null
           data_inicio: string | null
           descricao: string | null
+          eficacia_validada_em: string | null
+          eficacia_validada_por: string | null
           empresa_id: string | null
           exige_evidencia: boolean | null
           gravidade: number | null
@@ -18918,6 +20548,8 @@ export type Database = {
           data_conclusao?: string | null
           data_inicio?: string | null
           descricao?: string | null
+          eficacia_validada_em?: string | null
+          eficacia_validada_por?: string | null
           empresa_id?: string | null
           exige_evidencia?: boolean | null
           gravidade?: number | null
@@ -18957,6 +20589,8 @@ export type Database = {
           data_conclusao?: string | null
           data_inicio?: string | null
           descricao?: string | null
+          eficacia_validada_em?: string | null
+          eficacia_validada_por?: string | null
           empresa_id?: string | null
           exige_evidencia?: boolean | null
           gravidade?: number | null
@@ -21621,6 +23255,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ponto_expurgo_eventos: {
+        Row: {
+          corte: string
+          criterio: string
+          executado_em: string
+          id: string
+          marcacoes_afetadas: number
+          tenant_id: string
+        }
+        Insert: {
+          corte: string
+          criterio: string
+          executado_em?: string
+          id?: string
+          marcacoes_afetadas: number
+          tenant_id: string
+        }
+        Update: {
+          corte?: string
+          criterio?: string
+          executado_em?: string
+          id?: string
+          marcacoes_afetadas?: number
+          tenant_id?: string
+        }
+        Relationships: []
       }
       ponto_fechamentos: {
         Row: {
@@ -24802,9 +26463,65 @@ export type Database = {
           },
         ]
       }
+      sst_dados_extraidos: {
+        Row: {
+          chave: string | null
+          confianca: number | null
+          created_at: string
+          documento_id: string
+          id: string
+          revisado: boolean
+          revisado_em: string | null
+          revisado_por: string | null
+          tenant_id: string
+          tipo_dado: string
+          updated_at: string
+          valor: Json
+        }
+        Insert: {
+          chave?: string | null
+          confianca?: number | null
+          created_at?: string
+          documento_id: string
+          id?: string
+          revisado?: boolean
+          revisado_em?: string | null
+          revisado_por?: string | null
+          tenant_id: string
+          tipo_dado: string
+          updated_at?: string
+          valor?: Json
+        }
+        Update: {
+          chave?: string | null
+          confianca?: number | null
+          created_at?: string
+          documento_id?: string
+          id?: string
+          revisado?: boolean
+          revisado_em?: string | null
+          revisado_por?: string | null
+          tenant_id?: string
+          tipo_dado?: string
+          updated_at?: string
+          valor?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sst_dados_extraidos_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "sst_documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sst_documentos: {
         Row: {
           analise_ia: Json | null
+          analise_ia_confianca: number | null
+          analise_ia_revisado_em: string | null
+          analise_ia_revisado_por: string | null
           analise_ia_status: string | null
           arquivo_nome: string | null
           arquivo_tamanho: number | null
@@ -24828,6 +26545,9 @@ export type Database = {
         }
         Insert: {
           analise_ia?: Json | null
+          analise_ia_confianca?: number | null
+          analise_ia_revisado_em?: string | null
+          analise_ia_revisado_por?: string | null
           analise_ia_status?: string | null
           arquivo_nome?: string | null
           arquivo_tamanho?: number | null
@@ -24851,6 +26571,9 @@ export type Database = {
         }
         Update: {
           analise_ia?: Json | null
+          analise_ia_confianca?: number | null
+          analise_ia_revisado_em?: string | null
+          analise_ia_revisado_por?: string | null
           analise_ia_status?: string | null
           arquivo_nome?: string | null
           arquivo_tamanho?: number | null
@@ -24888,6 +26611,110 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sst_exposicao_agentes: {
+        Row: {
+          agente: string
+          colaborador_cpf: string
+          colaborador_nome: string | null
+          created_at: string
+          data_fim: string | null
+          data_inicio: string
+          empresa_id: string | null
+          epi_atenua: boolean
+          epi_ca: string | null
+          id: string
+          intensidade: string | null
+          ltcat_documento_id: string | null
+          s2240_enviado: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          agente: string
+          colaborador_cpf: string
+          colaborador_nome?: string | null
+          created_at?: string
+          data_fim?: string | null
+          data_inicio: string
+          empresa_id?: string | null
+          epi_atenua?: boolean
+          epi_ca?: string | null
+          id?: string
+          intensidade?: string | null
+          ltcat_documento_id?: string | null
+          s2240_enviado?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          agente?: string
+          colaborador_cpf?: string
+          colaborador_nome?: string | null
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string
+          empresa_id?: string | null
+          epi_atenua?: boolean
+          epi_ca?: string | null
+          id?: string
+          intensidade?: string | null
+          ltcat_documento_id?: string | null
+          s2240_enviado?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sst_exposicao_agentes_ltcat_documento_id_fkey"
+            columns: ["ltcat_documento_id"]
+            isOneToOne: false
+            referencedRelation: "sst_documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sst_ppp: {
+        Row: {
+          colaborador_cpf: string
+          colaborador_nome: string | null
+          conteudo: Json
+          created_at: string
+          documento_id: string | null
+          emitido_em: string
+          empresa_id: string | null
+          id: string
+          motivo: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          colaborador_cpf: string
+          colaborador_nome?: string | null
+          conteudo?: Json
+          created_at?: string
+          documento_id?: string | null
+          emitido_em?: string
+          empresa_id?: string | null
+          id?: string
+          motivo?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          colaborador_cpf?: string
+          colaborador_nome?: string | null
+          conteudo?: Json
+          created_at?: string
+          documento_id?: string | null
+          emitido_em?: string
+          empresa_id?: string | null
+          id?: string
+          motivo?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       subscription_addons: {
         Row: {
@@ -26522,6 +28349,42 @@ export type Database = {
           },
         ]
       }
+      usuario_empresa_ativa: {
+        Row: {
+          atualizado_em: string
+          empresa_id: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          empresa_id: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          empresa_id?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuario_empresa_ativa_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_cadastro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usuario_empresa_ativa_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuario_perfil_vinculos: {
         Row: {
           ativo: boolean
@@ -26588,6 +28451,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usuario_perfil_vinculos_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios_base"
             referencedColumns: ["id"]
           },
         ]
@@ -27227,7 +29097,43 @@ export type Database = {
         Args: { p_modalidade: string; p_token: string }
         Returns: string
       }
+      admissao_esocial_gerar_s2200: {
+        Args: { p_admissao: string; p_status?: string }
+        Returns: number
+      }
+      admissao_qualificacao_cadastral: {
+        Args: { p_admissao: string }
+        Returns: string
+      }
+      admissoes_contrato_duplicado: {
+        Args: never
+        Returns: {
+          admissoes: string[]
+          cargo: string
+          cpf: string
+          data_admissao: string
+          empresa_id: string
+          quantidade: number
+          tenant_id: string
+        }[]
+      }
       afastamento_encerrar_vencidos: { Args: never; Returns: number }
+      afastamento_esocial_gerar_s2230: {
+        Args: { p_afastamento: string; p_status?: string }
+        Returns: number
+      }
+      afastamento_pendencia_prazo: {
+        Args: { p_afastamento: string }
+        Returns: string
+      }
+      afastamento_proximo_dia_util: {
+        Args: { p_data: string; p_tenant: string }
+        Returns: string
+      }
+      afastamento_s2230_prazo: {
+        Args: { p_dias: number; p_inicio: string }
+        Returns: string
+      }
       afastamento_sem_prazo_e_legitimo: {
         Args: {
           p_prazo_indeterminado: boolean
@@ -27508,33 +29414,6 @@ export type Database = {
         Returns: Json
       }
       buscar_ponto_link_por_token: { Args: { p_token: string }; Returns: Json }
-      buscar_profissionais_proximos: {
-        Args: { p_lat: number; p_lon: number; p_raio_km?: number }
-        Returns: {
-          areas_atuacao: string[]
-          bio: string
-          cidade: string
-          conselho: string
-          distancia_km: number
-          email: string
-          especialidades: string[]
-          estado: string
-          foto_url: string
-          id: string
-          latitude: number
-          longitude: number
-          modalidades_atendimento: string[]
-          nome_completo: string
-          nota_media: number
-          registro_profissional: string
-          selo_verificado: boolean
-          status: string
-          telefone: string
-          tem_atestado_capacidade: boolean
-          total_avaliacoes: number
-          total_servicos_executados: number
-        }[]
-      }
       buscar_profissionais_proximos_publico: {
         Args: { p_lat: number; p_lon: number; p_raio_km?: number }
         Returns: {
@@ -27558,38 +29437,18 @@ export type Database = {
           total_servicos_executados: number
         }[]
       }
+      cadastro_empresa_livre_ativo: { Args: never; Returns: boolean }
       calcular_he_adicional_noturno_dia: {
         Args: { p_colaborador_id: string; p_data: string }
         Returns: Json
       }
-      central_incidentes: {
-        Args: { p_limite?: number }
-        Returns: {
-          clientes_afetados: number
-          fingerprint: string
-          modulo: string
-          ocorrencias: number
-          primeiro_visto: string
-          severidade: string
-          status: string
-          titulo: string
-          ultimo_visto: string
-        }[]
-      }
-      central_resumo: { Args: never; Returns: Json }
-      central_situacao_clientes: {
-        Args: never
-        Returns: {
-          colaboradores: number
-          erros_24h: number
-          nome: string
-          situacao: string
-          tenant_id: string
-        }[]
-      }
       check_ntep_relationship: {
         Args: { p_cid: string; p_cnae: string }
         Returns: string
+      }
+      cipa_dimensionar_quadro_i: {
+        Args: { p_efetivo: number; p_grupo?: string }
+        Returns: Json
       }
       classificar_marcacao_clt: {
         Args: { p_marcacao_id: string }
@@ -27631,7 +29490,9 @@ export type Database = {
           out_sem_ghe: number
         }[]
       }
-      converter_banco_horas_vencido: { Args: never; Returns: undefined }
+      converter_banco_horas_vencido:
+        | { Args: never; Returns: undefined }
+        | { Args: { p_tenant?: string }; Returns: undefined }
       cpf_do_usuario_logado: { Args: never; Returns: string }
       cpf_valido: { Args: { p_cpf: string }; Returns: boolean }
       current_user_tenant_id: { Args: never; Returns: string }
@@ -27773,11 +29634,35 @@ export type Database = {
         Args: { p_calculo: string; p_motivo: string }
         Returns: Json
       }
+      definir_empresa_ativa: { Args: { p_empresa_id: string }; Returns: string }
       delete_empresa_segura: { Args: { _empresa_id: string }; Returns: Json }
       desconsiderar_marcacao_ponto: {
         Args: { p_marcacao_id: string; p_motivo?: string }
         Returns: Json
       }
+      desligamento_esocial_gerar_s2299: {
+        Args: { p_admissao: string; p_status?: string }
+        Returns: number
+      }
+      desligamento_retificar: {
+        Args: {
+          p_admissao_id: string
+          p_data_desligamento: string
+          p_justificativa: string
+          p_motivo_desligamento: string
+        }
+        Returns: Json
+      }
+      empresa_ativa: { Args: never; Returns: string }
+      empresa_ativa_adocao: {
+        Args: never
+        Returns: {
+          com_empresa_registrada: number
+          registrada_ultimas_24h: number
+          usuarios_com_conta: number
+        }[]
+      }
+      empresa_ativa_obrigatoria: { Args: never; Returns: boolean }
       empresa_existe_por_documento: {
         Args: { p_doc: string; p_tipo: string }
         Returns: string
@@ -27838,6 +29723,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      esocial_rejeicao_traduzir: { Args: { p_codigo: string }; Returns: string }
+      esocial_s2220_prazo: { Args: { p_data_aso: string }; Returns: string }
       estabilidades_vigentes: {
         Args: { p_cpf: string; p_data?: string; p_tenant_id: string }
         Returns: {
@@ -27924,6 +29811,14 @@ export type Database = {
           meses_de_casa: number
         }[]
       }
+      ferias_concessivo_avalia: {
+        Args: { p_aquisitivo_fim: string; p_inicio_gozo: string }
+        Returns: {
+          dias_alem: number
+          limite: string
+          vencido: boolean
+        }[]
+      }
       ferias_dias_por_faltas_clt: {
         Args: { p_faltas: number }
         Returns: number
@@ -28001,6 +29896,8 @@ export type Database = {
           agencia: string | null
           art62_documento: string | null
           art62_inciso: string | null
+          assistente_legal_cpf: string | null
+          assistente_legal_nome: string | null
           aviso_previo_cumprido: boolean | null
           bairro: string | null
           banco: string | null
@@ -28036,8 +29933,10 @@ export type Database = {
           email: string | null
           empresa_id: string | null
           endereco: string | null
+          escala_noturna: boolean
           estado: string | null
           estado_civil: string | null
+          estudante: boolean
           exame_admissional_clinica: string | null
           exame_admissional_crm: string | null
           exame_admissional_data: string | null
@@ -28047,6 +29946,8 @@ export type Database = {
           exame_admissional_validade: string | null
           filial: string | null
           foto_url: string | null
+          funcao_insalubre: boolean
+          funcao_periculosa: boolean
           genero: string | null
           gestor_imediato: string | null
           id: string
@@ -28068,7 +29969,9 @@ export type Database = {
           observacoes_desligamento: string | null
           onboarding_status: string | null
           onboarding_token: string | null
+          qualificacao_cadastral: string | null
           resultado_exame_demissional: string | null
+          reversao_desligamento_justificativa: string | null
           rg: string | null
           salario: number | null
           seguro_desemprego_elegivel: boolean | null
@@ -28197,6 +30100,162 @@ export type Database = {
         Args: { p_context?: string; p_feature: string; p_tenant: string }
         Returns: undefined
       }
+      marketye_abrir_lead: {
+        Args: {
+          p_mensagem: string
+          p_obrigacao?: string
+          p_origem_id?: string
+          p_origem_modulo?: string
+          p_profissional_id: string
+          p_servico_id: string
+        }
+        Returns: Json
+      }
+      marketye_aceitar_termos: {
+        Args: { p_tipo: string; p_user_agent?: string; p_versao?: string }
+        Returns: Json
+      }
+      marketye_anuncio_publicar: { Args: { p_id: string }; Returns: Json }
+      marketye_anuncio_salvar: { Args: { _dados: Json }; Returns: Json }
+      marketye_anuncio_status: {
+        Args: { p_id: string; p_status: string }
+        Returns: Json
+      }
+      marketye_avaliacao_responder: {
+        Args: { p_avaliacao_id: string; p_resposta: string }
+        Returns: Json
+      }
+      marketye_avaliar: {
+        Args: {
+          p_comentario?: string
+          p_notas: Json
+          p_ref_id: string
+          p_ref_tipo: string
+        }
+        Returns: Json
+      }
+      marketye_buscar: { Args: { p_filtros?: Json }; Returns: Json }
+      marketye_buscar_interno: { Args: { p: Json }; Returns: Json[] }
+      marketye_cadastrar_especialista: { Args: { _dados: Json }; Returns: Json }
+      marketye_cadastrar_especialista_para: {
+        Args: { _dados: Json; p_user_id: string }
+        Returns: Json
+      }
+      marketye_cnpj_valido: { Args: { p_cnpj: string }; Returns: boolean }
+      marketye_config: {
+        Args: { p_chave: string; p_jurisdicao?: string }
+        Returns: Json
+      }
+      marketye_config_salvar: {
+        Args: {
+          p_chave: string
+          p_descricao?: string
+          p_jurisdicao?: string
+          p_valor: Json
+        }
+        Returns: Json
+      }
+      marketye_contestacao_decidir: {
+        Args: { p_id: string; p_resposta: string; p_resultado: string }
+        Returns: Json
+      }
+      marketye_contestacoes_fila: { Args: never; Returns: Json }
+      marketye_contestar: {
+        Args: {
+          p_evidencias?: Json
+          p_motivo: string
+          p_referencia_id: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
+      marketye_cupom_salvar: { Args: { _dados: Json }; Returns: Json }
+      marketye_denuncia_decidir: {
+        Args: { p_acao?: string; p_id: string; p_status: string }
+        Returns: Json
+      }
+      marketye_destaque_criar: {
+        Args: {
+          p_categoria_id: string
+          p_fim: string
+          p_inicio: string
+          p_profissional_id: string
+          p_servico_id: string
+          p_tipo: string
+          p_uf: string
+          p_valor?: number
+        }
+        Returns: Json
+      }
+      marketye_documento_valido: { Args: { p_doc: string }; Returns: boolean }
+      marketye_especialista_situacao: {
+        Args: { p_id: string; p_motivo?: string; p_situacao: string }
+        Returns: Json
+      }
+      marketye_excluir_meu_perfil: {
+        Args: { p_confirmacao: string }
+        Returns: Json
+      }
+      marketye_exportar_meus_dados: { Args: never; Returns: Json }
+      marketye_lead_contato: { Args: { p_lead_id: string }; Returns: Json }
+      marketye_lead_liberar_contato: {
+        Args: { p_lead_id: string }
+        Returns: Json
+      }
+      marketye_lead_mensagem: {
+        Args: { p_lead_id: string; p_texto: string }
+        Returns: Json
+      }
+      marketye_lead_papel: { Args: { p_lead_id: string }; Returns: string }
+      marketye_lead_status: {
+        Args: { p_lead_id: string; p_motivo?: string; p_status: string }
+        Returns: Json
+      }
+      marketye_lead_vincular_documento: {
+        Args: { p_documento_id: string; p_lead_id: string; p_tipo?: string }
+        Returns: Json
+      }
+      marketye_mascarar_contato: { Args: { p_texto: string }; Returns: string }
+      marketye_meu_id: { Args: never; Returns: string }
+      marketye_meu_perfil_salvar: { Args: { _dados: Json }; Returns: Json }
+      marketye_meu_portal: { Args: never; Returns: Json }
+      marketye_moderacao_fila: { Args: { p_status?: string }; Returns: Json }
+      marketye_moderar_especialista: {
+        Args: {
+          p_id: string
+          p_motivo?: string
+          p_resultado: string
+          p_selo?: boolean
+        }
+        Returns: Json
+      }
+      marketye_nivel_indice: { Args: { p_nivel: string }; Returns: number }
+      marketye_painel_liquidez: { Args: never; Returns: Json }
+      marketye_recalcular_reputacao: {
+        Args: { p_profissional_id: string }
+        Returns: Json
+      }
+      marketye_registrar_busca: {
+        Args: {
+          p_avisar?: boolean
+          p_categoria_id: string
+          p_cidade: string
+          p_email?: string
+          p_resultados: number
+          p_termos: string
+          p_uf: string
+        }
+        Returns: Json
+      }
+      marketye_so_digitos: { Args: { p_texto: string }; Returns: string }
+      marketye_texto_tem_contato: {
+        Args: { p_texto: string }
+        Returns: boolean
+      }
+      marketye_transparencia: { Args: { p_ano?: number }; Returns: Json }
+      marketye_vagas_demanda: { Args: { p_dias?: number }; Returns: Json }
+      marketye_via_funcao: { Args: never; Returns: boolean }
+      marketye_vitrine_publica: { Args: never; Returns: Json }
       my_cancelar_addon: { Args: { _feature_key: string }; Returns: undefined }
       my_contratar_addon: {
         Args: { _feature_key: string; _quantity?: number }
@@ -28241,6 +30300,10 @@ export type Database = {
         Args: { p_parceiro_id: string }
         Returns: Json
       }
+      parceiro_endereco_linha: {
+        Args: { p: Database["public"]["Tables"]["parceiros"]["Row"] }
+        Returns: string
+      }
       parceiro_estagio_calc: {
         Args: {
           p_contrato_assinado: boolean
@@ -28268,6 +30331,7 @@ export type Database = {
       parceiro_meu_portal: { Args: never; Returns: Json }
       parceiro_meu_portal_com_contrato: { Args: never; Returns: Json }
       parceiro_mrr_tenant: { Args: { p_tenant_id: string }; Returns: number }
+      parceiro_ref_publico: { Args: { p_codigo: string }; Returns: Json }
       parceiro_registrar_clique: {
         Args: { p_codigo: string; p_ua_hash?: string }
         Returns: boolean
@@ -28285,6 +30349,10 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: string
       }
+      perfil_permite_acao: {
+        Args: { p_acao: string; p_modulo: string; p_tenant_id: string }
+        Returns: boolean
+      }
       perfil_permite_modulo: {
         Args: { p_modulos: string[]; p_tenant_id: string }
         Returns: boolean
@@ -28293,6 +30361,7 @@ export type Database = {
         Args: { _tenant_id: string }
         Returns: boolean
       }
+      pode_gerir_acesso: { Args: { p_tenant_id: string }; Returns: boolean }
       ponto_acao_concluir_com_eficacia: {
         Args: { p_acao_id: string; p_evidencia?: string; p_tenant_id: string }
         Returns: Json
@@ -28913,6 +30982,10 @@ export type Database = {
           trabalhado_min: number
         }[]
       }
+      ponto_expurgar_geolocalizacao: {
+        Args: { p_tenant_id?: string }
+        Returns: Json
+      }
       ponto_expurgar_registros: {
         Args: {
           p_empresa_id?: string
@@ -29384,6 +31457,7 @@ export type Database = {
           tenants_com_erro: number
         }[]
       }
+      portas_entrada_config: { Args: never; Returns: Json }
       preencher_ghe_snapshot_entrevistas: {
         Args: { p_campanha_ids: string[] }
         Returns: number
@@ -29407,6 +31481,29 @@ export type Database = {
       proximo_tipo_marcacao_externo_cpf: {
         Args: { p_cpf: string; p_token: string }
         Returns: Json
+      }
+      qa_afast_legado: {
+        Args: { p_inicio: string; p_nome: string }
+        Returns: string
+      }
+      qa_afast_novo: {
+        Args: {
+          p_fim: string
+          p_inicio: string
+          p_nome: string
+          p_prazo_indeterminado?: boolean
+        }
+        Returns: string
+      }
+      qa_afast_tipado: {
+        Args: {
+          p_fim: string
+          p_inicio: string
+          p_nome: string
+          p_semente: number
+          p_tipo: string
+        }
+        Returns: string
       }
       qa_agendamento_e2e_ler_dias: {
         Args: never
@@ -29597,6 +31694,146 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_adm_020: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_021: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_022: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_030: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_031: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_040: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_041: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_050: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_051: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_052: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_070: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_071: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_072: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_073: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_adm_090: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -29608,6 +31845,26 @@ export type Database = {
         }
       }
       qa_caso_adm_091: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_092: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_adm_093: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -29667,6 +31924,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_adm_107: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_adm_108: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -29697,7 +31964,317 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_afast_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_011: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_020: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_021: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_022: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_030: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_031: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_032: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_040: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_050: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_051: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_060: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_070: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_afast_080: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ate_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_011: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_012: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_020: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_030: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_040: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_042: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_050: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_051: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_060: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_070: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_071: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ben_080: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -29788,6 +32365,16 @@ export type Database = {
         }
       }
       qa_caso_colab_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_colab_002: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -29927,6 +32514,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_colab_030: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_colab_031: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_colab_032: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_colab_033: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -30038,6 +32655,46 @@ export type Database = {
         }
       }
       qa_caso_cond_022: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ctx_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ctx_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ctx_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_dado_010: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -30477,6 +33134,46 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_desl_013: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_desl_015: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_desl_025: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_desl_057: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_desl_065: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -30507,7 +33204,57 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_desl_074: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_desl_081: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_desl_083: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_desl_091: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_desl_093: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_desl_094: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -30528,6 +33275,36 @@ export type Database = {
         }
       }
       qa_caso_desl_104: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_desl_105: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_desl_106: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_desl_110: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -30655,6 +33432,36 @@ export type Database = {
         }
       }
       qa_caso_doc_042: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_edge_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_edge_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_edge_007: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -30884,6 +33691,46 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_emp_051: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_emp_052: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_emp_053: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_emp_054: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_emp_060: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -30924,7 +33771,297 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_enq_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_enq_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_enq_011: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_enq_012: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_enq_013: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_enq_014: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_enq_050: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_enq_051: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_epi_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_011: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_020: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_021: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_022: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_030: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_040: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_041: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_042: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_043: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_044: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_050: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_051: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_epi_052: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_esc_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_esc_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_esc_011: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_esc_012: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_esc_020: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_esc_021: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_esc_031: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -31064,7 +34201,147 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ferias_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_007: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_008: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_011: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_012: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_013: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_014: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ferias_015: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_016: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -31084,7 +34361,77 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ferias_020: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_021: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_022: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ferias_023: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_024: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_030: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_031: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_032: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -31104,7 +34451,117 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ferias_034: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_035: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_040: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_041: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_042: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_050: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_051: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_052: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_053: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_054: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ferias_055: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_056: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -31144,6 +34601,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ferias_070: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_071: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ferias_080: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -31174,6 +34651,236 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ferias_090: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ferias_091: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_030: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_040: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_050: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_051: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_060: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_061: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_070: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_071: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_080: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_081: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_folha_090: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_hcal_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_hcal_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_hcal_011: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_hcal_012: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_hcat_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_hcat_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_hier_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_hier_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_hier_005: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -31185,6 +34892,26 @@ export type Database = {
         }
       }
       qa_caso_hier_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_htpl_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_htpl_010: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -31345,6 +35072,166 @@ export type Database = {
         }
       }
       qa_caso_ide_022: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_isol_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_isol_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_isol_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_isol_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_isol_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_isol_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_isol_007: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_isol_008: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_jor_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_jor_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_jor_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_lib_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_lib_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_lib_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_lib_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_lib_005: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -31664,6 +35551,836 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_mky_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_007: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_008: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_009: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_011: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_012: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_013: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_014: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_015: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_031: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_032: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_033: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_034: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_035: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_037: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_038: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_041: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_042: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_043: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_045: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_046: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_051: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_052: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_053: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_054: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_055: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_056: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_057: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_058: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_060: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_061: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_062: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_063: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_064: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_065: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_068: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_071: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_072: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_073: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_074: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_075: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_077: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_080: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_081: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_082: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_083: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_084: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_085: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_086: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_087: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_088: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_090: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_091: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_092: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_093: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_094: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_095: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_096: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_100: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_101: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_102: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_103: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_105: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_106: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_110: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_111: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_112: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_113: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_114: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_115: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_116: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_117: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_121: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_122: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_123: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_124: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_mky_131: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_mpar_001: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -31735,6 +36452,66 @@ export type Database = {
         }
       }
       qa_caso_mwkf_012: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_nac_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_nac_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_nac_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_nac_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_nac_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_nac_006: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -31964,6 +36741,96 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ouv_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ouv_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ouv_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ouv_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ouv_023: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ouv_024: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ouv_031: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ouv_033: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ouv_034: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_pass_001: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -32005,6 +36872,76 @@ export type Database = {
         }
       }
       qa_caso_pdoc_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_per_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_per_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_per_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_per_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_per_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_per_007: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_per_008: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -32194,6 +37131,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_pgp_017: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_plev_001: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -32294,7 +37241,57 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_020: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_021: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_022: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -32314,7 +37311,437 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_024: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_025: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_040: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_041: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_042: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_043: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_060: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_061: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_062: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_063: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_064: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_080: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_090: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_091: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_092: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_093: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_110: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_111: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_112: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_113: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_130: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_131: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_132: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_133: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_150: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_151: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_152: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_153: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_170: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_171: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_172: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_173: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_174: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_175: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_190: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_191: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_192: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_193: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_194: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_210: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_210_corpo: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_211: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_212: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_213: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -32394,6 +37821,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_291: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_292: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -32434,6 +37871,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_301_corpo: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_310: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -32445,6 +37892,76 @@ export type Database = {
         }
       }
       qa_caso_ponto_311: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_312: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_320: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_321: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_321_corpo: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_322: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_330: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_331: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -32474,7 +37991,227 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_350: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_351: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_352: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_353: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_354: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_355: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_356: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_357: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_358: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_359: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_360: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_361: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_362: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_370: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_371: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_372: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_373: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_374: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_375: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_376: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_377: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_378: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_379: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -32494,6 +38231,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_381: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_382: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_383: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -32504,7 +38261,117 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_384: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_385: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_386: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_387: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_388: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_389: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_390: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_391: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_392: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_393: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_394: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_394_corpo: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -32534,6 +38401,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_397: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_398: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_400: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_401: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -32554,7 +38451,27 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_403: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_410: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_420: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -32574,6 +38491,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_430: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_431: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_431_corpo: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
@@ -32584,7 +38521,47 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_440: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_441: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_450: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_ponto_451: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_460: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -32654,7 +38631,117 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_ponto_476: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_477: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_hom_c1: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_hom_c2: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ponto_hom_f2: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_caso_porte_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_priv_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_priv_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_priv_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_priv_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_priv_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_priv_006: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -32705,6 +38792,346 @@ export type Database = {
         }
       }
       qa_caso_proc_012: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_regra_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_regra_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_regra_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_regra_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_regra_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_regra_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_regra_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_regra_011: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_rls_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_rls_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_rls_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_rls_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_rls_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_rls_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_rls_007: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ses_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ses_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ses_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_ses_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_010: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_011: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_020: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_021: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_030: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_031: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_040: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_041: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_050: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_060: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_070: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_sst_080: {
         Args: never
         Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
         SetofOptions: {
@@ -33004,6 +39431,156 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      qa_caso_usr_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_usr_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_usr_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_usr_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_usr_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_usr_007: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_usr_008: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_vin_001: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_vin_002: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_vin_003: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_vin_004: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_vin_005: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_vin_006: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_vin_007: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      qa_caso_vin_008: {
+        Args: never
+        Returns: Database["public"]["CompositeTypes"]["qa_retorno"]
+        SetofOptions: {
+          from: "*"
+          to: "qa_retorno"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       qa_cercas_faltando: {
         Args: never
         Returns: {
@@ -33027,6 +39604,7 @@ export type Database = {
         }[]
       }
       qa_cpf: { Args: { p_semente: number }; Returns: string }
+      qa_cpf_formatado: { Args: { p_cpf: string }; Returns: string }
       qa_cron_sincronizar: { Args: never; Returns: string }
       qa_cron_sincronizar_e2e: { Args: never; Returns: string }
       qa_dia_util_passado: { Args: { p_atras?: number }; Returns: string }
@@ -33059,6 +39637,19 @@ export type Database = {
         }
       }
       qa_exigir_modo: { Args: never; Returns: undefined }
+      qa_feriado_da_unidade: {
+        Args: { p_data: string; p_empresa_id: string; p_nome?: string }
+        Returns: string
+      }
+      qa_ferias_periodo: {
+        Args: {
+          p_aquisitivo_fim?: string
+          p_cpf: string
+          p_faltas?: number
+          p_nome: string
+        }
+        Returns: string
+      }
       qa_ferias_sonda_calculo: { Args: { p_tenant: string }; Returns: string }
       qa_fixture_email: {
         Args: { p_codigo: string; p_n: number }
@@ -33093,6 +39684,33 @@ export type Database = {
           passou: number
           total: number
         }[]
+      }
+      qa_mky_anuncio_publicado: {
+        Args: {
+          p_extra?: Json
+          p_modalidade: string
+          p_nome: string
+          p_preco: number
+          p_slug: string
+          p_tipo_preco: string
+          p_uid: string
+        }
+        Returns: string
+      }
+      qa_mky_cenario_seguranca: { Args: never; Returns: Json }
+      qa_mky_claims: { Args: { p_uid: string }; Returns: undefined }
+      qa_mky_especialista: {
+        Args: { p_cpf: string; p_marca: string }
+        Returns: {
+          prof_id: string
+          uid: string
+        }[]
+      }
+      qa_mky_limpar: { Args: never; Returns: undefined }
+      qa_mky_superadmin: { Args: never; Returns: string }
+      qa_mky_usuario_empresa: {
+        Args: { p_marca: string; p_tenant: string }
+        Returns: string
       }
       qa_mobiliario_registrar: {
         Args: never
@@ -33218,6 +39836,49 @@ export type Database = {
         }
         Returns: undefined
       }
+      qa_ponto_dia_horarios: {
+        Args: {
+          p_cpf: string
+          p_data: string
+          p_entrada: string
+          p_nome: string
+          p_ralm?: string
+          p_saida: string
+          p_salm?: string
+        }
+        Returns: string
+      }
+      qa_ponto_dia_min: {
+        Args: {
+          p_cpf: string
+          p_data: string
+          p_minutos: number
+          p_nome: string
+        }
+        Returns: undefined
+      }
+      qa_ponto_escala_tol: {
+        Args: {
+          p_cpf: string
+          p_data_fim: string
+          p_data_inicio: string
+          p_jornada_min: number
+          p_nome: string
+          p_tol_min: number
+        }
+        Returns: string
+      }
+      qa_ponto_marca: {
+        Args: {
+          p_cpf: string
+          p_data: string
+          p_hora: string
+          p_nome: string
+          p_original?: boolean
+          p_tipo: string
+        }
+        Returns: undefined
+      }
       qa_registrar_bateria_e2e: { Args: { p_payload: Json }; Returns: string }
       qa_relatorio_falhas: {
         Args: { p_modulo?: string }
@@ -33260,6 +39921,49 @@ export type Database = {
       qa_sandbox_tenant_id: { Args: never; Returns: string }
       qa_sandbox2_tenant_id: { Args: never; Returns: string }
       qa_um_usuario: { Args: never; Returns: string }
+      qa_up_decisao_le_excecoes: { Args: never; Returns: boolean }
+      qa_up_entrar: { Args: { p_uid: string }; Returns: undefined }
+      qa_up_motivo_sem_papel: { Args: never; Returns: string }
+      qa_up_outro_tenant: { Args: never; Returns: string }
+      qa_up_perfil: {
+        Args: {
+          p_acao?: string
+          p_codigo: string
+          p_escopo?: string
+          p_modulo: string
+          p_sufixo: string
+        }
+        Returns: string
+      }
+      qa_up_pode_virar_usuario: { Args: never; Returns: boolean }
+      qa_up_sair: { Args: never; Returns: undefined }
+      qa_up_tem_empresa_ativa: { Args: never; Returns: boolean }
+      qa_up_tem_identidade: { Args: { p_auth_uid: string }; Returns: boolean }
+      qa_up_usuario: {
+        Args: {
+          p_auth_uid?: string
+          p_codigo: string
+          p_cpf: string
+          p_n: number
+          p_status?: string
+        }
+        Returns: string
+      }
+      qa_up_usuario_isolado: {
+        Args: { p_codigo: string; p_cpf: string }
+        Returns: string
+      }
+      qa_up_vincular: {
+        Args: {
+          p_ativo?: boolean
+          p_empresa: string
+          p_expira?: string
+          p_perfil: string
+          p_usuario: string
+        }
+        Returns: string
+      }
+      qa_up_voltar_papel: { Args: never; Returns: undefined }
       qa_verifica_contaminacao: {
         Args: { p_execucao_id: string }
         Returns: {
@@ -33316,6 +40020,10 @@ export type Database = {
         }[]
       }
       reconciliar_versoes_documentos: { Args: never; Returns: number }
+      registrar_acesso_cross_tenant: {
+        Args: { p_detalhe?: Json; p_recurso: string; p_tenant_id: string }
+        Returns: undefined
+      }
       registrar_assinatura_contrato:
         | {
             Args: {
@@ -33358,7 +40066,6 @@ export type Database = {
             }
             Returns: Json
           }
-      registrar_evento_erro: { Args: { p_evento: Json }; Returns: Json }
       registrar_ponto_externo:
         | {
             Args: {
@@ -33489,6 +40196,31 @@ export type Database = {
         }
         Returns: Json
       }
+      sst_confere_coerencia_documental: {
+        Args: { p_empresa: string; p_tenant: string }
+        Returns: Json
+      }
+      sst_enquadramento_adicional: {
+        Args: { p_cargo_nome: string; p_documento_id: string }
+        Returns: Json
+      }
+      sst_exposicao_gera_s2240: {
+        Args: { p_exposicao_id: string }
+        Returns: string
+      }
+      sst_gera_os_por_funcao: {
+        Args: {
+          p_cargo_nome: string
+          p_colaborador_id: string
+          p_documento_id: string
+        }
+        Returns: string
+      }
+      sst_gerar_ppp: {
+        Args: { p_colaborador_cpf: string; p_motivo?: string; p_tenant: string }
+        Returns: string
+      }
+      sst_pgr_gera_acoes: { Args: { p_documento_id: string }; Returns: number }
       superadmin_addon_prices_list: { Args: never; Returns: Json }
       superadmin_delete_tenant: {
         Args: { _tenant_id: string }
@@ -33590,6 +40322,10 @@ export type Database = {
       }
       superadmin_parceiros_list: { Args: never; Returns: Json }
       superadmin_parceiros_tenants_list: { Args: never; Returns: Json }
+      superadmin_portas_entrada_salvar: {
+        Args: { _dados: Json }
+        Returns: undefined
+      }
       superadmin_psicossocial_overview: { Args: never; Returns: Json }
       superadmin_set_addon_price: {
         Args: { _cents: number; _feature_key: string }
@@ -34123,6 +40859,7 @@ export type Database = {
         | "TERMINO_TEMPORARIO"
         | "TERMINO_APRENDIZ"
         | "ENCERRAMENTO_ESTAGIO"
+        | "CULPA_RECIPROCA"
       resposta_status: "pendente" | "em_andamento" | "concluida"
       risco_severidade: "baixo" | "medio" | "alto" | "critico"
       rubrica_natureza: "REMUNERATORIA" | "INDENIZATORIA" | "OUTRA"
@@ -34840,6 +41577,7 @@ export const Constants = {
         "TERMINO_TEMPORARIO",
         "TERMINO_APRENDIZ",
         "ENCERRAMENTO_ESTAGIO",
+        "CULPA_RECIPROCA",
       ],
       resposta_status: ["pendente", "em_andamento", "concluida"],
       risco_severidade: ["baixo", "medio", "alto", "critico"],

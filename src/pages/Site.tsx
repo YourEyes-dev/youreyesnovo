@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { DiagnosticoPsicossocial } from "@/components/site/DiagnosticoPsicossocial";
 import logoLocal from "@/assets/logo-youreyes.svg";
 import { capturarRefDaUrl, lerRef } from "@/lib/parceiroRef";
+import { trackConversion } from "@/lib/metaConversions";
 import mascot from "@/assets/mascot-ye.png.asset.json";
 import {
   ShieldCheck,

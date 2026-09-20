@@ -868,6 +868,11 @@ export default function Site() {
               onSubmit={(e) => {
                 e.preventDefault();
                 const data = new FormData(e.currentTarget);
+                trackConversion("Contact", {
+                  email: String(data.get("email") ?? ""),
+                  phone: String(data.get("telefone") ?? ""),
+                  url: window.location.href,
+                });
                 window.location.href = `mailto:contato@youreyes.com.br?subject=Diagnóstico de Maturidade YourEyes&body=${encodeURIComponent(
                   Array.from(data.entries())
                     .map(([k, v]) => `${k}: ${v}`)

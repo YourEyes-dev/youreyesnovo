@@ -868,14 +868,8 @@ export default function Site() {
               className="border border-white/10 rounded-lg p-8 bg-white/[0.04] backdrop-blur shadow-2xl space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
-                const data = new FormData(e.currentTarget);
-                trackConversion("Contact", {
-                  email: String(data.get("email") ?? ""),
-                  phone: String(data.get("telefone") ?? ""),
-                  url: window.location.href,
-                });
                 window.location.href = `mailto:contato@youreyes.com.br?subject=Diagnóstico de Maturidade YourEyes&body=${encodeURIComponent(
-                  Array.from(data.entries())
+                  Array.from(new FormData(e.currentTarget).entries())
                     .map(([k, v]) => `${k}: ${v}`)
                     .join("\n"),
                 )}`;
@@ -910,7 +904,17 @@ export default function Site() {
                 <textarea name="mensagem" rows={4} className="w-full mt-1 border border-white/15 bg-white/5 text-white placeholder:text-slate-400 rounded-md px-3 py-2 text-sm focus:border-[#60ABEF] focus:ring-1 focus:ring-[#60ABEF] outline-none" placeholder="Pessoas, jornada, SST, documentos, metas..." />
               </div>
               <button
-                type="submit"
+                type="button"
+                onClick={(e) => {
+                  const form = e.currentTarget.form;
+                  if (!form) return;
+                  trackConversion("Contact", {
+                    email: String((form.elements.namedItem("email") as HTMLInputElement | null)?.value ?? ""),
+                    phone: String((form.elements.namedItem("telefone") as HTMLInputElement | null)?.value ?? ""),
+                    url: window.location.href,
+                  });
+                  form.requestSubmit();
+                }}
                 className="w-full bg-[#FF8A00] hover:bg-[#e67a00] text-white font-semibold py-3 rounded-md transition inline-flex items-center justify-center gap-2"
               >
                 Medir a maturidade da minha empresa <ArrowRight className="w-4 h-4" />

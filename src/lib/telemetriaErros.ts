@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { rpcUntyped } from '@/integrations/supabase/untypedClient';
 
 // Telemetria de erro do YourEyes — o lado da tela.
 //
@@ -81,7 +82,7 @@ export async function registrarErro(evento: Evento): Promise<void> {
     if (!sessao?.session) return;
 
     const caminho = typeof window !== 'undefined' ? window.location.pathname : '';
-    await supabase.rpc('registrar_evento_erro', {
+    await rpcUntyped('registrar_evento_erro', {
       p_evento: {
         mensagem,
         stack: mascararPii(String(evento.stack ?? '')).slice(0, 8000),

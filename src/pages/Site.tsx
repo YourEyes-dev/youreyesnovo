@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { DiagnosticoPsicossocial } from "@/components/site/DiagnosticoPsicossocial";
 import logoLocal from "@/assets/logo-youreyes.svg";
 import { capturarRefDaUrl, lerRef } from "@/lib/parceiroRef";
+import { trackConversion } from "@/lib/metaConversions";
 import mascot from "@/assets/mascot-ye.png.asset.json";
 import {
   ShieldCheck,
@@ -868,6 +869,11 @@ export default function Site() {
               onSubmit={(e) => {
                 e.preventDefault();
                 const data = new FormData(e.currentTarget);
+                trackConversion("Contact", {
+                  email: String(data.get("email") ?? ""),
+                  phone: String(data.get("telefone") ?? ""),
+                  url: window.location.href,
+                });
                 window.location.href = `mailto:contato@youreyes.com.br?subject=Diagnóstico de Maturidade YourEyes&body=${encodeURIComponent(
                   Array.from(data.entries())
                     .map(([k, v]) => `${k}: ${v}`)

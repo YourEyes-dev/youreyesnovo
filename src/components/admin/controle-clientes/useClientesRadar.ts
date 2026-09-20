@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { rpcUntyped } from '@/integrations/supabase/untypedClient';
 
 // Leitura da Central de Controle de Clientes. Tudo cross-tenant, tudo por
 // função do servidor que exige superadmin — a tela não monta consulta livre
@@ -41,7 +41,7 @@ export function useClientesRadar(habilitado: boolean) {
     enabled: habilitado,
     refetchInterval: 60_000,
     queryFn: async (): Promise<ClienteNoRadar[]> => {
-      const { data, error } = await supabase.rpc('central_situacao_clientes');
+      const { data, error } = await rpcUntyped('central_situacao_clientes');
       if (error) throw error;
       const linhas = (data as Array<Record<string, unknown>> | null) ?? [];
       return linhas
@@ -64,7 +64,7 @@ export function useIncidentes() {
     queryKey: ['controle-clientes', 'incidentes'],
     refetchInterval: 60_000,
     queryFn: async (): Promise<Incidente[]> => {
-      const { data, error } = await supabase.rpc('central_incidentes', { p_limite: 50 });
+      const { data, error } = await rpcUntyped('central_incidentes', { p_limite: 50 });
       if (error) throw error;
       const linhas = (data as Array<Record<string, unknown>> | null) ?? [];
       return linhas.map((i) => ({
@@ -88,7 +88,7 @@ export function useResumoCentral() {
     queryKey: ['controle-clientes', 'resumo'],
     refetchInterval: 60_000,
     queryFn: async (): Promise<ResumoCentral> => {
-      const { data, error } = await supabase.rpc('central_resumo');
+      const { data, error } = await rpcUntyped('central_resumo');
       if (error) throw error;
       const r = (data as Record<string, unknown> | null) ?? {};
       const num = (v: unknown) => (v === undefined || v === null ? null : Number(v));

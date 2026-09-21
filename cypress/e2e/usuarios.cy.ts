@@ -43,6 +43,28 @@ describe("Módulo Usuários", () => {
     });
   }
 
+  // Abre um filtro do Radix (Select de status/tipo, Popover de empresa) de forma
+  // robusta. O flake da #54 vinha daqui: o clique com force pode ser interceptado
+  // pelo overlay do "humor" (scroll-lock) e o portal do Radix ainda anima —
+  // então a asserção da opção/input começava antes do conteúdo montar. Aqui
+  // clicamos e, se o conteúdo esperado não montou, dispensamos o humor e
+  // clicamos de novo; só então afirmamos que o conteúdo está visível.
+  function abrirFiltro(rotuloTrigger: string, seletorConteudo: string) {
+    const trigger = () =>
+      cy.contains('[role="combobox"]', rotuloTrigger, { timeout: 20000 });
+    trigger().should("be.visible").scrollIntoView().click({ force: true });
+    cy.get("body").then(($b) => {
+      if ($b.find(seletorConteudo).length === 0) {
+        if ($b.text().includes("Como você está hoje")) {
+          cy.get("body").type("{esc}", { force: true });
+          cy.wait(200);
+        }
+        trigger().click({ force: true });
+      }
+    });
+    cy.get(seletorConteudo, { timeout: 15000 }).should("be.visible");
+  }
+
   beforeEach(() => {
     login();
     goToModulo();
@@ -75,8 +97,8 @@ describe("Módulo Usuários", () => {
 
   // USR-TELA-04
   it("o filtro de status abre com as opções", () => {
-    cy.contains('[role="combobox"]', "Todos os status", { timeout: 20000 }).click({ force: true });
-    cy.contains('[role="option"]', "Todos os status", { timeout: 10000 }).should("be.visible");
+    abrirFiltro("Todos os status", '[role="listbox"]');
+    cy.get('[role="listbox"]').contains('[role="option"]', "Todos os status").should("be.visible");
     cy.get("body").type("{esc}", { force: true });
   });
 
@@ -89,15 +111,16 @@ describe("Módulo Usuários", () => {
 
   // USR-TELA-06
   it("o filtro de tipo de usuário abre com as opções", () => {
-    cy.contains('[role="combobox"]', "Todos os tipos de usuário", { timeout: 20000 }).click({ force: true });
-    cy.contains('[role="option"]', "Todos os tipos de usuário", { timeout: 10000 }).should("be.visible");
+    abrirFiltro("Todos os tipos de usuário", '[role="listbox"]');
+    cy.get('[role="listbox"]').contains('[role="option"]', "Todos os tipos de usuário").should("be.visible");
     cy.get("body").type("{esc}", { force: true });
   });
 
   // USR-TELA-07
   it("o filtro por empresa abre", () => {
-    cy.contains('[role="combobox"]', "Todas as empresas", { timeout: 20000 }).click({ force: true });
-    cy.get('input[placeholder*="Buscar empresa"]', { timeout: 10000 }).should("be.visible");
+    // O seletor de conteúdo já é o próprio input de busca de empresa: abrirFiltro
+    // clica (com re-tentativa) e afirma que o input ficou visível.
+    abrirFiltro("Todas as empresas", 'input[placeholder*="Buscar empresa"]');
     cy.get("body").type("{esc}", { force: true });
   });
 });

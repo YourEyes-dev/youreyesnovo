@@ -765,6 +765,15 @@ do diálogo** (o `TrilhaForm` só fecha após `criarTrilha` resolver; no erro o
 `catch` mantém o diálogo aberto). Sem tocar no código de produto; título do `it()`
 inalterado (ponte intacta).
 
+**Nota de flake (usuários — filtros do Radix):** na bateria #54 (`d7dbd7de`), 2 de 7
+`it()` de `usuarios.cy.ts` piscaram — o `Select` de status/tipo (a opção não ficava
+`visible` a tempo) e o `Popover` de empresa (o input `"Buscar empresa"` não montava)
+—, o mesmo padrão de overlay/scroll-lock do Radix (o robô é `owner`, então é timing,
+não permissão). Passaram 7/7 na #50. Endurecidos (só teste, títulos inalterados):
+um helper `abrirFiltro` clica o gatilho e, se o portal do Radix não montou (clique
+interceptado pelo overlay do "humor"), dispensa o modal e re-clica antes de afirmar
+que o conteúdo (`[role="listbox"]` / o input de empresa) está visível.
+
 ## Testes de tela (Cypress) na homologação
 
 Por padrão a suíte Cypress roda só no **teste** (é lá que a tela nasce, e as duas

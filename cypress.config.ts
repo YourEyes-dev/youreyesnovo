@@ -12,11 +12,11 @@ import { readFileSync, statSync } from "fs";
 // abaixo se for um host da lista de permitidos.
 // =====================================================================
 
-const SITE_DE_TESTE = "https://ustudy123.github.io/youreyesnovo/teste/";
+const SITE_DE_TESTE = "https://youreyes-dev.github.io/youreyesnovo/teste/";
 
 // Lista de PERMITIDOS (não de proibidos): host novo só entra aqui de
 // propósito. Uma lista de proibidos deixaria passar o que esquecêssemos.
-const HOSTS_DE_TESTE = ["ustudy123.github.io", "localhost", "127.0.0.1"];
+const HOSTS_DE_TESTE = ["youreyes-dev.github.io", "localhost", "127.0.0.1"];
 
 function exigirAmbienteDeTeste(url: string): string {
   let host: string;

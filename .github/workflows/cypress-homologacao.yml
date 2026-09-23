@@ -17,7 +17,7 @@
 #   5) devolve o resultado para o painel de QA da homologação.
 #
 # TRAVAS DE AMBIENTE (produção é inalcançável, de propósito):
-#   · cypress.config.ts só aceita host da lista (ustudy123.github.io) e aborta
+#   · cypress.config.ts só aceita host da lista (youreyes-dev.github.io) e aborta
 #     em tempo de execução se a app falar com o ref da produção;
 #   · a Edge Function seed-e2e-user recusa qualquer ref que não seja o do
 #     teste ou o da homologação — nunca semeia produção.
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HOMOLOGACAO_REF: fgsblefvdabgdouipigz
-      CYPRESS_BASE_URL: https://ustudy123.github.io/youreyesnovo/homologacao/
+      CYPRESS_BASE_URL: https://youreyes-dev.github.io/youreyesnovo/homologacao/
       CYPRESS_EMAIL: ${{ secrets.CYPRESS_EMAIL }}
       CYPRESS_PASSWORD: ${{ secrets.CYPRESS_PASSWORD }}
       # Caminho de volta para o painel de QA da HOMOLOGAÇÃO. O token tem de ser

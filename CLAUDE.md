@@ -10,7 +10,7 @@ produção são publicadas pelo Lovable.
 | | PRODUÇÃO | STAGING (testes) |
 |---|---|---|
 | Projeto Supabase | `diayjpsrcerycycyaxst` | `bmehdgthciuvdbvutsdv` |
-| Telas | seguramente.lovable.app (via Publicar no Lovable) | https://ustudy123.github.io/youreyesnovo/teste/ |
+| Telas | seguramente.lovable.app (via Publicar no Lovable) | https://youreyes-dev.github.io/youreyesnovo/teste/ |
 | Dados | reais, protegidos por LGPD | fictícios (Empresa Staging LTDA, CPFs 900000xxx) |
 
 **Fluxo obrigatório:** desenvolver → mesclar na `main` → o workflow
@@ -177,9 +177,9 @@ contrário. Consequências práticas:
 
 Ao terminar qualquer implementação, encerre a resposta com:
 1. o link do ambiente onde a mudança foi de fato validada — o site de teste
-   (https://ustudy123.github.io/youreyesnovo/teste/) quando o ciclo passou pelo
+   (https://youreyes-dev.github.io/youreyesnovo/teste/) quando o ciclo passou pelo
    staging, ou o da homologação
-   (https://ustudy123.github.io/youreyesnovo/homologacao/) quando a validação foi
+   (https://youreyes-dev.github.io/youreyesnovo/homologacao/) quando a validação foi
    lá. Não repita o link de teste no automático: mandar o usuário conferir num
    ambiente onde a mudança não foi aplicada não prova nada;
 2. o que exatamente o usuário deve abrir/clicar lá para conferir (tela, caminho

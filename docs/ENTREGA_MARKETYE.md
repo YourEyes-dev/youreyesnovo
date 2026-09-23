@@ -168,7 +168,7 @@ falhou** (os 16 são os achados de produto já dispostos).
 
 ## Como conferir no ambiente de teste
 
-1. Site de teste: https://ustudy123.github.io/youreyesnovo/teste/
+1. Site de teste: https://youreyes-dev.github.io/youreyesnovo/teste/
 2. Logado como empresa: botão **MarketYE** no cabeçalho → vitrine; filtre
    "Segurança do Trabalho" (aparece "Especialista Staging (QA)"); busque
    "xyz" (aviso de oferta insuficiente + Avise-me); abra uma conversa.

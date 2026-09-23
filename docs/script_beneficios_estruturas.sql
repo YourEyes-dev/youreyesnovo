@@ -25,6 +25,11 @@
 -- UMA transacao no SQL Editor. Ausencia de RESTRICTIVE de perfil aqui e
 -- proposital: o teste tambem nao tem — igualar isso e um passo separado, no
 -- teste primeiro.
+--
+-- FORMA: statements literais, SEM bloco DO e SEM aspas-dolar. O ENABLE ROW
+-- LEVEL SECURITY vem literal logo apos cada CREATE TABLE de proposito — assim o
+-- SQL Editor do Supabase enxerga que o RLS ja esta tratado e nao injeta o
+-- ALTER dele no meio do arquivo (o que quebrava a contagem de aspas-dolar).
 -- ============================================================================
 
 -- ── BEN-030: dependentes de beneficio ───────────────────────────────────────
@@ -44,6 +49,7 @@ CREATE TABLE IF NOT EXISTS public.beneficios_dependentes (
   created_at            timestamptz NOT NULL DEFAULT now(),
   updated_at            timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.beneficios_dependentes ENABLE ROW LEVEL SECURITY;
 COMMENT ON TABLE public.beneficios_dependentes IS
   'BEN-030: dependentes por titular (idade/parentesco/documento), refletindo na operadora e no IRRF.';
 
@@ -65,6 +71,7 @@ CREATE TABLE IF NOT EXISTS public.beneficios_manutencao_plano (
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.beneficios_manutencao_plano ENABLE ROW LEVEL SECURITY;
 COMMENT ON TABLE public.beneficios_manutencao_plano IS
   'BEN-040: manutencao do plano do demitido/aposentado (elegibilidade, periodo, prazo de 30 dias, custo integral).';
 
@@ -79,6 +86,7 @@ CREATE TABLE IF NOT EXISTS public.beneficios_operadoras (
   created_at   timestamptz NOT NULL DEFAULT now(),
   updated_at   timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.beneficios_operadoras ENABLE ROW LEVEL SECURITY;
 COMMENT ON TABLE public.beneficios_operadoras IS
   'BEN-042: operadoras/planos (base para movimentacoes e faturas).';
 
@@ -98,6 +106,7 @@ CREATE TABLE IF NOT EXISTS public.beneficios_faturas (
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.beneficios_faturas ENABLE ROW LEVEL SECURITY;
 COMMENT ON TABLE public.beneficios_faturas IS
   'BEN-042: faturas da operadora — conciliacao obrigatoria (vidas/valores) antes do pagamento.';
 
@@ -115,6 +124,7 @@ CREATE TABLE IF NOT EXISTS public.beneficios_plr (
   created_at            timestamptz NOT NULL DEFAULT now(),
   updated_at            timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.beneficios_plr ENABLE ROW LEVEL SECURITY;
 COMMENT ON TABLE public.beneficios_plr IS
   'BEN-070: programa de PLR — acordo previo como condicao da isencao, limite de 2 pagamentos/ano (Lei 10.101/2000).';
 
@@ -131,35 +141,65 @@ CREATE TABLE IF NOT EXISTS public.beneficios_consignado (
   created_at           timestamptz NOT NULL DEFAULT now(),
   updated_at           timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.beneficios_consignado ENABLE ROW LEVEL SECURITY;
 COMMENT ON TABLE public.beneficios_consignado IS
   'BEN-071: consignado e margem consignavel (validacao do desconto contra a margem, Lei 10.820/2003).';
 
--- ── RLS de isolamento por tenant + trigger de updated_at (por item, resiliente) ─
--- Bloco DO com tratamento por tabela: se um item falhar, os outros seguem e o
--- erro vira aviso (a conferencia no fim revela o que ficou de fora).
-DO $rls$
-DECLARE
-  t text;
-BEGIN
-  FOREACH t IN ARRAY ARRAY[
-    'beneficios_dependentes', 'beneficios_manutencao_plano', 'beneficios_operadoras',
-    'beneficios_faturas', 'beneficios_plr', 'beneficios_consignado'
-  ] LOOP
-    BEGIN
-      EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
-      IF NOT EXISTS (SELECT 1 FROM pg_policy WHERE polname = 'Tenant isolation ' || t) THEN
-        EXECUTE format(
-          'CREATE POLICY %I ON public.%I FOR ALL USING (tenant_id = public.get_user_tenant_id()) WITH CHECK (tenant_id = public.get_user_tenant_id())',
-          'Tenant isolation ' || t, t);
-      END IF;
-      EXECUTE format('DROP TRIGGER IF EXISTS update_%s_updated_at ON public.%I', t, t);
-      EXECUTE format('CREATE TRIGGER update_%s_updated_at BEFORE UPDATE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column()', t, t);
-    EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'RLS/trigger nao aplicado em %: %', t, SQLERRM;
-    END;
-  END LOOP;
-END;
-$rls$;
+-- ── Politicas de isolamento por tenant (idempotentes: DROP IF EXISTS + CREATE) ─
+DROP POLICY IF EXISTS "Tenant isolation beneficios_dependentes" ON public.beneficios_dependentes;
+CREATE POLICY "Tenant isolation beneficios_dependentes" ON public.beneficios_dependentes
+  FOR ALL USING (tenant_id = public.get_user_tenant_id())
+  WITH CHECK (tenant_id = public.get_user_tenant_id());
+
+DROP POLICY IF EXISTS "Tenant isolation beneficios_manutencao_plano" ON public.beneficios_manutencao_plano;
+CREATE POLICY "Tenant isolation beneficios_manutencao_plano" ON public.beneficios_manutencao_plano
+  FOR ALL USING (tenant_id = public.get_user_tenant_id())
+  WITH CHECK (tenant_id = public.get_user_tenant_id());
+
+DROP POLICY IF EXISTS "Tenant isolation beneficios_operadoras" ON public.beneficios_operadoras;
+CREATE POLICY "Tenant isolation beneficios_operadoras" ON public.beneficios_operadoras
+  FOR ALL USING (tenant_id = public.get_user_tenant_id())
+  WITH CHECK (tenant_id = public.get_user_tenant_id());
+
+DROP POLICY IF EXISTS "Tenant isolation beneficios_faturas" ON public.beneficios_faturas;
+CREATE POLICY "Tenant isolation beneficios_faturas" ON public.beneficios_faturas
+  FOR ALL USING (tenant_id = public.get_user_tenant_id())
+  WITH CHECK (tenant_id = public.get_user_tenant_id());
+
+DROP POLICY IF EXISTS "Tenant isolation beneficios_plr" ON public.beneficios_plr;
+CREATE POLICY "Tenant isolation beneficios_plr" ON public.beneficios_plr
+  FOR ALL USING (tenant_id = public.get_user_tenant_id())
+  WITH CHECK (tenant_id = public.get_user_tenant_id());
+
+DROP POLICY IF EXISTS "Tenant isolation beneficios_consignado" ON public.beneficios_consignado;
+CREATE POLICY "Tenant isolation beneficios_consignado" ON public.beneficios_consignado
+  FOR ALL USING (tenant_id = public.get_user_tenant_id())
+  WITH CHECK (tenant_id = public.get_user_tenant_id());
+
+-- ── Trigger de updated_at (idempotentes: DROP IF EXISTS + CREATE) ────────────
+DROP TRIGGER IF EXISTS update_beneficios_dependentes_updated_at ON public.beneficios_dependentes;
+CREATE TRIGGER update_beneficios_dependentes_updated_at BEFORE UPDATE ON public.beneficios_dependentes
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_beneficios_manutencao_plano_updated_at ON public.beneficios_manutencao_plano;
+CREATE TRIGGER update_beneficios_manutencao_plano_updated_at BEFORE UPDATE ON public.beneficios_manutencao_plano
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_beneficios_operadoras_updated_at ON public.beneficios_operadoras;
+CREATE TRIGGER update_beneficios_operadoras_updated_at BEFORE UPDATE ON public.beneficios_operadoras
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_beneficios_faturas_updated_at ON public.beneficios_faturas;
+CREATE TRIGGER update_beneficios_faturas_updated_at BEFORE UPDATE ON public.beneficios_faturas
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_beneficios_plr_updated_at ON public.beneficios_plr;
+CREATE TRIGGER update_beneficios_plr_updated_at BEFORE UPDATE ON public.beneficios_plr
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_beneficios_consignado_updated_at ON public.beneficios_consignado;
+CREATE TRIGGER update_beneficios_consignado_updated_at BEFORE UPDATE ON public.beneficios_consignado
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- ---------------------------------------------------------------------------
 -- CONFERENCIA — o SQL Editor mostra apenas o ultimo resultado.

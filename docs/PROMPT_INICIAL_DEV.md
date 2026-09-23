@@ -66,7 +66,7 @@ Uma conversa por demanda. Copie o bloco, preencha as três linhas do final e
 cole como primeira mensagem.
 
 ```
-Você está no projeto YourEyes (repo YourEyes-dev/youreyesnovo).
+Você está no projeto YourEyes (repo youreyes-dev/youreyesnovo).
 Leia o CLAUDE.md e siga as regras da casa à risca — em especial:
 
 1. TODA mudança nasce no banco de dados de TESTE (projeto Supabase

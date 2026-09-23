@@ -987,7 +987,7 @@ INSERT INTO public.app_config (chave, valor) VALUES
 ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = now();
 ```
 
-Opcionalmente, `github_dispatch_repo` (padrão `YourEyes-dev/youreyesnovo`), `github_dispatch_workflow` (padrão `staging.yml`) e `github_dispatch_ref` (padrão `main`) sobrescrevem os alvos. **Nunca versione o token** — ele vive só no `app_config` do ambiente. O schema/funções são instalados pela migration `20260814120000_qa_agendamento_e2e_esteira.sql` (staging) e pelo script `docs/script_qa_agendamento_e2e.sql` (produção).
+Opcionalmente, `github_dispatch_repo` (padrão `youreyes-dev/youreyesnovo`), `github_dispatch_workflow` (padrão `staging.yml`) e `github_dispatch_ref` (padrão `main`) sobrescrevem os alvos. **Nunca versione o token** — ele vive só no `app_config` do ambiente. O schema/funções são instalados pela migration `20260814120000_qa_agendamento_e2e_esteira.sql` (staging) e pelo script `docs/script_qa_agendamento_e2e.sql` (produção).
 
 ## Checklist antes de publicar
 

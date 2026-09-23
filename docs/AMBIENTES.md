@@ -791,7 +791,7 @@ estrutura reais). Ela **não roda sozinha**: é um botão.
 2. **Pela esteira:** Actions → `cypress-homologacao` → **Run workflow**.
 
 Nos dois, o workflow semeia a conta-robô e a ilha de fixtures na homologação,
-roda a suíte contra `https://ustudy123.github.io/youreyesnovo/homologacao/` e
+roda a suíte contra `https://youreyes-dev.github.io/youreyesnovo/homologacao/` e
 devolve o resultado ao painel de QA **da homologação** (aba Cypress → "Corridas").
 
 **O resultado no painel do app:** funciona porque a camada de QA e2e (tabela
@@ -821,7 +821,7 @@ a porta dedicada.)
 | Supabase homologação | `GITHUB_DISPATCH_TOKEN` | token do GitHub com permissão **Actions: write** no repositório. Só é preciso para o **botão** do app; a aba Actions não depende dele. |
 
 **Travas de ambiente (produção inalcançável):** o `cypress.config.ts` só aceita
-host da lista (`ustudy123.github.io`) e aborta se a app falar com o ref da
+host da lista (`youreyes-dev.github.io`) e aborta se a app falar com o ref da
 produção; a `seed-e2e-user` recusa qualquer ref fora do teste e da homologação.
 
 **Sobre a ilha e a fidelidade:** a suíte roda numa ilha isolada (tenant fixo
@@ -926,7 +926,7 @@ Secrets (Settings > Secrets and variables > Actions do repositório):
 |---|---|---|
 | `SUPABASE_ACCESS_TOKEN` | Token pessoal do Supabase (Account > Access Tokens) | Sim |
 | `SUPABASE_DB_PASSWORD` | Senha do banco do projeto de staging | Sim |
-O site de teste é publicado no **GitHub Pages** do próprio repositório — https://ustudy123.github.io/youreyesnovo/teste/ — sem contas nem secrets adicionais. Ele aponta para o banco de STAGING (login com os usuários fictícios).
+O site de teste é publicado no **GitHub Pages** do próprio repositório — https://youreyes-dev.github.io/youreyesnovo/teste/ — sem contas nem secrets adicionais. Ele aponta para o banco de STAGING (login com os usuários fictícios).
 
 O mesmo Pages hospeda os dois ambientes públicos, cada um numa pasta com nome próprio, e a raiz é só uma placa que redireciona para o teste:
 
@@ -987,7 +987,7 @@ INSERT INTO public.app_config (chave, valor) VALUES
 ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = now();
 ```
 
-Opcionalmente, `github_dispatch_repo` (padrão `ustudy123/youreyesnovo`), `github_dispatch_workflow` (padrão `staging.yml`) e `github_dispatch_ref` (padrão `main`) sobrescrevem os alvos. **Nunca versione o token** — ele vive só no `app_config` do ambiente. O schema/funções são instalados pela migration `20260814120000_qa_agendamento_e2e_esteira.sql` (staging) e pelo script `docs/script_qa_agendamento_e2e.sql` (produção).
+Opcionalmente, `github_dispatch_repo` (padrão `youreyes-dev/youreyesnovo`), `github_dispatch_workflow` (padrão `staging.yml`) e `github_dispatch_ref` (padrão `main`) sobrescrevem os alvos. **Nunca versione o token** — ele vive só no `app_config` do ambiente. O schema/funções são instalados pela migration `20260814120000_qa_agendamento_e2e_esteira.sql` (staging) e pelo script `docs/script_qa_agendamento_e2e.sql` (produção).
 
 ## Checklist antes de publicar
 

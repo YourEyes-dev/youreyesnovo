@@ -12,7 +12,7 @@
 | Feature | MarketYE — marketplace de serviços (antiga "Rede de Parceiros"), MVP conexão/lead sem pagamento intra-plataforma |
 | Versão testada | `main` até o commit `abb452f` + este pacote de rotinas (PRs #481–#484, #487–#489 desta sessão; #485, #486 de outra sessão) |
 | Requisito de referência | Documento de Requisitos v2.0 (11/09/2026): RN-001..037, RF-001..030, CA-001..023 |
-| Ambiente de prova | Réplica local (997 migrations) para banco; ambiente de teste (`bmehdgthciuvdbvutsdv`, site https://ustudy123.github.io/youreyesnovo/teste/) para tela e esteira |
+| Ambiente de prova | Réplica local (997 migrations) para banco; ambiente de teste (`bmehdgthciuvdbvutsdv`, site https://youreyes-dev.github.io/youreyesnovo/teste/) para tela e esteira |
 | Onde os casos vivem | Super Admin → QA e Testes → **Documentação de Teste** → módulo **MarketYE**: MKY-001..015 (api, com rotina), MKY-020..022 (e2e, com Cypress) e **MKY-030..161** (este pacote: 13 famílias, documentados, sem rotina ainda) |
 
 **Premissas.** (1) A produção não recebeu o módulo; tudo abaixo vale para o ambiente de teste. (2) A chave da IA (`OPENAI_API_KEY`) pode não estar configurada no ambiente de teste: casos que dependem dela ficam "não provado". (3) O segredo `QA_E2E_TOKEN` não está no repositório: a esteira pula a guarda de cobertura e a semeadura da conta-robô (defeito D-08). (4) Os textos dos termos são placeholders (`2026-09-v1`) até a redação jurídica final.

@@ -12,7 +12,7 @@ teste. O manual completo (PDF) explica o porquê de cada regra.
 
 | O quê | Endereço |
 |---|---|
-| **Site de teste** (telas, login, navegação) | https://ustudy123.github.io/youreyesnovo/teste/ |
+| **Site de teste** (telas, login, navegação) | https://youreyes-dev.github.io/youreyesnovo/teste/ |
 | Banco de dados de teste — painel | https://supabase.com/dashboard/project/bmehdgthciuvdbvutsdv |
 | Banco de dados de teste — consultas (SQL Editor) | https://supabase.com/dashboard/project/bmehdgthciuvdbvutsdv/sql/new |
 | Banco de dados de teste — usuários | https://supabase.com/dashboard/project/bmehdgthciuvdbvutsdv/auth/users |
@@ -66,7 +66,7 @@ Uma conversa por demanda. Copie o bloco, preencha as três linhas do final e
 cole como primeira mensagem.
 
 ```
-Você está no projeto YourEyes (repo ustudy123/youreyesnovo).
+Você está no projeto YourEyes (repo youreyes-dev/youreyesnovo).
 Leia o CLAUDE.md e siga as regras da casa à risca — em especial:
 
 1. TODA mudança nasce no banco de dados de TESTE (projeto Supabase
@@ -83,7 +83,7 @@ Leia o CLAUDE.md e siga as regras da casa à risca — em especial:
 4. Nenhum dado real no ambiente de teste, em seeds ou em documentos
    (LGPD). Dados fictícios: Empresa Staging LTDA, CPFs 900.000.0XX.
 5. AO TERMINAR, SEMPRE feche a resposta assim:
-   - o link do site de teste: https://ustudy123.github.io/youreyesnovo/teste/
+   - o link do site de teste: https://youreyes-dev.github.io/youreyesnovo/teste/
    - o que exatamente eu devo abrir/clicar lá para conferir a mudança
      (tela, caminho no menu, o que deve aparecer);
    - o aviso de que o sistema real continua intacto e só muda depois da
@@ -239,7 +239,7 @@ não repita): `90000010138`, `90000010219`, `90000010308`, `90000010480`,
 
 ### Passo 3 — entrar
 
-Abra https://ustudy123.github.io/youreyesnovo/teste/ e faça login com o
+Abra https://youreyes-dev.github.io/youreyesnovo/teste/ e faça login com o
 e-mail e a senha que você definiu no passo 1.
 
 ---

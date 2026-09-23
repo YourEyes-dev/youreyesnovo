@@ -33,7 +33,7 @@ diagnosticar**, não pela descrição verbal.
 | | TESTE (staging) | HOMOLOGAÇÃO | PRODUÇÃO |
 |---|---|---|---|
 | Projeto Supabase | `bmehdgthciuvdbvutsdv` | `fgsblefvdabgdouipigz` | `diayjpsrcerycycyaxst` |
-| Telas | ustudy123.github.io/youreyesnovo/**teste**/ | ustudy123.github.io/youreyesnovo/**homologacao**/ | seguramente.lovable.app |
+| Telas | youreyes-dev.github.io/youreyesnovo/**teste**/ | youreyes-dev.github.io/youreyesnovo/**homologacao**/ | seguramente.lovable.app |
 | Como recebe | esteira automática a cada merge | script colado à mão | script colado à mão (+ ver §5) |
 
 A identidade da homologação **não estava documentada em lugar nenhum** além de comentários

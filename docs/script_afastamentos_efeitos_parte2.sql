@@ -34,7 +34,7 @@ COMMENT ON COLUMN public.afastamentos.encerramento_justificativa IS
 -- Funcao do trigger (depois da DDL)
 CREATE OR REPLACE FUNCTION public.afastamento_bloqueia_encerramento_sem_aso()
 RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public'
-AS $$
+AS $fn$
 BEGIN
   IF NEW.status::text = 'encerrado'
      AND COALESCE(OLD.status::text, '') <> 'encerrado'
@@ -51,7 +51,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$;
+$fn$;
 
 -- Trigger em afastamentos (2a das duas tabelas movimentadas — por isso separado)
 DROP TRIGGER IF EXISTS trg_afastamento_bloqueia_encerramento_sem_aso ON public.afastamentos;

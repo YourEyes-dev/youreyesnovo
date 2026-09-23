@@ -171,7 +171,7 @@ WHERE NOT EXISTS (
 -- AFAST-032: efeito do afastamento no FGTS
 CREATE OR REPLACE FUNCTION public.afastamento_efeito_fgts(p_tenant uuid, p_tipo text)
 RETURNS text LANGUAGE sql STABLE SET search_path TO 'public'
-AS $$
+AS $fn$
   SELECT c.efeito_fgts
     FROM public.afastamento_tipo_config c
    WHERE c.tipo = p_tipo
@@ -179,35 +179,35 @@ AS $$
      AND c.ativo
    ORDER BY c.tenant_id NULLS LAST
    LIMIT 1;
-$$;
+$fn$;
 COMMENT ON FUNCTION public.afastamento_efeito_fgts(uuid, text) IS
   'AFAST-032: efeito do afastamento no FGTS (mantem/suspende) por tipo, da matriz AFAST-010.';
 
 -- AFAST-021: prazo diferenciado do S-2230 na recaida
 CREATE OR REPLACE FUNCTION public.afastamento_prazo_recaida_s2230(p_data_inicio date, p_is_recaida boolean)
 RETURNS date LANGUAGE sql IMMUTABLE SET search_path TO 'public'
-AS $$
+AS $fn$
   SELECT CASE
     WHEN COALESCE(p_is_recaida, false) THEN p_data_inicio
     ELSE (date_trunc('month', p_data_inicio + INTERVAL '1 month') + INTERVAL '14 days')::date
   END;
-$$;
+$fn$;
 COMMENT ON FUNCTION public.afastamento_prazo_recaida_s2230(date, boolean) IS
   'AFAST-021: prazo do S-2230; na recaida o evento vai no 1o dia do afastamento.';
 
 -- AFAST-040: fim da estabilidade gestante
 CREATE OR REPLACE FUNCTION public.afastamento_estabilidade_gestante_fim(p_data_parto date)
 RETURNS date LANGUAGE sql IMMUTABLE SET search_path TO 'public'
-AS $$
+AS $fn$
   SELECT (p_data_parto + INTERVAL '5 months')::date;
-$$;
+$fn$;
 COMMENT ON FUNCTION public.afastamento_estabilidade_gestante_fim(date) IS
   'AFAST-040: fim da estabilidade gestante = parto + 5 meses (ADCT art. 10).';
 
 -- AFAST-030: proximo dia util (REPOE a versao do teste — corrige drift)
 CREATE OR REPLACE FUNCTION public.afastamento_proximo_dia_util(p_tenant uuid, p_data date)
 RETURNS date LANGUAGE plpgsql STABLE SET search_path TO 'public'
-AS $$
+AS $fn$
 DECLARE
   v_dia date := p_data + 1;
   v_i   int := 0;
@@ -227,12 +227,12 @@ BEGIN
   END LOOP;
   RETURN v_dia;
 END;
-$$;
+$fn$;
 
 -- AFAST-030: preenche o prazo da pendencia de CAT (funcao do trigger)
 CREATE OR REPLACE FUNCTION public.afastamento_pendencia_preenche_prazo()
 RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public'
-AS $$
+AS $fn$
 DECLARE
   v_inicio date;
 BEGIN
@@ -246,7 +246,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$;
+$fn$;
 
 -- Trigger em afastamentos_pendencias (1a das duas tabelas movimentadas)
 DROP TRIGGER IF EXISTS trg_afastamento_pendencia_prazo ON public.afastamentos_pendencias;

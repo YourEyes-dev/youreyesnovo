@@ -12,11 +12,18 @@ import { readFileSync, statSync } from "fs";
 // abaixo se for um host da lista de permitidos.
 // =====================================================================
 
-const SITE_DE_TESTE = "https://ustudy123.github.io/youreyesnovo/teste/";
+const SITE_DE_TESTE = "https://youreyes-dev.github.io/youreyesnovo/teste/";
 
-// Lista de PERMITIDOS (não de proibidos): host novo só entra aqui de
-// propósito. Uma lista de proibidos deixaria passar o que esquecêssemos.
-const HOSTS_DE_TESTE = ["ustudy123.github.io", "localhost", "127.0.0.1"];
+// Lista de PERMITIDOS (não de proibidos): uma lista de proibidos deixaria
+// passar o que esquecêssemos. O site de teste vive no GitHub Pages do próprio
+// repositório (algo.github.io/<repo>/teste/); quando a conta/dono do repo muda,
+// o host muda junto — por isso aceitamos QUALQUER subdomínio .github.io, em vez
+// de fixar o dono e quebrar no próximo renome. Nunca há produção num .github.io
+// (produção é o Lovable), e a trava refProducao ainda barra em tempo de execução.
+const HOSTS_DE_TESTE_EXATOS = ["localhost", "127.0.0.1"];
+function hostDeTestePermitido(host: string): boolean {
+  return HOSTS_DE_TESTE_EXATOS.includes(host) || host.endsWith(".github.io");
+}
 
 function exigirAmbienteDeTeste(url: string): string {
   let host: string;
@@ -30,11 +37,11 @@ function exigirAmbienteDeTeste(url: string): string {
     );
   }
 
-  if (!HOSTS_DE_TESTE.includes(host)) {
+  if (!hostDeTestePermitido(host)) {
     throw new Error(
       `[Cypress] ALVO RECUSADO: ${url}\n` +
         `Esta suíte grava dados e só roda no ambiente de teste.\n` +
-        `Hosts permitidos: ${HOSTS_DE_TESTE.join(", ")}\n` +
+        `Hosts permitidos: *.github.io, localhost, 127.0.0.1\n` +
         `Site de teste: ${SITE_DE_TESTE}`,
     );
   }

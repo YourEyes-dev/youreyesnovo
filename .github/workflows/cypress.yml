@@ -2,7 +2,7 @@
 # Testes de tela (Cypress) sob demanda — YourEyes
 #
 # Roda SÓ a suíte Cypress contra o site de teste JÁ publicado
-# (https://ustudy123.github.io/youreyesnovo/teste/) — não aplica
+# (https://youreyes-dev.github.io/youreyesnovo/teste/) — não aplica
 # migrations, não reimplanta functions e não republica o site. É a corrida
 # rápida (~10 min) acionada pelo botão "Rodar testes" do painel de QA
 # (/admin/qa/runner, aba Cypress), via a Edge Function qa-disparar-cypress.
@@ -31,7 +31,8 @@ jobs:
     name: Testes de tela (Cypress) no staging
     runs-on: ubuntu-latest
     env:
-      CYPRESS_BASE_URL: https://ustudy123.github.io/youreyesnovo/teste/
+      # CYPRESS_BASE_URL é derivado do dono/nome do repositório num passo abaixo
+      # (não fixado aqui), para uma troca de conta/renome se ajustar sozinha.
       CYPRESS_EMAIL: ${{ secrets.CYPRESS_EMAIL }}
       CYPRESS_PASSWORD: ${{ secrets.CYPRESS_PASSWORD }}
       # Caminho de volta do resultado para o painel de QA. Mesmo token dos dois
@@ -46,6 +47,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Definir alvo do site de teste (deriva do dono/repo; sobrevive a renome)
+        run: |
+          owner=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "CYPRESS_BASE_URL=https://$owner.github.io/${{ github.event.repository.name }}/teste/" >> "$GITHUB_ENV"
       - name: Cache do binário do Cypress
         uses: actions/cache@v4
         with:

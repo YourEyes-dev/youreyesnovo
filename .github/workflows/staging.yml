@@ -7,7 +7,7 @@
 #      por CLI) e reimplanta as Edge Functions;
 #   2) publica o SITE DE TESTE (build com .env.staging) no GitHub
 #      Pages do próprio repositório — sem contas nem secrets extras:
-#      https://ustudy123.github.io/youreyesnovo/teste/
+#      https://youreyes-dev.github.io/youreyesnovo/teste/
 #      (a raiz .../youreyesnovo/ redireciona para /teste/; a homologação
 #       fica em .../youreyesnovo/homologacao/)
 #
@@ -88,7 +88,7 @@ jobs:
     env:
       # O NOME DO REPOSITÓRIO VEM DO PRÓPRIO GITHUB, e não escrito à mão.
       #
-      # O Pages de um repositório é servido em ustudy123.github.io/<nome>/, e
+      # O Pages de um repositório é servido em <dono>.github.io/<nome>/, e
       # o build precisa saber esse caminho para montar os endereços dos
       # arquivos. Quando o repositório foi renomeado, o nome antigo continuou
       # escrito aqui: o GitHub redirecionou o endereço velho por um tempo, o
@@ -254,7 +254,8 @@ jobs:
     needs: site
     runs-on: ubuntu-latest
     env:
-      CYPRESS_BASE_URL: https://ustudy123.github.io/youreyesnovo/teste/
+      # CYPRESS_BASE_URL é derivado do dono/nome do repositório num passo abaixo
+      # (não fixado aqui), para um próximo renome/troca de conta se ajustar sozinho.
       CYPRESS_EMAIL: ${{ secrets.CYPRESS_EMAIL }}
       CYPRESS_PASSWORD: ${{ secrets.CYPRESS_PASSWORD }}
       # Caminho de volta do resultado para o painel de QA. O token tem de
@@ -270,6 +271,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Definir alvo do site de teste (deriva do dono/repo; sobrevive a renome)
+        run: |
+          owner=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "CYPRESS_BASE_URL=https://$owner.github.io/${{ github.event.repository.name }}/teste/" >> "$GITHUB_ENV"
       - name: Cache do binário do Cypress
         uses: actions/cache@v4
         with:

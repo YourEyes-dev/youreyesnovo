@@ -3,7 +3,7 @@
 Documento de planejamento (não é implementação). Nasce da análise do mockup
 `youreyes_portal_parceiro_mockup.html` cruzada com o sistema que já existe no
 repositório. O desenvolvimento acontecerá no ambiente de desenvolvimento-teste
-(projeto Supabase de staging + site https://ustudy123.github.io/youreyesnovo/teste/);
+(projeto Supabase de staging + site https://youreyes-dev.github.io/youreyesnovo/teste/);
 a produção não é tocada por nada deste plano até aprovação explícita.
 
 ---
@@ -170,7 +170,7 @@ origem" e o ciclo contratual. `LeadsCRMKanban` ganha o campo "Parceiro".
    chamada pela landing (sem dado pessoal: só código, data e hash do user-agent).
 
 Observação de ambiente: o link do parceiro é montado com `VITE_APP_URL`, que no
-site de teste é `https://ustudy123.github.io/youreyesnovo/teste/`. Em produção
+site de teste é `https://youreyes-dev.github.io/youreyesnovo/teste/`. Em produção
 será o domínio real. Nunca hardcode.
 
 ### 2.7 Segurança e LGPD

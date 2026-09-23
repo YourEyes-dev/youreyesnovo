@@ -6,19 +6,25 @@
 --   da producao usava uma regra FROUXA: sem UF/cidade na filial, deduzia TODOS
 --   os feriados estaduais e municipais da base — enquanto o espelho de ponto
 --   nao considerava nenhum. O mesmo dia contava como feriado num calculo e como
---   dia util no outro, gerando divergencia entre a equalizacao e o espelho.
+--   dia util no outro. O teste (fonte da verdade) passou a deduzir os feriados
+--   via feriados_da_empresa (a MESMA resolucao do espelho). Mesma assinatura.
 --
---   O teste (fonte da verdade) passou a deduzir os feriados via
---   feriados_da_empresa (a MESMA resolucao do espelho, ciente de filial,
---   abrangencia e recorrencia). Este script traz a producao para esse estado.
---   Mesma assinatura; muda so o bloco de feriados (RN02).
+-- POR QUE O ENVELOPE "DO ... EXECUTE":
+--   O SQL Editor do Supabase tem um recurso que tenta "ativar RLS em tabelas
+--   novas". Ele varre o texto e confunde os alvos de SELECT ... INTO (v_esc,
+--   v_emp, ...) com criacao de tabela, injetando ALTER TABLE no meio da funcao
+--   e quebrando o corpo. Criando a funcao de DENTRO de um bloco DO/EXECUTE, o
+--   nivel de cima e so um DO (sem SELECT INTO visivel), e o injetor nao dispara.
+--   A funcao criada e byte a byte a mesma — a conferencia por md5 comprova.
 --
 -- SEGURANCA: so substitui a funcao; nao altera nem apaga dado; idempotente.
---   A conferencia final compara o corpo normalizado com o hash do teste (OK).
 -- ============================================================================
 
 SET lock_timeout = '10s';
 
+DO $ptdo$
+BEGIN
+  EXECUTE $ptsql$
 CREATE OR REPLACE FUNCTION public.ponto_equalizacao_competencia(p_tenant_id uuid, p_escala_id uuid, p_competencia text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -153,15 +159,18 @@ BEGIN
   );
 END;
 $fn$;
+  $ptsql$;
+END
+$ptdo$;
 
--- ── Conferencia (o editor mostra so o ultimo resultado) ─────────────────────
+-- ── Conferencia — RODE ESTE BLOCO SEPARADO (numa consulta nova) ─────────────
 -- Esperado: 1 linha, status = OK.
-SELECT
-  md5(regexp_replace(pg_get_functiondef(p.oid), '\s+', ' ', 'g'))  AS md5_producao,
-  '15dd498adb35c461ef2eb6ae0a65678e'                               AS md5_teste,
-  CASE WHEN md5(regexp_replace(pg_get_functiondef(p.oid), '\s+', ' ', 'g'))
-            = '15dd498adb35c461ef2eb6ae0a65678e'
-       THEN 'OK' ELSE 'CONFERIR' END                               AS status
-FROM pg_proc p
-JOIN pg_namespace n ON n.oid = p.pronamespace AND n.nspname = 'public'
-WHERE p.proname = 'ponto_equalizacao_competencia';
+--   SELECT
+--     md5(regexp_replace(pg_get_functiondef(p.oid), '\s+', ' ', 'g'))  AS md5_producao,
+--     '15dd498adb35c461ef2eb6ae0a65678e'                               AS md5_teste,
+--     CASE WHEN md5(regexp_replace(pg_get_functiondef(p.oid), '\s+', ' ', 'g'))
+--               = '15dd498adb35c461ef2eb6ae0a65678e'
+--          THEN 'OK' ELSE 'CONFERIR' END                               AS status
+--   FROM pg_proc p
+--   JOIN pg_namespace n ON n.oid = p.pronamespace AND n.nspname = 'public'
+--   WHERE p.proname = 'ponto_equalizacao_competencia';

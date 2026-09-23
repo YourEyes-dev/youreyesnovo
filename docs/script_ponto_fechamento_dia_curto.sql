@@ -155,8 +155,8 @@ $ptdo$;
 -- ── BLOCO 3 (conferencia) — RODE SEPARADO. Esperado: 2 linhas, ambas OK ─────
 --   WITH esperado(objeto, md5_teste) AS (
 --     VALUES
---       ('ponto_fechamento_pendencias_criticas', '3d320a3ae8656f908504b4e7b6b7825b'),
---       ('ponto_fechar_competencia_verificar',   '4ef34360bb65f360baad81cfd9bc9a71')
+--       ('ponto_fechamento_pendencias_criticas', '3d5790aec970bf2e9e60caef8759d6ae'),
+--       ('ponto_fechar_competencia_verificar',   '43871b5a9a274c7f0e6ba01b58ea2c24')
 --   )
 --   SELECT e.objeto,
 --          md5(regexp_replace(pg_get_functiondef(p.oid), '\s+', ' ', 'g')) AS md5_producao,

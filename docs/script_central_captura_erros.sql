@@ -2,47 +2,120 @@
 -- ENTREGA — Central de Controle: captura de erros (eixo tecnico)
 --
 -- Espelha a migration 20260916195655_central_captura_erros.sql (fonte da
--- verdade, ja no teste), que existe no desenvolvimento/teste mas nunca desceu
--- para homologacao e producao (passivo medido em 09/2026 pelo inventario).
+-- verdade, ja no teste), ausente em homologacao e producao (passivo 09/2026).
 --
--- O QUE ENTREGA:
---   * 2 tabelas: evento_incidente (agrupamento) e evento_erro (bruto);
---   * 4 indices; 3 politicas (leitura/triagem so superadmin, RLS);
---   * 7 funcoes: mascarar_pii, pseudonimo_usuario, registrar_evento_erro
---     (unica porta de escrita, SECURITY DEFINER), central_incidentes,
---     central_situacao_clientes, central_resumo, evento_erro_expurgar;
---   * seed do sal do pseudonimo no app_config (ON CONFLICT DO NOTHING);
---   * agendamento do expurgo de 90 dias no pg_cron (guardado).
+-- O QUE ENTREGA: 2 tabelas (evento_incidente, evento_erro), 4 indices, 3
+-- politicas (leitura/triagem so superadmin), 7 funcoes (mascarar_pii,
+-- pseudonimo_usuario, registrar_evento_erro, central_incidentes,
+-- central_situacao_clientes, central_resumo, evento_erro_expurgar), o seed do
+-- sal no app_config e o agendamento do expurgo. Depende de is_superadmin,
+-- current_user_tenant_id, tenants, admissoes (todos ja existem embaixo).
 --
--- DEPENDENCIA QUE FALTAVA EMBAIXO (conferido no inventario): homologacao e
--- producao NAO tinham os atalhos public.gen_random_bytes / public.digest que a
--- migration extensoes_base cria (o teste tem). Como as funcoes chamam
--- public.digest / public.gen_random_bytes com prefixo e SET search_path=public,
--- este script cria esses atalhos PRIMEIRO, guardados e idempotentes, iguais aos
--- do extensoes_base. Uso COM prefixo (extensions.digest) segue funcionando.
+-- DEPENDENCIA QUE FALTAVA: homolog/prod nao tinham os atalhos public.digest /
+-- public.gen_random_bytes do extensoes_base; este script os cria (guardados).
 --
--- SEGURANCA: entrega ADITIVA. So cria estrutura/funcoes novas (CREATE ... IF NOT
--- EXISTS, CREATE OR REPLACE de funcoes que estao AUSENTES embaixo — conferido:
--- nenhuma delas existe hoje em homolog/prod, entao nao ha corpo a sobrescrever)
--- e semeia UMA linha de config nova (ON CONFLICT DO NOTHING). NAO altera nem
--- apaga dado existente, entao nao ha backup a fazer. Idempotente: rodar duas
--- vezes nao quebra nem duplica. Roda inteiro em UMA transacao.
+-- ORDEM DE PROPOSITO — DDL PURA PRIMEIRO: as duas tabelas, indices, RLS e
+-- politicas vem no topo, ANTES de qualquer bloco com aspas-dolar. O editor do
+-- Supabase, ao detectar CREATE TABLE, tenta injetar RLS proprio e calcula o
+-- ponto de insercao lendo o texto; blocos com aspas-dolar ANTES das tabelas
+-- confundiam esse calculo e ele inseria um ; no meio do CREATE TABLE
+-- ('syntax error at or near ";"'). Com a DDL pura no topo, isso nao acontece.
+-- Se o editor ainda oferecer "enable RLS" num aviso, pode recusar/ignorar — o
+-- script ja liga o RLS das duas tabelas.
 --
--- CONFERENCIA: rode a query do fim como uma query SEPARADA depois — o editor do
--- Supabase costuma anexar comandos ao final do arquivo e esconder o ultimo
--- resultado. Esperada: 3 | 2 | 7 | 4 | 3 | OK.
+-- SEGURANCA: entrega ADITIVA. So cria estrutura/funcoes novas (todas AUSENTES
+-- embaixo — conferido, nenhum corpo a sobrescrever) e semeia UMA linha de
+-- config (ON CONFLICT DO NOTHING). Nao altera nem apaga dado. Idempotente.
+-- Roda inteiro em UMA transacao.
+--
+-- CONFERENCIA: rode a query do fim como uma query SEPARADA. Esperado:
+-- 3 | 2 | 7 | 4 | 3 | OK.
 -- ============================================================================
 
 SET lock_timeout = '10s';
 
--- ---------------------------------------------------------
--- 0) Atalhos public do pgcrypto (dependencia; guardados)
---    Parametros NOMEADOS de proposito (p_n / p_data / p_type), nunca posicionais:
---    o editor do Supabase conta os cifroes no texto cru para achar as aspas-dolar,
---    e um numero IMPAR deles desalinha a contagem e faz o editor inserir ; no meio
---    de um comando. Sem parametro posicional, a contagem fica PAR. Equivalem aos
---    atalhos do extensoes_base.
--- ---------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════
+-- PARTE 1 — DDL PURA (tabelas, indices, RLS, politicas). SEM aspas-dolar.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Incidente (agrupamento) + RLS literal
+CREATE TABLE IF NOT EXISTS public.evento_incidente (
+  fingerprint       text PRIMARY KEY,
+  titulo            text NOT NULL,
+  modulo            text,
+  tipo              text,
+  severidade        text NOT NULL DEFAULT 'media'
+                      CHECK (severidade IN ('critica', 'alta', 'media', 'baixa')),
+  status            text NOT NULL DEFAULT 'novo'
+                      CHECK (status IN ('novo', 'em_analise', 'resolvido', 'fechado')),
+  ocorrencias       integer NOT NULL DEFAULT 0,
+  primeiro_visto    timestamptz NOT NULL DEFAULT now(),
+  ultimo_visto      timestamptz NOT NULL DEFAULT now(),
+  resolvido_em      timestamptz,
+  observacao        text
+);
+ALTER TABLE public.evento_incidente ENABLE ROW LEVEL SECURITY;
+
+-- Evento bruto + RLS literal
+CREATE TABLE IF NOT EXISTS public.evento_erro (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  fingerprint       text NOT NULL REFERENCES public.evento_incidente(fingerprint) ON DELETE CASCADE,
+  ambiente          text NOT NULL DEFAULT 'desconhecido',
+  tenant_id         uuid,
+  origem            text NOT NULL DEFAULT 'frontend' CHECK (origem IN ('frontend', 'backend')),
+  usuario_pseudo    text,
+  modulo            text,
+  rota              text,
+  acao              text,
+  tipo              text,
+  mensagem          text,
+  stack             text,
+  breadcrumbs       jsonb NOT NULL DEFAULT '[]'::jsonb,
+  severidade        text NOT NULL DEFAULT 'media'
+                      CHECK (severidade IN ('critica', 'alta', 'media', 'baixa')),
+  versao_app        text,
+  navegador_os      text,
+  ocorrido_em       timestamptz NOT NULL DEFAULT now(),
+  recebido_em       timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.evento_erro ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS idx_evento_erro_recebido    ON public.evento_erro (recebido_em DESC);
+CREATE INDEX IF NOT EXISTS idx_evento_erro_fingerprint ON public.evento_erro (fingerprint, recebido_em DESC);
+CREATE INDEX IF NOT EXISTS idx_evento_erro_tenant      ON public.evento_erro (tenant_id, recebido_em DESC);
+CREATE INDEX IF NOT EXISTS idx_evento_incidente_vivo   ON public.evento_incidente (ultimo_visto DESC)
+  WHERE status IN ('novo', 'em_analise');
+
+COMMENT ON TABLE public.evento_erro IS
+  'Erro capturado no cliente, ja mascarado (LGPD). Gravado somente por registrar_evento_erro; leitura so de superadmin.';
+COMMENT ON TABLE public.evento_incidente IS
+  'Erros iguais agrupados por impressao digital (RN-005): a fila de trabalho da equipe.';
+
+-- RLS: leitura de superadmin; escrita so pela funcao (sem policy de INSERT, RN-001)
+REVOKE ALL ON public.evento_erro, public.evento_incidente FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.evento_erro, public.evento_incidente TO authenticated;
+
+DROP POLICY IF EXISTS "Superadmin le evento_erro" ON public.evento_erro;
+CREATE POLICY "Superadmin le evento_erro" ON public.evento_erro
+  FOR SELECT TO authenticated USING (public.is_superadmin(auth.uid()));
+
+DROP POLICY IF EXISTS "Superadmin le evento_incidente" ON public.evento_incidente;
+CREATE POLICY "Superadmin le evento_incidente" ON public.evento_incidente
+  FOR SELECT TO authenticated USING (public.is_superadmin(auth.uid()));
+
+DROP POLICY IF EXISTS "Superadmin triagem evento_incidente" ON public.evento_incidente;
+CREATE POLICY "Superadmin triagem evento_incidente" ON public.evento_incidente
+  FOR UPDATE TO authenticated
+  USING (public.is_superadmin(auth.uid()))
+  WITH CHECK (public.is_superadmin(auth.uid()));
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- PARTE 2 — Atalhos, funcoes, seed e agendamento (blocos com aspas-dolar).
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Atalhos public do pgcrypto (dependencia; guardados). Parametros NOMEADOS de
+-- proposito (p_n/p_data/p_type), nunca posicionais, para a contagem de cifroes
+-- do arquivo ficar PAR. Equivalem aos atalhos do extensoes_base.
 DO $ext$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -67,9 +140,7 @@ BEGIN
   END IF;
 END $ext$;
 
--- ---------------------------------------------------------
--- 1) Mascaramento de dado pessoal (roda na ingestao)
--- ---------------------------------------------------------
+-- Mascaramento de dado pessoal (roda na ingestao)
 CREATE OR REPLACE FUNCTION public.mascarar_pii(p_texto text)
 RETURNS text
 LANGUAGE sql
@@ -97,9 +168,7 @@ $mascara$;
 COMMENT ON FUNCTION public.mascarar_pii(text) IS
   'Mascara dado pessoal em texto livre antes de gravar evento de erro (LGPD, RN-002). Conservadora de proposito: prefere mascarar demais a deixar passar.';
 
--- ---------------------------------------------------------
--- 2) Sal do pseudonimo (por ambiente, nunca no codigo)
--- ---------------------------------------------------------
+-- Sal do pseudonimo (por ambiente) + pseudonimizacao
 INSERT INTO public.app_config (chave, valor)
 VALUES ('pseudonimo_sal', encode(public.gen_random_bytes(32), 'hex'))
 ON CONFLICT (chave) DO NOTHING;
@@ -121,85 +190,7 @@ $pseudo$;
 COMMENT ON FUNCTION public.pseudonimo_usuario(uuid) IS
   'Apelido estavel do usuario dentro dos eventos (RN-003): permite dizer "o mesmo usuario de novo" sem guardar quem ele e. O sal vive no app_config de cada ambiente.';
 
--- ---------------------------------------------------------
--- 3) Incidente (agrupamento) e evento bruto + RLS literal
--- ---------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.evento_incidente (
-  fingerprint       text PRIMARY KEY,
-  titulo            text NOT NULL,
-  modulo            text,
-  tipo              text,
-  severidade        text NOT NULL DEFAULT 'media'
-                      CHECK (severidade IN ('critica', 'alta', 'media', 'baixa')),
-  status            text NOT NULL DEFAULT 'novo'
-                      CHECK (status IN ('novo', 'em_analise', 'resolvido', 'fechado')),
-  ocorrencias       integer NOT NULL DEFAULT 0,
-  primeiro_visto    timestamptz NOT NULL DEFAULT now(),
-  ultimo_visto      timestamptz NOT NULL DEFAULT now(),
-  resolvido_em      timestamptz,
-  observacao        text
-);
-ALTER TABLE public.evento_incidente ENABLE ROW LEVEL SECURITY;
-
-CREATE TABLE IF NOT EXISTS public.evento_erro (
-  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  fingerprint       text NOT NULL REFERENCES public.evento_incidente(fingerprint) ON DELETE CASCADE,
-  ambiente          text NOT NULL DEFAULT 'desconhecido',
-  tenant_id         uuid,
-  origem            text NOT NULL DEFAULT 'frontend' CHECK (origem IN ('frontend', 'backend')),
-  usuario_pseudo    text,
-  modulo            text,
-  rota              text,
-  acao              text,
-  tipo              text,
-  mensagem          text,
-  stack             text,
-  breadcrumbs       jsonb NOT NULL DEFAULT '[]'::jsonb,
-  severidade        text NOT NULL DEFAULT 'media'
-                      CHECK (severidade IN ('critica', 'alta', 'media', 'baixa')),
-  versao_app        text,
-  navegador_os      text,
-  ocorrido_em       timestamptz NOT NULL DEFAULT now(),
-  recebido_em       timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.evento_erro ENABLE ROW LEVEL SECURITY;
-
-CREATE INDEX IF NOT EXISTS idx_evento_erro_recebido  ON public.evento_erro (recebido_em DESC);
-CREATE INDEX IF NOT EXISTS idx_evento_erro_fingerprint ON public.evento_erro (fingerprint, recebido_em DESC);
-CREATE INDEX IF NOT EXISTS idx_evento_erro_tenant    ON public.evento_erro (tenant_id, recebido_em DESC);
-CREATE INDEX IF NOT EXISTS idx_evento_incidente_vivo ON public.evento_incidente (ultimo_visto DESC)
-  WHERE status IN ('novo', 'em_analise');
-
-COMMENT ON TABLE public.evento_erro IS
-  'Erro capturado no cliente, ja mascarado (LGPD). Gravado somente por registrar_evento_erro; leitura so de superadmin.';
-COMMENT ON TABLE public.evento_incidente IS
-  'Erros iguais agrupados por impressao digital (RN-005): a fila de trabalho da equipe.';
-
--- ---------------------------------------------------------
--- 4) RLS: leitura de superadmin; escrita so pela funcao
--- ---------------------------------------------------------
-REVOKE ALL ON public.evento_erro, public.evento_incidente FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON public.evento_erro, public.evento_incidente TO authenticated;
-
-DROP POLICY IF EXISTS "Superadmin le evento_erro" ON public.evento_erro;
-CREATE POLICY "Superadmin le evento_erro" ON public.evento_erro
-  FOR SELECT TO authenticated USING (public.is_superadmin(auth.uid()));
-
-DROP POLICY IF EXISTS "Superadmin le evento_incidente" ON public.evento_incidente;
-CREATE POLICY "Superadmin le evento_incidente" ON public.evento_incidente
-  FOR SELECT TO authenticated USING (public.is_superadmin(auth.uid()));
-
-DROP POLICY IF EXISTS "Superadmin triagem evento_incidente" ON public.evento_incidente;
-CREATE POLICY "Superadmin triagem evento_incidente" ON public.evento_incidente
-  FOR UPDATE TO authenticated
-  USING (public.is_superadmin(auth.uid()))
-  WITH CHECK (public.is_superadmin(auth.uid()));
-
--- Sem politica de INSERT em evento_erro, de proposito (RN-001).
-
--- ---------------------------------------------------------
--- 5) Ingestao: a UNICA porta de escrita
--- ---------------------------------------------------------
+-- Ingestao: a UNICA porta de escrita
 CREATE OR REPLACE FUNCTION public.registrar_evento_erro(p_evento jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -300,9 +291,7 @@ GRANT EXECUTE ON FUNCTION public.registrar_evento_erro(jsonb) TO authenticated;
 COMMENT ON FUNCTION public.registrar_evento_erro(jsonb) IS
   'Unica porta de escrita de evento de erro (RN-001). Mascara dado pessoal, pseudonimiza o usuario, agrupa por impressao digital e limita a vazao por usuario.';
 
--- ---------------------------------------------------------
--- 6) Leitura para a tela (cross-tenant, so superadmin)
--- ---------------------------------------------------------
+-- Leitura para a tela (cross-tenant, so superadmin)
 CREATE OR REPLACE FUNCTION public.central_incidentes(p_limite int DEFAULT 50)
 RETURNS TABLE (
   fingerprint text, titulo text, modulo text, severidade text, status text,
@@ -382,9 +371,7 @@ GRANT EXECUTE ON FUNCTION public.central_incidentes(int)     TO authenticated;
 GRANT EXECUTE ON FUNCTION public.central_situacao_clientes() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.central_resumo()            TO authenticated;
 
--- ---------------------------------------------------------
--- 7) Expurgo automatico (RN-012) + agendamento (guardado)
--- ---------------------------------------------------------
+-- Expurgo automatico (RN-012) + agendamento (guardado)
 CREATE OR REPLACE FUNCTION public.evento_erro_expurgar()
 RETURNS integer
 LANGUAGE plpgsql
@@ -422,10 +409,10 @@ EXCEPTION WHEN OTHERS THEN
 END
 $agenda2$;
 
--- ---------------------------------------------------------
+-- ---------------------------------------------------------------------------
 -- CONFERENCIA — rode SEPARADA (query propria) apos aplicar.
 -- Esperado: 3 | 2 | 7 | 4 | 3 | OK
--- ---------------------------------------------------------
+-- ---------------------------------------------------------------------------
 WITH atalhos AS MATERIALIZED (
   SELECT count(*) AS n FROM (VALUES
     ('public.gen_random_bytes(integer)'),

@@ -118,10 +118,23 @@ SELECT 0 AS ord,
        coalesce((SELECT valor FROM public.app_config WHERE chave = 'supabase_url'),
                 '(app_config sem supabase_url)') AS assinatura
 UNION ALL
+-- Registro de migrations — resiliente: a homologação/produção podem NÃO ter o
+-- schema supabase_migrations (só o teste recebe db push). query_to_xml roda o
+-- count sem criar dependência de plano na tabela, e o CASE só executa quando
+-- ela existe; onde não existe, devolve NULL / aviso (é informativo, não mede
+-- o passivo).
 SELECT 1,
        'migrations (registro)',
-       (SELECT count(*) FROM supabase_migrations.schema_migrations),
-       (SELECT max(version) FROM supabase_migrations.schema_migrations)
+       (CASE WHEN to_regclass('supabase_migrations.schema_migrations') IS NOT NULL
+             THEN (xpath('/row/c/text()',
+                    query_to_xml('SELECT count(*) AS c FROM supabase_migrations.schema_migrations',
+                                 true, true, '')))[1]::text::bigint
+             ELSE NULL END),
+       (CASE WHEN to_regclass('supabase_migrations.schema_migrations') IS NOT NULL
+             THEN (xpath('/row/v/text()',
+                    query_to_xml('SELECT max(version) AS v FROM supabase_migrations.schema_migrations',
+                                 true, true, '')))[1]::text
+             ELSE '(sem schema supabase_migrations neste banco)' END)
 UNION ALL
 SELECT 2, categoria, count(*), md5(string_agg(sig, chr(10) ORDER BY sig))
 FROM itens

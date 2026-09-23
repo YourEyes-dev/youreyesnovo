@@ -67,6 +67,15 @@ jobs:
         run: |
           supabase link --project-ref "$STAGING_REF"
           supabase db push --include-all
+      - name: Login no ghcr.io (evita rate limit ao baixar a imagem de bundling)
+        # `supabase functions deploy` empacota as functions dentro de um container
+        # ghcr.io/supabase/edge-runtime. O pull ANONIMO dessa imagem estoura o
+        # limite do registro compartilhado dos runners ("toomanyrequests") e
+        # derruba o deploy — foi o que deixou a esteira vermelha por dias, mesmo
+        # com as migrations passando. O pull AUTENTICADO (com o GITHUB_TOKEN que a
+        # esteira ja tem) tem limite muito maior. Nao precisa de packages:read: a
+        # imagem e publica; basta a requisicao ser autenticada.
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - name: Reimplantar Edge Functions
         # O empacotamento baixa dependências de CDNs públicos que às vezes
         # falham momentaneamente (522/timeout) — tenta até 3 vezes.

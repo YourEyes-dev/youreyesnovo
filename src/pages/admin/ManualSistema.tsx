@@ -11,7 +11,19 @@ import { supabase } from "@/integrations/supabase/client";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
-const MANUAL_URL = "/MANUAL_YourEyes.md";
+// O arquivo estático vive em public/ e é servido SOB o base do build
+// (import.meta.env.BASE_URL). Um caminho absoluto "/MANUAL_YourEyes.md" iria
+// para a RAIZ do domínio (ex.: youreyes-dev.github.io/MANUAL_YourEyes.md), fora
+// do subcaminho /youreyesnovo/teste/ — o host devolvia sua página 404 e ela era
+// gravada como se fosse o manual. Com o base, resolve certo em teste, homologação
+// e produção (onde o base é "/").
+const MANUAL_URL = `${import.meta.env.BASE_URL}MANUAL_YourEyes.md`;
+
+// O conteúdo válido do manual começa com um cabeçalho Markdown ("# ..."). Serve
+// para NÃO gravar (nem exibir) uma página de erro HTML do host caso o arquivo
+// não seja encontrado.
+const pareceManual = (t?: string | null): t is string =>
+  !!t && t.trimStart().startsWith("#");
 
 function extractToc(md: string) {
   const lines = md.split("\n");
@@ -48,17 +60,22 @@ export default function ManualSistema() {
         .limit(1)
         .maybeSingle();
 
-      if (data?.content) {
+      if (pareceManual(data?.content)) {
         setContent(data.content);
         setLoading(false);
       } else {
-        // Fallback to static file and seed Supabase
+        // Sem conteúdo válido no banco: carrega o arquivo estático e semeia.
         const res = await fetch(MANUAL_URL);
-        const text = await res.text();
-        setContent(text);
+        const text = res.ok ? await res.text() : "";
+        const bom = pareceManual(text) ? text : "";
+        setContent(bom || "# Manual do Sistema\n\nNão foi possível carregar o manual agora. Recarregue a página.");
         setLoading(false);
-        // Seed the DB
-        await supabase.from("system_manual").insert({ content: text });
+        // Só semeia quando a tabela estava REALMENTE vazia (data == null) e o
+        // texto é um manual de verdade — nunca grava página de erro do host,
+        // e não cria uma 2ª linha por cima de um conteúdo inválido já existente.
+        if (bom && !data) {
+          await supabase.from("system_manual").insert({ content: bom });
+        }
       }
     }
     loadManual();

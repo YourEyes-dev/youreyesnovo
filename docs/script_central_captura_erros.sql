@@ -37,6 +37,11 @@ SET lock_timeout = '10s';
 
 -- ---------------------------------------------------------
 -- 0) Atalhos public do pgcrypto (dependencia; guardados)
+--    Parametros NOMEADOS de proposito (p_n / p_data / p_type), nunca posicionais:
+--    o editor do Supabase conta os cifroes no texto cru para achar as aspas-dolar,
+--    e um numero IMPAR deles desalinha a contagem e faz o editor inserir ; no meio
+--    de um comando. Sem parametro posicional, a contagem fica PAR. Equivalem aos
+--    atalhos do extensoes_base.
 -- ---------------------------------------------------------
 DO $ext$
 BEGIN
@@ -44,21 +49,21 @@ BEGIN
              WHERE p.proname = 'gen_random_bytes' AND n.nspname = 'extensions')
      AND NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
              WHERE p.proname = 'gen_random_bytes' AND n.nspname = 'public') THEN
-    CREATE FUNCTION public.gen_random_bytes(integer)
+    CREATE FUNCTION public.gen_random_bytes(p_n integer)
     RETURNS bytea LANGUAGE sql
-    AS 'SELECT extensions.gen_random_bytes($1)';
+    AS 'SELECT extensions.gen_random_bytes(p_n)';
   END IF;
 
   IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
              WHERE p.proname = 'digest' AND n.nspname = 'extensions')
      AND NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
              WHERE p.proname = 'digest' AND n.nspname = 'public') THEN
-    CREATE FUNCTION public.digest(text, text)
+    CREATE FUNCTION public.digest(p_data text, p_type text)
     RETURNS bytea LANGUAGE sql IMMUTABLE
-    AS 'SELECT extensions.digest($1, $2)';
-    CREATE FUNCTION public.digest(bytea, text)
+    AS 'SELECT extensions.digest(p_data, p_type)';
+    CREATE FUNCTION public.digest(p_data bytea, p_type text)
     RETURNS bytea LANGUAGE sql IMMUTABLE
-    AS 'SELECT extensions.digest($1, $2)';
+    AS 'SELECT extensions.digest(p_data, p_type)';
   END IF;
 END $ext$;
 

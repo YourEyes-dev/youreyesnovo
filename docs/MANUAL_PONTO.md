@@ -411,7 +411,7 @@ de tela para o RH marcar quem é rural. *Base:* Lei 5.889/1973, art. 7º.
 Tudo o que este manual descreve está **validado no ambiente de teste**. Para ver o placar
 **113 · 1 · 6** com os próprios olhos:
 
-- Site de teste: https://ustudy123.github.io/seguramente-0aed4f79/
+- Site de teste: https://youreyes-dev.github.io/youreyesnovo/teste/
 - Menu **Administração → QA → Runner** → bateria **Ponto**.
 
 **Produção.** Nada foi aplicado na produção. As entregas estão na fila do roteiro

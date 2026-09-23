@@ -4,30 +4,16 @@
 -- O QUE ESTE SCRIPT FAZ (e por que):
 --   O teste (fonte da verdade) passou a bloquear o fechamento da competencia
 --   quando ha um dia MUITO abaixo da jornada SEM que ninguem tenha declarado o
---   motivo. Um dia curto pode ser folga compensatoria (debita o banco),
---   ausencia justificada (nao debita) ou falta injustificada (desconta dia +
---   DSR): tres efeitos diferentes, e so quem esteve la sabe qual. Sem a
---   declaracao, o sistema aplica um por omissao e o espelho assinado nao
---   explica o debito (fragiliza a prova — Sumula 338; Portaria 671).
+--   motivo (folga? abono? falta?). Sao DUAS funcoes: uma DETECTA o dia curto
+--   (ponto_fechamento_pendencias_criticas), a outra CONTA e bloqueia
+--   (ponto_fechar_competencia_verificar). A producao ainda nao tem a trava.
 --
---   Sao DUAS funcoes que andam juntas:
---     1. ponto_fechamento_pendencias_criticas — DETECTA o dia curto sem motivo
---        (limite em ponto_configuracao.dia_curto_bloqueia_fechamento_minutos,
---        padrao 60; zero/nulo desliga a trava);
---     2. ponto_fechar_competencia_verificar   — CONTA essa pendencia e a inclui
---        na mensagem de bloqueio do fechamento.
+--   Corpo copiado VERBATIM do teste (pg_get_functiondef). Envelope DO/EXECUTE
+--   para o SQL Editor do Supabase nao confundir SELECT ... INTO com criacao de
+--   tabela (injetor de RLS). As funcoes criadas sao byte a byte as do teste.
 --
---   A producao ainda nao tem a trava. Este script traz as duas para o teste.
---
--- POR QUE O ENVELOPE "DO ... EXECUTE":
---   A funcao (2) usa SELECT ... INTO, que o SQL Editor do Supabase confunde com
---   criacao de tabela e injeta ALTER TABLE ... ENABLE RLS no meio do corpo,
---   quebrando a funcao. Criando de DENTRO de um DO/EXECUTE, o nivel de cima e
---   so um DO e o injetor nao dispara. As funcoes criadas sao byte a byte as
---   mesmas — a conferencia por md5 comprova. Aplico as duas assim, por padrao.
---
--- COMO RODAR: execute o BLOCO 1, depois o BLOCO 2, depois a conferencia (BLOCO
---   3) numa consulta separada. Cada bloco de criacao volta "Success. No rows".
+-- COMO RODAR: BLOCO 1, depois BLOCO 2, depois a conferencia (BLOCO 3) numa
+--   consulta separada. Cada bloco de criacao volta "Success. No rows returned".
 --
 -- SEGURANCA: so substitui funcoes; nao altera nem apaga dado; idempotente.
 -- ============================================================================
@@ -99,14 +85,8 @@ BEGIN
     AND (p_empresa_id IS NULL OR d.empresa_id = p_empresa_id)
     AND COALESCE(l.min, 0) > 0
     AND COALESCE(j.jornada_min, 0) > 0
-    -- so dia com trabalho: dia sem nenhuma batida ja e falta, e tem
-    -- tratamento proprio
     AND COALESCE(floor(EXTRACT(EPOCH FROM d.horas_trabalhadas)/60)::int, 0) > 0
     AND (j.jornada_min - COALESCE(floor(EXTRACT(EPOCH FROM d.horas_trabalhadas)/60)::int, 0)) >= l.min
-    -- ja declarado por alguem: folga, abono, ferias, atestado, feriado.
-    -- E lista de EXCLUSAO, nao igualdade a 'normal': o dia comum vem
-    -- gravado como 'util', e comparar com 'normal' deixava passar
-    -- justamente o caso que esta trava existe para pegar.
     AND COALESCE(d.tipo_dia, 'util') NOT IN
         ('ferias', 'atestado', 'afastamento', 'feriado', 'folga_compensatoria')
     AND COALESCE(d.status, '') NOT IN ('justificado', 'incompleto', 'ajuste_pendente')
@@ -116,9 +96,7 @@ BEGIN
                        AND regexp_replace(COALESCE(a2.colaborador_cpf, ''), '[^0-9]', '', 'g')
                          = regexp_replace(COALESCE(d.colaborador_cpf, ''), '[^0-9]', '', 'g'));
 
-  -- (387) Espelho SEM CIÊNCIA (Súmula 338): status ainda não confirmado/assinado,
-  -- sem data_confirmacao e sem assinatura_hash. Espelho com RESSALVA formal
-  -- registrada não bloqueia (a recusa está formalizada).
+  -- (387) Espelho SEM CIÊNCIA (Súmula 338).
   RETURN QUERY
   SELECT 'espelho_sem_ciencia'::text, e.colaborador_cpf, NULL::date,
          format('Espelho sem ciencia do colaborador (status %s, sem confirmacao/assinatura)', COALESCE(e.status,'-'))::text
@@ -162,15 +140,12 @@ BEGIN
   FROM public.ponto_fechamento_pendencias_criticas(p_tenant_id, p_empresa_id, p_competencia);
 
   IF v_n > 0 THEN
-    -- Bloqueia o fechamento: pendencia critica aberta. Inclui o ESPELHO sem
-    -- ciencia — o fechamento confere status/confirmacao/assinatura dos espelhos
-    -- (Sumula 338); espelho com ressalva formal nao bloqueia.
     RAISE EXCEPTION 'Fechamento bloqueado na competencia %: % pendencia(s) critica(s) — % ajuste(s) pendente(s) de aprovacao, % dia(s) incompleto(s), % dia(s) curto(s) sem motivo declarado e % espelho(s) sem ciencia (status/confirmacao/assinatura). Trate antes de fechar.',
       p_competencia, v_n, v_ajustes, v_dias, v_curtos, v_espelhos
       USING ERRCODE = 'raise_exception';
   END IF;
 
-  RETURN 0;  -- sem pendencias: pode fechar
+  RETURN 0;
 END;
 $fn$;
   $ptsql$;

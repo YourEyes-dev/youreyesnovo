@@ -8,8 +8,8 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
-import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // O arquivo estático vive em public/ e é servido SOB o base do build
 // (import.meta.env.BASE_URL). Um caminho absoluto "/MANUAL_YourEyes.md" iria
@@ -24,6 +24,201 @@ const MANUAL_URL = `${import.meta.env.BASE_URL}MANUAL_YourEyes.md`;
 // não seja encontrado.
 const pareceManual = (t?: string | null): t is string =>
   !!t && t.trimStart().startsWith("#");
+
+// ── Geração do PDF no padrão ABNT (NBR 14724) ──────────────────────────────
+// Gera TEXTO real (selecionável), não um print da tela. Padrão:
+//   • Papel A4, fonte Arial (Helvetica) 12 no corpo, entrelinha 1,5;
+//   • Margens 3 cm (esquerda/superior) e 2 cm (direita/inferior);
+//   • Corpo justificado; títulos em negrito; número da página no canto
+//     superior direito.
+const PT_MM = 0.352778; // 1 ponto tipográfico em milímetros
+
+function gerarManualPdf(md: string): jsPDF {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const PAGE_W = 210, PAGE_H = 297;
+  const ML = 30, MR = 20, MT = 30, MB = 20;
+  const TEXT_W = PAGE_W - ML - MR;
+  const FONT = "helvetica"; // equivalente ao Arial, aceito pela ABNT
+  let y = MT;
+
+  const newPage = () => { doc.addPage(); y = MT; };
+  const emojiRe = /[\p{Extended_Pictographic}️•←-⇿⬀-⯿]/gu;
+  const limpar = (s: string) => s.replace(emojiRe, "").replace(/\s+/g, " ").trim();
+
+  type Word = { w: string; style: string; width: number };
+
+  const medir = (txt: string, style: string, size: number) => {
+    doc.setFont(FONT, style); doc.setFontSize(size); return doc.getTextWidth(txt);
+  };
+
+  const tokenizar = (texto: string) => {
+    const limpo = texto.replace(emojiRe, "");
+    const out: { t: string; style: string }[] = [];
+    const re = /\*\*(.+?)\*\*|`(.+?)`|\*(.+?)\*/g;
+    let last = 0, m: RegExpExecArray | null;
+    while ((m = re.exec(limpo)) !== null) {
+      if (m.index > last) out.push({ t: limpo.slice(last, m.index), style: "normal" });
+      if (m[1] !== undefined) out.push({ t: m[1], style: "bold" });
+      else if (m[2] !== undefined) out.push({ t: m[2], style: "normal" });
+      else out.push({ t: m[3] as string, style: "italic" });
+      last = re.lastIndex;
+    }
+    if (last < limpo.length) out.push({ t: limpo.slice(last), style: "normal" });
+    return out;
+  };
+
+  const paragrafo = (
+    texto: string,
+    opts: { size?: number; lh?: number; indent?: number; justify?: boolean } = {},
+  ) => {
+    const size = opts.size ?? 12;
+    const lh = opts.lh ?? 1.5;
+    const indent = opts.indent ?? 0;
+    const justify = opts.justify ?? true;
+    const maxW = TEXT_W - indent;
+    const spaceW = medir(" ", "normal", size);
+
+    const words: Word[] = [];
+    for (const tk of tokenizar(texto)) {
+      for (const p of tk.t.split(/\s+/)) {
+        if (p) words.push({ w: p, style: tk.style, width: medir(p, tk.style, size) });
+      }
+    }
+    if (words.length === 0) return;
+
+    const lines: { words: Word[]; natW: number }[] = [];
+    let cur: Word[] = [], natW = 0;
+    for (const wd of words) {
+      if (cur.length === 0) { cur = [wd]; natW = wd.width; }
+      else if (natW + spaceW + wd.width > maxW) { lines.push({ words: cur, natW }); cur = [wd]; natW = wd.width; }
+      else { cur.push(wd); natW += spaceW + wd.width; }
+    }
+    if (cur.length) lines.push({ words: cur, natW });
+
+    const lhmm = size * lh * PT_MM;
+    lines.forEach((line, i) => {
+      if (y + lhmm > PAGE_H - MB) newPage();
+      const baseY = y + size * PT_MM * 0.9;
+      const isLast = i === lines.length - 1;
+      const gap = justify && !isLast && line.words.length > 1
+        ? (maxW - line.natW) / (line.words.length - 1) : 0;
+      let x = ML + indent;
+      for (const wd of line.words) {
+        doc.setFont(FONT, wd.style); doc.setFontSize(size);
+        doc.text(wd.w, x, baseY);
+        x += wd.width + spaceW + gap;
+      }
+      y += lhmm;
+    });
+    y += size * PT_MM * 0.35;
+  };
+
+  const titulo = (texto: string, nivel: number) => {
+    const size = nivel === 1 ? 16 : nivel === 2 ? 13 : 12;
+    const cleaned = limpar(texto);
+    if (!cleaned) return;
+    y += nivel <= 2 ? 5 : 3;
+    doc.setFont(FONT, "bold"); doc.setFontSize(size);
+    const linhas = doc.splitTextToSize(cleaned, TEXT_W) as string[];
+    const lhmm = size * 1.2 * PT_MM;
+    for (const l of linhas) {
+      if (y + lhmm > PAGE_H - MB) newPage();
+      const baseY = y + size * PT_MM * 0.9;
+      if (nivel === 1) doc.text(l, PAGE_W / 2, baseY, { align: "center" });
+      else doc.text(l, ML, baseY);
+      y += lhmm;
+    }
+    y += 2;
+  };
+
+  const item = (texto: string, marcador: string, size = 12, indent = 8) => {
+    if (y + size * 1.5 * PT_MM > PAGE_H - MB) newPage();
+    doc.setFont(FONT, "normal"); doc.setFontSize(size);
+    doc.text(marcador, ML + (indent - 6), y + size * PT_MM * 0.9);
+    paragrafo(texto, { size, lh: 1.5, indent, justify: false });
+  };
+
+  const regua = () => {
+    y += 2;
+    if (y > PAGE_H - MB) newPage();
+    doc.setDrawColor(210); doc.setLineWidth(0.2);
+    doc.line(ML, y, PAGE_W - MR, y);
+    y += 4;
+  };
+
+  const tabela = (head: string[], body: string[][]) => {
+    autoTable(doc, {
+      startY: y,
+      head: [head.map(limpar)],
+      body: body.map((r) => r.map(limpar)),
+      margin: { left: ML, right: MR },
+      tableWidth: TEXT_W,
+      styles: { font: FONT, fontSize: 11, cellPadding: 2, valign: "top", textColor: [30, 30, 30], lineColor: [200, 200, 200], lineWidth: 0.1 },
+      headStyles: { fillColor: [235, 235, 235], textColor: [20, 20, 20], fontStyle: "bold" },
+      theme: "grid",
+    });
+    const fin = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
+    y = (fin ?? y) + 4;
+  };
+
+  // ── Parser do Markdown ──────────────────────────────────────────────────
+  const linhas = md.replace(/\r/g, "").split("\n");
+  let paraBuf: string[] = [];
+  let quoteBuf: string[] = [];
+  let tblBuf: string[] = [];
+
+  const flushPara = () => { if (paraBuf.length) { paragrafo(paraBuf.join(" ")); paraBuf = []; } };
+  const flushQuote = () => {
+    if (!quoteBuf.length) return;
+    for (const ql of quoteBuf) {
+      const t = ql.trim();
+      if (t === "") { y += 1.5; continue; }
+      const b = t.match(/^[-*]\s+(.*)$/);
+      if (b) item(b[1], "•", 11, 16);
+      else paragrafo(t, { size: 11, lh: 1.25, indent: 12, justify: true });
+    }
+    quoteBuf = [];
+  };
+  const flushTable = () => {
+    if (!tblBuf.length) return;
+    const rows = tblBuf.map((r) => r.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim()));
+    const head = rows[0] ?? [];
+    const body = rows.slice(1).filter((r) => !r.every((c) => /^:?-+:?$/.test(c) || c === ""));
+    tblBuf = [];
+    if (head.length) tabela(head, body);
+  };
+
+  for (const raw of linhas) {
+    const line = raw.trimEnd();
+    if (/^\s*\|/.test(line)) { flushPara(); flushQuote(); tblBuf.push(line); continue; }
+    if (tblBuf.length) flushTable();
+
+    if (/^\s*>/.test(line)) { flushPara(); quoteBuf.push(line.replace(/^\s*>\s?/, "")); continue; }
+    if (quoteBuf.length) flushQuote();
+
+    if (line.trim() === "") { flushPara(); continue; }
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if (h) { flushPara(); titulo(h[2], h[1].length); continue; }
+    if (/^---+$/.test(line.trim())) { flushPara(); regua(); continue; }
+    const ul = line.match(/^\s*[-*]\s+(.*)$/);
+    if (ul) { flushPara(); item(ul[1], "•"); continue; }
+    const ol = line.match(/^\s*(\d+)\.\s+(.*)$/);
+    if (ol) { flushPara(); item(ol[2], `${ol[1]}.`); continue; }
+    paraBuf.push(line.trim());
+  }
+  flushPara(); flushQuote(); flushTable();
+
+  // Numeração de páginas (canto superior direito) — pós-processo, cobre também
+  // páginas criadas pela renderização das tabelas.
+  const total = doc.getNumberOfPages();
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p);
+    doc.setFont(FONT, "normal"); doc.setFontSize(10); doc.setTextColor(90);
+    doc.text(String(p), PAGE_W - MR, 15, { align: "right" });
+  }
+  doc.setTextColor(0);
+  return doc;
+}
 
 function extractToc(md: string) {
   const lines = md.split("\n");
@@ -121,46 +316,25 @@ export default function ManualSistema() {
   };
 
   const exportPDF = useCallback(async () => {
-    if (!contentRef.current) return;
+    if (!pareceManual(content)) {
+      toast.error("Manual sem conteúdo para exportar.");
+      return;
+    }
     setExporting(true);
-    toast.info("Gerando PDF, aguarde...");
+    toast.info("Gerando PDF (padrão ABNT), aguarde...");
 
     try {
-      const canvas = await html2canvas(contentRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        windowWidth: 900,
-      });
-
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pdfWidth - 20;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 10;
-
-      pdf.addImage(imgData, "JPEG", 10, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight - 20;
-
-      while (heightLeft > 0) {
-        position = position - pdfHeight + 20;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 10, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight - 20;
-      }
-
-      pdf.save("Manual_YourEyes.pdf");
+      // Texto real, formatado nas normas ABNT (ver gerarManualPdf).
+      const doc = gerarManualPdf(content);
+      doc.save("Manual_YourEyes.pdf");
       toast.success("PDF baixado com sucesso!");
-    } catch {
+    } catch (e) {
+      console.error(e);
       toast.error("Erro ao gerar PDF.");
     } finally {
       setExporting(false);
     }
-  }, []);
+  }, [content]);
 
   const toc = extractToc(content);
 

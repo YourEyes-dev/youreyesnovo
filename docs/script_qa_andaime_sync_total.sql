@@ -994,7 +994,7 @@ BEGIN
 
   -- Padrões públicos (o repo/workflow já aparecem no código do painel e
   -- na esteira); só o token é segredo. Podem ser sobrescritos por app_config.
-  v_repo     := COALESCE(NULLIF(btrim(v_repo),     ''), 'ustudy123/seguramente-0aed4f79');
+  v_repo     := COALESCE(NULLIF(btrim(v_repo),     ''), 'YourEyes-dev/youreyesnovo');
   v_workflow := COALESCE(NULLIF(btrim(v_workflow), ''), 'staging.yml');
   v_ref      := COALESCE(NULLIF(btrim(v_ref),      ''), 'main');
 

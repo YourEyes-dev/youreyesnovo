@@ -31,7 +31,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // mais comum de "Bad credentials" na API do GitHub.
 const GITHUB_TOKEN = (Deno.env.get("GITHUB_DISPATCH_TOKEN") ?? "").trim();
 // Configuráveis por ambiente; default aponta para este repositório.
-const GITHUB_REPO = (Deno.env.get("GITHUB_REPO") ?? "ustudy123/youreyesnovo").trim();
+const GITHUB_REPO = (Deno.env.get("GITHUB_REPO") ?? "YourEyes-dev/youreyesnovo").trim();
 const WORKFLOW_REF = (Deno.env.get("GITHUB_CYPRESS_REF") ?? "main").trim();
 
 // Ref do projeto de HOMOLOGAÇÃO. O botão de cada ambiente deve disparar a

@@ -76,7 +76,7 @@ BEGIN
     RETURN;
   END IF;
 
-  v_repo     := COALESCE(NULLIF(btrim(v_repo),     ''), 'ustudy123/youreyesnovo');
+  v_repo     := COALESCE(NULLIF(btrim(v_repo),     ''), 'YourEyes-dev/youreyesnovo');
   v_workflow := COALESCE(NULLIF(btrim(v_workflow), ''), 'staging.yml');
   v_ref      := COALESCE(NULLIF(btrim(v_ref),      ''), 'main');
 
@@ -257,9 +257,9 @@ END $sync$;
 -- ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = now();
 --
 --   (Opcionais — só se quiser mudar dos padrões
---    ustudy123/youreyesnovo, staging.yml, main:)
+--    YourEyes-dev/youreyesnovo, staging.yml, main:)
 -- INSERT INTO public.app_config (chave, valor) VALUES
---   ('github_dispatch_repo',     'ustudy123/youreyesnovo'),
+--   ('github_dispatch_repo',     'YourEyes-dev/youreyesnovo'),
 --   ('github_dispatch_workflow', 'staging.yml'),
 --   ('github_dispatch_ref',      'main')
 -- ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = now();

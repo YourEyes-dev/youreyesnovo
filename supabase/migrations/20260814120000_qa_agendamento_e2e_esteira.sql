@@ -32,7 +32,7 @@
 --    que esta rotina lê. NENHUM valor é semeado aqui — o token é
 --    colado à mão no ambiente que deve disparar (staging e/ou prod).
 --      github_dispatch_token     (obrigatório p/ disparar) fine-grained PAT, Actions:write
---      github_dispatch_repo      (opcional) padrão 'ustudy123/seguramente-0aed4f79'
+--      github_dispatch_repo      (opcional) padrão 'YourEyes-dev/youreyesnovo'
 --      github_dispatch_workflow  (opcional) padrão 'staging.yml'
 --      github_dispatch_ref       (opcional) padrão 'main'
 -- ─────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ BEGIN
 
   -- Padrões públicos (o repo/workflow já aparecem no código do painel e
   -- na esteira); só o token é segredo. Podem ser sobrescritos por app_config.
-  v_repo     := COALESCE(NULLIF(btrim(v_repo),     ''), 'ustudy123/seguramente-0aed4f79');
+  v_repo     := COALESCE(NULLIF(btrim(v_repo),     ''), 'YourEyes-dev/youreyesnovo');
   v_workflow := COALESCE(NULLIF(btrim(v_workflow), ''), 'staging.yml');
   v_ref      := COALESCE(NULLIF(btrim(v_ref),      ''), 'main');
 

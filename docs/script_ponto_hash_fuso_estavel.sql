@@ -150,22 +150,23 @@ $fn$;
 END
 $ptdo$;
 
--- ── BLOCO 3 (conferencia) — RODE SEPARADO. Esperado: 2 linhas ───────────────
--- verify: md5_normalizado tem de bater com o do TESTE (a17e6d58...). gerar: nao
--- entra no inventario "%ponto%" (o nome nao tem 'ponto'), entao aqui conferimos
--- que o corpo tem a marca do UTC e mostramos o md5 para o cruzamento final.
---   SELECT
---     p.proname                                                        AS objeto,
---     l.lanname                                                        AS linguagem,
---     md5(regexp_replace(pg_get_functiondef(p.oid), '\s+', ' ', 'g'))  AS md5_normalizado,
---     (pg_get_functiondef(p.oid) LIKE '%AT TIME ZONE ''UTC''%')        AS tem_utc,
---     CASE WHEN p.proname = 'ponto_verificar_cadeia_hash'
---          THEN CASE WHEN md5(regexp_replace(pg_get_functiondef(p.oid), '\s+', ' ', 'g'))
---                         = 'a17e6d5809a62d8d2dbbe94787ee8d51'
---                    THEN 'OK' ELSE 'CONFERIR' END
---          ELSE '(cruzar com o teste)' END                             AS status_verify
---   FROM pg_proc p
+-- ── BLOCO 3 (conferencia) — RODE SEPARADO. Esperado: 2 linhas, ambas OK ─────
+-- md5_normalizado do TESTE (confirmado no cruzamento teste=homologacao):
+--   gerar_hash_marcacao          -> 07b70172fd02a3f67933c3c4d558bcf1
+--   ponto_verificar_cadeia_hash  -> a17e6d5809a62d8d2dbbe94787ee8d51
+--   WITH esperado(objeto, md5_teste) AS (
+--     VALUES
+--       ('gerar_hash_marcacao',         '07b70172fd02a3f67933c3c4d558bcf1'),
+--       ('ponto_verificar_cadeia_hash', 'a17e6d5809a62d8d2dbbe94787ee8d51')
+--   )
+--   SELECT e.objeto,
+--          l.lanname                                                        AS linguagem,
+--          md5(regexp_replace(pg_get_functiondef(p.oid), '\s+', ' ', 'g'))  AS md5_producao,
+--          (pg_get_functiondef(p.oid) LIKE '%AT TIME ZONE ''UTC''%')        AS tem_utc,
+--          CASE WHEN md5(regexp_replace(pg_get_functiondef(p.oid), '\s+', ' ', 'g')) = e.md5_teste
+--               THEN 'OK' ELSE 'CONFERIR' END                               AS status
+--   FROM esperado e
+--   JOIN pg_proc p      ON p.proname = e.objeto
 --   JOIN pg_namespace n ON n.oid = p.pronamespace AND n.nspname = 'public'
 --   JOIN pg_language  l ON l.oid = p.prolang
---   WHERE p.proname IN ('gerar_hash_marcacao', 'ponto_verificar_cadeia_hash')
---   ORDER BY p.proname;
+--   ORDER BY e.objeto;

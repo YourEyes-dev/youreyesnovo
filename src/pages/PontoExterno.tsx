@@ -72,6 +72,9 @@ const PontoExterno = () => {
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const [ajusteOpen, setAjusteOpen] = useState(false);
+  // Exigir selfie vem da configuração da empresa (exigir_selfie_link). Padrão
+  // true: só quem desmarca a opção registra sem selfie.
+  const [exigirSelfie, setExigirSelfie] = useState(true);
 
   // Clock
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -120,6 +123,7 @@ const PontoExterno = () => {
         return;
       }
       const result = data as any;
+      if (typeof result.exigir_selfie === "boolean") setExigirSelfie(result.exigir_selfie);
       if (result.compartilhado) {
         setModo("compartilhado");
         setLoading(false);
@@ -248,6 +252,7 @@ const PontoExterno = () => {
     }
     // Lembra o CPF neste aparelho para não precisar redigitar nas próximas vezes.
     try { if (CPF_STORAGE_KEY) localStorage.setItem(CPF_STORAGE_KEY, digits); } catch { /* storage indisponível */ }
+    if (typeof r.exigir_selfie === "boolean") setExigirSelfie(r.exigir_selfie);
     setColaborador(r as ColaboradorData);
   }, [token, cpf, CPF_STORAGE_KEY]);
 
@@ -281,7 +286,7 @@ const PontoExterno = () => {
     setSelfiePreview(null);
   }, [CPF_STORAGE_KEY]);
 
-  const selfieObrigatoriaFaltando = modo === "compartilhado" && !selfieFile;
+  const selfieObrigatoriaFaltando = modo === "compartilhado" && exigirSelfie && !selfieFile;
 
   const handleRegistrar = useCallback(async () => {
     if (!token || !colaborador || !proximoTipo) return;
@@ -436,7 +441,7 @@ const PontoExterno = () => {
         </motion.div>
 
         <p className="text-slate-500 text-[10px] text-center max-w-xs">
-          Identificação por CPF • Selfie obrigatória no registro • Geolocalização e horário capturados automaticamente
+          Identificação por CPF{exigirSelfie ? " • Selfie obrigatória no registro" : ""} • Geolocalização e horário capturados automaticamente
         </p>
       </div>
     );
@@ -511,6 +516,7 @@ const PontoExterno = () => {
               selfieFile={selfieFile}
               selfiePreview={selfiePreview}
               onChange={(file, preview) => { setSelfieFile(file); setSelfiePreview(preview); }}
+              obrigatoria={exigirSelfie}
             />
 
             {/* Error */}

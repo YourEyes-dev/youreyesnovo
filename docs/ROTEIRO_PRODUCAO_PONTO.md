@@ -62,9 +62,35 @@ cola e um passo de preparo antes. Três gestos:
 
 ## Estado atual
 
-**Nenhum pacote foi aplicado em produção ainda.** Todos estão validados (ou em
-validação) apenas no ambiente de teste. Esta é a fila para quando você decidir
-implantar.
+**Medição na PRODUÇÃO (`diayjpsrcerycycyaxst`) em 24/09/2026 — a fila abaixo já
+foi, na prática, aplicada.** Dois diagnósticos **só-leitura** confirmaram:
+
+- **Raio-X do motor** (`docs/script_ponto_raiox_motor.sql`): **9 de 9** — as nove
+  correções centrais do motor estão presentes **com o corpo corrigido** (não só o
+  nome certo). Idêntico ao que a homologação já dava.
+- **Inventário** (`docs/script_ponto_inventario_ambiente.sql`): **181 de 181, 0
+  faltando** — a produção tem todos os objetos do Ponto, inclusive os que o
+  handoff de 17/09 listava como ausentes (adicional noturno rural, auditoria de
+  motivos de ajuste ×2, expurgo de geolocalização).
+
+Ou seja: a produção **não está defasada** — a disciplina de "colar o script à mão"
+manteve o banco em dia. A tabela abaixo permanece como **registro histórico da
+ordem** dos pacotes; a coluna "Produção" reflete a fila original e **não** foi
+remarcada item a item (a medição foi agregada — motor + objetos —, não pacote a
+pacote).
+
+> **Ressalva — o que a medição NÃO cobre.** Raio-X e inventário provam *estrutura
+> e corpo de função*. Itens que apenas **regravam DADOS** não aparecem neles e
+> precisam de conferência própria — em especial o **pacote 58**
+> (`docs/script_ponto_escalas_regrava_jornada_declarada.sql`, que regrava
+> `jornada_diaria_minutos` nas escalas com intervalo declarado): status **a
+> confirmar**.
+
+> **Nota de infraestrutura (24/09/2026):** as **telas** de produção deixaram de
+> ser publicadas pelo Lovable e passaram a ser servidas pela **Vercel**
+> (`youreyes.com.br`) — ver `docs/AMBIENTES.md`. Isso **não muda nada** deste
+> roteiro: mudanças de **banco** continuam sendo script colado à mão no SQL
+> Editor de produção.
 
 Legenda de status: ⬜ a fazer · ✅ feito · ⏳ aguardando validação no teste
 

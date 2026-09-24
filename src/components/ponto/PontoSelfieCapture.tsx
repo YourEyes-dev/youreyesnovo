@@ -7,9 +7,15 @@ interface PontoSelfieCaptureProps {
   selfieFile: File | null;
   selfiePreview: string | null;
   onChange: (file: File | null, preview: string | null) => void;
+  /**
+   * Quando a empresa exige selfie no registro (padrão). Só nesse caso a câmera
+   * abre sozinha ao montar — evitando o pedido de permissão a cada abertura
+   * quando a selfie é opcional.
+   */
+  obrigatoria?: boolean;
 }
 
-export function PontoSelfieCapture({ selfieFile, selfiePreview, onChange }: PontoSelfieCaptureProps) {
+export function PontoSelfieCapture({ selfieFile, selfiePreview, onChange, obrigatoria = true }: PontoSelfieCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -83,13 +89,16 @@ export function PontoSelfieCapture({ selfieFile, selfiePreview, onChange }: Pont
     setIsCameraOpen(false);
   }, [stream]);
 
-  // Auto-abre a câmera ao montar (se ainda não há selfie capturada)
+  // Auto-abre a câmera ao montar apenas quando a selfie é obrigatória (se ainda
+  // não há selfie capturada). Selfie opcional não abre a câmera sozinha — a
+  // pessoa toca em "Abrir câmera" se quiser, e o navegador não pede permissão à
+  // toa a cada abertura do link.
   useEffect(() => {
-    if (!selfieFile && !isCameraOpen && !stream) {
+    if (obrigatoria && !selfieFile && !isCameraOpen && !stream) {
       startCamera();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [obrigatoria]);
 
   // Cleanup ao desmontar
   useEffect(() => {
@@ -132,7 +141,7 @@ export function PontoSelfieCapture({ selfieFile, selfiePreview, onChange }: Pont
       <div className="flex items-center justify-between">
         <h4 className="font-medium text-sm text-foreground">📸 Selfie de Verificação</h4>
         <Badge variant={selfieFile ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
-          {selfieFile ? "✓ Capturada" : "Opcional"}
+          {selfieFile ? "✓ Capturada" : obrigatoria ? "Obrigatória" : "Opcional"}
         </Badge>
       </div>
 

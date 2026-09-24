@@ -309,9 +309,17 @@ const PontoExterno = () => {
           const { data: urlData } = supabasePublic.storage.from("ponto-selfies").getPublicUrl(uploadData.path);
           selfieUrl = urlData.publicUrl;
           selfieNome = selfieFile.name || `selfie_${proximoTipo}.jpg`;
+        } else if (exigirSelfie) {
+          // A pessoa TIROU a selfie, mas o envio da foto falhou. Se a selfie é
+          // exigida, não seguir sem ela: sem esta guarda o registro ia adiante
+          // sem foto e o banco devolvia "É obrigatório tirar a selfie" — o que
+          // faz parecer que ela não tirou. Mensagem clara e para, mantendo a
+          // foto capturada para tentar de novo.
+          setError("Não consegui enviar sua selfie agora. Verifique sua conexão e toque em Registrar novamente.");
+          setRegistrando(false);
+          return;
         }
-        // Se o upload falhar, segue sem selfie no modo colaborador; no modo
-        // compartilhado a selfie é obrigatória e o backend rejeita sem ela.
+        // Se o upload falhar e a selfie for opcional, segue sem ela.
       }
 
       const { data, error } =
@@ -360,7 +368,7 @@ const PontoExterno = () => {
       setError(traduzirErroPonto(e.message));
     }
     setRegistrando(false);
-  }, [token, colaborador, modo, cpf, geo.latitude, geo.longitude, geo.endereco, selfieFile, proximoTipo, selfieObrigatoriaFaltando, carregarProximoTipo]);
+  }, [token, colaborador, modo, cpf, geo.latitude, geo.longitude, geo.endereco, selfieFile, proximoTipo, selfieObrigatoriaFaltando, exigirSelfie, carregarProximoTipo]);
 
   if (loading) {
     return (

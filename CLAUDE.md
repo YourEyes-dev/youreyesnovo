@@ -3,14 +3,15 @@
 Plataforma SaaS de RH/SST (ponto eletrônico, saúde ocupacional, psicossocial,
 admissões, financeiro). Stack: Vite + React 18 + TypeScript + shadcn/ui +
 TanStack Query; Supabase (PostgreSQL com RLS, Edge Functions); as telas de
-produção são publicadas pelo Lovable.
+produção são publicadas pela **Vercel** (a partir da branch `producao`; o
+Lovable está dormente — ver `docs/AMBIENTES.md`).
 
 ## Os dois ambientes — decore isto antes de qualquer coisa
 
 | | PRODUÇÃO | STAGING (testes) |
 |---|---|---|
 | Projeto Supabase | `diayjpsrcerycycyaxst` | `bmehdgthciuvdbvutsdv` |
-| Telas | seguramente.lovable.app (via Publicar no Lovable) | https://youreyes-dev.github.io/youreyesnovo/teste/ |
+| Telas | youreyes.com.br (Vercel, via branch `producao`) | https://youreyes-dev.github.io/youreyesnovo/teste/ |
 | Dados | reais, protegidos por LGPD | fictícios (Empresa Staging LTDA, CPFs 900000xxx) |
 
 **Fluxo obrigatório:** desenvolver → mesclar na `main` → o workflow
@@ -19,9 +20,12 @@ functions + site de teste) → humano valida no staging → só então produçã
 
 **A produção NUNCA é alterada por esta esteira.** Ela só muda por dois gestos
 manuais do usuário: (1) colar um script de entrega no SQL Editor de produção;
-(2) clicar Publicar no Lovable. Nunca peça nem simule outros caminhos.
-O Lovable publica as telas a partir da `main` — merge aqui já deixa o código
-pronto para o próximo Publicar.
+(2) publicar as telas na **Vercel**. Nunca peça nem simule outros caminhos.
+A Vercel serve as telas de produção a partir da branch **`producao`** (NÃO da
+`main`): merges na `main` geram só pré-visualização. **Publicar** = avançar a
+`producao` para o commit desejado da `main`, via PR `main → producao` (a Vercel
+então publica em `youreyes.com.br` sozinha). O Lovable está dormente — não
+republique por ele. Detalhes e rollback (DNS/branch) em `docs/AMBIENTES.md`.
 
 **Nunca** coloque dados reais (CPFs, nomes, atestados) no staging, em seeds,
 em PDFs de devolutiva ou em documentos que circulam. Dados de saúde são
@@ -57,7 +61,8 @@ sem exceção.
 Toda mudança de banco vira DUAS entregas:
 1. **Migration** em `supabase/migrations/` — é o que o robô aplica no staging;
 2. **Script de entrega** em `docs/script_*.sql` — versão para o usuário colar
-   no SQL Editor de produção (o Lovable NÃO roda migrations em produção).
+   no SQL Editor de produção (nem a Vercel nem a esteira rodam migrations em
+   produção — o banco de produção só muda por script colado à mão).
 
 Regras dos scripts de entrega (aprendidas a caro preço):
 - O SQL Editor roda o arquivo inteiro em UMA transação e NÃO mantém sessão
@@ -188,9 +193,10 @@ Ao terminar qualquer implementação, encerre a resposta com:
 3. o aviso de que a produção segue intacta.
 
 Então PARE e espere. Só depois de um "aprovado" explícito entregue o passo de
-produção (script para o SQL Editor de produção e/ou "requer Publicar no
-Lovable"). Nunca antecipe o passo de produção sem aprovação, e nunca sugira
-que o usuário aplique algo na produção sem ter conferido no teste antes.
+produção (script para o SQL Editor de produção e/ou publicar as telas na Vercel
+avançando a branch `producao` — PR `main → producao`). Nunca antecipe o passo de
+produção sem aprovação, e nunca sugira que o usuário aplique algo na produção sem
+ter conferido no teste antes.
 
 ## Convenções de trabalho
 
@@ -198,8 +204,8 @@ que o usuário aplique algo na produção sem ter conferido no teste antes.
   O merge dispara a esteira do staging automaticamente. (Nas respostas ao
   usuário, evite o jargão: fale em "registrar a mudança no projeto" e
   "ambiente de teste", não em branch/PR/merge/staging.)
-- Antes de mexer em migrations, `git pull` — outras sessões e o Lovable também
-  escrevem na `main`.
+- Antes de mexer em migrations, `git pull` — outras sessões também escrevem
+  na `main`.
 - Respostas e PDFs de devolutiva para o usuário: didáticos, em português,
   para leitor de RH não-técnico; nunca transcrever dados pessoais reais.
 - `docs/AMBIENTES.md` documenta a infraestrutura dos ambientes; o manual da

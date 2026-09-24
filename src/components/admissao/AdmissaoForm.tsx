@@ -1044,7 +1044,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="banco">Banco *</Label>
+                <Label htmlFor="banco">Banco</Label>
                 <Select 
                   value={formBancarios.watch('banco')}
                   onValueChange={(value) => formBancarios.setValue('banco', value)}
@@ -1071,7 +1071,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
               </div>
 
               <div>
-                <Label htmlFor="tipoConta">Tipo de Conta *</Label>
+                <Label htmlFor="tipoConta">Tipo de Conta</Label>
                 <Select 
                   value={formBancarios.watch('tipoConta')}
                   onValueChange={(value) => formBancarios.setValue('tipoConta', value)}
@@ -1091,7 +1091,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
               </div>
 
               <div>
-                <Label htmlFor="agencia">Agência *</Label>
+                <Label htmlFor="agencia">Agência</Label>
                 <Input 
                   id="agencia"
                   {...formBancarios.register('agencia')}
@@ -1103,7 +1103,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
               </div>
 
               <div>
-                <Label htmlFor="conta">Conta *</Label>
+                <Label htmlFor="conta">Conta</Label>
                 <Input 
                   id="conta"
                   {...formBancarios.register('conta')}

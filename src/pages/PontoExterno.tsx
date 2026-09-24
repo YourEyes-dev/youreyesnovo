@@ -322,24 +322,39 @@ const PontoExterno = () => {
         // Se o upload falhar e a selfie for opcional, segue sem ela.
       }
 
+      // A localização é capturada AGORA, no momento da batida — não a de quando
+      // o link foi aberto. Um atalho salvo pode ter sido aberto em casa e a
+      // batida acontecer no trabalho: sem recapturar, o registro sairia com o
+      // lugar errado. Se a recaptura falhar ou for negada, usa a melhor leitura
+      // já disponível (a da abertura) em vez de travar o registro.
+      let lat = geo.latitude;
+      let lon = geo.longitude;
+      let endereco = geo.endereco;
+      const fresh = await geo.capturarLocalizacao();
+      if (fresh) {
+        lat = fresh.latitude;
+        lon = fresh.longitude;
+        endereco = fresh.endereco;
+      }
+
       const { data, error } =
         modo === "compartilhado"
           ? await supabasePublic.rpc("registrar_ponto_externo_cpf" as any, {
               p_token: token,
               p_cpf: cleanCpf(cpf),
               p_tipo_marcacao: proximoTipo,
-              p_latitude: geo.latitude,
-              p_longitude: geo.longitude,
-              p_endereco: geo.endereco,
+              p_latitude: lat,
+              p_longitude: lon,
+              p_endereco: endereco,
               p_selfie_url: selfieUrl,
               p_selfie_nome: selfieNome,
             })
           : await supabasePublic.rpc("registrar_ponto_externo", {
               p_token: token,
               p_tipo_marcacao: proximoTipo,
-              p_latitude: geo.latitude,
-              p_longitude: geo.longitude,
-              p_endereco: geo.endereco,
+              p_latitude: lat,
+              p_longitude: lon,
+              p_endereco: endereco,
               p_selfie_url: selfieUrl,
               p_selfie_nome: selfieNome,
             });
@@ -368,7 +383,7 @@ const PontoExterno = () => {
       setError(traduzirErroPonto(e.message));
     }
     setRegistrando(false);
-  }, [token, colaborador, modo, cpf, geo.latitude, geo.longitude, geo.endereco, selfieFile, proximoTipo, selfieObrigatoriaFaltando, exigirSelfie, carregarProximoTipo]);
+  }, [token, colaborador, modo, cpf, geo.latitude, geo.longitude, geo.endereco, geo.capturarLocalizacao, selfieFile, proximoTipo, selfieObrigatoriaFaltando, exigirSelfie, carregarProximoTipo]);
 
   if (loading) {
     return (

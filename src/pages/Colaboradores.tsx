@@ -1221,20 +1221,31 @@ function AdmissoesTab() {
 
         let documentosReaisPorLocalId = new Map<string, string>();
         if (dados.documentos?.length) {
+          const { data: admissaoAtual, error: admissaoAtualError } = await supabase
+            .from('admissoes')
+            .select('tenant_id')
+            .eq('id', selectedId)
+            .single();
+
+          if (admissaoAtualError) throw admissaoAtualError;
+
+          // Documentos ja persistidos desta admissao. O indice unico e
+          // (admissao_id, nome), entao a dedup e por NOME — evita reinserir um
+          // documento que ja existe (criado no envio imediato, em outra sessao
+          // ou que nao veio carregado no formulario) e estourar o unique.
+          const { data: existentes } = await supabase
+            .from('admissao_documentos')
+            .select('id, nome')
+            .eq('admissao_id', selectedId);
+          const idPorNome = new Map<string, string>((existentes || []).map((d) => [d.nome, d.id]));
+
           const docsExistentesReais = dados.documentos.filter((doc) => !doc.id.startsWith('new-doc-'));
           docsExistentesReais.forEach((doc) => documentosReaisPorLocalId.set(doc.id, doc.id));
 
           const docsNovos = dados.documentos.filter((doc) => doc.id.startsWith('new-doc-'));
-          if (docsNovos.length) {
-            const { data: admissaoAtual, error: admissaoAtualError } = await supabase
-              .from('admissoes')
-              .select('tenant_id')
-              .eq('id', selectedId)
-              .single();
-
-            if (admissaoAtualError) throw admissaoAtualError;
-
-            const docsParaInserir = docsNovos.map((doc) => ({
+          const docsParaInserir = docsNovos
+            .filter((doc) => !idPorNome.has(doc.nome))
+            .map((doc) => ({
               admissao_id: selectedId,
               tenant_id: admissaoAtual.tenant_id,
               nome: doc.nome,
@@ -1243,18 +1254,22 @@ function AdmissoesTab() {
               status: 'pendente' as const,
             }));
 
+          if (docsParaInserir.length) {
             const { data: insertedDocs, error: insertedDocsError } = await supabase
               .from('admissao_documentos')
               .insert(docsParaInserir)
-              .select('id, nome, tipo');
+              .select('id, nome');
 
             if (insertedDocsError) throw insertedDocsError;
-
-            docsNovos.forEach((doc) => {
-              const inserted = insertedDocs?.find((item) => item.nome === doc.nome && item.tipo === doc.tipo);
-              if (inserted) documentosReaisPorLocalId.set(doc.id, inserted.id);
-            });
+            (insertedDocs || []).forEach((d) => idPorNome.set(d.nome, d.id));
           }
+
+          // Todo doc local "new-doc-" aponta para o id real: recem-inserido ou
+          // um que ja existia por nome.
+          docsNovos.forEach((doc) => {
+            const realId = idPorNome.get(doc.nome);
+            if (realId) documentosReaisPorLocalId.set(doc.id, realId);
+          });
         }
 
         // Upload documentos anexados na edição
@@ -1300,12 +1315,14 @@ function AdmissoesTab() {
           .from('admissoes').select('tenant_id').eq('id', selectedId).single();
         if (admissaoAtualError) throw admissaoAtualError;
 
+        // Dedup pela chave real do indice unico: (admissao_id, nome). Filtrar
+        // tambem por tipo deixaria passar um insert que colide com um nome ja
+        // existente de tipo diferente.
         const { data: existente } = await supabase
           .from('admissao_documentos')
           .select('id')
           .eq('admissao_id', selectedId)
           .eq('nome', documento.nome)
-          .eq('tipo', documento.tipo)
           .maybeSingle();
 
         if (existente?.id) {

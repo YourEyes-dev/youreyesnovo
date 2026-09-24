@@ -86,7 +86,7 @@ interface AdmissaoFormProps {
     dadosBancarios: Partial<DadosBancarios>;
     exameAdmissional?: Partial<DadosExameAdmissional>;
   }) => Promise<void>;
-  onDocumentUploadImmediate?: (documentoId: string, file: File) => Promise<void>;
+  onDocumentUploadImmediate?: (documento: DocumentoAdmissao, file: File) => Promise<{ realId?: string } | void>;
   onDocumentRemoveImmediate?: (documentoId: string) => Promise<void>;
   initialData?: {
     dadosPessoais?: Partial<DadosPessoais>;
@@ -372,6 +372,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
 
   const handleDocumentUpload = async (documentoId: string, file: File) => {
     const previousDocumentos = documentos;
+    const documentoAlvo = previousDocumentos.find(doc => doc.id === documentoId);
     const nextDocumentos: DocumentoAdmissao[] = previousDocumentos.map(doc =>
       doc.id === documentoId
         ? {
@@ -386,9 +387,19 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
 
     setDocumentos(nextDocumentos);
 
-    if (onDocumentUploadImmediate) {
+    if (onDocumentUploadImmediate && documentoAlvo) {
       try {
-        await onDocumentUploadImmediate(documentoId, file);
+        const resultado = await onDocumentUploadImmediate(documentoAlvo, file);
+        // Documento novo (id local "new-doc-N") vira uma linha real no banco na
+        // hora do envio imediato. Trocamos o id local pelo UUID recebido para
+        // que ações seguintes (remover/aprovar/substituir) não voltem a mandar
+        // "new-doc-N" onde o banco espera um uuid.
+        const realId = resultado?.realId;
+        if (realId && realId !== documentoId) {
+          setDocumentos(prev =>
+            prev.map(doc => (doc.id === documentoId ? { ...doc, id: realId } : doc))
+          );
+        }
       } catch (error) {
         setDocumentos(previousDocumentos);
         throw error;
@@ -1033,7 +1044,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="banco">Banco *</Label>
+                <Label htmlFor="banco">Banco</Label>
                 <Select 
                   value={formBancarios.watch('banco')}
                   onValueChange={(value) => formBancarios.setValue('banco', value)}
@@ -1060,7 +1071,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
               </div>
 
               <div>
-                <Label htmlFor="tipoConta">Tipo de Conta *</Label>
+                <Label htmlFor="tipoConta">Tipo de Conta</Label>
                 <Select 
                   value={formBancarios.watch('tipoConta')}
                   onValueChange={(value) => formBancarios.setValue('tipoConta', value)}
@@ -1080,7 +1091,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
               </div>
 
               <div>
-                <Label htmlFor="agencia">Agência *</Label>
+                <Label htmlFor="agencia">Agência</Label>
                 <Input 
                   id="agencia"
                   {...formBancarios.register('agencia')}
@@ -1092,7 +1103,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
               </div>
 
               <div>
-                <Label htmlFor="conta">Conta *</Label>
+                <Label htmlFor="conta">Conta</Label>
                 <Input 
                   id="conta"
                   {...formBancarios.register('conta')}

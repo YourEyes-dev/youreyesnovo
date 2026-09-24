@@ -252,20 +252,31 @@ export default function Admissao() {
 
         let documentosReaisPorLocalId = new Map<string, string>();
         if (dados.documentos?.length) {
+          const { data: admissaoAtual, error: admissaoAtualError } = await supabase
+            .from('admissoes')
+            .select('tenant_id')
+            .eq('id', selectedId)
+            .single();
+
+          if (admissaoAtualError) throw admissaoAtualError;
+
+          // Documentos ja persistidos desta admissao. O indice unico e
+          // (admissao_id, nome), entao a dedup e por NOME — evita reinserir um
+          // documento que ja existe (criado no envio imediato, em outra sessao
+          // ou que nao veio carregado no formulario) e estourar o unique.
+          const { data: existentes } = await supabase
+            .from('admissao_documentos')
+            .select('id, nome')
+            .eq('admissao_id', selectedId);
+          const idPorNome = new Map<string, string>((existentes || []).map((d) => [d.nome, d.id]));
+
           const docsExistentesReais = dados.documentos.filter((doc) => !doc.id.startsWith('new-doc-'));
           docsExistentesReais.forEach((doc) => documentosReaisPorLocalId.set(doc.id, doc.id));
 
           const docsNovos = dados.documentos.filter((doc) => doc.id.startsWith('new-doc-'));
-          if (docsNovos.length) {
-            const { data: admissaoAtual, error: admissaoAtualError } = await supabase
-              .from('admissoes')
-              .select('tenant_id')
-              .eq('id', selectedId)
-              .single();
-
-            if (admissaoAtualError) throw admissaoAtualError;
-
-            const docsParaInserir = docsNovos.map((doc) => ({
+          const docsParaInserir = docsNovos
+            .filter((doc) => !idPorNome.has(doc.nome))
+            .map((doc) => ({
               admissao_id: selectedId,
               tenant_id: admissaoAtual.tenant_id,
               nome: doc.nome,
@@ -274,18 +285,22 @@ export default function Admissao() {
               status: 'pendente' as const,
             }));
 
+          if (docsParaInserir.length) {
             const { data: insertedDocs, error: insertedDocsError } = await supabase
               .from('admissao_documentos')
               .insert(docsParaInserir)
-              .select('id, nome, tipo');
+              .select('id, nome');
 
             if (insertedDocsError) throw insertedDocsError;
-
-            docsNovos.forEach((doc) => {
-              const inserted = insertedDocs?.find((item) => item.nome === doc.nome && item.tipo === doc.tipo);
-              if (inserted) documentosReaisPorLocalId.set(doc.id, inserted.id);
-            });
+            (insertedDocs || []).forEach((d) => idPorNome.set(d.nome, d.id));
           }
+
+          // Todo doc local "new-doc-" aponta para o id real: recem-inserido ou
+          // um que ja existia por nome.
+          docsNovos.forEach((doc) => {
+            const realId = idPorNome.get(doc.nome);
+            if (realId) documentosReaisPorLocalId.set(doc.id, realId);
+          });
         }
 
         if (dados.documentosComArquivo?.length) {
@@ -319,6 +334,60 @@ export default function Admissao() {
         toast.error(error.message || 'Erro ao enviar documento');
         throw error;
       }
+    }
+  };
+  // Envio imediato (formulário em edição). Documentos do checklist padrão ainda
+  // não persistidos chegam com id local "new-doc-N"; o banco espera um uuid, e
+  // o UPDATE por esse id quebrava com "invalid input syntax for type uuid".
+  // Aqui criamos a linha real (ou reaproveitamos a existente) antes de enviar e
+  // devolvemos o uuid para o formulário trocar o id local.
+  const handleDocumentUploadImmediate = async (
+    documento: { id: string; nome: string; tipo: string; obrigatorio: boolean },
+    file: File
+  ): Promise<{ realId?: string } | void> => {
+    if (!selectedId) return;
+    try {
+      let realId = documento.id;
+      if (documento.id.startsWith('new-doc-')) {
+        const { data: admissaoAtual, error: admissaoAtualError } = await supabase
+          .from('admissoes').select('tenant_id').eq('id', selectedId).single();
+        if (admissaoAtualError) throw admissaoAtualError;
+
+        // Dedup pela chave real do indice unico: (admissao_id, nome). Filtrar
+        // tambem por tipo deixaria passar um insert que colide com um nome ja
+        // existente de tipo diferente.
+        const { data: existente } = await supabase
+          .from('admissao_documentos')
+          .select('id')
+          .eq('admissao_id', selectedId)
+          .eq('nome', documento.nome)
+          .maybeSingle();
+
+        if (existente?.id) {
+          realId = existente.id;
+        } else {
+          const { data: inserido, error: inseridoError } = await supabase
+            .from('admissao_documentos')
+            .insert({
+              admissao_id: selectedId,
+              tenant_id: admissaoAtual.tenant_id,
+              nome: documento.nome,
+              tipo: documento.tipo,
+              obrigatorio: documento.obrigatorio,
+              status: 'pendente' as const,
+            })
+            .select('id')
+            .single();
+          if (inseridoError) throw inseridoError;
+          realId = inserido.id;
+        }
+      }
+      await uploadDocumento(selectedId, realId, file);
+      toast.success('Documento enviado com sucesso!');
+      return { realId };
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao enviar documento');
+      throw error;
     }
   };
 
@@ -582,7 +651,7 @@ export default function Admissao() {
           <AdmissaoForm
             onSubmit={handleSubmitForm}
             onCancel={handleBack}
-            onDocumentUploadImmediate={viewMode === 'edit' ? handleDocumentUpload : undefined}
+            onDocumentUploadImmediate={viewMode === 'edit' ? handleDocumentUploadImmediate : undefined}
             onDocumentRemoveImmediate={viewMode === 'edit' ? handleDocumentRemove : undefined}
             initialData={selectedAdmissaoFormatted ? {
               dadosPessoais: selectedAdmissaoFormatted.dadosPessoais,

@@ -57,10 +57,12 @@ export const dadosProfissionaisSchema = z.object({
 });
 
 export const dadosBancariosSchema = z.object({
-  banco: z.string().min(2, 'Banco obrigatório'),
-  agencia: z.string().min(3, 'Agência obrigatória'),
-  conta: z.string().min(4, 'Conta obrigatória'),
-  tipoConta: z.string().min(1, 'Tipo de conta obrigatório'),
+  // Dados bancários deixaram de ser obrigatórios na admissão (podem ser
+  // preenchidos depois). Mantidos como texto opcional — aceitam vazio.
+  banco: z.string().optional(),
+  agencia: z.string().optional(),
+  conta: z.string().optional(),
+  tipoConta: z.string().optional(),
   chavePix: z.string().optional(),
 });
 

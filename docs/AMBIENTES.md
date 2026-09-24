@@ -45,6 +45,72 @@ teste, e uma rotina de QA quebrou por funções auxiliares que nunca chegaram l�
 a decisão 09/2026 a homologação não é mais espelho da produção; a proteção contra
 esse tipo de erro passa a depender da disciplina do script de entrega.
 
+## Onde as TELAS de produção são publicadas — Vercel (decisão 24/09/2026)
+
+Até 09/2026 as telas de produção eram publicadas pelo **Lovable** (botão "Publicar"),
+servindo `youreyes.com.br`. Em **24/09/2026** a publicação das telas de produção
+passou para a **Vercel**.
+
+**Por quê.** O repositório foi transferido de `ustudy123` para a organização
+`YourEyes-dev` no GitHub (~21–23/09/2026). A conexão Lovable↔GitHub quebrou por causa
+de uma **referência antiga (stale) da conta `ustudy123`** guardada no backend do
+Lovable — o próprio suporte confirmou que limpar isso exige intervenção manual deles,
+disponível só em conta paga. Sem depender do Lovable, migramos a hospedagem das telas
+para a Vercel.
+
+> **Isto NÃO muda o banco.** A produção continua sendo o Supabase
+> `diayjpsrcerycycyaxst`, e toda mudança de banco segue por **script colado à mão no
+> SQL Editor** de produção. A Vercel serve **apenas as telas**.
+
+### Mapa da hospedagem de produção
+| | Valor |
+|---|---|
+| Provedor das telas | **Vercel** (time `your-eyes`, projeto `youreyesnovo`) |
+| Repositório | `YourEyes-dev/youreyesnovo` (GitHub) |
+| Domínio | `youreyes.com.br` (raiz) + `www.youreyes.com.br` |
+| Banco (inalterado) | Supabase produção `diayjpsrcerycycyaxst` |
+| Lovable | **dormente** — não é mais usado para publicar |
+
+### O portão manual (produção só muda no seu comando)
+A regra da casa — "produção só muda por gesto manual" — é preservada assim:
+- Na Vercel, a **Production Branch é `producao`** (não a `main`).
+- **Merges na `main`** geram só **pré-visualização** na Vercel — não tocam a produção.
+- **Publicar** = atualizar a branch **`producao`** para o commit desejado da `main`
+  (avanço/fast-forward, via PR `main → producao` ou empurrando a branch). A Vercel
+  então publica em `youreyes.com.br` automaticamente.
+
+### Configuração no repositório e na Vercel
+- `vercel.json` (raiz do repo): rewrite de SPA (`/(.*) → /index.html`) para deep links
+  não darem 404 ao recarregar.
+- Build: preset **Vite** (`vite build` → `dist`); o modo produção lê o `.env.production`
+  versionado no repositório.
+- Variáveis de ambiente definidas **na Vercel** (Production e Preview):
+  - `VITE_APP_URL = https://youreyes.com.br`
+  - `CYPRESS_INSTALL_BINARY = 0` (evita o build baixar o binário do Cypress)
+  - As chaves do Supabase **não** são definidas na Vercel — vêm do `.env.production`.
+
+### DNS (cPanel — nameservers `ns1/ns2.midianow.com`)
+| Nome | Tipo | Valor | TTL |
+|---|---|---|---|
+| `youreyes.com.br` (`@`) | A | `216.198.79.1` | 300 |
+| `www` | A | `216.198.79.1` | 300 |
+
+*(A Vercel também aceita `www` como CNAME para `cname.vercel-dns.com`; usamos A para o
+mesmo IP do raiz por simplicidade.)*
+
+**⏪ Rollback para o Lovable** (se algum dia precisar): reeditar os dois registros A de
+volta para **`185.158.133.1`** (valor anterior, do Lovable). Com TTL 300, volta em
+~5 min.
+
+**⚠️ Não tocar** nos registros de e-mail: **MX**, **TXT** (SPF/DKIM) e os subdomínios
+`mail`, `webmail`, `ftp`, `cpanel`… (em `187.110.165.194`). A migração mexeu **só** nos
+`A` de `@` e `www`; o e-mail segue intacto.
+
+### Se o Lovable for reconectado um dia
+A produção agora é a Vercel. **Não republique pelo Lovable sem querer** (ele publicaria
+a partir da `main`, em outro endereço). Decida antes quem é a fonte autoritativa das
+telas.
+
 ## Arquivos de ambiente
 
 | Arquivo | Propósito | Está no Git? |

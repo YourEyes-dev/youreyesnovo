@@ -29,12 +29,18 @@ function diasRestantes(valor?: string | null): number | null {
 
 
 function getPontoExternoUrl(token: string): string {
-  const customDomain = "https://youreyes.com.br";
-  const baseUrl =
-    window.location.hostname.includes("lovable.app") || window.location.hostname === "localhost"
-      ? window.location.origin
-      : customDomain;
-  return `${baseUrl}/ponto-externo/${token}`;
+  // Produção usa o domínio próprio (link bonito para o colaborador). Todos os
+  // outros ambientes — preview do Lovable, localhost e os sites de teste e
+  // homologação no github.io — usam o PRÓPRIO endereço + base do app, para o
+  // link abrir no MESMO ambiente onde foi gerado. Antes, o teste/homologação
+  // caíam no ramo do domínio de produção e o link gerado no teste abria na
+  // produção (token inexistente lá -> "Link inválido").
+  const host = window.location.hostname;
+  const ehProducao = host === "youreyes.com.br" || host.endsWith(".youreyes.com.br");
+  // BASE_URL termina com "/" (ex.: "/youreyesnovo/teste/" no teste, "/" na produção).
+  const base = import.meta.env.BASE_URL || "/";
+  const raiz = ehProducao ? "https://youreyes.com.br/" : `${window.location.origin}${base}`;
+  return `${raiz}ponto-externo/${token}`;
 }
 
 export function PontoLinksTab() {

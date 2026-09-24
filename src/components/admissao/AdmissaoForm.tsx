@@ -86,7 +86,7 @@ interface AdmissaoFormProps {
     dadosBancarios: Partial<DadosBancarios>;
     exameAdmissional?: Partial<DadosExameAdmissional>;
   }) => Promise<void>;
-  onDocumentUploadImmediate?: (documentoId: string, file: File) => Promise<void>;
+  onDocumentUploadImmediate?: (documento: DocumentoAdmissao, file: File) => Promise<{ realId?: string } | void>;
   onDocumentRemoveImmediate?: (documentoId: string) => Promise<void>;
   initialData?: {
     dadosPessoais?: Partial<DadosPessoais>;
@@ -372,6 +372,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
 
   const handleDocumentUpload = async (documentoId: string, file: File) => {
     const previousDocumentos = documentos;
+    const documentoAlvo = previousDocumentos.find(doc => doc.id === documentoId);
     const nextDocumentos: DocumentoAdmissao[] = previousDocumentos.map(doc =>
       doc.id === documentoId
         ? {
@@ -386,9 +387,19 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
 
     setDocumentos(nextDocumentos);
 
-    if (onDocumentUploadImmediate) {
+    if (onDocumentUploadImmediate && documentoAlvo) {
       try {
-        await onDocumentUploadImmediate(documentoId, file);
+        const resultado = await onDocumentUploadImmediate(documentoAlvo, file);
+        // Documento novo (id local "new-doc-N") vira uma linha real no banco na
+        // hora do envio imediato. Trocamos o id local pelo UUID recebido para
+        // que ações seguintes (remover/aprovar/substituir) não voltem a mandar
+        // "new-doc-N" onde o banco espera um uuid.
+        const realId = resultado?.realId;
+        if (realId && realId !== documentoId) {
+          setDocumentos(prev =>
+            prev.map(doc => (doc.id === documentoId ? { ...doc, id: realId } : doc))
+          );
+        }
       } catch (error) {
         setDocumentos(previousDocumentos);
         throw error;

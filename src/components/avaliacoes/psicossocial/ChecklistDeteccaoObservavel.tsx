@@ -13,7 +13,9 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
+  Lock,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +34,18 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/hooks/useTenant";
+import { useTenantFeatures } from "@/hooks/useTenantFeatures";
+
+/**
+ * Sinais que dependem de um módulo que pode não estar no plano do cliente.
+ * Quando o plano não inclui o módulo, o sinal aparece como "ative o módulo X"
+ * em vez de um valor — vira gancho de upsell, sem alarme falso.
+ */
+const MODULO_POR_INDICADOR: Record<string, { feature: string; nome: string }> = {
+  ocorrencias: { feature: "mod.cultura", nome: "Feedback & Ocorrências" },
+  denuncias: { feature: "mod.cultura", nome: "Ouvidoria" },
+  horas_excessivas: { feature: "mod.ponto", nome: "Ponto" },
+};
 
 interface IndicadorDeteccao {
   id: string;
@@ -47,10 +61,13 @@ interface IndicadorDeteccao {
   invertido?: boolean; // true = menor é pior
   status: "normal" | "atencao" | "critico" | "sem_dados";
   detalhe?: string;
+  /** Preenchido quando o módulo-fonte do sinal não está no plano do cliente. */
+  bloqueado?: { modulo: string; feature: string };
 }
 
 export function ChecklistDeteccaoObservavel() {
   const { tenantId } = useTenant();
+  const { features, planGatingActive } = useTenantFeatures();
   const [expandido, setExpandido] = useState(false);
 
   // Buscar dados de múltiplas fontes do sistema
@@ -206,7 +223,7 @@ export function ChecklistDeteccaoObservavel() {
       return "normal";
     };
 
-    return [
+    const base: IndicadorDeteccao[] = [
       {
         id: "turnover",
         titulo: "Taxa de Turnover (6m)",
@@ -288,7 +305,19 @@ export function ChecklistDeteccaoObservavel() {
         status: calcularStatus(dadosSistema.diasHoraExcessiva, 20, 50),
       },
     ];
-  }, [dadosSistema]);
+
+    // Sinais cujo módulo-fonte não está no plano viram "ative o módulo X":
+    // status vira 'sem_dados' (não conta como crítico/atenção — sem alarme
+    // falso) e ganham o rótulo de bloqueio. Fail-open: sem leitura de plano,
+    // nada é bloqueado.
+    return base.map((ind) => {
+      const dep = MODULO_POR_INDICADOR[ind.id];
+      if (dep && planGatingActive && !features.has(dep.feature)) {
+        return { ...ind, status: "sem_dados" as const, bloqueado: { modulo: dep.nome, feature: dep.feature } };
+      }
+      return ind;
+    });
+  }, [dadosSistema, features, planGatingActive]);
 
   const contadores = useMemo(() => {
     return {
@@ -445,7 +474,13 @@ function IndicadorCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="font-medium text-sm">{indicador.titulo}</p>
-          {statusBadge(indicador.status)}
+          {indicador.bloqueado ? (
+            <Badge variant="outline" className="gap-1 text-muted-foreground">
+              <Lock className="h-3 w-3" /> Módulo inativo
+            </Badge>
+          ) : (
+            statusBadge(indicador.status)
+          )}
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">{indicador.descricao}</p>
         {indicador.detalhe && (
@@ -459,10 +494,24 @@ function IndicadorCard({
         </div>
       </div>
       <div className="flex-shrink-0 text-right">
-        <p className="text-lg font-bold">
-          {indicador.valor !== null ? indicador.valor : "—"}
-        </p>
-        <p className="text-[10px] text-muted-foreground">{indicador.unidade}</p>
+        {indicador.bloqueado ? (
+          <Link
+            to="/meu-plano"
+            className="text-xs font-medium text-primary hover:underline leading-tight inline-block"
+            title={`Este sinal usa o módulo ${indicador.bloqueado.modulo}, que não está no plano atual.`}
+          >
+            Ative o módulo
+            <br />
+            {indicador.bloqueado.modulo}
+          </Link>
+        ) : (
+          <>
+            <p className="text-lg font-bold">
+              {indicador.valor !== null ? indicador.valor : "—"}
+            </p>
+            <p className="text-[10px] text-muted-foreground">{indicador.unidade}</p>
+          </>
+        )}
       </div>
     </div>
   );

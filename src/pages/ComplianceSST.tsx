@@ -21,8 +21,10 @@ import {
   Sparkles,
   BookOpen,
   ClipboardCheck,
+  HeartPulse,
 } from "lucide-react";
 import { useSSTDocumentos, SSTDocumento } from "@/hooks/useSSTDocumentos";
+import { PsicossocialVisaoBasica } from "@/components/avaliacoes/psicossocial/PsicossocialVisaoBasica";
 import { SSTAnaliseIAModal } from "@/components/sst/SSTAnaliseIAModal";
 import { SSTAlertasTab } from "@/components/sst/SSTAlertasTab";
 import { SSTAcoesTab } from "@/components/sst/SSTAcoesTab";
@@ -89,7 +91,7 @@ const ComplianceSST = () => {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 md:grid-cols-7 w-full">
+        <TabsList className="grid grid-cols-3 md:grid-cols-8 w-full">
           <TabsTrigger value="importacao" className="text-xs md:text-sm">
             <Sparkles className="w-4 h-4 mr-1.5" />
             Importação IA
@@ -121,9 +123,17 @@ const ComplianceSST = () => {
             <FileCheck className="w-4 h-4 mr-1.5" />
             eSocial
           </TabsTrigger>
+          <TabsTrigger value="psicossocial-visao" className="text-xs md:text-sm">
+            <HeartPulse className="w-4 h-4 mr-1.5" />
+            Visão Psicossocial
+          </TabsTrigger>
         </TabsList>
 
         {/* IMPORTAÇÃO INTELIGENTE */}
+        <TabsContent value="psicossocial-visao" className="space-y-4">
+          <PsicossocialVisaoBasica />
+        </TabsContent>
+
         <TabsContent value="importacao" className="space-y-4">
           <ImportacaoInteligente onImportado={() => setActiveTab("documentos")} />
         </TabsContent>

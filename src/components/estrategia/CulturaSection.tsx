@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useEstrategia } from "@/hooks/useEstrategia";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
+import { useGruposEconomicos } from "@/hooks/useGruposEconomicos";
 import type { EstrategiaOrganograma } from "@/types/estrategia";
 import type { EstrategiaEscopo } from "./EstrategiaEscopoSelector";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +24,15 @@ type ListField = "valores" | "principios" | "comportamentos_esperados" | "compor
 export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
   const { cultura, loadingCultura, upsertCultura, organograma } = useEstrategia(escopo);
   const { profile, tenantId, user } = useAuth();
-  const { empresaAtivaId } = useEmpresaAtiva();
+  const { empresaAtivaId, empresaAtiva } = useEmpresaAtiva();
+  const { grupos } = useGruposEconomicos();
+
+  // Nome a usar como "empresa" no manual: o da empresa (ou do grupo) do escopo
+  // atual — NUNCA o nome do usuário logado.
+  const nomeEscopo =
+    (escopo.tipo === "grupo"
+      ? grupos.find((g) => g.id === escopo.grupoId)?.nome
+      : (empresaAtiva?.nome_fantasia || empresaAtiva?.razao_social)) || "Nossa Empresa";
   const [form, setForm] = useState({
     missao: "",
     visao: "",
@@ -270,7 +279,7 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
       const { data, error } = await supabase.functions.invoke("ai-cultura-manual", {
         body: {
           ...form,
-          empresa_nome: profile?.nome_completo || "Nossa Empresa",
+          empresa_nome: nomeEscopo,
           organograma: organograma || [],
           tenantId,
         },

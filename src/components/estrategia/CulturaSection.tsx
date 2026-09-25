@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Heart, Plus, X, Save, Loader2, Sparkles, Wand2, Eye, LayoutGrid, ListTodo, FileText } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Heart, Plus, X, Save, Loader2, Sparkles, Wand2, Eye, LayoutGrid, ListTodo, FileText, Upload, Download } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,70 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
     },
     enabled: !!tenantId,
   });
+
+  // Manual de cultura ENVIADO pela empresa (upload). Fica salvo no módulo de
+  // Documentos (bucket privado "documentos"); aqui só listamos o mais recente.
+  const TIPO_MANUAL_ENVIADO = "Manual de Cultura (enviado)";
+  const ACCEPT_MANUAL = ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingManual, setUploadingManual] = useState(false);
+
+  const { data: uploadedManual, refetch: refetchUploaded } = useQuery({
+    queryKey: ["manual_cultura_enviado", tenantId],
+    queryFn: async () => {
+      if (!tenantId) return null;
+      const { data } = await fromTable("documentos")
+        .select("id, nome_original, storage_path, created_at")
+        .eq("tenant_id", tenantId)
+        .eq("tipo", TIPO_MANUAL_ENVIADO)
+        .order("created_at", { ascending: false })
+        .limit(1) as { data: any[] | null };
+      return data?.[0] || null;
+    },
+    enabled: !!tenantId,
+  });
+
+  const handleUploadManual = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = ""; // permite reenviar o mesmo arquivo
+    if (!file) return;
+    if (!tenantId || !user) { toast.error("Sessão inválida."); return; }
+    const nome = file.name.toLowerCase();
+    const extOk = [".pdf", ".doc", ".docx"].some((ext) => nome.endsWith(ext));
+    if (!extOk) { toast.error("Envie um arquivo PDF ou Word (.pdf, .doc, .docx)."); return; }
+    if (file.size > 20 * 1024 * 1024) { toast.error("Arquivo muito grande (máx. 20 MB)."); return; }
+    setUploadingManual(true);
+    try {
+      const res = await arquivarDocumento({
+        tenantId,
+        empresaId: empresaAtivaId || null,
+        userId: user.id,
+        userNome: profile?.nome_completo || user.email || "",
+        file,
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        tipo: TIPO_MANUAL_ENVIADO,
+        pastaCategoria: "Cultura",
+        observacoes: "Manual de Cultura enviado pela empresa (upload).",
+      });
+      if (!res) throw new Error("Falha no envio.");
+      toast.success("Manual de cultura enviado e salvo!");
+      refetchUploaded();
+    } catch (err: any) {
+      toast.error("Não foi possível enviar o manual. " + (err?.message || ""));
+    } finally {
+      setUploadingManual(false);
+    }
+  };
+
+  const handleDownloadUploaded = async () => {
+    if (!uploadedManual?.storage_path) return;
+    const { data, error } = await supabase.storage
+      .from("documentos")
+      .createSignedUrl(uploadedManual.storage_path, 60);
+    if (error || !data?.signedUrl) { toast.error("Não foi possível gerar o link para download."); return; }
+    window.open(data.signedUrl, "_blank");
+  };
 
   useEffect(() => {
     // Reset form whenever the active scope (empresa/grupo) changes,
@@ -298,8 +362,13 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
             <Heart className="w-5 h-5 text-primary" /> Cultura Organizacional
           </h3>
           <p className="text-sm text-muted-foreground">Formalize e gerencie a identidade cultural da empresa</p>
+          {uploadedManual && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              <FileText className="w-3.5 h-3.5" /> Manual enviado: <span className="font-medium">{uploadedManual.nome_original}</span>
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:justify-end">
           {activeTab === "editor" && (
             <>
               {cachedManual && (
@@ -310,6 +379,16 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
               <Button variant="outline" size="sm" onClick={handleGenerateManual} disabled={manualLoading}>
                 <Sparkles className="w-4 h-4 mr-1" /> {cachedManual ? "Regerar Manual" : "Gerar Manual com IA"}
               </Button>
+              {uploadedManual && (
+                <Button variant="outline" size="sm" onClick={handleDownloadUploaded}>
+                  <Download className="w-4 h-4 mr-1" /> Baixar enviado
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploadingManual}>
+                {uploadingManual ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+                {uploadedManual ? "Substituir enviado" : "Enviar manual pronto"}
+              </Button>
+              <input ref={fileInputRef} type="file" accept={ACCEPT_MANUAL} className="hidden" onChange={handleUploadManual} />
               <Button size="sm" onClick={handleSave} disabled={upsertCultura.isPending}>
                 <Save className="w-4 h-4 mr-1" /> {upsertCultura.isPending ? "Salvando..." : "Salvar"}
               </Button>

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  MessageSquare, Loader2, AlertCircle, CheckCircle2, Shield, UserCheck, EyeOff, Copy,
+  MessageSquare, Loader2, AlertCircle, CheckCircle2, Shield, UserCheck, EyeOff, Copy, Search, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,20 @@ import { toast } from "sonner";
 
 const TIPOS: TipoManifestacao[] = ["denuncia", "reclamacao", "sugestao", "elogio", "duvida"];
 
+const STATUS_INFO: Record<string, { label: string; classe: string }> = {
+  pendente: { label: "Pendente", classe: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+  em_analise: { label: "Em análise", classe: "bg-sky-500/15 text-sky-600 border-sky-500/30" },
+  respondido: { label: "Respondido", classe: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
+  arquivado: { label: "Arquivado", classe: "bg-slate-500/15 text-slate-500 border-slate-500/30" },
+};
+
+function formatarDataHora(valor?: string | null): string {
+  if (!valor) return "";
+  try { return new Date(valor).toLocaleString("pt-BR"); } catch { return ""; }
+}
+
 type Etapa = "carregando" | "erro" | "formulario" | "enviando" | "concluido";
+type Vista = "registrar" | "acompanhar";
 
 export default function OuvidoriaExterna() {
   const { token } = useParams<{ token: string }>();
@@ -36,6 +49,13 @@ export default function OuvidoriaExterna() {
   const [assunto, setAssunto] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [protocolo, setProtocolo] = useState<string>("");
+
+  // Acompanhamento por protocolo
+  const [vista, setVista] = useState<Vista>("registrar");
+  const [protocoloConsulta, setProtocoloConsulta] = useState("");
+  const [consultando, setConsultando] = useState(false);
+  const [consulta, setConsulta] = useState<any | null>(null);
+  const [consultaVazia, setConsultaVazia] = useState(false);
 
   // Resolve o link
   useEffect(() => {
@@ -104,6 +124,26 @@ export default function OuvidoriaExterna() {
     toast.success("Protocolo copiado!");
   };
 
+  const consultar = async () => {
+    if (!token) return;
+    const p = protocoloConsulta.trim();
+    if (!p) { toast.error("Informe o protocolo."); return; }
+    setConsultando(true);
+    setConsulta(null);
+    setConsultaVazia(false);
+    const { data, error } = await (supabasePublic as any).rpc("consultar_manifestacao_ouvidoria", {
+      p_token: token, p_protocolo: p,
+    });
+    setConsultando(false);
+    const r = (data || {}) as any;
+    if (error || r.error) {
+      toast.error(r.error || "Não foi possível consultar agora. Tente novamente.");
+      return;
+    }
+    if (!r.encontrado) { setConsultaVazia(true); return; }
+    setConsulta(r);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex flex-col items-center justify-center p-4 gap-4">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg">
@@ -146,8 +186,16 @@ export default function OuvidoriaExterna() {
                       <Copy className="w-3.5 h-3.5" />
                     </Button>
                   </div>
+                  <p className="text-[11px] text-muted-foreground">Guarde-o para acompanhar o andamento por aqui, a qualquer momento.</p>
                 </div>
               )}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { setProtocoloConsulta(protocolo); setVista("acompanhar"); setConsulta(null); setConsultaVazia(false); setEtapa("formulario"); }}
+              >
+                <Search className="w-4 h-4 mr-2" /> Acompanhar pelo protocolo
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -155,6 +203,25 @@ export default function OuvidoriaExterna() {
         {(etapa === "formulario" || etapa === "enviando") && (
           <Card>
             <CardContent className="py-6 space-y-5">
+              {/* Alternador: Registrar / Acompanhar */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVista("registrar")}
+                  className={`rounded-lg border px-3 py-2 text-sm transition-colors ${vista === "registrar" ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted/50 text-muted-foreground"}`}
+                >
+                  Registrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVista("acompanhar")}
+                  className={`rounded-lg border px-3 py-2 text-sm transition-colors ${vista === "acompanhar" ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted/50 text-muted-foreground"}`}
+                >
+                  Acompanhar
+                </button>
+              </div>
+
+              {vista === "registrar" && (<>
               {/* Tipo */}
               <div className="space-y-2">
                 <Label className="text-sm">Tipo de manifestação</Label>
@@ -246,6 +313,64 @@ export default function OuvidoriaExterna() {
                   No modo <strong>anônimo</strong>, nenhum dado de identificação é registrado. Ao se identificar, seus dados ficam visíveis apenas aos responsáveis pela ouvidoria.
                 </span>
               </div>
+              </>)}
+
+              {vista === "acompanhar" && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="protocolo" className="text-sm">Protocolo</Label>
+                    <Input
+                      id="protocolo"
+                      placeholder="OUV-00000000-XXXXXX"
+                      value={protocoloConsulta}
+                      onChange={(e) => setProtocoloConsulta(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => { if (e.key === "Enter") consultar(); }}
+                    />
+                    <p className="text-[11px] text-muted-foreground">Use o protocolo que você recebeu ao enviar a manifestação.</p>
+                  </div>
+                  <Button className="w-full" size="lg" onClick={consultar} disabled={consultando}>
+                    {consultando ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                    Consultar
+                  </Button>
+
+                  {consultaVazia && (
+                    <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      Nenhuma manifestação encontrada com esse protocolo. Confira o código e tente novamente.
+                    </div>
+                  )}
+
+                  {consulta && (
+                    <div className="rounded-lg border bg-muted/20 p-4 space-y-3 text-left">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium flex items-center gap-1.5">
+                          {TIPO_MANIFESTACAO_ICONS[consulta.tipo as TipoManifestacao]} {TIPO_MANIFESTACAO_LABELS[consulta.tipo as TipoManifestacao]}
+                        </span>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${STATUS_INFO[consulta.status]?.classe || ""}`}>
+                          {STATUS_INFO[consulta.status]?.label || consulta.status}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Assunto</p>
+                        <p className="text-sm">{consulta.assunto}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Clock className="w-3.5 h-3.5" /> Enviada em {formatarDataHora(consulta.created_at)}
+                      </div>
+                      {consulta.resposta ? (
+                        <div className="rounded-md border bg-background p-3">
+                          <p className="text-xs text-muted-foreground mb-1">
+                            Resposta da empresa{consulta.respondido_em ? ` • ${formatarDataHora(consulta.respondido_em)}` : ""}
+                          </p>
+                          <p className="text-sm whitespace-pre-wrap">{consulta.resposta}</p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Ainda sem resposta. Volte a consultar mais tarde com o mesmo protocolo.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

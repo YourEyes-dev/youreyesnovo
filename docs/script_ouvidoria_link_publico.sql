@@ -314,7 +314,54 @@ $fn$;
 REVOKE EXECUTE ON FUNCTION public.buscar_ouvidoria_link_por_ponto_token(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.buscar_ouvidoria_link_por_ponto_token(text) TO anon, authenticated;
 
--- 9) CONFERÊNCIA (único resultado exibido): confirma estrutura e RPCs criadas.
+-- 9) consultar_manifestacao_ouvidoria: acompanhamento por protocolo -----------
+-- Devolve só campos de status (nunca identidade do autor). O protocolo é o segredo.
+CREATE OR REPLACE FUNCTION public.consultar_manifestacao_ouvidoria(p_token text, p_protocolo text)
+RETURNS json
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE
+  v_link RECORD;
+  v_m RECORD;
+BEGIN
+  SELECT * INTO v_link
+  FROM public.ouvidoria_links
+  WHERE token = p_token AND ativo = true
+    AND (data_expiracao IS NULL OR data_expiracao > now());
+  IF NOT FOUND THEN
+    RETURN json_build_object('error', 'Link inválido ou expirado');
+  END IF;
+
+  SELECT tipo, assunto, status, resposta, respondido_em, created_at
+    INTO v_m
+  FROM public.ouvidoria
+  WHERE tenant_id = v_link.tenant_id
+    AND protocolo = upper(TRIM(COALESCE(p_protocolo, '')))
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RETURN json_build_object('encontrado', false);
+  END IF;
+
+  RETURN json_build_object(
+    'encontrado', true,
+    'tipo', v_m.tipo,
+    'assunto', v_m.assunto,
+    'status', v_m.status,
+    'resposta', v_m.resposta,
+    'respondido_em', v_m.respondido_em,
+    'created_at', v_m.created_at
+  );
+END;
+$fn$;
+
+REVOKE EXECUTE ON FUNCTION public.consultar_manifestacao_ouvidoria(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.consultar_manifestacao_ouvidoria(text, text) TO anon, authenticated;
+
+-- 10) CONFERÊNCIA (único resultado exibido): confirma estrutura e RPCs criadas.
 SELECT
   to_regclass('public.ouvidoria_links') IS NOT NULL AS tabela_links_ok,
   (SELECT count(*) FROM information_schema.columns
@@ -325,4 +372,5 @@ SELECT
       'buscar_ouvidoria_link_por_token',
       'buscar_colaborador_ouvidoria_por_cpf',
       'registrar_manifestacao_externa',
-      'buscar_ouvidoria_link_por_ponto_token')) AS rpcs_ok;
+      'buscar_ouvidoria_link_por_ponto_token',
+      'consultar_manifestacao_ouvidoria')) AS rpcs_ok;

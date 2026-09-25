@@ -87,6 +87,7 @@ const Register = lazy(() => import("./pages/auth/Register"));
 const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
 const QuestionarioPsicossocial = lazy(() => import("./pages/QuestionarioPsicossocial"));
+const OuvidoriaExterna = lazy(() => import("./pages/OuvidoriaExterna"));
 const EntrevistaGuiada = lazy(() => import("./pages/EntrevistaGuiada"));
 const PdiAssinatura = lazy(() => import("./pages/PdiAssinatura"));
 const PontoExterno = lazy(() => import("./pages/PontoExterno"));
@@ -208,6 +209,7 @@ const App = () => (
               <Route path="/trilha-terceiro/:token" element={<TrilhaTerceiroPublica />} />
               <Route path="/ponto-externo" element={<PontoExterno />} />
               <Route path="/ponto-externo/:token" element={<PontoExterno />} />
+              <Route path="/ouvidoria-externa/:token" element={<OuvidoriaExterna />} />
               <Route path="/contrato-assinatura/:token" element={<AssinaturaContrato />} />
               <Route path="/experiencia-assinatura/:token" element={<ExperienciaAssinatura />} />
               <Route path="/os/:token" element={<OrdemServicoAssinatura />} />

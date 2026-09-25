@@ -13,7 +13,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { missao, visao, valores, principios, comportamentos_esperados, comportamentos_nao_tolerados, empresa_nome, organograma, tenantId } = await req.json();
+    const {
+      missao, visao, valores, principios, comportamentos_esperados, comportamentos_nao_tolerados,
+      empresa_nome, organograma, tenantId,
+      proposito, carta_boas_vindas, tom_de_voz, codigo_conduta, dress_code, modelo_trabalho,
+      documentos_cultura,
+    } = await req.json();
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -90,20 +95,34 @@ DADOS DA ESTRATÉGIA:
 - Princípios Culturais: ${principios?.length > 0 ? principios.join(", ") : "(nenhum)"}
 - Comportamentos Esperados: ${comportamentos_esperados?.length > 0 ? comportamentos_esperados.join(", ") : "(nenhum)"}
 - Comportamentos Não Tolerados: ${comportamentos_nao_tolerados?.length > 0 ? comportamentos_nao_tolerados.join(", ") : "(nenhum)"}
+- Propósito: ${proposito || "(não informado)"}
+- Carta / Manifesto de boas-vindas (voz da liderança): ${carta_boas_vindas || "(não informada)"}
+- Tom de voz e comunicação: ${tom_de_voz || "(não informado)"}
+- Conduta e diversidade: ${codigo_conduta || "(não informado)"}
+- Dress code: ${dress_code || "(não informado)"}
+- Modelo de trabalho (presencial/híbrido/remoto, horários): ${modelo_trabalho || "(não informado)"}
+- Documentos que compõem a cultura (anexados pela empresa): ${documentos_cultura?.length > 0 ? documentos_cultura.join(", ") : "(nenhum)"}
 
 INSTRUÇÕES OBRIGATÓRIAS PARA O MANUAL:
 
 1. O manual DEVE ter no mínimo 8 seções completas e detalhadas:
    - Capa com nome da empresa e título "Manual de Cultura Organizacional"
-   - Mensagem de Boas-Vindas (2-3 parágrafos inspiradores)
+   - Mensagem de Boas-Vindas (2-3 parágrafos inspiradores). Se houver "Carta / Manifesto de boas-vindas", use-a como base desta seção, preservando o tom da liderança
+   - Nosso Propósito (quando informado, seção própria explicando por que a empresa existe além do lucro e o impacto que quer gerar; integre com a Missão)
    - Nossa Missão (explicação expandida com contexto e significado prático)
    - Nossa Visão de Futuro (detalhamento da visão com metas aspiracionais)
    - Nossos Valores (cada valor com título, descrição detalhada de 3-4 linhas e um exemplo prático de como vivenciá-lo no dia a dia)
    - Princípios Culturais (cada princípio com explicação aprofundada e diretrizes de aplicação)
    - Comportamentos Esperados (cada comportamento detalhado com cenários práticos e exemplos do que FAZER)
    - Comportamentos Não Tolerados (cada comportamento com explicação do impacto negativo e exemplos do que NÃO fazer)
+   - Conduta e Diversidade (quando informado, seção sobre respeito, inclusão e como as pessoas devem se tratar)
+   - Como Nos Comunicamos (quando houver "Tom de voz e comunicação", seção descrevendo o jeito da empresa de se comunicar)
+   - Como Trabalhamos (quando houver "Dress code" e/ou "Modelo de trabalho", seção prática sobre vestimenta, presencial/híbrido/remoto, horários e flexibilidade)
    - Como Vivemos Nossa Cultura (seção integradora com dicas práticas para o dia a dia)
+   - Documentos Complementares (quando houver documentos anexados, cite-os como leitura de referência que faz parte da cultura — ex.: Código de Ética e Conduta, Regulamento Interno)
    - Compromisso Coletivo (encerramento motivacional)
+
+   IMPORTANTE: só inclua as seções acima cujos dados foram informados. Nunca invente conteúdo para um campo marcado como "(não informado)" — simplesmente omita a seção correspondente.
 
 2. FORMATAÇÃO HTML OBRIGATÓRIA:
    - Use CSS inline em cada elemento

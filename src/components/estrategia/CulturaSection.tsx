@@ -40,6 +40,13 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
     principios: [] as string[],
     comportamentos_esperados: [] as string[],
     comportamentos_nao_tolerados: [] as string[],
+    // Campos de texto do manual (Onda 1)
+    proposito: "",
+    carta_boas_vindas: "",
+    tom_de_voz: "",
+    codigo_conduta: "",
+    dress_code: "",
+    modelo_trabalho: "",
   });
   const [newValue, setNewValue] = useState({ valores: "", principios: "", comportamentos_esperados: "", comportamentos_nao_tolerados: "" });
   const [activeTab, setActiveTab] = useState("editor");
@@ -128,6 +135,82 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
     window.open(data.signedUrl, "_blank");
   };
 
+  // Documentos que compõem a cultura (Código de Ética/Conduta, Regulamento
+  // Interno etc.). Ficam salvos no módulo de Documentos (bucket privado
+  // "documentos"); aqui listamos todos os do tipo e usamos os nomes como
+  // insumo para o manual gerado por IA.
+  const TIPO_DOC_CULTURA = "Documento de Cultura";
+  const ACCEPT_DOC = ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  const docsFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const { data: docsCultura, refetch: refetchDocs } = useQuery({
+    queryKey: ["documentos_cultura", tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      const { data } = await fromTable("documentos")
+        .select("id, nome_original, storage_path, created_at")
+        .eq("tenant_id", tenantId)
+        .eq("tipo", TIPO_DOC_CULTURA)
+        .order("created_at", { ascending: false }) as { data: any[] | null };
+      return data || [];
+    },
+    enabled: !!tenantId,
+  });
+
+  const handleUploadDocsCultura = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (e.target) e.target.value = ""; // permite reenviar o mesmo arquivo
+    if (files.length === 0) return;
+    if (!tenantId || !user) { toast.error("Sessão inválida."); return; }
+    setUploadingDoc(true);
+    let ok = 0;
+    try {
+      for (const file of files) {
+        const nome = file.name.toLowerCase();
+        const extOk = [".pdf", ".doc", ".docx"].some((ext) => nome.endsWith(ext));
+        if (!extOk) { toast.error(`"${file.name}": envie PDF ou Word (.pdf, .doc, .docx).`); continue; }
+        if (file.size > 20 * 1024 * 1024) { toast.error(`"${file.name}": arquivo muito grande (máx. 20 MB).`); continue; }
+        const res = await arquivarDocumento({
+          tenantId,
+          empresaId: empresaAtivaId || null,
+          userId: user.id,
+          userNome: profile?.nome_completo || user.email || "",
+          file,
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          tipo: TIPO_DOC_CULTURA,
+          pastaCategoria: "Cultura",
+          observacoes: "Documento que compõe a cultura (upload).",
+        });
+        if (res) ok++;
+      }
+      if (ok > 0) toast.success(`${ok} documento(s) enviado(s) e salvo(s)!`);
+      refetchDocs();
+    } catch (err: any) {
+      toast.error("Não foi possível enviar os documentos. " + (err?.message || ""));
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleDownloadDoc = async (storagePath: string) => {
+    if (!storagePath) return;
+    const { data, error } = await supabase.storage
+      .from("documentos")
+      .createSignedUrl(storagePath, 60);
+    if (error || !data?.signedUrl) { toast.error("Não foi possível gerar o link para download."); return; }
+    window.open(data.signedUrl, "_blank");
+  };
+
+  const handleRemoveDoc = async (id: string) => {
+    if (!id) return;
+    const { error } = await fromTable("documentos").delete().eq("id", id);
+    if (error) { toast.error("Não foi possível remover o documento."); return; }
+    toast.success("Documento removido.");
+    refetchDocs();
+  };
+
   useEffect(() => {
     // Reset form whenever the active scope (empresa/grupo) changes,
     // so switching empresas doesn't carry over stale Missão/Visão/Valores.
@@ -139,6 +222,12 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
         principios: Array.isArray(cultura.principios) ? cultura.principios : [],
         comportamentos_esperados: Array.isArray(cultura.comportamentos_esperados) ? cultura.comportamentos_esperados : [],
         comportamentos_nao_tolerados: Array.isArray(cultura.comportamentos_nao_tolerados) ? cultura.comportamentos_nao_tolerados : [],
+        proposito: cultura.proposito || "",
+        carta_boas_vindas: cultura.carta_boas_vindas || "",
+        tom_de_voz: cultura.tom_de_voz || "",
+        codigo_conduta: cultura.codigo_conduta || "",
+        dress_code: cultura.dress_code || "",
+        modelo_trabalho: cultura.modelo_trabalho || "",
       });
     } else {
       setForm({
@@ -148,6 +237,12 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
         principios: [],
         comportamentos_esperados: [],
         comportamentos_nao_tolerados: [],
+        proposito: "",
+        carta_boas_vindas: "",
+        tom_de_voz: "",
+        codigo_conduta: "",
+        dress_code: "",
+        modelo_trabalho: "",
       });
     }
   }, [cultura, empresaAtivaId, escopo?.tipo, escopo?.grupoId]);
@@ -280,6 +375,7 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
         body: {
           ...form,
           empresa_nome: nomeEscopo,
+          documentos_cultura: (docsCultura || []).map((d: any) => d.nome_original).filter(Boolean),
           organograma: organograma || [],
           tenantId,
         },
@@ -344,6 +440,16 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
     { key: "principios" as const, label: "Princípios Culturais", color: "bg-accent text-accent-foreground" },
     { key: "comportamentos_esperados" as const, label: "Comportamentos Esperados", color: "bg-emerald-100 text-emerald-800" },
     { key: "comportamentos_nao_tolerados" as const, label: "Comportamentos Não Tolerados", color: "bg-red-100 text-red-800" },
+  ];
+
+  // Campos de texto livre que enriquecem o Manual de Cultura (Onda 1).
+  const textFields = [
+    { key: "proposito" as const, label: "Propósito", placeholder: "Por que a empresa existe além do lucro? O impacto que ela quer gerar." },
+    { key: "carta_boas_vindas" as const, label: "Carta / Manifesto de boas-vindas", placeholder: "Mensagem de acolhimento a quem chega — a voz da liderança dando as boas-vindas." },
+    { key: "tom_de_voz" as const, label: "Tom de voz e comunicação", placeholder: "Como a empresa se comunica (formal, próximo, descontraído...) e o jeito de falar com as pessoas." },
+    { key: "codigo_conduta" as const, label: "Conduta e diversidade", placeholder: "Postura esperada, respeito, inclusão e diversidade — como as pessoas devem se tratar." },
+    { key: "dress_code" as const, label: "Dress code", placeholder: "Orientações de vestimenta (livre, casual, uniforme, por área...)." },
+    { key: "modelo_trabalho" as const, label: "Modelo de trabalho", placeholder: "Presencial, híbrido ou remoto; horários, flexibilidade e como o trabalho acontece." },
   ];
 
   const AiButton = ({ campo, label }: { campo: string; label: string }) => (
@@ -466,6 +572,73 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
               </CardContent>
             </Card>
           ))}
+
+          {textFields.map(({ key, label, placeholder }) => (
+            <Card key={key}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">{label}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={form[key]}
+                  onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                  placeholder={placeholder}
+                  rows={4}
+                />
+              </CardContent>
+            </Card>
+          ))}
+
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm">Documentos da cultura</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Código de Ética e Conduta, Regulamento Interno e outros documentos que
+                  compõem a cultura. Ficam salvos no módulo Documentos e servem de insumo
+                  para o manual gerado por IA.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => docsFileInputRef.current?.click()}
+                disabled={uploadingDoc}
+              >
+                {uploadingDoc ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+                Adicionar documento
+              </Button>
+              <input
+                ref={docsFileInputRef}
+                type="file"
+                accept={ACCEPT_DOC}
+                multiple
+                className="hidden"
+                onChange={handleUploadDocsCultura}
+              />
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(docsCultura || []).map((doc: any) => (
+                <div key={doc.id} className="flex items-center justify-between gap-2 p-2 rounded-lg border bg-muted/20">
+                  <span className="text-sm flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="truncate">{doc.nome_original}</span>
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadDoc(doc.storage_path)} title="Baixar">
+                      <Download className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700" onClick={() => handleRemoveDoc(doc.id)} title="Remover">
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {(!docsCultura || docsCultura.length === 0) && (
+                <p className="text-xs text-muted-foreground">Nenhum documento adicionado</p>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="dashboard" className="mt-6 space-y-6">

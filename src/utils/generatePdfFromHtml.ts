@@ -103,6 +103,8 @@ export function normalizeManualHtml(html: string) {
       box-sizing: border-box;
       overflow-wrap: break-word;
       word-wrap: break-word;
+      font-size: 13px;
+      line-height: 1.6;
     }
 
     *, *::before, *::after { box-sizing: border-box; }
@@ -120,6 +122,20 @@ export function normalizeManualHtml(html: string) {
   `;
 
   documentNode.head.appendChild(baseStyle);
+
+  // Reduz tamanhos de fonte pensados para TELA (capa 42px, títulos 28px, corpo
+  // 15px+), que no A4 ficam grandes demais e "estouram" o layout. Escala os
+  // font-size inline em px por um fator, com um piso para não sumir.
+  const FONT_SCALE = 0.78;
+  const FONT_MIN_PX = 11;
+  documentNode.body.querySelectorAll<HTMLElement>('[style*="font-size"]').forEach((el) => {
+    const style = el.getAttribute("style") || "";
+    const novo = style.replace(/font-size\s*:\s*([\d.]+)px/gi, (_m, px) => {
+      const val = Math.max(FONT_MIN_PX, Math.round(parseFloat(px) * FONT_SCALE));
+      return `font-size: ${val}px`;
+    });
+    if (novo !== style) el.setAttribute("style", novo);
+  });
 
   // Ensure naked text nodes in body are wrapped in <p>
   Array.from(documentNode.body.childNodes).forEach(node => {
@@ -420,29 +436,54 @@ export async function generatePdfFromHtml({ html, filenamePrefix }: GeneratePdfF
 
     const contentRect = contentDiv.getBoundingClientRect();
 
+    // Altura útil de uma página em px de CSS (para não tratar um bloco maior que
+    // uma página como "não pode cortar" — isso travaria a paginação).
+    const usablePageCssPx = usableHeight * ((contentDiv.offsetWidth || 604) / contentWidth);
+
     // Pontos onde é aceitável cortar: começo e fim de cada bloco semântico.
     const breakPointsCss: number[] = [];
+    const pushBreak = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      breakPointsCss.push(r.top - contentRect.top);
+      breakPointsCss.push(r.bottom - contentRect.top);
+    };
     contentDiv
       .querySelectorAll(".capa, .sumario, .funcao, .secao, .grupo, .tabela, .cards, .card, .rodape")
-      .forEach((el) => {
-        const r = (el as HTMLElement).getBoundingClientRect();
-        breakPointsCss.push(r.top - contentRect.top);
-        breakPointsCss.push(r.bottom - contentRect.top);
-      });
+      .forEach((el) => pushBreak(el as HTMLElement));
 
-    // Zonas onde cortar é PROIBIDO: dentro de um título ou de uma linha de
-    // tabela. Os pontos de quebra acima são a preferência; isto é a garantia.
-    // Sem isto o corte passava no meio do "3 Escopo Geral" — ele saía picado
-    // no rodapé de uma página e no topo da seguinte.
+    // O manual gerado por IA usa ESTILO INLINE (sem as classes acima). Então
+    // também tratamos títulos e contêineres visuais (cards/faixas com fundo,
+    // borda, sombra ou padding) como fronteiras de bloco — é o que impede as
+    // seções de serem cortadas no meio entre páginas.
+    const headings = Array.from(contentDiv.querySelectorAll("h1, h2, h3, h4, h5, h6")) as HTMLElement[];
+    const visualContainers = (Array.from(
+      contentDiv.querySelectorAll("div[style], section[style], header[style], article[style]")
+    ) as HTMLElement[]).filter((el) => hasVisualContainerStyle(el));
+
+    headings.forEach((el) => pushBreak(el));
+    visualContainers.forEach((el) => pushBreak(el));
+
+    // Zonas onde cortar é PROIBIDO: dentro de um título, de uma linha de tabela
+    // ou de um card/faixa que caiba numa página. Os pontos de quebra acima são
+    // a preferência; isto é a garantia contra cortar um bloco ao meio.
     const zonasProibidasCss: Array<[number, number]> = [];
+    const pushZona = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      zonasProibidasCss.push([r.top - contentRect.top, r.bottom - contentRect.top]);
+    };
     contentDiv
       .querySelectorAll(
         ".capa-titulo, .funcao-titulo, .secao-titulo, .grupo-titulo, .card-titulo, .sumario-titulo, tr, .rodape"
       )
-      .forEach((el) => {
-        const r = (el as HTMLElement).getBoundingClientRect();
-        zonasProibidasCss.push([r.top - contentRect.top, r.bottom - contentRect.top]);
-      });
+      .forEach((el) => pushZona(el as HTMLElement));
+
+    headings.forEach((el) => pushZona(el));
+    // Só proíbe cortar DENTRO de um card se ele couber numa página; blocos
+    // maiores que uma página precisam poder ser cortados (senão trava).
+    visualContainers.forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.height > 0 && r.height <= usablePageCssPx) pushZona(el);
+    });
 
     const canvas = await html2canvas(contentDiv, {
       scale: 2,

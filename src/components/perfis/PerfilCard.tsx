@@ -30,10 +30,18 @@ interface PerfilCardProps {
   onToggleStatus: (id: string, ativo: boolean) => void;
   onVerVinculos: (perfil: PerfilAcesso) => void;
   onSimular?: (perfil: PerfilAcesso) => void;
+  /**
+   * Contagem de usuários calculada ao vivo a partir dos vínculos ativos.
+   * Quando informada, tem prioridade sobre o campo armazenado
+   * `perfil.total_usuarios`, que pode estar defasado (o contador do banco
+   * derivava por causa de gatilho duplicado/incremental).
+   */
+  usuariosCount?: number;
 }
 
-export function PerfilCard({ perfil, onEdit, onClone, onToggleStatus, onVerVinculos, onSimular }: PerfilCardProps) {
+export function PerfilCard({ perfil, onEdit, onClone, onToggleStatus, onVerVinculos, onSimular, usuariosCount }: PerfilCardProps) {
   const Icon = perfil.icone ? (ICON_MAP[perfil.icone] || ShieldCheck) : ShieldCheck;
+  const totalUsuarios = usuariosCount ?? perfil.total_usuarios ?? 0;
   const modulosCount = perfil.permissoes
     ? new Set(perfil.permissoes.map((p) => p.modulo)).size
     : 0;
@@ -141,7 +149,7 @@ export function PerfilCard({ perfil, onEdit, onClone, onToggleStatus, onVerVincu
                 className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Users className="w-3.5 h-3.5" />
-                <span>{perfil.total_usuarios} usuário{perfil.total_usuarios !== 1 ? "s" : ""}</span>
+                <span>{totalUsuarios} usuário{totalUsuarios !== 1 ? "s" : ""}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent>Usuários com este perfil</TooltipContent>

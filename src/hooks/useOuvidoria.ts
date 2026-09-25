@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "./useTenant";
 import { useAuth } from "./useAuth";
+import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { toast } from "sonner";
 import type { Manifestacao, TipoManifestacao, StatusManifestacao, PrioridadeManifestacao } from "@/types/ouvidoria";
 
@@ -37,6 +38,7 @@ export function useOuvidoria() {
   const queryClient = useQueryClient();
   const { tenantId } = useTenant();
   const { user, profile } = useAuth();
+  const { empresaAtivaId } = useEmpresaAtiva();
 
   // Buscar manifestações (usuários veem apenas as suas, managers veem todas)
   const manifestacoesQuery = useQuery({
@@ -120,6 +122,9 @@ export function useOuvidoria() {
         autor_nome: data.anonimo ? null : profile?.nome_completo,
         autor_email: data.anonimo ? null : user?.email,
         autor_departamento: data.anonimo ? null : profile?.cargo,
+        // Marca a empresa do seletor do topo (não em anônimas, para não estreitar
+        // o anonimato). Assim o filtro por empresa da área logada funciona.
+        empresa_id: data.anonimo ? null : (empresaAtivaId || null),
         status: "pendente" as StatusManifestacao,
         prioridade: "normal" as PrioridadeManifestacao,
         anexos: [] as AnexoData[],
@@ -240,7 +245,13 @@ export function useOuvidoria() {
     },
   });
 
-  const manifestacoesFinais = manifestacoesQuery.data || [];
+  // Filtro por empresa do seletor do topo (área logada). Mostra as manifestações
+  // da empresa selecionada E as sem empresa (anônimas / não atribuídas / criadas
+  // antes deste recurso) — estas nunca somem, por serem de denúncia. Sem empresa
+  // selecionada, mostra tudo do tenant.
+  const manifestacoesFinais = (manifestacoesQuery.data || []).filter((m) =>
+    !empresaAtivaId || !m.empresa_id || m.empresa_id === empresaAtivaId
+  );
 
   // Estatísticas
   const stats = {

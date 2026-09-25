@@ -27,6 +27,13 @@ export interface Manifestacao {
   respondido_por_nome: string | null;
   respondido_em: string | null;
   anexos: AnexoManifestacao[] | null;
+  // Preenchidos pelo link público: empresa resolvida pelo CPF (nula quando anônima
+  // ou CPF fora do cadastro), origem ('app' | 'link_publico'), CPF do autor e o
+  // protocolo de acompanhamento.
+  empresa_id: string | null;
+  origem: string | null;
+  autor_cpf: string | null;
+  protocolo: string | null;
   created_at: string;
   updated_at: string;
 }

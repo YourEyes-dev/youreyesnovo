@@ -71,6 +71,15 @@ export interface EmpresaCadastro {
   turnos: Turno[];
   possui_terceiro_turno: boolean;
   possui_escalas_especiais: boolean;
+  // Controle de jornada (Ponto). Desligado, a empresa NÃO gera falta por dia
+  // sem marcação e some do seletor do módulo de Ponto. CLT art. 74, §2º:
+  // obrigatório acima de 20 trabalhadores no estabelecimento, facultativo
+  // abaixo. A edição só é liberada quando o plano do cliente inclui o módulo
+  // de Ponto (feature mod.ponto).
+  usa_controle_ponto: boolean;
+  // Sinalização automática (rotina do banco) de que o estabelecimento passou
+  // de 20 trabalhadores e é OBRIGADO ao controle de jornada. Somente leitura.
+  controle_ponto_obrigatorio: boolean;
   
   // Condições Especiais
   trabalho_altura: boolean;

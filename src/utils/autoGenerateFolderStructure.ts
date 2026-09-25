@@ -63,6 +63,13 @@ const STANDARD_STRUCTURE: FolderNode[] = [
       },
     ],
   },
+  {
+    nome: "Cultura Organizacional", tipo: "root", ordem: 4, icone: "Heart",
+    children: [
+      { nome: "Manual de Cultura", tipo: "categoria", ordem: 0, icone: "FileText" },
+      { nome: "Documentos da Cultura", tipo: "categoria", ordem: 1, icone: "FileCheck" },
+    ],
+  },
   { nome: "Gestão de Pessoas", tipo: "root", ordem: 5, icone: "Users" },
   {
     nome: "Investigação de Incidentes", tipo: "root", ordem: 6, icone: "SearchX",

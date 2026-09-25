@@ -11,7 +11,7 @@ import {
   History, FileText, Shield, UserCheck, Wallet, BarChart3,
   Bell, Lock, FileDown, Settings, HardDrive, FileSpreadsheet, Scale,
   MapPin, Loader2, Link2, HelpCircle, Search, Paperclip, Eye, Image as ImageIcon, CalendarDays,
-  AlertTriangle, ShieldAlert, ShieldCheck, FolderArchive, ArrowLeftRight,
+  AlertTriangle, ShieldAlert, ShieldCheck, FolderArchive, ArrowLeftRight, Building2,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
@@ -35,6 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { usePonto, TIPO_MARCACAO_LABELS, STATUS_PONTO_CONFIG, type PontoDiario, type PontoAjuste } from "@/hooks/usePonto";
+import { usePontoEmpresas } from "@/hooks/usePontoEmpresas";
 import { calcularCoberturaJornada, formatarMinutosCurto } from "@/lib/ponto/alertasDia";
 import { formatarHoraMinuto } from "@/lib/ponto/formatoHoras";
 import { useColaboradores, type Colaborador } from "@/hooks/useColaboradores";
@@ -126,6 +127,25 @@ const Ponto = () => {
 
   // Marcações detalhadas do dia selecionado (todas, em ordem cronológica)
   const { empresaAtivaId } = useEmpresaAtiva();
+
+  // Seletor do módulo de Ponto: só empresas com controle de ponto ligado.
+  // Empresas que não usam o ponto (ex.: clientes só-psicossocial de um
+  // prestador) ficam de fora — não poluem o seletor nem inflam contagens.
+  const {
+    empresasPonto,
+    ativaEmRegime,
+    nenhumaEmpresaPonto,
+    setEmpresaAtiva: setEmpresaAtivaPonto,
+  } = usePontoEmpresas();
+
+  // Ao abrir o Ponto, se a empresa ativa (herdada de outro módulo) não usa
+  // ponto, troca para a primeira empresa em regime — assim as telas nunca
+  // exibem dados de uma empresa fora do módulo. Se nenhuma usa, cai no
+  // estado vazio abaixo.
+  useEffect(() => {
+    if (empresasPonto.length === 0 || ativaEmRegime) return;
+    setEmpresaAtivaPonto(empresasPonto[0]);
+  }, [ativaEmRegime, empresasPonto, setEmpresaAtivaPonto]);
   const dataSelStr = format(selectedDate, "yyyy-MM-dd");
   const { data: marcacoesDoDia = [] } = useQuery({
     queryKey: ["ponto-marcacoes-dia", tenantIdAtivo, dataSelStr, empresaAtivaId],
@@ -639,6 +659,40 @@ const Ponto = () => {
     return parts.length >= 2 ? `${parts[0]}h ${parts[1]}min` : interval;
   };
 
+  // Nenhuma empresa do cliente usa o Ponto: em vez de tabelas vazias que
+  // parecem "dados faltando", mostra um caminho claro para habilitar.
+  if (nenhumaEmpresaPonto) {
+    return (
+      <div className="space-y-6">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-1 pb-2 border-b">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary/80">
+            Gestão de Jornada · CLT
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2.5">
+            <Clock className="w-7 h-7 text-primary" /> Controle de Ponto Eletrônico
+          </h1>
+        </motion.div>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center text-center gap-3 py-14 px-6">
+            <div className="rounded-full bg-primary/10 p-3">
+              <Building2 className="w-7 h-7 text-primary" />
+            </div>
+            <h2 className="text-lg font-semibold">Nenhuma empresa utiliza o Ponto ainda</h2>
+            <p className="text-sm text-muted-foreground max-w-md">
+              O controle de ponto é definido por empresa. Para começar, abra o
+              cadastro da empresa que usa o ponto e ligue a opção
+              <span className="font-medium text-foreground"> “Utiliza controle de ponto” </span>
+              na aba <span className="font-medium text-foreground">Jornada e Turnos</span>.
+              Enquanto nenhuma empresa estiver ligada, o módulo fica vazio de
+              propósito — assim ninguém gera falta indevida.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -676,6 +730,37 @@ const Ponto = () => {
           </Button>
         </div>
       </motion.div>
+
+      {/* Seletor de empresa do MÓDULO — lista só empresas com controle de
+          ponto ligado. Some quando há uma única (já auto-selecionada). */}
+      {empresasPonto.length > 1 && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-card border rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Building2 className="w-4 h-4 text-primary" /> Empresa
+          </div>
+          <Select
+            value={empresaAtivaId ?? undefined}
+            onValueChange={(id) => {
+              const e = empresasPonto.find((x) => x.id === id);
+              if (e) setEmpresaAtivaPonto(e);
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-[320px]">
+              <SelectValue placeholder="Selecione a empresa" />
+            </SelectTrigger>
+            <SelectContent>
+              {empresasPonto.map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.razao_social || e.nome_fantasia || e.cnpj || "Empresa sem nome"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground sm:ml-auto">
+            Só empresas com controle de ponto ativo
+          </span>
+        </div>
+      )}
 
 
       {/* Main Tabs — 7 grupos funcionais */}

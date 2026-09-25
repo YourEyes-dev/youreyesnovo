@@ -3,8 +3,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, HardHat, AlertTriangle } from 'lucide-react';
+import { Clock, HardHat, AlertTriangle, Lock } from 'lucide-react';
 import type { EmpresaCadastro } from '@/types/empresa';
+import { useTenantFeatures } from '@/hooks/useTenantFeatures';
 
 const JORNADAS_PADRONIZADAS = [
   '44h semanais — 8h diárias (seg a sex) + 4h sábado',
@@ -44,6 +45,15 @@ const CONDICOES_ESPECIAIS = [
 export function EmpresaJornadaCondicoes({ data, onChange }: Props) {
   const condicoesAtivas = CONDICOES_ESPECIAIS.filter((c) => data[c.key]);
 
+  // O módulo de Ponto é liberado pelo PLANO do cliente (feature mod.ponto).
+  // Fail-open: quando o gating não está ativo (sem assinatura lida ou erro),
+  // `features` fica vazio e liberamos a edição — nunca travamos um operador
+  // real por não conseguir ler o plano. Só desabilitamos quando temos certeza
+  // de que o plano NÃO inclui o Ponto.
+  const { features, planGatingActive } = useTenantFeatures();
+  const planoLiberaPonto = !planGatingActive || features.has('mod.ponto');
+  const usaPonto = planoLiberaPonto && !!data.usa_controle_ponto;
+
   return (
     <div className="space-y-8">
       {/* Jornada e Turnos */}
@@ -51,6 +61,46 @@ export function EmpresaJornadaCondicoes({ data, onChange }: Props) {
         <div className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-primary" />
           <h3 className="font-semibold">Jornada e Turnos</h3>
+        </div>
+
+        {/* Utiliza controle de ponto — chave que coloca a empresa no regime de
+            Ponto (aparece no seletor do módulo e gera falta por dia sem
+            marcação). Só editável quando o plano inclui o módulo. */}
+        <div
+          className={`flex items-start justify-between gap-4 p-4 rounded-lg border transition-colors ${
+            usaPonto ? 'bg-primary/5 border-primary/30' : 'bg-card border-border'
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Label className="text-sm font-medium">Utiliza controle de ponto</Label>
+              {data.controle_ponto_obrigatorio && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-400 text-amber-800 text-[10px] gap-1"
+                  title="Mais de 20 empregados: o controle de jornada é obrigatório neste estabelecimento (CLT art. 74, §2º)."
+                >
+                  <Clock className="w-3 h-3" /> obrigatório
+                </Badge>
+              )}
+              {!planoLiberaPonto && (
+                <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground">
+                  <Lock className="w-3 h-3" /> não incluído no plano
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground max-w-prose">
+              {planoLiberaPonto
+                ? 'Ligado, a empresa entra no módulo de Ponto: aparece no seletor de empresas do Ponto e passa a gerar falta nos dias úteis sem marcação. Desligado, fica de fora — sem lançar falta indevida.'
+                : 'O módulo de Ponto não faz parte do plano contratado por este cliente. Contrate o módulo para habilitar o controle de jornada por empresa.'}
+            </p>
+          </div>
+          <Switch
+            checked={usaPonto}
+            disabled={!planoLiberaPonto}
+            onCheckedChange={(v) => onChange({ usa_controle_ponto: v })}
+            aria-label="Utiliza controle de ponto"
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -28,6 +28,8 @@ interface ArquivarDocumentoParams {
   pastaCategoria?: "SST" | "Ergonomia" | "Psicossocial" | "Ponto" | "Financeiro" | "Desligamento" | "Admissão" | "Aprendizado" | "Cultura" | null;
   // Subfolder inside collaborator folder
   subpastaColaborador?: "Admissão" | "Vida Funcional" | "Saúde Ocupacional" | "Desligamento" | null;
+  // Subfolder inside the "Cultura Organizacional" folder (used with pastaCategoria "Cultura")
+  subpastaCultura?: "Manual de Cultura" | "Documentos da Cultura" | null;
 }
 
 /**
@@ -84,7 +86,8 @@ async function findCategoriaPasta(
     Desligamento: ["Gestão de Pessoas"],
     "Admissão": ["Gestão de Pessoas"],
     Aprendizado: ["Processos Organizacionais", "Gestão de Pessoas"],
-    Cultura: ["Processos Organizacionais", "Gestão de Pessoas"],
+    // "Cultura" é resolvida por findOrCreateCulturaPasta (pasta dedicada, criada
+    // sob demanda), não por este mapa.
   };
 
   const candidates = FOLDER_MAP[categoria] || [categoria];
@@ -102,6 +105,82 @@ async function findCategoriaPasta(
   }
 
   return null;
+}
+
+/**
+ * Finds or creates a folder by name at a given level (root or under a parent),
+ * scoped by tenant + empresa so it matches how the Documentos module lists folders.
+ */
+async function findOrCreatePastaPorNome(
+  tenantId: string,
+  empresaId: string | null | undefined,
+  nome: string,
+  parentId: string | null,
+  tipo: string,
+  ordem: number,
+  icone: string | null,
+  userId: string,
+  userNome: string | null
+): Promise<string | null> {
+  let query = supabase
+    .from("documento_pastas")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("nome", nome);
+
+  query = parentId ? query.eq("pasta_pai_id", parentId) : query.is("pasta_pai_id", null);
+  query = empresaId ? query.eq("empresa_id", empresaId) : query.is("empresa_id", null);
+
+  const { data: existente } = await query.limit(1).maybeSingle();
+  if (existente?.id) return existente.id;
+
+  const { data: nova, error } = await supabase
+    .from("documento_pastas")
+    .insert({
+      tenant_id: tenantId,
+      empresa_id: empresaId || null,
+      nome,
+      tipo,
+      pasta_pai_id: parentId,
+      ordem,
+      icone,
+      criado_por: userId,
+      criado_por_nome: userNome,
+    } as any)
+    .select("id")
+    .single();
+
+  if (error || !nova) {
+    console.warn("[arquivarDocumento] Não foi possível criar a pasta:", nome, error);
+    return null;
+  }
+  return (nova as any).id;
+}
+
+/**
+ * Resolves (creating on demand) the "Cultura Organizacional" folder and its
+ * subfolder. Mirrors the STANDARD_STRUCTURE node, so tenants that never rodaram
+ * o assistente de estrutura também ganham a pasta ao salvar o primeiro documento.
+ */
+async function findOrCreateCulturaPasta(
+  tenantId: string,
+  empresaId: string | null | undefined,
+  subpasta: string | null | undefined,
+  userId: string,
+  userNome: string | null
+): Promise<string | null> {
+  const rootId = await findOrCreatePastaPorNome(
+    tenantId, empresaId, "Cultura Organizacional", null, "root", 4, "Heart", userId, userNome
+  );
+  if (!rootId) return null;
+  if (!subpasta) return rootId;
+
+  const ordem = subpasta === "Manual de Cultura" ? 0 : 1;
+  const icone = subpasta === "Manual de Cultura" ? "FileText" : "FileCheck";
+  const subId = await findOrCreatePastaPorNome(
+    tenantId, empresaId, subpasta, rootId, "categoria", ordem, icone, userId, userNome
+  );
+  return subId || rootId;
 }
 
 /**
@@ -125,6 +204,7 @@ export async function arquivarDocumento(params: ArquivarDocumentoParams): Promis
     colaboradorCpf,
     pastaCategoria,
     subpastaColaborador,
+    subpastaCultura,
   } = params;
 
   try {
@@ -154,6 +234,8 @@ export async function arquivarDocumento(params: ArquivarDocumentoParams): Promis
         subpastaColaborador,
         empresaId
       );
+    } else if (pastaCategoria === "Cultura") {
+      pastaId = await findOrCreateCulturaPasta(tenantId, empresaId, subpastaCultura, userId, userNome);
     } else if (pastaCategoria) {
       pastaId = await findCategoriaPasta(tenantId, pastaCategoria);
     }

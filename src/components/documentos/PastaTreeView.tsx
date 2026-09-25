@@ -20,6 +20,7 @@ import {
   FileCheck,
   Award,
   Shield,
+  Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   FileCheck,
   Award,
   Shield,
+  Heart,
 };
 
 interface PastaTreeViewProps {

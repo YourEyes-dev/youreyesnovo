@@ -114,6 +114,7 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
         mimeType: file.type || "application/octet-stream",
         tipo: TIPO_MANUAL_ENVIADO,
         pastaCategoria: "Cultura",
+        subpastaCultura: "Manual de Cultura",
         observacoes: "Manual de Cultura enviado pela empresa (upload).",
       });
       if (!res) throw new Error("Falha no envio.");
@@ -181,6 +182,7 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
           mimeType: file.type || "application/octet-stream",
           tipo: TIPO_DOC_CULTURA,
           pastaCategoria: "Cultura",
+          subpastaCultura: "Documentos da Cultura",
           observacoes: "Documento que compõe a cultura (upload).",
         });
         if (res) ok++;
@@ -353,6 +355,7 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
         tipo: "Manual de Cultura",
         observacoes: "Manual de Cultura Organizacional gerado por IA",
         pastaCategoria: "Cultura",
+        subpastaCultura: "Manual de Cultura",
       });
     } catch (err) {
       console.error("Erro ao arquivar:", err);
@@ -424,6 +427,7 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
         tipo: "Manual de Cultura (PDF)",
         observacoes: "PDF do Manual de Cultura Organizacional",
         pastaCategoria: "Cultura",
+        subpastaCultura: "Manual de Cultura",
       });
       toast.success("PDF arquivado no módulo Documentos!");
     } catch (err) {
@@ -713,6 +717,53 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
               </Card>
             </div>
           </div>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Heart className="w-5 h-5 text-primary" /> Identidade e Jeito de Ser
+              </CardTitle>
+              <Badge variant="secondary" className="font-normal">
+                {textFields.filter((f) => (form[f.key] || "").trim()).length} de {textFields.length} preenchidos
+              </Badge>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-2 gap-x-6 gap-y-5">
+              {textFields.map(({ key, label }) => (
+                <div key={key} className={key === "carta_boas_vindas" ? "md:col-span-2" : ""}>
+                  <h4 className="text-sm font-semibold text-primary mb-1">{label}</h4>
+                  {form[key]?.trim() ? (
+                    <p className="text-sm text-muted-foreground whitespace-pre-line p-3 bg-muted/30 rounded-lg border">{form[key]}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground/60 italic">Não definido</p>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" /> Documentos da cultura
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(docsCultura || []).map((doc: any) => (
+                <div key={doc.id} className="flex items-center justify-between gap-2 p-2 rounded-lg border bg-muted/20">
+                  <span className="text-sm flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="truncate">{doc.nome_original}</span>
+                  </span>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleDownloadDoc(doc.storage_path)} title="Baixar">
+                    <Download className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              {(!docsCultura || docsCultura.length === 0) && (
+                <p className="text-sm text-muted-foreground italic">Nenhum documento adicionado. Anexe no Editor de Cultura.</p>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

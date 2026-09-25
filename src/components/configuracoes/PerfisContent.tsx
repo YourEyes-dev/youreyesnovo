@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 
 export default function PerfisContent() {
   const {
@@ -29,6 +30,7 @@ export default function PerfisContent() {
   } = usePerfisAcesso();
 
   const { tenantId } = useAuth();
+  const { empresaAtivaId } = useEmpresaAtiva();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("perfis");
   const [perfilFormOpen, setPerfilFormOpen] = useState(false);
@@ -50,19 +52,37 @@ export default function PerfisContent() {
     enabled: !!tenantId,
   });
 
-  // Contagem de usuários por perfil calculada AO VIVO a partir dos vínculos
-  // ativos (fonte da verdade), por usuário distinto. Substitui o campo
-  // armazenado perfis_acesso.total_usuarios, que derivava do real por causa de
-  // gatilho duplicado + incremental no banco.
+  // Vínculos no escopo da empresa selecionada no seletor do topo (empresaAtivaId).
+  // Sem empresa selecionada, conta o tenant inteiro. Com empresa, conta os
+  // vínculos DAQUELA empresa e os sem empresa (empresa_id nulo aplica em qualquer
+  // contexto — ex.: o vínculo automático do "Colaborador (padrão)"), mesma regra
+  // do porteiro perfil_permite_modulo. Assim os contadores refletem a empresa
+  // logada, não vínculos de outra empresa.
+  const vinculosEscopo = useMemo(() => {
+    return vinculos.filter((v) => {
+      if (v.ativo === false) return false;
+      return !empresaAtivaId || !v.empresa_id || v.empresa_id === empresaAtivaId;
+    });
+  }, [vinculos, empresaAtivaId]);
+
+  // Contagem de usuários por perfil calculada AO VIVO (usuário distinto) a partir
+  // dos vínculos no escopo da empresa. Substitui o campo armazenado
+  // perfis_acesso.total_usuarios, que era do tenant inteiro e ainda derivava.
   const usuariosPorPerfil = useMemo(() => {
     const map = new Map<string, Set<string>>();
-    for (const v of vinculos) {
-      if (v.ativo === false) continue;
+    for (const v of vinculosEscopo) {
       if (!map.has(v.perfil_id)) map.set(v.perfil_id, new Set());
       map.get(v.perfil_id)!.add(v.usuario_id);
     }
     return map;
-  }, [vinculos]);
+  }, [vinculosEscopo]);
+
+  // "Usuários com perfil": usuários distintos com ao menos um vínculo no escopo.
+  const usuariosComPerfil = useMemo(() => {
+    const s = new Set<string>();
+    for (const v of vinculosEscopo) s.add(v.usuario_id);
+    return s.size;
+  }, [vinculosEscopo]);
 
   const perfisFiltered = perfis.filter((p) =>
     p.nome.toLowerCase().includes(search.toLowerCase()) ||
@@ -131,7 +151,7 @@ export default function PerfisContent() {
         {[
           { label: "Perfis ativos", value: perfis.filter((p) => p.ativo).length, color: "text-primary" },
           { label: "Templates disponíveis", value: templates.length, color: "text-violet-500" },
-          { label: "Usuários com perfil", value: vinculos.length, color: "text-emerald-500" },
+          { label: "Usuários com perfil", value: usuariosComPerfil, color: "text-emerald-500" },
           { label: "Perfis personalizados", value: perfisPersonalizados.length, color: "text-amber-500" },
         ].map((stat) => (
           <div key={stat.label} className="border rounded-xl p-3 bg-card">
@@ -275,7 +295,7 @@ export default function PerfisContent() {
           open={!!perfilVinculos}
           onClose={() => setPerfilVinculos(undefined)}
           perfil={perfilVinculos}
-          vinculos={vinculos}
+          vinculos={vinculosEscopo}
           usuarios={usuarios}
           onVincular={(payload) => vincularPerfil.mutate(payload)}
           onDesvincular={(vinculoId) => desvincularPerfil.mutate(vinculoId)}

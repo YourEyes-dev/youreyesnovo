@@ -18,6 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
+import { useUsuarios } from "@/hooks/useUsuarios";
+import { isTipoUsuarioGlobal } from "@/lib/tiposUsuario";
 
 export default function PerfisContent() {
   const {
@@ -31,6 +33,7 @@ export default function PerfisContent() {
 
   const { tenantId } = useAuth();
   const { empresaAtivaId } = useEmpresaAtiva();
+  const { usuarios: usuariosTenant } = useUsuarios();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("perfis");
   const [perfilFormOpen, setPerfilFormOpen] = useState(false);
@@ -52,18 +55,37 @@ export default function PerfisContent() {
     enabled: !!tenantId,
   });
 
-  // Vínculos no escopo da empresa selecionada no seletor do topo (empresaAtivaId).
-  // Sem empresa selecionada, conta o tenant inteiro. Com empresa, conta os
-  // vínculos DAQUELA empresa e os sem empresa (empresa_id nulo aplica em qualquer
-  // contexto — ex.: o vínculo automático do "Colaborador (padrão)"), mesma regra
-  // do porteiro perfil_permite_modulo. Assim os contadores refletem a empresa
-  // logada, não vínculos de outra empresa.
+  // Quais usuários pertencem à empresa selecionada no seletor do topo. MESMA regra
+  // da aba Usuários: tipos de acesso global aparecem em qualquer empresa; os demais
+  // pertencem por vínculo ativo (usuario_vinculos) com aquela empresa. É esta a
+  // fonte de "pertence à empresa" — o vínculo de PERFIL do Colaborador (padrão) tem
+  // empresa_id nulo e por isso não serve para recortar por empresa sozinho.
+  const usuariosDaEmpresa = useMemo(() => {
+    const ids = new Set<string>();
+    for (const u of usuariosTenant) {
+      if (!empresaAtivaId) { ids.add(u.id); continue; }
+      const pertence = isTipoUsuarioGlobal(u.tipo_usuario) ||
+        (u.vinculos || []).some((v) => v.empresa_id === empresaAtivaId && v.status === "ativo");
+      if (pertence) ids.add(u.id);
+    }
+    return ids;
+  }, [usuariosTenant, empresaAtivaId]);
+
+  // Vínculos perfil↔usuário que valem na empresa selecionada:
+  //  - sem empresa no seletor: todos (tenant inteiro);
+  //  - vínculo de perfil com empresa explícita = a selecionada; ou
+  //  - vínculo de perfil sem empresa (aplica em qualquer contexto) E o usuário
+  //    pertence à empresa selecionada.
+  // Assim, o "Colaborador (padrão)" (vínculos sem empresa) passa a contar só os
+  // usuários da empresa logada, e some a contagem de usuários de outras empresas.
   const vinculosEscopo = useMemo(() => {
     return vinculos.filter((v) => {
       if (v.ativo === false) return false;
-      return !empresaAtivaId || !v.empresa_id || v.empresa_id === empresaAtivaId;
+      if (!empresaAtivaId) return true;
+      if (v.empresa_id === empresaAtivaId) return true;
+      return !v.empresa_id && usuariosDaEmpresa.has(v.usuario_id);
     });
-  }, [vinculos, empresaAtivaId]);
+  }, [vinculos, empresaAtivaId, usuariosDaEmpresa]);
 
   // Contagem de usuários por perfil calculada AO VIVO (usuário distinto) a partir
   // dos vínculos no escopo da empresa. Substitui o campo armazenado

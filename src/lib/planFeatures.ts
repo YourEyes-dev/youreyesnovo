@@ -54,8 +54,16 @@ export const PATH_TO_FEATURE: Record<string, string> = {
   "/ouvidoria": "mod.cultura",
   "/feed": "mod.cultura",
 
-  // Governança / Enterprise: hoje sem item de menu dedicado (SSO, KPIs,
-  // integração ERP, etc.). Ficam de fora do mapa até virarem tela.
+  // Governança — a rota /estrategia é COMPARTILHADA: o Organograma é
+  // Estrutura (Starter) e Identidade/Planejamento são Estratégia (Governança).
+  // Por isso o gate é POR ABA (a chave inclui o ?tab=...); featureForPath
+  // casa a chave com query ANTES da sem query.
+  "/estrategia?tab=organograma": "mod.estrutura", // Organograma — nunca cadeia
+  "/estrategia?tab=cultura": "mod.estrategia",     // Identidade Estratégica
+  "/estrategia": "mod.estrategia",                 // Planejamento Estratégico
+
+  // Enterprise: SSO/IA/API sem item de menu dedicado (sem tela). Ficam de
+  // fora do mapa até virarem tela.
 };
 
 /**
@@ -96,9 +104,16 @@ export const FEATURE_PLAN_NAME: Record<string, string> = {
 
 /** Funcionalidade associada a um caminho, ou null se o caminho não é gateado. */
 export function featureForPath(pathname: string): string | null {
-  const cleanPath = pathname.split("?")[0].split("#")[0];
+  const full = pathname.split("#")[0]; // mantém a query (gate por aba)
+  // 1) casa exatamente COM a query — ex.: /estrategia?tab=cultura
+  if (PATH_TO_FEATURE[full]) return PATH_TO_FEATURE[full];
+  const cleanPath = full.split("?")[0];
+  // 2) casa exatamente sem a query
   if (PATH_TO_FEATURE[cleanPath]) return PATH_TO_FEATURE[cleanPath];
-  const sortedKeys = Object.keys(PATH_TO_FEATURE).sort((a, b) => b.length - a.length);
+  // 3) casa por prefixo (só chaves sem query)
+  const sortedKeys = Object.keys(PATH_TO_FEATURE)
+    .filter((k) => !k.includes("?"))
+    .sort((a, b) => b.length - a.length);
   for (const key of sortedKeys) {
     if (cleanPath === key || cleanPath.startsWith(key + "/")) return PATH_TO_FEATURE[key];
   }

@@ -193,6 +193,37 @@ const FAQ = [
   { q: "A oferta de 50% é permanente?", a: "É exclusiva de lançamento, válida por 6 meses. Quem assina o semestral neste período mantém o desconto durante todo o ciclo contratado." },
 ];
 
+// Hero dinâmico por campanha de tráfego pago (utm_campaign). Cada campanha do
+// Meta Ads testa uma dor diferente e cai na home; aqui o headline/subheadline
+// batem com o anúncio que a pessoa clicou. Fora desta lista (orgânico, direto,
+// parâmetro ausente ou desconhecido), o hero mantém o conteúdo padrão.
+const HERO_CAMPANHAS: Record<string, { headline: string; subheadline: string }> = {
+  descoberta_sst: {
+    headline: "Seu time usa EPI certo... ou só acha que usa?",
+    subheadline: "Fiscalização não avisa antes de chegar. Descubra em 3 minutos onde sua empresa está exposta — grátis.",
+  },
+  descoberta_jornada: {
+    headline: "Ponto batido é jornada em dia... ou só parece?",
+    subheadline: "Erro na apuração pode virar passivo trabalhista. Descubra em 3 minutos o risco real da sua operação — grátis.",
+  },
+  descoberta_documentos: {
+    headline: "Seus documentos estão em dia... ou só guardados?",
+    subheadline: "Quantos estão vencidos agora, sem ninguém saber? Descubra em 3 minutos — grátis.",
+  },
+  descoberta_pessoas: {
+    headline: "Seus talentos ficam... ou só passam?",
+    subheadline: "Processo ultrapassado custa caro em turnover. Descubra em 3 minutos onde sua cultura está travando — grátis.",
+  },
+  descoberta_dho: {
+    headline: "Sua equipe desenvolve pessoas... ou só preenche planilha?",
+    subheadline: "Avaliação manual rouba tempo que podia virar plano de ação. Descubra em 3 minutos — grátis.",
+  },
+  descoberta_estrategia: {
+    headline: "Sua gestão decide com dado... ou no escuro?",
+    subheadline: "Descubra em 3 minutos o nível de maturidade real da sua empresa — grátis.",
+  },
+};
+
 // ---------------- Component ----------------
 export default function Site() {
   const [ciclo, setCiclo] = useState<Ciclo>("semestral");
@@ -206,11 +237,23 @@ export default function Site() {
     (supabase as any).rpc("parceiro_ref_publico", { p_codigo: ref }).then(({ data }: { data: { nome: string; cidade: string | null; uf: string | null } | null }) => { if (data?.nome) setIndicador(data); });
     // Link "contratar" (#planos): rola até os planos depois que a página monta
     if (window.location.hash === "#planos") setTimeout(() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" }), 400);
+    // Tráfego pago (#diagnostico): abre direto na seção do diagnóstico ao carregar.
+    // Compara só o alvo do hash (descartando qualquer query string colada junto).
+    const alvoHash = window.location.hash.replace(/^#/, "").split("?")[0];
+    if (alvoHash === "diagnostico") setTimeout(() => document.getElementById("diagnostico")?.scrollIntoView({ behavior: "smooth" }), 400);
   }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [loadingPlano, setLoadingPlano] = useState<string | null>(null);
 
   const cicloAtual = useMemo(() => CICLOS.find((c) => c.key === ciclo)!, [ciclo]);
+
+  // Tráfego pago: se a URL trouxer uma utm_campaign conhecida, o hero assume o
+  // headline/subheadline da campanha. Caso contrário fica null e o hero padrão
+  // é renderizado normalmente (nada muda para orgânico/direto).
+  const heroCampanha = useMemo(() => {
+    const camp = new URLSearchParams(window.location.search).get("utm_campaign");
+    return camp ? HERO_CAMPANHAS[camp] ?? null : null;
+  }, []);
 
   useEffect(() => {
     const prevTitle = document.title;
@@ -377,12 +420,22 @@ export default function Site() {
               <span className="w-8 h-px bg-[#FFA033]" /> Sistema Operacional da Maturidade Organizacional
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.05] tracking-tight">
-              Sua empresa cresce <span className="text-[#60ABEF]">ou só aumenta?</span>
+              {heroCampanha ? (
+                heroCampanha.headline
+              ) : (
+                <>Sua empresa cresce <span className="text-[#60ABEF]">ou só aumenta?</span></>
+              )}
             </h1>
             <p className="mt-6 text-lg text-slate-300 max-w-2xl leading-relaxed">
-              Crescer é faturar mais com processo, evidência e gente desenvolvida. Aumentar é faturar mais com caos,
-              planilha e dependência de heróis. A YourEyes organiza pessoas, SST, DP, documentos, metas e estratégia em
-              uma única plataforma auditável com IA — e mede, em tempo real, o quanto sua empresa amadureceu.
+              {heroCampanha ? (
+                heroCampanha.subheadline
+              ) : (
+                <>
+                  Crescer é faturar mais com processo, evidência e gente desenvolvida. Aumentar é faturar mais com caos,
+                  planilha e dependência de heróis. A YourEyes organiza pessoas, SST, DP, documentos, metas e estratégia em
+                  uma única plataforma auditável com IA — e mede, em tempo real, o quanto sua empresa amadureceu.
+                </>
+              )}
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <a

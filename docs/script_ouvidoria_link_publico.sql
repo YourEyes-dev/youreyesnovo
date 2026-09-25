@@ -1,17 +1,18 @@
 -- ============================================================================
--- ENTREGA: Ouvidoria — link público (sem login) para manifestações
--- Equivalente à migration 20260925134309_ouvidoria_link_publico.sql
+-- ENTREGA: Ouvidoria — link público (sem login) + acompanhamento por protocolo
 -- Cole INTEIRO no SQL Editor (roda em uma única transação). Idempotente.
 --
 -- Cria: colunas novas em public.ouvidoria (origem, empresa_id, autor_cpf,
 -- protocolo), a tabela public.ouvidoria_links (um link por tenant) com RLS, e as
--- RPCs SECURITY DEFINER liberadas para anon que a tela pública usa. Só CRIA coisa
--- nova (não altera nem apaga dado existente), então não precisa de backup.
+-- RPCs SECURITY DEFINER liberadas para anon. Só CRIA coisa nova (não altera nem
+-- apaga dado existente), então não precisa de backup.
 --
--- NOTA: cada função usa uma marca de aspas-dólar PRÓPRIA (f1..f7, e pol no DO).
--- O divisor de comandos do SQL Editor (navegador) se perdia com a mesma marca
--- repetida em muitas funções no mesmo colar; marcas distintas evitam isso. No
--- servidor (db push/psql) tanto faz.
+-- NOTAS de compatibilidade com o SQL Editor (o db push/psql não precisa delas):
+--  1) Cada função usa marca de aspas-dólar PRÓPRIA (f1..f7; pol no DO).
+--  2) Nenhuma função grava resultado direto em variável por consulta (a forma que
+--     o auxiliar de RLS do SQL Editor confundia com "tabela nova", injetando
+--     ALTER TABLE dentro da função e quebrando o corpo). Aqui as funções atribuem
+--     por subconsulta escalar (v := (SELECT ...)) e por to_json(...).
 -- ============================================================================
 
 SET lock_timeout = '10s';
@@ -122,22 +123,18 @@ SECURITY DEFINER
 SET search_path = public
 AS $f3$
 DECLARE
-  v_link RECORD;
+  v_tenant uuid;
 BEGIN
-  SELECT * INTO v_link
-  FROM public.ouvidoria_links
-  WHERE token = p_token
-    AND ativo = true
-    AND (data_expiracao IS NULL OR data_expiracao > now());
-
-  IF NOT FOUND THEN
+  v_tenant := (
+    SELECT tenant_id FROM public.ouvidoria_links
+    WHERE token = p_token AND ativo = true
+      AND (data_expiracao IS NULL OR data_expiracao > now())
+    LIMIT 1
+  );
+  IF v_tenant IS NULL THEN
     RETURN json_build_object('error', 'Link inválido ou expirado');
   END IF;
-
-  RETURN json_build_object(
-    'valido', true,
-    'empresa_nome', public._ouvidoria_nome_empresa(v_link.tenant_id)
-  );
+  RETURN json_build_object('valido', true, 'empresa_nome', public._ouvidoria_nome_empresa(v_tenant));
 END;
 $f3$;
 
@@ -153,27 +150,32 @@ SECURITY DEFINER
 SET search_path = public
 AS $f4$
 DECLARE
-  v_link RECORD;
-  v_colab RECORD;
+  v_tenant uuid;
+  v_colab json;
 BEGIN
-  SELECT * INTO v_link
-  FROM public.ouvidoria_links
-  WHERE token = p_token AND ativo = true
-    AND (data_expiracao IS NULL OR data_expiracao > now());
-  IF NOT FOUND THEN
+  v_tenant := (
+    SELECT tenant_id FROM public.ouvidoria_links
+    WHERE token = p_token AND ativo = true
+      AND (data_expiracao IS NULL OR data_expiracao > now())
+    LIMIT 1
+  );
+  IF v_tenant IS NULL THEN
     RETURN json_build_object('error', 'Link inválido ou expirado');
   END IF;
 
-  SELECT * INTO v_colab FROM public._ouvidoria_resolver_colaborador_cpf(v_link.tenant_id, p_cpf);
-  IF v_colab.nome IS NULL THEN
+  v_colab := (
+    SELECT json_build_object('nome', nome, 'empresa_id', empresa_id)
+    FROM public._ouvidoria_resolver_colaborador_cpf(v_tenant, p_cpf)
+  );
+  IF v_colab IS NULL THEN
     RETURN json_build_object('encontrado', false);
   END IF;
 
   RETURN json_build_object(
     'encontrado', true,
-    'nome', v_colab.nome,
-    'empresa_id', v_colab.empresa_id,
-    'empresa_nome', public._ouvidoria_nome_empresa(v_link.tenant_id)
+    'nome', v_colab->>'nome',
+    'empresa_id', v_colab->>'empresa_id',
+    'empresa_nome', public._ouvidoria_nome_empresa(v_tenant)
   );
 END;
 $f4$;
@@ -198,9 +200,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $f5$
 DECLARE
-  v_link RECORD;
-  v_rot RECORD;
-  v_colab RECORD;
+  v_tenant uuid;
+  v_rot json;
+  v_colab json;
   v_assunto text := NULLIF(TRIM(COALESCE(p_assunto,'')), '');
   v_mensagem text := NULLIF(TRIM(COALESCE(p_mensagem,'')), '');
   v_cpf_digits text := regexp_replace(COALESCE(p_cpf,''), '\D', '', 'g');
@@ -210,11 +212,13 @@ DECLARE
   v_protocolo text;
   v_tentativa int := 0;
 BEGIN
-  SELECT * INTO v_link
-  FROM public.ouvidoria_links
-  WHERE token = p_token AND ativo = true
-    AND (data_expiracao IS NULL OR data_expiracao > now());
-  IF NOT FOUND THEN
+  v_tenant := (
+    SELECT tenant_id FROM public.ouvidoria_links
+    WHERE token = p_token AND ativo = true
+      AND (data_expiracao IS NULL OR data_expiracao > now())
+    LIMIT 1
+  );
+  IF v_tenant IS NULL THEN
     RETURN json_build_object('error', 'Link inválido ou expirado');
   END IF;
 
@@ -229,10 +233,13 @@ BEGIN
 
   IF COALESCE(p_anonimo, false) = false THEN
     IF length(v_cpf_digits) = 11 THEN
-      SELECT * INTO v_colab FROM public._ouvidoria_resolver_colaborador_cpf(v_link.tenant_id, v_cpf_digits);
-      IF v_colab.nome IS NOT NULL THEN
-        v_empresa_id := v_colab.empresa_id;
-        IF v_nome IS NULL THEN v_nome := v_colab.nome; END IF;
+      v_colab := (
+        SELECT json_build_object('nome', nome, 'empresa_id', empresa_id)
+        FROM public._ouvidoria_resolver_colaborador_cpf(v_tenant, v_cpf_digits)
+      );
+      IF v_colab IS NOT NULL THEN
+        v_empresa_id := (v_colab->>'empresa_id')::uuid;
+        IF v_nome IS NULL THEN v_nome := v_colab->>'nome'; END IF;
       END IF;
     END IF;
   ELSE
@@ -242,20 +249,21 @@ BEGIN
     v_empresa_id := NULL;
   END IF;
 
-  SELECT responsavel_id, responsavel_nome, departamento_responsavel
-    INTO v_rot
-  FROM public.ouvidoria_roteamento
-  WHERE tenant_id = v_link.tenant_id
-    AND tipo_manifestacao = p_tipo
-    AND ativo = true
-  LIMIT 1;
+  v_rot := (
+    SELECT to_json(t) FROM (
+      SELECT responsavel_id, responsavel_nome, departamento_responsavel
+      FROM public.ouvidoria_roteamento
+      WHERE tenant_id = v_tenant AND tipo_manifestacao = p_tipo AND ativo = true
+      LIMIT 1
+    ) t
+  );
 
   LOOP
     v_tentativa := v_tentativa + 1;
     v_protocolo := 'OUV-' || to_char(now() AT TIME ZONE 'America/Sao_Paulo', 'YYYYMMDD') || '-' ||
                    upper(substring(encode(gen_random_bytes(4), 'hex') from 1 for 6));
     EXIT WHEN NOT EXISTS (
-      SELECT 1 FROM public.ouvidoria WHERE tenant_id = v_link.tenant_id AND protocolo = v_protocolo
+      SELECT 1 FROM public.ouvidoria WHERE tenant_id = v_tenant AND protocolo = v_protocolo
     );
     IF v_tentativa >= 8 THEN
       v_protocolo := 'OUV-' || upper(substring(encode(gen_random_bytes(8), 'hex') from 1 for 12));
@@ -269,10 +277,10 @@ BEGIN
     status, prioridade, anexos, origem, protocolo,
     responsavel_id, responsavel_nome, departamento_destino
   ) VALUES (
-    v_link.tenant_id, p_tipo, v_assunto, v_mensagem, COALESCE(p_anonimo, false),
+    v_tenant, p_tipo, v_assunto, v_mensagem, COALESCE(p_anonimo, false),
     NULL, v_nome, v_email, v_cpf_digits, v_empresa_id,
     'pendente', 'normal', '[]'::jsonb, 'link_publico', v_protocolo,
-    v_rot.responsavel_id, v_rot.responsavel_nome, v_rot.departamento_responsavel
+    (v_rot->>'responsavel_id')::uuid, v_rot->>'responsavel_nome', v_rot->>'departamento_responsavel'
   );
 
   RETURN json_build_object('success', true, 'protocolo', v_protocolo);
@@ -294,20 +302,22 @@ DECLARE
   v_tenant uuid;
   v_token text;
 BEGIN
-  SELECT tenant_id INTO v_tenant
-  FROM public.ponto_links
-  WHERE token = p_ponto_token AND ativo = true
-    AND (data_expiracao IS NULL OR data_expiracao > now());
+  v_tenant := (
+    SELECT tenant_id FROM public.ponto_links
+    WHERE token = p_ponto_token AND ativo = true
+      AND (data_expiracao IS NULL OR data_expiracao > now())
+    LIMIT 1
+  );
   IF v_tenant IS NULL THEN
     RETURN json_build_object('encontrado', false);
   END IF;
 
-  SELECT token INTO v_token
-  FROM public.ouvidoria_links
-  WHERE tenant_id = v_tenant AND ativo = true
-    AND (data_expiracao IS NULL OR data_expiracao > now())
-  LIMIT 1;
-
+  v_token := (
+    SELECT token FROM public.ouvidoria_links
+    WHERE tenant_id = v_tenant AND ativo = true
+      AND (data_expiracao IS NULL OR data_expiracao > now())
+    LIMIT 1
+  );
   IF v_token IS NULL THEN
     RETURN json_build_object('encontrado', false);
   END IF;
@@ -320,7 +330,6 @@ REVOKE EXECUTE ON FUNCTION public.buscar_ouvidoria_link_por_ponto_token(text) FR
 GRANT EXECUTE ON FUNCTION public.buscar_ouvidoria_link_por_ponto_token(text) TO anon, authenticated;
 
 -- 9) consultar_manifestacao_ouvidoria: acompanhamento por protocolo -----------
--- Devolve só campos de status (nunca identidade do autor). O protocolo é o segredo.
 CREATE OR REPLACE FUNCTION public.consultar_manifestacao_ouvidoria(p_token text, p_protocolo text)
 RETURNS json
 LANGUAGE plpgsql
@@ -329,36 +338,39 @@ SECURITY DEFINER
 SET search_path = public
 AS $f7$
 DECLARE
-  v_link RECORD;
-  v_m RECORD;
+  v_tenant uuid;
+  v_m json;
 BEGIN
-  SELECT * INTO v_link
-  FROM public.ouvidoria_links
-  WHERE token = p_token AND ativo = true
-    AND (data_expiracao IS NULL OR data_expiracao > now());
-  IF NOT FOUND THEN
+  v_tenant := (
+    SELECT tenant_id FROM public.ouvidoria_links
+    WHERE token = p_token AND ativo = true
+      AND (data_expiracao IS NULL OR data_expiracao > now())
+    LIMIT 1
+  );
+  IF v_tenant IS NULL THEN
     RETURN json_build_object('error', 'Link inválido ou expirado');
   END IF;
 
-  SELECT tipo, assunto, status, resposta, respondido_em, created_at
-    INTO v_m
-  FROM public.ouvidoria
-  WHERE tenant_id = v_link.tenant_id
-    AND protocolo = upper(TRIM(COALESCE(p_protocolo, '')))
-  LIMIT 1;
-
-  IF NOT FOUND THEN
+  v_m := (
+    SELECT to_json(t) FROM (
+      SELECT tipo, assunto, status, resposta, respondido_em, created_at
+      FROM public.ouvidoria
+      WHERE tenant_id = v_tenant AND protocolo = upper(TRIM(COALESCE(p_protocolo, '')))
+      LIMIT 1
+    ) t
+  );
+  IF v_m IS NULL THEN
     RETURN json_build_object('encontrado', false);
   END IF;
 
   RETURN json_build_object(
     'encontrado', true,
-    'tipo', v_m.tipo,
-    'assunto', v_m.assunto,
-    'status', v_m.status,
-    'resposta', v_m.resposta,
-    'respondido_em', v_m.respondido_em,
-    'created_at', v_m.created_at
+    'tipo', v_m->>'tipo',
+    'assunto', v_m->>'assunto',
+    'status', v_m->>'status',
+    'resposta', v_m->>'resposta',
+    'respondido_em', v_m->>'respondido_em',
+    'created_at', v_m->>'created_at'
   );
 END;
 $f7$;

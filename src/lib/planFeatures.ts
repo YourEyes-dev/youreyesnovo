@@ -23,25 +23,31 @@ export const PATH_TO_FEATURE: Record<string, string> = {
   "/colaboradores": "mod.estrutura",
   "/terceiros": "mod.estrutura",
   "/compliance-sst": "mod.nr1",
-  "/ponto": "mod.ponto",
   "/ferias": "mod.ferias",
   "/atestados": "mod.ferias",
   "/onboarding-rh": "mod.onboarding",
 
   // Essential
+  "/ponto": "mod.ponto",
   "/psicossocial": "mod.psicossocial",
   "/ergonomia": "mod.epi_ergo",
   "/epis": "mod.epi_ergo",
   "/analise-jornada": "mod.analise_jornada",
+  "/saude-ocupacional": "mod.saude_ocupacional",
+  "/incidentes-acidentes": "mod.incidentes",
 
   // Performance
   "/financeiro/beneficios": "mod.beneficios",
   "/documentos": "mod.beneficios",
   "/hub-contabil": "mod.beneficios",
+  "/financeiro": "mod.financeiro",
   "/metas": "mod.metas",
   "/plano-acao": "mod.metas",
   "/trilhas": "mod.trilhas",
   "/aprendizado-papeis": "mod.trilhas",
+  "/avaliacoes": "mod.avaliacoes",
+  "/pdi": "mod.pdi",
+  "/felicidade": "mod.bem_estar",
   "/contratos-experiencia": "mod.contratos_exp",
   "/cultura-celebracoes": "mod.cultura",
   "/feedback-ocorrencias": "mod.cultura",
@@ -60,24 +66,32 @@ export const FEATURE_PLAN_NAME: Record<string, string> = {
   // Starter
   "mod.estrutura": "Starter",
   "mod.nr1": "Starter",
-  "mod.ponto": "Starter",
   "mod.ferias": "Starter",
   "mod.onboarding": "Starter",
   // Essential
+  "mod.ponto": "Essential",
   "mod.gro_pgr": "Essential",
   "mod.psicossocial": "Essential",
   "mod.epi_ergo": "Essential",
   "mod.analise_jornada": "Essential",
+  "mod.saude_ocupacional": "Essential",
+  "mod.incidentes": "Essential",
   // Performance
   "mod.beneficios": "Performance",
   "mod.metas": "Performance",
   "mod.trilhas": "Performance",
   "mod.cultura": "Performance",
   "mod.contratos_exp": "Performance",
+  "mod.avaliacoes": "Performance",
+  "mod.pdi": "Performance",
+  "mod.bem_estar": "Performance",
+  "mod.financeiro": "Performance",
   // Governança
-  "mod.sso": "Governança",
+  "mod.estrategia": "Governança",
   "mod.kpis": "Governança",
   "mod.integracao": "Governança",
+  // Enterprise
+  "mod.sso": "Enterprise",
 };
 
 /** Funcionalidade associada a um caminho, ou null se o caminho não é gateado. */

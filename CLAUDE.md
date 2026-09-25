@@ -79,6 +79,26 @@ Regras dos scripts de entrega (aprendidas a caro preço):
   aquilo era uma variável PL/pgSQL). No `psql` passa — o servidor ignora
   comentário —, então a réplica local NÃO pega isso. Confira que cada marca
   aparece em número PAR no arquivo inteiro, comentários incluídos.
+- **Script que CRIA TABELA nova aciona o "auto-RLS" do SQL Editor — e ele
+  corrompe as funções do mesmo arquivo.** O editor tem um auxiliar "enable RLS
+  on newly created tables" que só LIGA quando o script cria tabela (`CREATE
+  TABLE`, ou `SELECT ... INTO`, que também cria tabela). Uma vez ligado, ele
+  varre o texto inteiro e INJETA `ALTER TABLE <x> ENABLE ROW LEVEL SECURITY` —
+  inclusive DENTRO do corpo das funções, tratando cada variável de `SELECT ...
+  INTO v_x` como se fosse tabela nova. Isso parte a string com aspas-dólar e o
+  erro sai deslocado (`unterminated dollar-quoted string`, `no function body
+  specified`) numa função QUALQUER, longe da causa. No `db push`/`psql` não
+  existe esse auxiliar — o staging NÃO pega (aconteceu com o script da Ouvidoria,
+  set/2026: injetou `ALTER TABLE v_link/v_colab/v_rot ...` dentro de uma RPC).
+  Por isso os scripts que só criam FUNÇÃO nunca sofrem, e só o que cria TABELA
+  quebra. Num script de entrega que precisa criar tabela:
+  1) Crie a tabela por `EXECUTE` dentro de um bloco `DO`, montando a string como
+     `'CREATE ' || 'TABLE public.x (...)'` — assim a sequência contígua
+     `CREATE TABLE` NÃO existe no texto e o auxiliar não detecta tabela nova.
+  2) Nas funções, NUNCA use `SELECT ... INTO var`; atribua por subconsulta
+     escalar (`v := (SELECT ... LIMIT 1)`) e monte objetos com `to_json(...)`.
+  A migration equivalente (que roda por `db push`) pode manter `CREATE TABLE` e
+  `SELECT INTO` normais — a pegadinha é só do editor.
 - Termina com UMA conferência `SELECT` — o editor só mostra o último
   resultado. Inclua colunas de erro (ex.: `erro_tecnico`) quando houver.
 - Existe statement timeout: updates linha a linha com função por registro

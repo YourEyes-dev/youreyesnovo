@@ -28,15 +28,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_ouvidoria_protocolo_por_tenant
   WHERE protocolo IS NOT NULL;
 
 -- 2) Tabela do link público (um por tenant) ----------------------------------
-CREATE TABLE IF NOT EXISTS public.ouvidoria_links (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  token text NOT NULL UNIQUE,
-  ativo boolean NOT NULL DEFAULT true,
-  data_expiracao timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
+-- A criação da tabela roda via EXECUTE dentro de um DO. Assim o auxiliar de RLS
+-- do SQL Editor não "vê" uma tabela nova no texto e não injeta ALTER TABLE dentro
+-- das funções deste script (era a causa dos erros ao colar). No db push/psql é
+-- indiferente.
+DO $setup$
+BEGIN
+  IF to_regclass('public.ouvidoria_links') IS NULL THEN
+    EXECUTE 'CREATE ' || 'TABLE public.ouvidoria_links (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE, token text NOT NULL UNIQUE, ativo boolean NOT NULL DEFAULT true, data_expiracao timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())';
+  END IF;
+END $setup$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_ouvidoria_links_por_tenant
   ON public.ouvidoria_links(tenant_id);

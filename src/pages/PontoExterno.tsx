@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Clock, MapPin, LogIn, LogOut, CheckCircle2, AlertCircle, Loader2, Shield, FileEdit, IdCard, ArrowLeft } from "lucide-react";
+import { Clock, MapPin, LogIn, LogOut, CheckCircle2, AlertCircle, Loader2, Shield, FileEdit, IdCard, ArrowLeft, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -79,10 +79,26 @@ const PontoExterno = () => {
   // Clock
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Link da Ouvidoria da mesma empresa (para o botão de acesso fácil).
+  const [ouvidoriaHref, setOuvidoriaHref] = useState<string | null>(null);
+
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Resolve o link público de Ouvidoria a partir do token do ponto.
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      const { data } = await (supabasePublic as any).rpc("buscar_ouvidoria_link_por_ponto_token", { p_ponto_token: token });
+      const r = (data || {}) as any;
+      if (r.encontrado && r.token) {
+        const base = import.meta.env.BASE_URL || "/";
+        setOuvidoriaHref(`${base}ouvidoria-externa/${r.token}`);
+      }
+    })();
+  }, [token]);
 
   useEffect(() => {
     const standalone =
@@ -460,6 +476,15 @@ const PontoExterno = () => {
               </Button>
             </CardContent>
           </Card>
+          {ouvidoriaHref && (
+            <Button
+              variant="ghost"
+              className="w-full h-10 text-xs text-slate-300 hover:text-white mt-2"
+              onClick={() => window.open(ouvidoriaHref, "_blank")}
+            >
+              <MessageSquare className="w-4 h-4 mr-2" /> Canal de Ouvidoria
+            </Button>
+          )}
           <PontoPWASetup token={token} />
         </motion.div>
 
@@ -631,6 +656,16 @@ const PontoExterno = () => {
               onClick={() => setAjusteOpen(true)}
             >
               <FileEdit className="w-4 h-4 mr-2" /> Solicitar Ajuste de Ponto
+            </Button>)}
+
+            {/* Ouvidoria (canal de manifestações) */}
+            {ouvidoriaHref && (
+            <Button
+              variant="outline"
+              className="w-full h-10 text-xs"
+              onClick={() => window.open(ouvidoriaHref, "_blank")}
+            >
+              <MessageSquare className="w-4 h-4 mr-2" /> Ouvidoria
             </Button>)}
 
             {/* Trocar colaborador (aparelho compartilhado) */}

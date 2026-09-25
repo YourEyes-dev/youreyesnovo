@@ -7,6 +7,11 @@
 -- protocolo), a tabela public.ouvidoria_links (um link por tenant) com RLS, e as
 -- RPCs SECURITY DEFINER liberadas para anon que a tela pública usa. Só CRIA coisa
 -- nova (não altera nem apaga dado existente), então não precisa de backup.
+--
+-- NOTA: cada função usa uma marca de aspas-dólar PRÓPRIA (f1..f7, e pol no DO).
+-- O divisor de comandos do SQL Editor (navegador) se perdia com a mesma marca
+-- repetida em muitas funções no mesmo colar; marcas distintas evitam isso. No
+-- servidor (db push/psql) tanto faz.
 -- ============================================================================
 
 SET lock_timeout = '10s';
@@ -73,7 +78,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
-AS $fn$
+AS $f1$
   SELECT COALESCE(
     (SELECT NULLIF(TRIM(COALESCE(ec.nome_fantasia, ec.razao_social)), '')
      FROM public.empresa_cadastro ec
@@ -82,7 +87,7 @@ AS $fn$
      LIMIT 1),
     'sua empresa'
   );
-$fn$;
+$f1$;
 
 -- 4) Resolve colaborador por CPF (declaratório) ------------------------------
 CREATE OR REPLACE FUNCTION public._ouvidoria_resolver_colaborador_cpf(p_tenant_id uuid, p_cpf text)
@@ -91,7 +96,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
-AS $fn$
+AS $f2$
   SELECT a.nome_completo, a.empresa_id
   FROM public.admissoes a
   WHERE a.tenant_id = p_tenant_id
@@ -101,7 +106,7 @@ AS $fn$
     AND COALESCE(a.inativo, false) = false
   ORDER BY a.data_admissao DESC NULLS LAST
   LIMIT 1;
-$fn$;
+$f2$;
 
 REVOKE EXECUTE ON FUNCTION public._ouvidoria_nome_empresa(uuid) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public._ouvidoria_resolver_colaborador_cpf(uuid, text) FROM PUBLIC, anon;
@@ -115,7 +120,7 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
-AS $fn$
+AS $f3$
 DECLARE
   v_link RECORD;
 BEGIN
@@ -134,7 +139,7 @@ BEGIN
     'empresa_nome', public._ouvidoria_nome_empresa(v_link.tenant_id)
   );
 END;
-$fn$;
+$f3$;
 
 REVOKE EXECUTE ON FUNCTION public.buscar_ouvidoria_link_por_token(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.buscar_ouvidoria_link_por_token(text) TO anon, authenticated;
@@ -146,7 +151,7 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
-AS $fn$
+AS $f4$
 DECLARE
   v_link RECORD;
   v_colab RECORD;
@@ -171,7 +176,7 @@ BEGIN
     'empresa_nome', public._ouvidoria_nome_empresa(v_link.tenant_id)
   );
 END;
-$fn$;
+$f4$;
 
 REVOKE EXECUTE ON FUNCTION public.buscar_colaborador_ouvidoria_por_cpf(text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.buscar_colaborador_ouvidoria_por_cpf(text, text) TO anon, authenticated;
@@ -191,7 +196,7 @@ RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $fn$
+AS $f5$
 DECLARE
   v_link RECORD;
   v_rot RECORD;
@@ -272,7 +277,7 @@ BEGIN
 
   RETURN json_build_object('success', true, 'protocolo', v_protocolo);
 END;
-$fn$;
+$f5$;
 
 REVOKE EXECUTE ON FUNCTION public.registrar_manifestacao_externa(text, text, text, text, boolean, text, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.registrar_manifestacao_externa(text, text, text, text, boolean, text, text, text) TO anon, authenticated;
@@ -284,7 +289,7 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
-AS $fn$
+AS $f6$
 DECLARE
   v_tenant uuid;
   v_token text;
@@ -309,7 +314,7 @@ BEGIN
 
   RETURN json_build_object('encontrado', true, 'token', v_token);
 END;
-$fn$;
+$f6$;
 
 REVOKE EXECUTE ON FUNCTION public.buscar_ouvidoria_link_por_ponto_token(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.buscar_ouvidoria_link_por_ponto_token(text) TO anon, authenticated;
@@ -322,7 +327,7 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
-AS $fn$
+AS $f7$
 DECLARE
   v_link RECORD;
   v_m RECORD;
@@ -356,7 +361,7 @@ BEGIN
     'created_at', v_m.created_at
   );
 END;
-$fn$;
+$f7$;
 
 REVOKE EXECUTE ON FUNCTION public.consultar_manifestacao_ouvidoria(text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.consultar_manifestacao_ouvidoria(text, text) TO anon, authenticated;

@@ -17,7 +17,7 @@ import { fromTable } from "@/integrations/supabase/untypedClient";
 import { toast } from "sonner";
 import { ManualCulturaModal } from "./ManualCulturaModal";
 import { arquivarDocumento } from "@/utils/arquivarDocumento";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 type ListField = "valores" | "principios" | "comportamentos_esperados" | "comportamentos_nao_tolerados";
 
@@ -26,6 +26,15 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
   const { profile, tenantId, user } = useAuth();
   const { empresaAtivaId, empresaAtiva } = useEmpresaAtiva();
   const { grupos } = useGruposEconomicos();
+  const queryClient = useQueryClient();
+
+  // Após arquivar qualquer documento no módulo de Documentos, invalida também as
+  // queries daquele módulo (senão, com o staleTime de 2min, a tela de Documentos
+  // continua mostrando o estado antigo e o arquivo "não aparece" na pasta).
+  const invalidarDocumentos = () => {
+    queryClient.invalidateQueries({ queryKey: ["documentos-com-pasta"] });
+    queryClient.invalidateQueries({ queryKey: ["documento-pastas"] });
+  };
 
   // Nome a usar como "empresa" no manual: o da empresa (ou do grupo) do escopo
   // atual — NUNCA o nome do usuário logado.
@@ -120,6 +129,7 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
       if (!res) throw new Error("Falha no envio.");
       toast.success("Manual de cultura enviado e salvo!");
       refetchUploaded();
+      invalidarDocumentos();
     } catch (err: any) {
       toast.error("Não foi possível enviar o manual. " + (err?.message || ""));
     } finally {
@@ -186,9 +196,11 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
           observacoes: "Documento que compõe a cultura (upload).",
         });
         if (res) ok++;
+        else toast.error(`Não foi possível salvar "${file.name}".`);
       }
       if (ok > 0) toast.success(`${ok} documento(s) enviado(s) e salvo(s)!`);
       refetchDocs();
+      invalidarDocumentos();
     } catch (err: any) {
       toast.error("Não foi possível enviar os documentos. " + (err?.message || ""));
     } finally {
@@ -357,6 +369,7 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
         pastaCategoria: "Cultura",
         subpastaCultura: "Manual de Cultura",
       });
+      invalidarDocumentos();
     } catch (err) {
       console.error("Erro ao arquivar:", err);
     }
@@ -429,6 +442,7 @@ export function CulturaSection({ escopo }: { escopo: EstrategiaEscopo }) {
         pastaCategoria: "Cultura",
         subpastaCultura: "Manual de Cultura",
       });
+      invalidarDocumentos();
       toast.success("PDF arquivado no módulo Documentos!");
     } catch (err) {
       console.error("Erro ao arquivar PDF:", err);

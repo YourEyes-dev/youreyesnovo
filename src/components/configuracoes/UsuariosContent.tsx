@@ -79,8 +79,25 @@ export default function UsuariosContent() {
     return map;
   }, [perfilVinculos]);
 
-  const filtered = useMemo(() => {
+  // Escopo por empresa selecionada no filtro. Administradores e papéis de acesso
+  // global aparecem em qualquer empresa; os demais dependem de vínculo ativo com a
+  // empresa filtrada. 'proprietario'/'owner' (dono da conta) têm acesso amplo ao
+  // tenant e não são vinculados a uma empresa específica — sem eles aqui, o dono
+  // some sempre que há uma empresa selecionada (o padrão).
+  // Cards de métrica e rodapé usam ESTE escopo, para refletir a empresa filtrada e
+  // não o tenant inteiro.
+  const escopoEmpresa = useMemo(() => {
+    const tiposGlobais = ["proprietario", "owner", "administrador", "rh_dp", "corporativo_multiempresa", "suporte_autorizado", "auditor"];
     return usuarios.filter(u => {
+      if (filterEmpresa === "todos") return true;
+      const isGlobal = tiposGlobais.includes(u.tipo_usuario);
+      return isGlobal ||
+        ((u as any).vinculos || []).some((v: any) => v.empresa_id === filterEmpresa && v.status === "ativo");
+    });
+  }, [usuarios, filterEmpresa]);
+
+  const filtered = useMemo(() => {
+    return escopoEmpresa.filter(u => {
       const q = search.toLowerCase();
       const matchQ = !q ||
         u.nome_completo.toLowerCase().includes(q) ||
@@ -89,22 +106,14 @@ export default function UsuariosContent() {
         (u.telefone_principal || "").includes(q);
       const matchStatus = filterStatus === "todos" || u.status === filterStatus;
       const matchTipo = filterTipo === "todos" || u.tipo_usuario === filterTipo;
-      // Administradores e papéis de acesso global aparecem em qualquer empresa filtrada.
-      // 'proprietario'/'owner' (dono da conta) têm acesso amplo ao tenant e não são
-      // vinculados a uma empresa específica — sem eles nesta lista, o dono some da
-      // tela sempre que há uma empresa selecionada no filtro (o padrão).
-      const tiposGlobais = ["proprietario", "owner", "administrador", "rh_dp", "corporativo_multiempresa", "suporte_autorizado", "auditor"];
-      const isGlobal = tiposGlobais.includes(u.tipo_usuario);
-      const matchEmpresa = filterEmpresa === "todos" || isGlobal ||
-        ((u as any).vinculos || []).some((v: any) => v.empresa_id === filterEmpresa && v.status === "ativo");
-      return matchQ && matchStatus && matchTipo && matchEmpresa;
+      return matchQ && matchStatus && matchTipo;
     });
-  }, [usuarios, search, filterStatus, filterTipo, filterEmpresa]);
+  }, [escopoEmpresa, search, filterStatus, filterTipo]);
 
-  const ativos = usuarios.filter(u => u.status === "ativo").length;
-  const convites = usuarios.filter(u => ["convite_enviado", "aguardando_ativacao", "pendente_convite"].includes(u.status)).length;
-  const duplicidades = usuarios.filter(u => u.alerta_duplicidade).length;
-  const multiempresa = usuarios.filter(u => ((u as any).vinculos || []).filter((v: any) => v.status === "ativo").length > 1).length;
+  const ativos = escopoEmpresa.filter(u => u.status === "ativo").length;
+  const convites = escopoEmpresa.filter(u => ["convite_enviado", "aguardando_ativacao", "pendente_convite"].includes(u.status)).length;
+  const duplicidades = escopoEmpresa.filter(u => u.alerta_duplicidade).length;
+  const multiempresa = escopoEmpresa.filter(u => ((u as any).vinculos || []).filter((v: any) => v.status === "ativo").length > 1).length;
 
   const hasFilters = search || filterStatus !== "todos" || filterTipo !== "todos" || filterEmpresa !== "todos";
 
@@ -336,7 +345,7 @@ export default function UsuariosContent() {
 
       {!isLoading && filtered.length > 0 && (
         <p className="text-xs text-muted-foreground text-center">
-          {filtered.length} de {usuarios.length} usuário(s)
+          {filtered.length} de {escopoEmpresa.length} usuário(s)
         </p>
       )}
 

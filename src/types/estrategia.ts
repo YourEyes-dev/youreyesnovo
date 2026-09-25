@@ -67,6 +67,13 @@ export interface EstrategiaCultura {
   principios: string[];
   comportamentos_esperados: string[];
   comportamentos_nao_tolerados: string[];
+  // Campos de texto livre do Manual de Cultura (Onda 1)
+  proposito?: string;
+  carta_boas_vindas?: string;
+  tom_de_voz?: string;
+  codigo_conduta?: string;
+  dress_code?: string;
+  modelo_trabalho?: string;
   criado_por?: string;
   criado_por_nome?: string;
   created_at: string;

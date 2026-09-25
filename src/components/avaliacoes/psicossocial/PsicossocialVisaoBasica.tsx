@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ShieldAlert, ArrowRight } from "lucide-react";
 import { ChecklistDeteccaoObservavel } from "./ChecklistDeteccaoObservavel";
+import { useTenantFeatures } from "@/hooks/useTenantFeatures";
 
 /**
  * Visão Psicossocial "básica" — a que fica disponível já no NR-1 (Starter).
@@ -13,6 +14,11 @@ import { ChecklistDeteccaoObservavel } from "./ChecklistDeteccaoObservavel";
  * (Essential). Serve de "básico honesto" e gancho de upsell.
  */
 export function PsicossocialVisaoBasica() {
+  // Fail-open: sem leitura de plano, tratamos como se já tivesse o módulo
+  // (não empurra upsell na dúvida).
+  const { features, planGatingActive } = useTenantFeatures();
+  const temPsicossocialCompleto = !planGatingActive || features.has("mod.psicossocial");
+
   return (
     <div className="space-y-4">
       <Card className="border-violet-200 bg-violet-50/40">
@@ -30,16 +36,34 @@ export function PsicossocialVisaoBasica() {
             que a empresa já tem — um primeiro alerta de que há risco a
             investigar.
           </p>
-          <p>
-            Para <strong>medir</strong> o risco com instrumento validado
-            (COPSOQ, HSE, PROART, SIPRO) e <strong>gerar o PGR</strong> com plano
-            de ação, ative o módulo completo de Psicossocial.
-          </p>
-          <Button asChild size="sm" variant="outline" className="gap-1.5">
-            <Link to="/meu-plano">
-              Ativar Psicossocial completo <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
+          {temPsicossocialCompleto ? (
+            <>
+              <p>
+                Você já tem o <strong>módulo completo de Psicossocial</strong>.
+                Abra-o para <strong>medir</strong> o risco com instrumento
+                validado (COPSOQ, HSE, PROART, SIPRO) e <strong>gerar o
+                PGR</strong> com plano de ação.
+              </p>
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link to="/psicossocial">
+                  Abrir Psicossocial completo <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <p>
+                Para <strong>medir</strong> o risco com instrumento validado
+                (COPSOQ, HSE, PROART, SIPRO) e <strong>gerar o PGR</strong> com
+                plano de ação, ative o módulo completo de Psicossocial.
+              </p>
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link to="/meu-plano">
+                  Ativar Psicossocial completo <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 

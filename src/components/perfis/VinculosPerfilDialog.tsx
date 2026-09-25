@@ -125,7 +125,7 @@ export function VinculosPerfilDialog({
           {/* Lista de usuários vinculados */}
           <div className="space-y-1.5">
             <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">
-              Usuários vinculados ({vinculosDoPerfil.length})
+              Usuários vinculados ({idsVinculados.size})
             </p>
             {vinculosDoPerfil.length === 0 ? (
               <p className="text-[12px] text-muted-foreground text-center py-6">

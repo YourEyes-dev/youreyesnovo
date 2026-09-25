@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Settings, Save, Loader2, UserCheck, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/hooks/useTenant";
 import { useColaboradores } from "@/hooks/useColaboradores";
+import { useUsuarios } from "@/hooks/useUsuarios";
 import { useDepartamentos } from "@/hooks/useCadastros";
 import {
   TIPO_MANIFESTACAO_LABELS,
@@ -36,10 +37,52 @@ const TIPOS: TipoManifestacao[] = ["sugestao", "reclamacao", "denuncia", "elogio
 export function OuvidoriaRoteamentoConfig() {
   const { tenantId } = useTenant();
   const { colaboradores } = useColaboradores();
+  const { usuarios } = useUsuarios();
   const { departamentos } = useDepartamentos();
   const [roteamentos, setRoteamentos] = useState<Record<string, Roteamento>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Lista de pessoas que podem receber/tratar manifestações. Começa pelos
+  // colaboradores (admissões concluídas) e acrescenta os usuários de conta com
+  // papel de gestão/propriedade — donos e administradores não passam pelo fluxo
+  // de admissão e, sem isto, nunca apareciam como responsáveis selecionáveis.
+  const responsaveis = useMemo(() => {
+    const soDigitos = (s?: string | null) => (s || "").replace(/\D/g, "");
+    const nomeNorm = (s?: string | null) => (s || "").trim().toLowerCase();
+    const vistos = new Set<string>();
+    const lista: { id: string; nome_completo: string; cargo: string }[] = [];
+
+    for (const c of colaboradores) {
+      const chave = soDigitos(c.cpf) ? `cpf:${soDigitos(c.cpf)}` : `nome:${nomeNorm(c.nome_completo)}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      lista.push({ id: c.id, nome_completo: c.nome_completo, cargo: c.cargo });
+    }
+
+    const TIPOS_GESTAO = new Set(["proprietario", "owner", "administrador", "admin", "gestor", "rh_dp", "rh"]);
+    const LABEL_TIPO: Record<string, string> = {
+      proprietario: "Proprietário", owner: "Proprietário",
+      administrador: "Administrador", admin: "Administrador",
+      gestor: "Gestor", rh_dp: "RH / DP", rh: "RH",
+    };
+    for (const u of usuarios) {
+      const tipo = (u.tipo_usuario || "").toString();
+      if (!TIPOS_GESTAO.has(tipo)) continue;
+      if (u.status !== "ativo") continue;
+      const chave = soDigitos(u.cpf) ? `cpf:${soDigitos(u.cpf)}` : `nome:${nomeNorm(u.nome_completo)}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      lista.push({
+        id: u.id,
+        nome_completo: u.nome_completo,
+        cargo: u.cargo_funcao || LABEL_TIPO[tipo] || "Responsável",
+      });
+    }
+
+    lista.sort((a, b) => a.nome_completo.localeCompare(b.nome_completo, "pt-BR", { sensitivity: "base" }));
+    return lista;
+  }, [colaboradores, usuarios]);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -87,13 +130,13 @@ export function OuvidoriaRoteamentoConfig() {
   };
 
   const handleResponsavelChange = (tipo: string, value: string) => {
-    const colab = colaboradores.find((c) => c.id === value);
+    const pessoa = responsaveis.find((c) => c.id === value);
     setRoteamentos((prev) => ({
       ...prev,
       [tipo]: {
         ...prev[tipo],
         responsavel_id: value === "none" ? null : value,
-        responsavel_nome: value === "none" ? null : colab?.nome_completo || null,
+        responsavel_nome: value === "none" ? null : pessoa?.nome_completo || null,
       },
     }));
   };
@@ -208,9 +251,9 @@ export function OuvidoriaRoteamentoConfig() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Nenhum (qualquer gestor)</SelectItem>
-                      {colaboradores.map((colab) => (
-                        <SelectItem key={colab.id} value={colab.id}>
-                          {colab.nome_completo} — {colab.cargo}
+                      {responsaveis.map((pessoa) => (
+                        <SelectItem key={pessoa.id} value={pessoa.id}>
+                          {pessoa.nome_completo} — {pessoa.cargo}
                         </SelectItem>
                       ))}
                     </SelectContent>

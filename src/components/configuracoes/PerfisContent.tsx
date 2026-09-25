@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +49,20 @@ export default function PerfisContent() {
     },
     enabled: !!tenantId,
   });
+
+  // Contagem de usuários por perfil calculada AO VIVO a partir dos vínculos
+  // ativos (fonte da verdade), por usuário distinto. Substitui o campo
+  // armazenado perfis_acesso.total_usuarios, que derivava do real por causa de
+  // gatilho duplicado + incremental no banco.
+  const usuariosPorPerfil = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const v of vinculos) {
+      if (v.ativo === false) continue;
+      if (!map.has(v.perfil_id)) map.set(v.perfil_id, new Set());
+      map.get(v.perfil_id)!.add(v.usuario_id);
+    }
+    return map;
+  }, [vinculos]);
 
   const perfisFiltered = perfis.filter((p) =>
     p.nome.toLowerCase().includes(search.toLowerCase()) ||
@@ -195,7 +209,8 @@ export default function PerfisContent() {
                       <motion.div key={perfil.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                         <PerfilCard perfil={perfil} onEdit={handleEditar} onClone={handleClonar}
                           onToggleStatus={(id, ativo) => togglePerfilStatus.mutate({ id, ativo })}
-                          onVerVinculos={setPerfilVinculos} onSimular={setPerfilSimulacao} />
+                          onVerVinculos={setPerfilVinculos} onSimular={setPerfilSimulacao}
+                          usuariosCount={usuariosPorPerfil.get(perfil.id)?.size ?? 0} />
                       </motion.div>
                     ))}
                   </div>
@@ -209,7 +224,8 @@ export default function PerfisContent() {
                       <motion.div key={perfil.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                         <PerfilCard perfil={perfil} onEdit={handleEditar} onClone={handleClonar}
                           onToggleStatus={(id, ativo) => togglePerfilStatus.mutate({ id, ativo })}
-                          onVerVinculos={setPerfilVinculos} onSimular={setPerfilSimulacao} />
+                          onVerVinculos={setPerfilVinculos} onSimular={setPerfilSimulacao}
+                          usuariosCount={usuariosPorPerfil.get(perfil.id)?.size ?? 0} />
                       </motion.div>
                     ))}
                   </div>

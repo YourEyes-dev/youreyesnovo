@@ -89,8 +89,11 @@ export default function UsuariosContent() {
         (u.telefone_principal || "").includes(q);
       const matchStatus = filterStatus === "todos" || u.status === filterStatus;
       const matchTipo = filterTipo === "todos" || u.tipo_usuario === filterTipo;
-      // Administradores e papéis de acesso global aparecem em qualquer empresa filtrada
-      const tiposGlobais = ["administrador", "rh_dp", "corporativo_multiempresa", "suporte_autorizado", "auditor"];
+      // Administradores e papéis de acesso global aparecem em qualquer empresa filtrada.
+      // 'proprietario'/'owner' (dono da conta) têm acesso amplo ao tenant e não são
+      // vinculados a uma empresa específica — sem eles nesta lista, o dono some da
+      // tela sempre que há uma empresa selecionada no filtro (o padrão).
+      const tiposGlobais = ["proprietario", "owner", "administrador", "rh_dp", "corporativo_multiempresa", "suporte_autorizado", "auditor"];
       const isGlobal = tiposGlobais.includes(u.tipo_usuario);
       const matchEmpresa = filterEmpresa === "todos" || isGlobal ||
         ((u as any).vinculos || []).some((v: any) => v.empresa_id === filterEmpresa && v.status === "ativo");

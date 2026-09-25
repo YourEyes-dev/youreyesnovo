@@ -8,6 +8,7 @@ import { OuvidoriaForm } from "@/components/ouvidoria/OuvidoriaForm";
 import { OuvidoriaList } from "@/components/ouvidoria/OuvidoriaList";
 import { OuvidoriaStats } from "@/components/ouvidoria/OuvidoriaStats";
 import { OuvidoriaRoteamentoConfig } from "@/components/ouvidoria/OuvidoriaRoteamentoConfig";
+import { OuvidoriaLinkTab } from "@/components/ouvidoria/OuvidoriaLinkTab";
 import type { StatusManifestacao, PrioridadeManifestacao } from "@/types/ouvidoria";
 
 const Ouvidoria = () => {
@@ -122,8 +123,9 @@ const Ouvidoria = () => {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="max-w-3xl mx-auto"
+              className="max-w-3xl mx-auto space-y-8"
             >
+              <OuvidoriaLinkTab />
               <OuvidoriaRoteamentoConfig />
             </motion.div>
           </TabsContent>

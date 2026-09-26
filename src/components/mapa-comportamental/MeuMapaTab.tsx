@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Send } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Eye } from "lucide-react";
 import { useMapaComportamental } from "@/hooks/useMapaComportamental";
 import { useMinhaCampanhaPendente } from "@/hooks/useMapaComportamentalCampanhas";
+import { useMeusAcessos } from "@/hooks/useMapaComportamentalTime";
 import { AvisoTratamento, AVISO_TRATAMENTO_VERSAO } from "./AvisoTratamento";
 import { ResponderMapa } from "./ResponderMapa";
 import { ResultadoMapa } from "./ResultadoMapa";
@@ -77,14 +79,19 @@ export function MeuMapaTab() {
   // Estado padrão: já tem mapa concluído → mostra; senão, convida a começar.
   if (mapaAtual?.resultado) {
     return (
-      <ResultadoMapa
-        resultado={mapaAtual.resultado}
-        concluidoEm={mapaAtual.concluido_em}
-        onRefazer={() => {
-          setContinuando(false);
-          setFase("aviso");
-        }}
-      />
+      <div className="space-y-4">
+        <ResultadoMapa
+          resultado={mapaAtual.resultado}
+          concluidoEm={mapaAtual.concluido_em}
+          onRefazer={() => {
+            setContinuando(false);
+            setFase("aviso");
+          }}
+        />
+        <div className="max-w-2xl mx-auto">
+          <MeusAcessos />
+        </div>
+      </div>
     );
   }
 
@@ -145,5 +152,36 @@ export function MeuMapaTab() {
       </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Transparência ao titular: quem acessou o próprio mapa (CA-009 / RF-013).
+function MeusAcessos() {
+  const { data: acessos = [], isLoading } = useMeusAcessos();
+  if (isLoading) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Eye className="w-4 h-4" /> Quem viu o seu mapa
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {acessos.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Ninguém abriu o seu mapa até agora.</p>
+        ) : (
+          <ul className="space-y-1 text-sm">
+            {acessos.map((a, i) => (
+              <li key={i} className="flex items-center justify-between">
+                <span>{a.acessado_por_nome ?? "—"}</span>
+                <span className="text-muted-foreground text-xs">
+                  {new Date(a.acessado_em).toLocaleString("pt-BR")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }

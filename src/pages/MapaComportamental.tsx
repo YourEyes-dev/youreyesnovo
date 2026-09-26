@@ -1,16 +1,17 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
-import { Fingerprint, LayoutDashboard, UserCircle2, Send, ShieldCheck } from "lucide-react";
+import { Fingerprint, LayoutDashboard, UserCircle2, Send, ShieldCheck, BookOpen } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMapaComportamentalPermissoes } from "@/hooks/useMapaComportamentalPermissoes";
 import { MeuMapaTab } from "@/components/mapa-comportamental/MeuMapaTab";
 import { PainelMapaTab } from "@/components/mapa-comportamental/PainelMapaTab";
 import { CampanhasTab } from "@/components/mapa-comportamental/CampanhasTab";
 import { GovernancaTab } from "@/components/mapa-comportamental/GovernancaTab";
+import { GuiaLiderTab } from "@/components/mapa-comportamental/GuiaLiderTab";
 
 export default function MapaComportamental() {
-  const { podeVerPainel, podeGerenciarCampanhas, podeVerGovernanca } = useMapaComportamentalPermissoes();
+  const { podeVerPainel, podeVerGuia, podeGerenciarCampanhas, podeVerGovernanca } = useMapaComportamentalPermissoes();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "meu-mapa";
   const [activeTab, setActiveTab] = useState(tabFromUrl);
@@ -62,6 +63,11 @@ export default function MapaComportamental() {
               <LayoutDashboard className="w-4 h-4" /> Painel
             </TabsTrigger>
           )}
+          {podeVerGuia && (
+            <TabsTrigger value="guia" className="gap-2">
+              <BookOpen className="w-4 h-4" /> Guia do Líder
+            </TabsTrigger>
+          )}
           {podeGerenciarCampanhas && (
             <TabsTrigger value="campanhas" className="gap-2">
               <Send className="w-4 h-4" /> Campanhas
@@ -80,6 +86,11 @@ export default function MapaComportamental() {
         {podeVerPainel && (
           <TabsContent value="painel">
             <PainelMapaTab />
+          </TabsContent>
+        )}
+        {podeVerGuia && (
+          <TabsContent value="guia">
+            <GuiaLiderTab />
           </TabsContent>
         )}
         {podeGerenciarCampanhas && (

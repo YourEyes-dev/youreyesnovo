@@ -22,6 +22,8 @@ export function useMapaComportamentalPermissoes() {
     podeVerPainel: isGestor,
     // Aba "Guia do Líder": orientação por perfil — gestor e RH.
     podeVerGuia: isGestor,
+    // Aba "Mapa do Time" / ficha da pessoa — gestor e RH.
+    podeVerMapaTime: isGestor,
     // Campanhas / Governança — RH/Admin (fatias seguintes).
     podeGerenciarCampanhas: isRH,
     podeVerGovernanca: isRH,

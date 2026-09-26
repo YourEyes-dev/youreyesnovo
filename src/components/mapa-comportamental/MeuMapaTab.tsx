@@ -3,7 +3,10 @@ import { Fingerprint, PlayCircle, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Send } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useMapaComportamental } from "@/hooks/useMapaComportamental";
+import { useMinhaCampanhaPendente } from "@/hooks/useMapaComportamentalCampanhas";
 import { AvisoTratamento, AVISO_TRATAMENTO_VERSAO } from "./AvisoTratamento";
 import { ResponderMapa } from "./ResponderMapa";
 import { ResultadoMapa } from "./ResultadoMapa";
@@ -13,6 +16,7 @@ type Fase = "inicio" | "aviso" | "respondendo" | "resultado";
 
 export function MeuMapaTab() {
   const { mapaAtual, rascunho, isLoading, salvarRascunho, concluir } = useMapaComportamental();
+  const { data: campanhaPendente } = useMinhaCampanhaPendente();
   const [fase, setFase] = useState<Fase | null>(null);
   const [resultadoRecem, setResultadoRecem] = useState<MapaResultado | null>(null);
   const [continuando, setContinuando] = useState(false);
@@ -61,6 +65,7 @@ export function MeuMapaTab() {
             respostas,
             avisoVersao: AVISO_TRATAMENTO_VERSAO,
             tempoTotalSegundos: tempo,
+            campanhaId: campanhaPendente?.campanha_id ?? null,
           });
           setResultadoRecem(r);
           setFase("resultado");
@@ -84,7 +89,19 @@ export function MeuMapaTab() {
   }
 
   return (
-    <Card className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto space-y-4">
+      {campanhaPendente && (
+        <Alert>
+          <Send className="h-4 w-4" />
+          <AlertDescription>
+            Você foi convidado para a campanha <strong>{campanhaPendente.nome}</strong>
+            {campanhaPendente.data_fim
+              ? ` (até ${new Date(campanhaPendente.data_fim).toLocaleDateString("pt-BR")})`
+              : ""}. Responder é voluntário.
+          </AlertDescription>
+        </Alert>
+      )}
+      <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Fingerprint className="w-5 h-5 text-indigo-600" />
@@ -126,6 +143,7 @@ export function MeuMapaTab() {
           )}
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }

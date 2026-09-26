@@ -111,6 +111,7 @@ export function useMapaComportamental() {
       avisoVersao: string;
       tempoTotalSegundos: number;
       tempoPorItem?: Record<string, number>;
+      campanhaId?: string | null;
     }): Promise<MapaResultado> => {
       if (!tenantId) throw new Error("Tenant não encontrado");
       const resultado = calcularMapa(input.respostas, {
@@ -119,6 +120,7 @@ export function useMapaComportamental() {
       const agora = new Date().toISOString();
       const payload = {
         empresa_id: empresaAtivaId || null,
+        campanha_id: input.campanhaId ?? null,
         instrumento_versao: resultado.instrumentoVersao,
         algoritmo_versao: resultado.algoritmoVersao,
         status: "concluido" as const,
@@ -144,7 +146,8 @@ export function useMapaComportamental() {
       return resultado;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mapa-comportamental", "meus"] });
+      // Invalida também campanha-pendente/cobertura para o banner sumir.
+      qc.invalidateQueries({ queryKey: ["mapa-comportamental"] });
       toast.success("Mapa concluído! Veja o seu resultado.");
     },
     onError: (e) => toast.error(`Não foi possível concluir: ${e.message}`),

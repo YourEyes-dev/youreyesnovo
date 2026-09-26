@@ -44,6 +44,7 @@ import Avaliacoes from "./pages/Avaliacoes";
 import MetasModule from "./pages/MetasModule";
 import CentralGaf from "./pages/CentralGaf";
 import Pdi from "./pages/Pdi";
+import MapaComportamental from "./pages/MapaComportamental";
 import Financeiro from "./pages/Financeiro";
 import Academia from "./pages/Academia";
 import Empresa from "./pages/Empresa";
@@ -275,6 +276,7 @@ const App = () => (
                 <Route path="/plano-acao" element={<PlanoAcao />} />
                 <Route path="/plano-acao/:id" element={<PlanoAcaoDetalhe />} />
                 <Route path="/pdi" element={<Pdi />} />
+                <Route path="/mapa-comportamental" element={<MapaComportamental />} />
                 <Route path="/epis" element={<Epis />} />
                 <Route path="/compliance-sst" element={<ComplianceSST />} />
                 <Route path="/feedback-ocorrencias" element={<FeedbackOcorrencias />} />

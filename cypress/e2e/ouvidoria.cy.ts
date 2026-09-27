@@ -42,26 +42,8 @@ describe("Ouvidoria (/ouvidoria)", () => {
     cy.get('[role="switch"]').should("exist");
   });
 
-  // OUV-003
-  it("mostra os cinco tipos de manifestação", () => {
-    ["Sugestão", "Reclamação", "Denúncia", "Elogio", "Dúvida"].forEach((t) =>
-      cy.contains("button", t).should("be.visible")
-    );
-  });
-
-  // OUV-004
-  it("bloqueia o envio sem assunto", () => {
-    cy.contains("button", "Sugestão").click({ force: true });
-    cy.get("#mensagem").type("Mensagem de teste de uma manifestação sem assunto preenchido.");
-    cy.contains("button", "Enviar Manifestação").should("be.disabled");
-  });
-
-  // OUV-005
-  it("bloqueia o envio sem mensagem", () => {
-    cy.contains("button", "Reclamação").click({ force: true });
-    cy.get("#assunto").type("Assunto de teste sem mensagem");
-    cy.contains("button", "Enviar Manifestação").should("be.disabled");
-  });
+  // OUV-003/004/005 rodam no motor (nível api: qa_caso_ouv_003/004/005) —
+  // sem it() de tela aqui, para não duplicar cobertura nem deixar ponte órfã.
 
   // OUV-011
   it("avisa ao ativar o modo anônimo e retira o aviso ao desligar", () => {

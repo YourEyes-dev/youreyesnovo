@@ -57,15 +57,14 @@ export function useMapaComportamental() {
   const qc = useQueryClient();
 
   // ── Meu último mapa concluído + rascunho em aberto ─────────────────────────
+  // Usa a RPC que cruza por auth_user_id OU CPF — assim o titular vê também o
+  // mapa que respondeu por link público (sem login) antes de ter acesso, desde
+  // que o CPF bata com o do seu cadastro.
   const { data: meusMapas = [], isLoading } = useQuery({
     queryKey: ["mapa-comportamental", "meus", tenantId, user?.id],
     queryFn: async (): Promise<MapaRespostaRow[]> => {
       if (!tenantId || !user?.id) return [];
-      const { data, error } = await fromTable(TABELA)
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .eq("auth_user_id", user.id)
-        .order("created_at", { ascending: false });
+      const { data, error } = await rpcUntyped("mapa_comportamental_meus", {});
       if (error) throw error;
       return (data ?? []) as MapaRespostaRow[];
     },

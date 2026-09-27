@@ -12,20 +12,23 @@ export interface MeuPlanoModulo {
 export interface MeuPlanoAddon {
   feature_key: string;
   name: string;
-  kind: 'module' | 'life';
+  kind: 'module' | 'life' | 'quota';
   quantity: number;
   unit_price_cents: number;
 }
 
+export interface MeuPlanoConsumo {
+  used: number;
+  limit: number | null;
+  is_unlimited: boolean;
+  remaining: number | null;
+  percent: number | null;
+}
+
 export interface MeuPlano {
   plano: { code: string; name: string; is_public: boolean } | null;
-  vidas: {
-    used: number;
-    limit: number | null;
-    is_unlimited: boolean;
-    remaining: number | null;
-    percent: number | null;
-  };
+  vidas: MeuPlanoConsumo;
+  mapas: MeuPlanoConsumo;
   modulos: MeuPlanoModulo[];
   precos: Record<string, number>; // feature_key -> centavos (itens contratáveis)
   addons: MeuPlanoAddon[];

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { BookOpen, Briefcase, Settings, ChevronLeft, BarChart3, FileSignature } from "lucide-react";
+import { BookOpen, Briefcase, Settings, ChevronLeft, LayoutDashboard, FileSignature } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCargos } from "@/hooks/useCadastros";
 import { FuncaoList } from "@/components/aprendizado/FuncaoList";
@@ -44,7 +44,7 @@ export default function AprendizadoPapeis() {
             <FileSignature className="w-4 h-4" /> Assinaturas
           </TabsTrigger>
           <TabsTrigger value="indicadores" className="gap-1">
-            <BarChart3 className="w-4 h-4" /> Indicadores
+            <LayoutDashboard className="w-4 h-4" /> Visão geral
           </TabsTrigger>
           <TabsTrigger value="config" className="gap-1">
             <Settings className="w-4 h-4" /> Configurações

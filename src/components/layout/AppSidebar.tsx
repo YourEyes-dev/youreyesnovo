@@ -187,7 +187,7 @@ const menuSections: MenuSection[] = [
     color: "text-emerald-400",
     sectionIcon: Target,
     items: [
-      { title: "Aprendizado & Competências", icon: BookOpen, path: "/aprendizado-papeis" },
+      { title: "Aprendizado & Papéis", icon: BookOpen, path: "/aprendizado-papeis" },
       { title: "Trilhas", icon: Route, path: "/trilhas" },
       { title: "Avaliações", icon: Star, path: "/avaliacoes" },
       { title: "PDI", icon: Target, path: "/pdi" },

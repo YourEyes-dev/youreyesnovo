@@ -9,15 +9,17 @@ import { Eye } from "lucide-react";
 import { useMapaComportamental } from "@/hooks/useMapaComportamental";
 import { useMinhaCampanhaPendente } from "@/hooks/useMapaComportamentalCampanhas";
 import { useMeusAcessos } from "@/hooks/useMapaComportamentalTime";
+import { useAuth } from "@/hooks/useAuth";
 import { AvisoTratamento, AVISO_TRATAMENTO_VERSAO } from "./AvisoTratamento";
 import { ResponderMapa } from "./ResponderMapa";
-import { ResultadoMapa } from "./ResultadoMapa";
+import { RelatorioMeuMapa } from "./RelatorioMeuMapa";
 import type { MapaResultado, MapaRespostas } from "@/data/instrumentos/mapaComportamental";
 
 type Fase = "inicio" | "aviso" | "respondendo" | "resultado";
 
 export function MeuMapaTab() {
   const { mapaAtual, rascunho, isLoading, salvarRascunho, concluir } = useMapaComportamental();
+  const { profile } = useAuth();
   const { data: campanhaPendente } = useMinhaCampanhaPendente();
   const [fase, setFase] = useState<Fase | null>(null);
   const [resultadoRecem, setResultadoRecem] = useState<MapaResultado | null>(null);
@@ -32,11 +34,12 @@ export function MeuMapaTab() {
     );
   }
 
-  // Resultado recém-concluído tem prioridade.
+  // Resultado recém-concluído tem prioridade (RF-020: relatório na mesma sessão).
   if (fase === "resultado" && resultadoRecem) {
     return (
-      <ResultadoMapa
+      <RelatorioMeuMapa
         resultado={resultadoRecem}
+        nome={profile?.nome_completo}
         onRefazer={() => {
           setResultadoRecem(null);
           setContinuando(false);
@@ -80,9 +83,12 @@ export function MeuMapaTab() {
   if (mapaAtual?.resultado) {
     return (
       <div className="space-y-4">
-        <ResultadoMapa
+        <RelatorioMeuMapa
           resultado={mapaAtual.resultado}
+          nome={profile?.nome_completo}
+          mapaId={mapaAtual.id}
           concluidoEm={mapaAtual.concluido_em}
+          venceEm={mapaAtual.vence_em}
           onRefazer={() => {
             setContinuando(false);
             setFase("aviso");

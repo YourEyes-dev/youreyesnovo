@@ -39,6 +39,7 @@ import {
   Search,
   X,
   Brain,
+  Fingerprint,
   BarChart3,
   LifeBuoy,
   Info,
@@ -84,6 +85,7 @@ const SEARCH_KEYWORDS: Record<string, string[]> = {
   "/plano-acao": ["plano", "acao", "5w2h"],
   "/avaliacoes": ["avaliacao", "desempenho", "ciclo", "9box"],
   "/pdi": ["pdi", "desenvolvimento", "individual", "metas"],
+  "/mapa-comportamental": ["mapa", "comportamental", "perfil", "arquetipo", "guia do lider", "estilo"],
   "/colaboradores": ["colaborador", "funcionario", "admissao", "pessoa"],
   "/contratos-experiencia": ["contrato", "experiencia", "periodo"],
   "/onboarding-rh": ["onboarding", "integracao", "novo colaborador"],
@@ -189,6 +191,7 @@ const menuSections: MenuSection[] = [
       { title: "Trilhas", icon: Route, path: "/trilhas" },
       { title: "Avaliações", icon: Star, path: "/avaliacoes" },
       { title: "PDI", icon: Target, path: "/pdi" },
+      { title: "Mapa Comportamental", icon: Fingerprint, path: "/mapa-comportamental" },
     ],
   },
   {

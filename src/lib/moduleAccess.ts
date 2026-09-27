@@ -40,6 +40,7 @@ export const PATH_TO_MODULO: Record<string, string> = {
   "/plano-acao": "plano_acao",
   "/avaliacoes": "avaliacoes",
   "/pdi": "pdi",
+  "/mapa-comportamental": "mapa_comportamental",
 
   // Pessoas
   "/cultura-celebracoes": "bem_estar",

@@ -140,6 +140,7 @@ export const MODULOS_SISTEMA = [
   { id: "trilhas", label: "Trilhas", grupo: "Desenvolvimento & Performance" },
   { id: "avaliacoes", label: "Avaliações", grupo: "Desenvolvimento & Performance" },
   { id: "pdi", label: "PDI", grupo: "Desenvolvimento & Performance" },
+  { id: "mapa_comportamental", label: "Mapa Comportamental", grupo: "Desenvolvimento & Performance" },
 
   // Jornada & Rotina
   { id: "ponto", label: "Ponto", grupo: "Jornada & Rotina" },

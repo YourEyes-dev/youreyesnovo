@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Sparkles, Download, RefreshCw, Info, AlertTriangle, Target,
-  BookOpen, Compass, MessageSquare, Users, TrendingUp, ArrowRight, Copy, Check, Loader2,
+  BookOpen, Compass, MessageSquare, Users, TrendingUp, ArrowRight, Copy, Check, Loader2, MessageSquareWarning,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,8 @@ import {
   RELATORIO_ABERTURA, RELATORIO_SOBRE,
 } from "@/data/mapaComportamentalRelatorio";
 import { gerarRelatorioMeuMapaPdf } from "@/lib/mapaComportamentalRelatorioPdf";
+import { ContestarModal } from "./ContestarModal";
+import { useMinhasContestacoes } from "@/hooks/useMapaComportamentalContestacoes";
 
 interface Props {
   resultado: MapaResultado;
@@ -67,6 +69,11 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
   const [encaminhar, setEncaminhar] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [contestar, setContestar] = useState(false);
+  const { data: minhasContestacoes = [] } = useMinhasContestacoes();
+  const minhaContestacao = publico
+    ? null
+    : minhasContestacoes.find((c) => (mapaId ? c.mapa_id === mapaId : false)) ?? null;
   const baixa = resultado.confiabilidade === "baixa";
   const primario = resultado.arquetipos[0];
   const secundario = resultado.arquetipos[1] ?? null;
@@ -298,9 +305,26 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
       <Secao icon={<Info className="w-4 h-4 text-muted-foreground" />} titulo="Sobre este resultado">
         {venceEm && <p>Válido até {new Date(venceEm).toLocaleDateString("pt-BR")}. Depois disso, vale refazer — as pessoas mudam.</p>}
         {RELATORIO_SOBRE.map((p, i) => <p key={i} className="text-muted-foreground">{p}</p>)}
+        {!publico && (
+          minhaContestacao ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50/60 dark:bg-amber-950/20 p-3 text-xs">
+              <p className="font-medium flex items-center gap-1.5">
+                <MessageSquareWarning className="w-3.5 h-3.5 text-amber-600" />
+                Você contestou este resultado {minhaContestacao.resposta ? "— o RH respondeu" : "— aguardando análise do RH"}.
+              </p>
+              {minhaContestacao.resposta && <p className="text-muted-foreground mt-1">Resposta do RH: {minhaContestacao.resposta}</p>}
+            </div>
+          ) : (
+            <div className="pt-1">
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => setContestar(true)}>
+                <MessageSquareWarning className="w-4 h-4" /> Não me reconheço neste resultado
+              </Button>
+            </div>
+          )
+        )}
         <p className="text-xs text-muted-foreground">
-          Logo abaixo você vê quem acessou o seu mapa. Se não se reconhece neste resultado, refaça o mapa
-          para um retrato mais fiel.
+          Logo abaixo você vê quem acessou o seu mapa. Contestar é um direito seu (revisão humana) e não
+          afeta a sua avaliação.
         </p>
       </Secao>
 
@@ -317,6 +341,10 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
         }
         contextoExtra={`Meu perfil predominante: ${ARQUETIPO_LABEL[primario]}. Ação de desenvolvimento, nunca de movimentação de pessoal.`}
       />
+      )}
+
+      {!publico && (
+        <ContestarModal open={contestar} onOpenChange={setContestar} mapaId={mapaId ?? null} onRefazer={onRefazer} />
       )}
     </div>
   );

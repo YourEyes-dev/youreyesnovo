@@ -79,10 +79,10 @@ describe("Módulo Colaboradores", () => {
   });
 
   // COLAB-TELA-04
-  it("abre a escolha de Novo Cadastro (colaborador ou terceiro)", () => {
+  it("abre direto o formulário de novo colaborador", () => {
     cy.contains("button", "Novo Cadastro", { timeout: 20000 }).click({ force: true });
-    cy.get('[role="dialog"]', { timeout: 15000 }).contains("O que deseja cadastrar").should("exist");
-    cy.get('[role="dialog"]').contains("Empresa Terceira").should("exist");
+    cy.get('[role="dialog"]', { timeout: 15000 }).contains("Novo Colaborador").should("exist");
+    cy.get('[role="dialog"]').contains("Preencha os dados para cadastrar um novo colaborador").should("exist");
     cy.get("body").type("{esc}", { force: true });
   });
 

@@ -27,6 +27,9 @@ interface Props {
   concluidoEm?: string | null;
   venceEm?: string | null;
   onRefazer?: () => void;
+  /** true quando exibido a um funcionário sem login (link público): esconde
+   *  ações que exigem autenticação, como encaminhar ao Plano de Ação. */
+  publico?: boolean;
 }
 
 function Secao({ icon, titulo, children }: { icon: React.ReactNode; titulo: string; children: React.ReactNode }) {
@@ -60,7 +63,7 @@ function EixoBarra({ titulo, esq, dir, pontosA, pontosB, intensidade }: {
   );
 }
 
-export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm, onRefazer }: Props) {
+export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm, onRefazer, publico = false }: Props) {
   const [encaminhar, setEncaminhar] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const baixa = resultado.confiabilidade === "baixa";
@@ -275,7 +278,7 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
       <Secao icon={<ArrowRight className="w-4 h-4 text-indigo-600" />} titulo="Seus próximos passos">
         <p className="text-muted-foreground">Este relatório termina em ação, não em reflexão. Escolha por onde começar:</p>
         <div className="flex flex-wrap gap-2 pt-1">
-          {!baixa && (
+          {!baixa && !publico && (
             <Button size="sm" className="gap-1" onClick={() => setEncaminhar(true)}>
               <Target className="w-4 h-4" /> Criar uma ação a partir deste mapa
             </Button>
@@ -296,6 +299,7 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
         </p>
       </Secao>
 
+      {!publico && (
       <CriarAcaoAlertaModal
         open={encaminhar}
         onOpenChange={setEncaminhar}
@@ -308,6 +312,7 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
         }
         contextoExtra={`Meu perfil predominante: ${ARQUETIPO_LABEL[primario]}. Ação de desenvolvimento, nunca de movimentação de pessoal.`}
       />
+      )}
     </div>
   );
 }

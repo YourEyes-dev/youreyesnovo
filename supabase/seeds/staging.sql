@@ -45,7 +45,7 @@ VALUES (
   '00.000.000/0001-00',
   'São Paulo', 'SP', '01000-000', '(11) 99999-9999', 'staging@youreyes.local',
   '6201501', 'Desenvolvimento de programas de computador sob encomenda', 2,
-  'juridica', 'matriz',
+  'pj', 'matriz',
   true, now(), now()
 )
 ON CONFLICT (id) DO UPDATE SET

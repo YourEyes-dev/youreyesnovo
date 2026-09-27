@@ -1,13 +1,15 @@
-import { Users, ShieldAlert, BarChart3 } from "lucide-react";
+import { Users, ShieldAlert, BarChart3, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useMapaComportamentalPainel } from "@/hooks/useMapaComportamental";
+import { useDesdobramento } from "@/hooks/useMapaComportamentalTime";
 import { ARQUETIPO_LABEL, type Arquetipo } from "@/data/instrumentos/mapaComportamental";
 
 export function PainelMapaTab() {
   const { data, isLoading, error } = useMapaComportamentalPainel(true);
+  const { data: desdobrados = 0 } = useDesdobramento(!!data && !data.suprimido);
 
   if (isLoading) {
     return (
@@ -49,8 +51,14 @@ export function PainelMapaTab() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={<Users className="w-5 h-5" />} titulo="Mapas concluídos" valor={String(data.total_concluidos)} />
+        <StatCard
+          icon={<Target className="w-5 h-5" />}
+          titulo="Taxa de desdobramento"
+          valor={data.total_concluidos > 0 ? `${Math.round((desdobrados / data.total_concluidos) * 100)}%` : "—"}
+          hint={`${desdobrados} mapa(s) viraram ação`}
+        />
         <StatCard
           icon={<BarChart3 className="w-5 h-5" />}
           titulo="Consistência média"

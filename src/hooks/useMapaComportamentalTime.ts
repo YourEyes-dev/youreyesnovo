@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { rpcUntyped } from "@/integrations/supabase/untypedClient";
+import { fromTable, rpcUntyped } from "@/integrations/supabase/untypedClient";
 import { useAuth } from "./useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import type { MapaResultado } from "@/data/instrumentos/mapaComportamental";
@@ -57,6 +57,31 @@ export function useVerMapa(mapaId: string | null) {
     },
     enabled: !!tenantId && !!mapaId,
     staleTime: 5 * 60 * 1000, // evita relogar o acesso a cada re-render
+  });
+}
+
+/**
+ * Desdobramento (RF-012 / indicador-chave do doc): quantos mapas viraram ação
+ * no Plano de Ação. Conta origem_id distintos das ações com origem no módulo.
+ */
+export function useDesdobramento(enabled: boolean) {
+  const { tenantId } = useAuth();
+  return useQuery({
+    queryKey: ["mapa-comportamental", "desdobramento", tenantId],
+    queryFn: async (): Promise<number> => {
+      const { data, error } = await fromTable("plano_acoes")
+        .select("origem_id")
+        .eq("tenant_id", tenantId)
+        .eq("origem_modulo", "mapa_comportamental");
+      if (error) throw error;
+      const ids = new Set(
+        ((data ?? []) as { origem_id: string | null }[])
+          .map((r) => r.origem_id)
+          .filter((v): v is string => !!v),
+      );
+      return ids.size;
+    },
+    enabled: !!tenantId && enabled,
   });
 }
 

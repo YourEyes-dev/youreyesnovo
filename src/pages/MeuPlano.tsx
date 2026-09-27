@@ -21,10 +21,12 @@ import {
   Plus,
   Loader2,
   X,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const VIDA_KEY = "limit.vidas";
+const MAPA_KEY = "limit.mapa_comportamental";
 
 function centsToReais(cents: number | null | undefined): string {
   if (cents == null) return "—";
@@ -35,6 +37,7 @@ export default function MeuPlano() {
   const navigate = useNavigate();
   const { plano, isLoading, contratar, cancelar, isMutating } = useMeuPlano();
   const [vidasQtd, setVidasQtd] = useState("");
+  const [mapasQtd, setMapasQtd] = useState("");
 
   const vidas = plano?.vidas;
   const percent = vidas?.percent ?? null;
@@ -42,6 +45,12 @@ export default function MeuPlano() {
   const noLimite = percent !== null && percent >= 100;
 
   const barCor = noLimite ? "bg-red-500" : perto ? "bg-amber-500" : "bg-emerald-500";
+
+  const mapas = plano?.mapas;
+  const mapasPercent = mapas?.percent ?? null;
+  const mapasPerto = mapasPercent !== null && mapasPercent >= 80 && mapasPercent < 100;
+  const mapasNoLimite = mapasPercent !== null && mapasPercent >= 100;
+  const mapasBarCor = mapasNoLimite ? "bg-red-500" : mapasPerto ? "bg-amber-500" : "bg-emerald-500";
 
   const disponiveis = plano?.modulos.filter((m) => m.disponivel) ?? [];
   const bloqueados = plano?.modulos.filter((m) => !m.disponivel) ?? [];
@@ -51,6 +60,10 @@ export default function MeuPlano() {
 
   const precoVida = precos[VIDA_KEY] ?? 0;
   const vidasAddon = addons.find((a) => a.feature_key === VIDA_KEY);
+  const precoMapa = precos[MAPA_KEY] ?? 0;
+  // O módulo só aparece como "mapas" quando a empresa tem acesso a ele; se estiver
+  // bloqueado, o card de contratação do módulo aparece na lista de módulos abaixo.
+  const temMapaComportamental = disponiveis.some((m) => m.key === "mod.mapa_comportamental");
 
   const doContratar = async (featureKey: string, quantity?: number) => {
     try {
@@ -78,6 +91,16 @@ export default function MeuPlano() {
     }
     await doContratar(VIDA_KEY, q);
     setVidasQtd("");
+  };
+
+  const contratarMapas = async () => {
+    const q = parseInt(mapasQtd, 10);
+    if (!Number.isFinite(q) || q < 1) {
+      toast.error("Informe quantas análises deseja adicionar (1 ou mais).");
+      return;
+    }
+    await doContratar(MAPA_KEY, q);
+    setMapasQtd("");
   };
 
   return (
@@ -295,6 +318,96 @@ export default function MeuPlano() {
               )}
             </CardContent>
           </Card>
+
+          {/* Mapas comportamentais: uso × cota (só quando o módulo está incluído) */}
+          {temMapaComportamental && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Brain className="w-4 h-4" /> Mapas comportamentais
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {mapas?.is_unlimited || mapas?.limit == null ? (
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold">{mapas?.used ?? 0}</span>
+                    <span className="text-sm text-muted-foreground">pessoas mapeadas · análises ilimitadas</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-baseline justify-between">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-2xl font-bold">{mapas.used}</span>
+                        <span className="text-sm text-muted-foreground">de {mapas.limit} análises</span>
+                      </div>
+                      <span
+                        className={cn(
+                          "text-sm font-semibold",
+                          mapasNoLimite ? "text-red-600" : mapasPerto ? "text-amber-600" : "text-emerald-600"
+                        )}
+                      >
+                        {mapasPercent}%
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all", mapasBarCor)}
+                        style={{ width: `${Math.min(mapasPercent ?? 0, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Cada pessoa mapeada consome uma análise. Rotatividade e novas contratações
+                      consomem novas análises; refazer o mapa da mesma pessoa não consome.
+                    </p>
+                    {(mapasPerto || mapasNoLimite) && (
+                      <div
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm",
+                          mapasNoLimite
+                            ? "border-red-200 bg-red-50 text-red-800"
+                            : "border-amber-200 bg-amber-50 text-amber-800"
+                        )}
+                      >
+                        {mapasNoLimite
+                          ? "Você atingiu a cota de análises do seu plano. Adicione mais análises abaixo para mapear novas pessoas."
+                          : `Você usou ${mapasPercent}% da cota de análises. Você pode adicionar mais análises abaixo.`}
+                      </div>
+                    )}
+
+                    {/* Comprar mais análises (avulso, unitário por pessoa) */}
+                    {precoMapa > 0 && (
+                      <div className="rounded-md border bg-muted/30 px-3 py-3 space-y-2">
+                        <p className="text-sm font-medium">Comprar mais análises</p>
+                        <p className="text-xs text-muted-foreground">
+                          R$ {centsToReais(precoMapa)} por análise (pessoa), acima da cota do plano.
+                          Compra avulsa — soma ao seu saldo e não altera o valor mensal.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min={1}
+                            inputMode="numeric"
+                            className="w-24"
+                            placeholder="Qtd"
+                            value={mapasQtd}
+                            onChange={(e) => setMapasQtd(e.target.value)}
+                          />
+                          <Button size="sm" disabled={isMutating} onClick={contratarMapas}>
+                            {isMutating ? (
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            ) : (
+                              <Plus className="w-4 h-4 mr-1" />
+                            )}
+                            Comprar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Módulos: disponíveis × bloqueados */}
           <Card>

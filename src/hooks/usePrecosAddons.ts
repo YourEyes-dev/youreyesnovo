@@ -6,7 +6,7 @@ export interface AddonPreco {
   key: string;
   name: string;
   category: string | null;
-  kind: 'module' | 'life';
+  kind: 'module' | 'life' | 'quota';
   unit_price_cents: number;
 }
 

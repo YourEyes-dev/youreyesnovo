@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useColaboradores } from "@/hooks/useColaboradores";
 import { useAfastamentosAtivos } from "@/hooks/useAfastamentosAtivos";
 import { AfastadoBadge } from "@/components/shared/AfastadoBadge";
+import { GuiaFeedbackPanel } from "@/components/mapa-comportamental/GuiaFeedbackPanel";
 import type { FeedbackCategoria } from "@/types/feedback";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -119,6 +120,7 @@ export function FeedbackForm({ onSubmit, isLoading }: FeedbackFormProps) {
               <span>Unidade: {selectedColab.filial || "—"}</span>
             </div>
           )}
+          {selectedColab && <GuiaFeedbackPanel cpf={selectedColab.cpf} />}
         </div>
 
         {/* Passo 2: Categoria */}

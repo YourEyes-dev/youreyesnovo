@@ -27,6 +27,15 @@ export interface AcessoMapa {
   acessado_em: string;
 }
 
+export interface MapaPorCpf {
+  id: string;
+  colaborador_nome: string | null;
+  arquetipo: string | null;
+  confiabilidade: "alta" | "baixa" | null;
+  concluido_em: string | null;
+  resultado: MapaResultado | null;
+}
+
 /** Composição do time (mapas concluídos do tenant/empresa) — gestor/RH. */
 export function useMapaTime(enabled: boolean) {
   const { tenantId } = useAuth();
@@ -82,6 +91,27 @@ export function useDesdobramento(enabled: boolean) {
       return ids.size;
     },
     enabled: !!tenantId && enabled,
+  });
+}
+
+/**
+ * Mapa do colaborador por CPF (integração com Feedback — Fatia 6). Registra o
+ * acesso quando é leitura de mapa de terceiro (RF-013) e NÃO traz respostas
+ * item a item (RN-003). Sem mapa ou sem permissão, devolve null — o painel do
+ * Guia simplesmente não aparece e a tela de Feedback nunca quebra.
+ */
+export function useMapaPorCpf(cpf: string | null | undefined) {
+  const { tenantId } = useAuth();
+  const cpfDigits = (cpf ?? "").replace(/\D/g, "");
+  return useQuery({
+    queryKey: ["mapa-comportamental", "por-cpf", tenantId, cpfDigits],
+    queryFn: async (): Promise<MapaPorCpf | null> => {
+      const { data, error } = await rpcUntyped("mapa_comportamental_por_cpf", { p_cpf: cpfDigits });
+      if (error) throw error;
+      return (data ?? null) as MapaPorCpf | null;
+    },
+    enabled: !!tenantId && cpfDigits.length > 0,
+    staleTime: 5 * 60 * 1000, // evita relogar o acesso a cada re-render
   });
 }
 

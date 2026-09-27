@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Sparkles, Download, RefreshCw, Info, AlertTriangle, Target,
-  BookOpen, Compass, MessageSquare, Users, TrendingUp, ArrowRight, Copy, Check,
+  BookOpen, Compass, MessageSquare, Users, TrendingUp, ArrowRight, Copy, Check, Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +66,7 @@ function EixoBarra({ titulo, esq, dir, pontosA, pontosB, intensidade }: {
 export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm, onRefazer, publico = false }: Props) {
   const [encaminhar, setEncaminhar] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const baixa = resultado.confiabilidade === "baixa";
   const primario = resultado.arquetipos[0];
   const secundario = resultado.arquetipos[1] ?? null;
@@ -74,12 +75,16 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
   const custos = intensidadeBaixa ? lib.precos.slice(0, 2) : lib.precos;
   const modoKey = resultado.modo.resultado as Modo | "misto";
 
-  const baixarPdf = () => {
+  const baixarPdf = async () => {
+    if (gerandoPdf) return;
+    setGerandoPdf(true);
     try {
-      gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, venceEm });
+      await gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, venceEm });
     } catch (e) {
       console.error("Falha ao gerar PDF do relatório:", e);
       toast.error("Não foi possível gerar o PDF agora.");
+    } finally {
+      setGerandoPdf(false);
     }
   };
 
@@ -110,8 +115,8 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
           </p>
         </div>
         <CardContent className="pt-4 flex flex-wrap gap-2">
-          <Button size="sm" className="gap-1" onClick={baixarPdf}>
-            <Download className="w-4 h-4" /> Baixar em PDF
+          <Button size="sm" className="gap-1" onClick={baixarPdf} disabled={gerandoPdf}>
+            {gerandoPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Baixar em PDF
           </Button>
           {onRefazer && (
             <Button size="sm" variant="outline" className="gap-1" onClick={onRefazer}>
@@ -283,8 +288,8 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
               <Target className="w-4 h-4" /> Criar uma ação a partir deste mapa
             </Button>
           )}
-          <Button size="sm" variant="outline" className="gap-1" onClick={baixarPdf}>
-            <Download className="w-4 h-4" /> Baixar em PDF
+          <Button size="sm" variant="outline" className="gap-1" onClick={baixarPdf} disabled={gerandoPdf}>
+            {gerandoPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Baixar em PDF
           </Button>
         </div>
       </Secao>

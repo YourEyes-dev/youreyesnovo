@@ -202,7 +202,7 @@ serve(async (req) => {
             if (!effectiveTenant) throw new Error("tenantId não disponível");
             const { data, error } = await supabaseAdmin.from("empresa_cadastro").insert({
               tenant_id: effectiveTenant,
-              tipo_pessoa: "juridica",
+              tipo_pessoa: "pj",
               tipo_unidade: "matriz",
               razao_social: "QA Agent — Empresa Teste LTDA",
               nome_fantasia: "QA Teste Corp",

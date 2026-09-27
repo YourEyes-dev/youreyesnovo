@@ -67,7 +67,7 @@ const CSS = `
   .linha.rosa  { border-left-color: #fda4af; background-color: #fff1f2; }
   .linha .cond { font-weight: 700; }
   .linha .acao { color: #4b5563; font-size: 12.5px; margin-top: 2px; }
-  .bloco-tit { font-weight: 800; color: #4338ca; margin: 12px 0 4px; }
+  h3.bloco-tit { font-weight: 800; color: #4338ca; font-size: 14px; margin: 14px 0 4px; }
   ol.passos { margin: 4px 0 8px 18px; padding: 0; }
   ol.passos li { margin: 0 0 6px; }
   .frase-lider { font-style: italic; background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
@@ -92,15 +92,30 @@ export async function gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, v
     `${resultado.motor.predominantes.map((m) => `Motor ${MOTOR_LABEL[m]}`).join(" e ")} · ` +
     `${resultado.modo.resultado === "misto" ? "Modo Misto" : `Modo ${MODO_LABEL[resultado.modo.resultado as Modo]}`}`;
 
+  // Estilo de CAIXA aplicado INLINE (além das classes). O paginador do pipeline
+  // só reconhece um bloco como "não pode ser cortado ao meio" quando o estilo
+  // de caixa — fundo/borda/padding — está no atributo style inline; via classe
+  // ele não enxerga, e cortava cartões no meio da página. Cor/borda por variante.
+  const BOX = {
+    cabecalho: "background-color:#4f46e5;color:#ffffff;padding:22px 24px;border-radius:12px;margin-bottom:6px;",
+    aviso: "background-color:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px 14px;margin:10px 0;",
+    alerta: "background-color:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 14px;margin:10px 0;color:#991b1b;",
+    fraseLider: "background-color:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:8px 10px;margin:6px 0;font-style:italic;",
+    linha: (variante: "base" | "verde" | "ambar" | "rosa") => {
+      const cor = { base: ["#c7d2fe", "#f5f3ff"], verde: ["#6ee7b7", "#ecfdf5"], ambar: ["#fcd34d", "#fffbeb"], rosa: ["#fda4af", "#fff1f2"] }[variante];
+      return `border-left:3px solid ${cor[0]};background-color:${cor[1]};padding:9px 12px;border-radius:8px;margin:7px 0;`;
+    },
+  };
+
   const secao = (titulo: string, corpo: string) => `<h2 class="secao">${esc(titulo)}</h2>${corpo}`;
-  const cond = (classe: string, c: { condicao: string; acao: string }) =>
-    `<div class="linha ${classe}"><div class="cond">${esc(c.condicao)}</div><div class="acao">→ ${esc(c.acao)}</div></div>`;
+  const cond = (classe: "verde" | "ambar" | "rosa" | "base", c: { condicao: string; acao: string }) =>
+    `<div class="linha" style="${BOX.linha(classe)}"><div class="cond">${esc(c.condicao)}</div><div class="acao">→ ${esc(c.acao)}</div></div>`;
 
   const partes: string[] = [];
 
   // Cabeçalho
   partes.push(`
-    <div class="cabecalho">
+    <div class="cabecalho" style="${BOX.cabecalho}">
       <p class="marca">Mapa Comportamental</p>
       <p class="titular">Meu Mapa — ${esc(titular)}</p>
       <p class="datas">Emitido em ${esc(emissao)}${concluidoEm ? ` · respondido em ${esc(dataBR(concluidoEm))}` : ""}${venceEm ? ` · válido até ${esc(dataBR(venceEm))}` : ""}</p>
@@ -108,10 +123,10 @@ export async function gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, v
   `);
 
   // Abertura + enquadramento
-  partes.push(`<div class="aviso">${RELATORIO_ABERTURA.map((p, i) => `<p class="${i === 0 ? "destaque" : ""}" style="margin-bottom:6px">${esc(p)}</p>`).join("")}</div>`);
+  partes.push(`<div class="aviso" style="${BOX.aviso}">${RELATORIO_ABERTURA.map((p, i) => `<p class="${i === 0 ? "destaque" : ""}" style="margin-bottom:6px">${esc(p)}</p>`).join("")}</div>`);
 
   if (baixa) {
-    partes.push(`<div class="alerta"><span class="destaque">Atenção:</span> este resultado pode não refletir bem você — as respostas ficaram pouco consistentes. Vale refazer o mapa com calma. As seções de recomendação foram omitidas até uma nova aplicação.</div>`);
+    partes.push(`<div class="alerta" style="${BOX.alerta}"><span class="destaque">Atenção:</span> este resultado pode não refletir bem você — as respostas ficaram pouco consistentes. Vale refazer o mapa com calma. As seções de recomendação foram omitidas até uma nova aplicação.</div>`);
   }
 
   // 2 — Em uma frase
@@ -141,19 +156,19 @@ export async function gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, v
 
   // 7 — Preço do estilo
   partes.push(secao("O preço do seu estilo",
-    custos.map((c) => `<div class="linha rosa"><div class="cond">${esc(c.texto)}</div><div class="acao">Sinal de que está sendo pago agora: ${esc(c.sinal)}</div></div>`).join("")));
+    custos.map((c) => `<div class="linha" style="${BOX.linha("rosa")}"><div class="cond">${esc(c.texto)}</div><div class="acao">Sinal de que está sendo pago agora: ${esc(c.sinal)}</div></div>`).join("")));
 
   // 8 — Como melhorar (suprimida em baixa confiabilidade)
   if (!baixa) {
     partes.push(secao("Como melhorar seu desempenho",
-      `<p class="bloco-tit">Para começar esta semana</p>` +
+      `<h3 class="bloco-tit">Para começar esta semana</h3>` +
       `<ol class="passos">${lib.ajustesImediatos.map((a) => `<li>${esc(a)}</li>`).join("")}</ol>` +
-      `<p class="bloco-tit">Para desenvolver nos próximos meses</p>` +
+      `<h3 class="bloco-tit">Para desenvolver nos próximos meses</h3>` +
       lib.contrapesos.map((c) =>
-        `<div class="linha"><div class="cond">${esc(c.nome)}</div><div class="acao">Por que importa para você: ${esc(c.porque)}</div><div class="acao">Como treinar: ${esc(c.comoTreinar)}</div></div>`).join("") +
-      `<p class="bloco-tit">O que pedir ao seu líder</p>` +
+        `<div class="linha" style="${BOX.linha("base")}"><div class="cond">${esc(c.nome)}</div><div class="acao">Por que importa para você: ${esc(c.porque)}</div><div class="acao">Como treinar: ${esc(c.comoTreinar)}</div></div>`).join("") +
+      `<h3 class="bloco-tit">O que pedir ao seu líder</h3>` +
       `<p class="sub" style="font-size:12px">Use estas frases na próxima conversa, do jeito que estão:</p>` +
-      lib.pedidosLider.map((f) => `<p class="frase-lider">“${esc(f)}”</p>`).join("")));
+      lib.pedidosLider.map((f) => `<div class="frase-lider" style="${BOX.fraseLider}">“${esc(f)}”</div>`).join("")));
   }
 
   // 9 — Zona de conforto
@@ -174,7 +189,7 @@ export async function gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, v
       (Object.keys(blocos) as (keyof typeof ARQUETIPO_LABEL)[]).map((outro) => {
         const b = blocos[outro];
         if (!b) return "";
-        return `<div class="linha"><div class="cond">Com ${esc(OUTRO_PERFIL_APRESENTACAO[outro])} (${esc(ARQUETIPO_LABEL[outro])})</div>` +
+        return `<div class="linha" style="${BOX.linha("base")}"><div class="cond">Com ${esc(OUTRO_PERFIL_APRESENTACAO[outro])} (${esc(ARQUETIPO_LABEL[outro])})</div>` +
           `<div class="acao"><b>Como te vê:</b> ${esc(b.comoTeVe)}</div>` +
           `<div class="acao"><b>Onde atrita:</b> ${esc(b.atrito)}</div>` +
           `<div class="acao"><b>Ajuste:</b> ${esc(b.ajuste)}</div></div>`;

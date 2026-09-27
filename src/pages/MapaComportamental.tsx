@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
-import { Fingerprint, LayoutDashboard, UserCircle2, Send, ShieldCheck, BookOpen } from "lucide-react";
+import { Fingerprint, LayoutDashboard, UserCircle2, Send, ShieldCheck, BookOpen, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMapaComportamentalPermissoes } from "@/hooks/useMapaComportamentalPermissoes";
 import { MeuMapaTab } from "@/components/mapa-comportamental/MeuMapaTab";
@@ -9,9 +9,10 @@ import { PainelMapaTab } from "@/components/mapa-comportamental/PainelMapaTab";
 import { CampanhasTab } from "@/components/mapa-comportamental/CampanhasTab";
 import { GovernancaTab } from "@/components/mapa-comportamental/GovernancaTab";
 import { GuiaLiderTab } from "@/components/mapa-comportamental/GuiaLiderTab";
+import { MapaTimeTab } from "@/components/mapa-comportamental/MapaTimeTab";
 
 export default function MapaComportamental() {
-  const { podeVerPainel, podeVerGuia, podeGerenciarCampanhas, podeVerGovernanca } = useMapaComportamentalPermissoes();
+  const { podeVerPainel, podeVerGuia, podeVerMapaTime, podeGerenciarCampanhas, podeVerGovernanca } = useMapaComportamentalPermissoes();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab") || "meu-mapa";
   const [activeTab, setActiveTab] = useState(tabFromUrl);
@@ -68,6 +69,11 @@ export default function MapaComportamental() {
               <BookOpen className="w-4 h-4" /> Guia do Líder
             </TabsTrigger>
           )}
+          {podeVerMapaTime && (
+            <TabsTrigger value="time" className="gap-2">
+              <Users className="w-4 h-4" /> Mapa do Time
+            </TabsTrigger>
+          )}
           {podeGerenciarCampanhas && (
             <TabsTrigger value="campanhas" className="gap-2">
               <Send className="w-4 h-4" /> Campanhas
@@ -91,6 +97,11 @@ export default function MapaComportamental() {
         {podeVerGuia && (
           <TabsContent value="guia">
             <GuiaLiderTab />
+          </TabsContent>
+        )}
+        {podeVerMapaTime && (
+          <TabsContent value="time">
+            <MapaTimeTab />
           </TabsContent>
         )}
         {podeGerenciarCampanhas && (

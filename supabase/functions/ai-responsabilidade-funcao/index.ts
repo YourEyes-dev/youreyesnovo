@@ -13,7 +13,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { cargoNome, descricao, textoAtual, acao, competenciaNome, competenciaTipo, tenantId } = await req.json();
+    const { cargoNome, descricao, textoAtual, acao, competenciaNome, competenciaTipo, tenantId,
+            objetivoFuncao, atividades, competencias } = await req.json();
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -28,7 +29,27 @@ Deno.serve(async (req) => {
     let systemPrompt = "";
     let userPrompt = "";
 
-    if (acao === "sugerir_descricao_competencia") {
+    if (acao === "sugerir_perfil_ideal") {
+      const atividadesTxt = Array.isArray(atividades) ? atividades.filter(Boolean).join("; ") : (atividades || "");
+      const competenciasTxt = Array.isArray(competencias) ? competencias.filter(Boolean).join("; ") : (competencias || "");
+      systemPrompt = `Você é especialista em RH e no instrumento "Mapa Comportamental" da casa. A partir do objetivo, atividades e competências comportamentais de uma FUNÇÃO (cargo), sugira o ESTILO comportamental que TENDE a fluir nela — em linguagem de tendência, nunca de capacidade ou aptidão. Não existe perfil melhor nem pior; é referência de desenvolvimento, não critério de seleção/promoção/desligamento.
+
+Responda SOMENTE em JSON válido, com exatamente estas chaves e valores em minúsculas:
+- "arquetipo_ideal": um de "pioneiro" | "conector" | "guardiao" | "estrategista"
+- "motor_ideal": array com 1 ou 2 de "racional" | "relacional" | "pragmatico"
+- "modo_ideal": um de "constante" | "cadenciado" | "misto"
+- "justificativa": 1 a 2 frases curtas explicando a tendência (sem julgamento de valor)
+
+Referência dos arquétipos (Foco × Ritmo): pioneiro = tarefas + acelerado; conector = pessoas + acelerado; guardiao = pessoas + ponderado; estrategista = tarefas + ponderado.
+
+${companyContext}`;
+      userPrompt = `Função: ${cargoNome || ""}
+Objetivo: ${objetivoFuncao || "(não informado)"}
+Atividades: ${atividadesTxt || "(não informadas)"}
+Competências comportamentais: ${competenciasTxt || "(não informadas)"}
+
+Sugira o estilo comportamental que tende a fluir nesta função, no formato JSON pedido.`;
+    } else if (acao === "sugerir_descricao_competencia") {
       systemPrompt = `Você é um especialista em gestão de competências e RH. Gere descrições curtas e objetivas para competências profissionais. Retorne apenas o texto da descrição (1-2 frases), sem explicações adicionais.
       
 ${companyContext}`;
@@ -77,6 +98,7 @@ Seja objetivo, profissional e direto. Use linguagem corporativa adequada. Retorn
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        ...(acao === "sugerir_perfil_ideal" ? { response_format: { type: "json_object" } } : {}),
       }),
     });
 
@@ -98,9 +120,30 @@ Seja objetivo, profissional e direto. Use linguagem corporativa adequada. Retorn
     }
 
     const data = await response.json();
-    const texto = data.choices?.[0]?.message?.content?.trim() || "";
+    const conteudo = data.choices?.[0]?.message?.content?.trim() || "";
 
-    return new Response(JSON.stringify({ texto }), {
+    if (acao === "sugerir_perfil_ideal") {
+      // Valida contra os enums do instrumento; descarta o que vier fora.
+      const ARQ = ["pioneiro", "conector", "guardiao", "estrategista"];
+      const MOT = ["racional", "relacional", "pragmatico"];
+      const MOD = ["constante", "cadenciado", "misto"];
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(conteudo); } catch { parsed = {}; }
+      const arq = String(parsed.arquetipo_ideal ?? "").toLowerCase();
+      const modo = String(parsed.modo_ideal ?? "").toLowerCase();
+      const motoresRaw = Array.isArray(parsed.motor_ideal) ? parsed.motor_ideal : [];
+      const perfil = {
+        arquetipo_ideal: ARQ.includes(arq) ? arq : null,
+        motor_ideal: motoresRaw.map((m) => String(m).toLowerCase()).filter((m) => MOT.includes(m)).slice(0, 2),
+        modo_ideal: MOD.includes(modo) ? modo : null,
+        justificativa: typeof parsed.justificativa === "string" ? parsed.justificativa : null,
+      };
+      return new Response(JSON.stringify({ perfil }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ texto: conteudo }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

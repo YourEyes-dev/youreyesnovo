@@ -89,8 +89,8 @@ export function AtividadesSection({ cargoId, funcaoNome, nivel }: AtividadesSect
     setNome(""); setDescricao(""); setShowForm(false);
   };
 
-  const complColor: Record<string, string> = { baixa: "bg-green-100 text-green-800", media: "bg-yellow-100 text-yellow-800", alta: "bg-red-100 text-red-800" };
-  const classColor: Record<string, string> = { rotineira: "bg-blue-100 text-blue-800", critica: "bg-red-100 text-red-800", excepcional: "bg-purple-100 text-purple-800" };
+  const complColor: Record<string, string> = { baixa: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300", media: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300", alta: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" };
+  const classColor: Record<string, string> = { rotineira: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", critica: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300", excepcional: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" };
 
   return (
     <div className="space-y-4">

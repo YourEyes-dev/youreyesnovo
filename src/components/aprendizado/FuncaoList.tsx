@@ -130,9 +130,9 @@ export function FuncaoList({ cargos, isLoading, onSelect }: FuncaoListProps) {
   };
 
   const nivelColor: Record<string, string> = {
-    operacional: "bg-blue-100 text-blue-800",
-    tatico: "bg-amber-100 text-amber-800",
-    estrategico: "bg-purple-100 text-purple-800",
+    operacional: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+    tatico: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+    estrategico: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
   };
 
   const saveManualCache = async (tipo: string, refId: string | null, titulo: string, html: string) => {

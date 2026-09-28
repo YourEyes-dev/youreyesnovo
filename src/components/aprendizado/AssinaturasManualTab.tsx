@@ -28,10 +28,10 @@ interface Assinatura {
 }
 
 const STATUS_META: Record<string, { label: string; color: string; icon: any }> = {
-  aguardando_colaborador: { label: "Aguardando colaborador", color: "bg-amber-100 text-amber-800", icon: Clock },
-  aguardando_gestor: { label: "Aguardando gestor", color: "bg-blue-100 text-blue-800", icon: Clock },
-  concluido: { label: "Concluído", color: "bg-emerald-100 text-emerald-800", icon: CheckCircle2 },
-  cancelado: { label: "Cancelado", color: "bg-red-100 text-red-800", icon: XCircle },
+  aguardando_colaborador: { label: "Aguardando colaborador", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300", icon: Clock },
+  aguardando_gestor: { label: "Aguardando gestor", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", icon: Clock },
+  concluido: { label: "Concluído", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300", icon: CheckCircle2 },
+  cancelado: { label: "Cancelado", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300", icon: XCircle },
 };
 
 export function AssinaturasManualTab() {

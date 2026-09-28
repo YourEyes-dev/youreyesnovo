@@ -250,6 +250,12 @@ ter conferido no teste antes.
   O merge dispara a esteira do staging automaticamente. (Nas respostas ao
   usuário, evite o jargão: fale em "registrar a mudança no projeto" e
   "ambiente de teste", não em branch/PR/merge/staging.)
+- **O merge para a `main` é feito pelo próprio Claude, por comando aqui na
+  sessão** (via ferramenta do GitHub) — o usuário NÃO precisa abrir o GitHub
+  para executá-lo. Quando o usuário aprovar/pedir o merge, o Claude o realiza
+  daqui. (Isto vale só para a `main`; a publicação em produção — avançar a
+  branch `producao` — segue sendo gesto manual do usuário, conforme as regras
+  dos dois ambientes acima.)
 - Antes de mexer em migrations, `git pull` — outras sessões também escrevem
   na `main`.
 - Respostas e PDFs de devolutiva para o usuário: didáticos, em português,

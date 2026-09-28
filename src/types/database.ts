@@ -70,6 +70,7 @@ export interface AdmissaoFormData {
   
   // Dados Profissionais
   cargo: string;
+  cargo_id?: string | null;
   departamento?: string;
   filial?: string;
   data_admissao?: string;

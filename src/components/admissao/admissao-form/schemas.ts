@@ -45,6 +45,7 @@ export const dadosContatoSchema = z.object({
 
 export const dadosProfissionaisSchema = z.object({
   cargo: z.string().min(2, 'Cargo obrigatório'),
+  cargo_id: z.string().nullable().optional(),
   departamento: z.string().min(2, 'Departamento obrigatório'),
   filial: z.string().optional(),
   dataAdmissao: z.string().min(1, 'Data de admissão obrigatória'),

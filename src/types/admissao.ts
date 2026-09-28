@@ -51,6 +51,7 @@ export interface DadosContato {
 
 export interface DadosProfissionais {
   cargo: string;
+  cargo_id?: string | null;
   departamento: string;
   filial: string;
   dataAdmissao: string;

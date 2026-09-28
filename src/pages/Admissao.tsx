@@ -139,6 +139,7 @@ export default function Admissao() {
         estado: dados.dadosContato.estado,
         cep: dados.dadosContato.cep,
         cargo: dados.dadosProfissionais.cargo,
+        cargo_id: dados.dadosProfissionais.cargo_id ?? null,
         departamento: dados.dadosProfissionais.departamento,
         filial: dados.dadosProfissionais.filial,
         data_admissao: dados.dadosProfissionais.dataAdmissao,
@@ -537,6 +538,7 @@ export default function Admissao() {
     },
     dadosProfissionais: {
       cargo: a.cargo,
+      cargo_id: a.cargo_id ?? null,
       departamento: a.departamento || '',
       filial: a.filial || '',
       dataAdmissao: a.data_admissao || '',

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Compass, Info } from "lucide-react";
+import { Compass, Info, AlertTriangle } from "lucide-react";
 import { useAderenciaFuncao } from "@/hooks/useMapaComportamentalTime";
 import {
   calcularAderencia,
@@ -59,6 +59,15 @@ export function AderenciaFuncaoCard({ mapaId, resultado }: Props) {
 
   const aderencia = calcularAderencia(resumo, ideal);
 
+  // Divergência de versão do instrumento entre o mapa da pessoa e o perfil ideal:
+  // a comparação pode não ser 100% comparável quando o algoritmo evoluiu de versão.
+  const versaoPessoa =
+    resultado && typeof resultado === "object"
+      ? (resultado as { algoritmoVersao?: string }).algoritmoVersao
+      : undefined;
+  const versaoIdeal = perfil.algoritmo_versao ?? undefined;
+  const divergenciaVersao = !!versaoPessoa && !!versaoIdeal && versaoPessoa !== versaoIdeal;
+
   return (
     <Card className="max-w-2xl mx-auto">
       <CardHeader>
@@ -97,6 +106,17 @@ export function AderenciaFuncaoCard({ mapaId, resultado }: Props) {
 
             {aderencia.resumoGeral && (
               <p className="text-sm font-medium text-foreground pt-1">{aderencia.resumoGeral}</p>
+            )}
+
+            {divergenciaVersao && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-400/40 bg-amber-100/40 p-2.5 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>
+                  O mapa da pessoa (versão <strong>{versaoPessoa}</strong>) e o perfil ideal da função
+                  (versão <strong>{versaoIdeal}</strong>) foram feitos com versões diferentes do instrumento —
+                  a aderência pode não ser totalmente comparável. Vale revisar o perfil ideal.
+                </span>
+              </div>
             )}
           </>
         )}

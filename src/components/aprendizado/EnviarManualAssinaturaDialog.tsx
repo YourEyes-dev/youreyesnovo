@@ -49,9 +49,16 @@ export function EnviarManualAssinaturaDialog({ open, onClose, cargoId, cargoNome
   const [copied, setCopied] = useState<string | null>(null);
 
   const cargoNomeLc = cargoNome.trim().toLowerCase();
+  // Prioriza o vínculo canônico cargo_id (O2-A); só cai no match por texto do
+  // nome quando o colaborador ainda não tem cargo_id resolvido (legado/backfill).
   const colaboradoresDoCargo = useMemo(
-    () => colaboradores.filter((c) => (c.cargo || "").trim().toLowerCase() === cargoNomeLc),
-    [colaboradores, cargoNomeLc]
+    () =>
+      colaboradores.filter((c) =>
+        c.cargo_id
+          ? c.cargo_id === cargoId
+          : (c.cargo || "").trim().toLowerCase() === cargoNomeLc
+      ),
+    [colaboradores, cargoNomeLc, cargoId]
   );
 
   const handleToggle = (id: string) => {

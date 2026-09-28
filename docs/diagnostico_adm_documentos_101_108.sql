@@ -81,13 +81,13 @@ resol AS MATERIALIZED (
             SELECT 1 FROM public.usuarios_base ub
              WHERE ub.tenant_id = l.tenant_id
                AND regexp_replace(COALESCE(ub.cpf,''),'[^0-9]','','g') = l.cpf
-               AND COALESCE(ub.status,'ativo') <> 'excluido'))::text
+               AND COALESCE(ub.status::text,'ativo') <> 'excluido'))::text
   UNION ALL SELECT 32,'resolubilidade','  destes: admissão EM CURSO (sem usuário — ficam, legítimo)',
          (SELECT count(*) FROM limbo l WHERE NOT EXISTS (
             SELECT 1 FROM public.usuarios_base ub
              WHERE ub.tenant_id = l.tenant_id
                AND regexp_replace(COALESCE(ub.cpf,''),'[^0-9]','','g') = l.cpf
-               AND COALESCE(ub.status,'ativo') <> 'excluido'))::text
+               AND COALESCE(ub.status::text,'ativo') <> 'excluido'))::text
   UNION ALL SELECT 33,'resolubilidade','  limbo SEM CPF (não resolve por chave — triagem manual)',
          (SELECT count(*) FROM docs_adm d
            WHERE (d.colaborador_id IS NULL OR d.pasta_id IS NULL)

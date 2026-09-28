@@ -72,7 +72,10 @@ export function useMapaComportamental() {
   });
 
   const rascunho = meusMapas.find((m) => m.status === "rascunho") ?? null;
-  const mapaAtual = meusMapas.find((m) => m.status === "concluido") ?? null;
+  const concluidos = meusMapas.filter((m) => m.status === "concluido");
+  const mapaAtual = concluidos[0] ?? null;
+  // Aplicação imediatamente anterior (reaplicação) — para o bloco comparativo.
+  const mapaAnterior = concluidos[1] ?? null;
 
   // ── Salvar rascunho (pausa e retomada — RF-004) ────────────────────────────
   const salvarRascunho = useMutation({
@@ -155,6 +158,7 @@ export function useMapaComportamental() {
   return {
     meusMapas,
     mapaAtual,
+    mapaAnterior,
     rascunho,
     isLoading,
     salvarRascunho,

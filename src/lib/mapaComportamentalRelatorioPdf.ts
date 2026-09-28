@@ -23,12 +23,14 @@ import {
   MOTOR_RELATORIO, MODO_RELATORIO, textoIntensidade,
   RELATORIO_ABERTURA, RELATORIO_SOBRE, RELATORIO_BIBLIOTECA_VERSAO,
 } from "@/data/mapaComportamentalRelatorio";
+import { compararMapas } from "@/data/instrumentos/mapaComportamentalComparativo";
 
 export interface DadosRelatorioPdf {
   resultado: MapaResultado;
   nome?: string | null;
   concluidoEm?: string | null;
   venceEm?: string | null;
+  anterior?: { resultado: MapaResultado; concluidoEm?: string | null } | null;
 }
 
 const esc = (s: unknown): string =>
@@ -76,7 +78,7 @@ const CSS = `
   .rodape { margin-top: 20px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 10.5px; color: #9ca3af; }
 `;
 
-export async function gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, venceEm }: DadosRelatorioPdf) {
+export async function gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, venceEm, anterior }: DadosRelatorioPdf) {
   const baixa = resultado.confiabilidade === "baixa";
   const primario = resultado.arquetipos[0];
   const secundario = resultado.arquetipos[1] ?? null;
@@ -127,6 +129,16 @@ export async function gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, v
 
   if (baixa) {
     partes.push(`<div class="alerta" style="${BOX.alerta}"><span class="destaque">Atenção:</span> este resultado pode não refletir bem você — as respostas ficaram pouco consistentes. Vale refazer o mapa com calma. As seções de recomendação foram omitidas até uma nova aplicação.</div>`);
+  }
+
+  // Comparativo com a aplicação anterior (RF-015 / RF-030)
+  if (anterior) {
+    const comp = compararMapas(resultado, anterior.resultado);
+    const quando = anterior.concluidoEm ? ` (comparado com ${esc(dataBR(anterior.concluidoEm))})` : "";
+    const itens = comp.itens
+      .map((it) => `<div class="linha" style="${BOX.linha("base")}"><span class="cond">${esc(it.rotulo)}:</span> <span style="color:#9ca3af">${esc(it.de)}</span> → ${esc(it.para)}</div>`)
+      .join("");
+    partes.push(secao(`O que mudou desde a última vez${quando}`, `<p>${esc(comp.resumo)}</p>${itens}`));
   }
 
   // 2 — Em uma frase

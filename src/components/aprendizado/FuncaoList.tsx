@@ -16,6 +16,8 @@ import { ManualFuncaoModal } from "./ManualFuncaoModal";
 import { toast } from "sonner";
 import { arquivarDocumento } from "@/utils/arquivarDocumento";
 import { CriarFuncaoRapidaDialog } from "./CriarFuncaoRapidaDialog";
+import { CompletudeBadgePopover } from "./CompletudeChecklist";
+import { useCompletudeCargos } from "@/hooks/useCompletudeAprendizado";
 import type { PopData } from "@/hooks/usePopAtividade";
 
 interface Cargo {
@@ -24,6 +26,7 @@ interface Cargo {
   nivel: string | null;
   departamento_id: string | null;
   descricao: string | null;
+  objetivo_funcao?: string | null;
   departamento?: { id: string; nome: string } | null;
 }
 
@@ -111,6 +114,8 @@ export function FuncaoList({ cargos, isLoading, onSelect }: FuncaoListProps) {
     },
     enabled: !!tenantId,
   });
+
+  const { completudePorCargo } = useCompletudeCargos(cargos);
 
   const filtered = cargos.filter(
     (c) =>
@@ -546,6 +551,12 @@ export function FuncaoList({ cargos, isLoading, onSelect }: FuncaoListProps) {
                       <Shield className="w-3.5 h-3.5" />
                       {epiCounts[cargo.id] || 0}
                     </span>
+                    {completudePorCargo[cargo.id] && (
+                      <CompletudeBadgePopover
+                        resultado={completudePorCargo[cargo.id]}
+                        onNavegar={() => onSelect(cargo.id)}
+                      />
+                    )}
                     {cached && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Fingerprint, Save, Loader2, Lock } from "lucide-react";
+import { Fingerprint, Save, Loader2, Lock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,8 +9,10 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { fromTable } from "@/integrations/supabase/untypedClient";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
+import { useAprendizado } from "@/hooks/useAprendizado";
 import {
   ARQUETIPO_LABEL, MOTOR_LABEL, MODO_LABEL, MAPA_ALGORITMO_VERSAO,
   type Arquetipo, type Motor,
@@ -19,6 +21,7 @@ import {
 interface PerfilIdealSectionProps {
   cargoId: string;
   cargoNome: string;
+  objetivoFuncao?: string | null;
 }
 
 type ModoIdeal = "constante" | "cadenciado" | "misto";
@@ -29,11 +32,13 @@ const MOTORES: Motor[] = ["racional", "relacional", "pragmatico"];
 const MODOS: ModoIdeal[] = ["constante", "cadenciado", "misto"];
 const MODO_IDEAL_LABEL: Record<ModoIdeal, string> = { ...MODO_LABEL, misto: "Misto (flexível)" };
 
-export function PerfilIdealSection({ cargoId, cargoNome }: PerfilIdealSectionProps) {
+export function PerfilIdealSection({ cargoId, cargoNome, objetivoFuncao }: PerfilIdealSectionProps) {
   const { tenantId, user, profile, hasMinimumRole } = useAuth();
   const { empresaAtivaId } = useEmpresaAtiva();
+  const { atividades, competencias } = useAprendizado(cargoId);
   const qc = useQueryClient();
   const podeEditar = hasMinimumRole("admin");
+  const [sugerindo, setSugerindo] = useState(false);
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ["cargo_perfil_ideal", cargoId],
@@ -90,6 +95,39 @@ export function PerfilIdealSection({ cargoId, cargoNome }: PerfilIdealSectionPro
   const toggleMotor = (m: Motor) =>
     setMotores((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
 
+  // Sugestão por IA: preenche o formulário como PRÉVIA editável (nada é salvo).
+  const sugerirIA = async () => {
+    setSugerindo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-responsabilidade-funcao", {
+        body: {
+          acao: "sugerir_perfil_ideal",
+          cargoNome,
+          tenantId,
+          objetivoFuncao: objetivoFuncao || null,
+          atividades: atividades.map((a) => a.nome).filter(Boolean),
+          competencias: competencias
+            .filter((c) => c.tipo === "comportamental")
+            .map((c) => c.nome)
+            .filter(Boolean),
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      const p = data?.perfil;
+      if (!p) throw new Error("A IA não retornou uma sugestão válida.");
+      setArquetipo(p.arquetipo_ideal || SEM);
+      setMotores(Array.isArray(p.motor_ideal) ? p.motor_ideal.filter((m: Motor) => MOTORES.includes(m)) : []);
+      setModo(p.modo_ideal || SEM);
+      if (p.justificativa && !observacoes.trim()) setObservacoes(String(p.justificativa));
+      toast.success("Sugestão aplicada — revise e clique em Salvar.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao sugerir com IA");
+    } finally {
+      setSugerindo(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-10 text-muted-foreground">
@@ -115,6 +153,19 @@ export function PerfilIdealSection({ cargoId, cargoNome }: PerfilIdealSectionPro
       {!podeEditar && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Lock className="w-3.5 h-3.5" /> Somente RH/Admin edita o perfil ideal — você está vendo em modo leitura.
+        </div>
+      )}
+
+      {podeEditar && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed p-3">
+          <p className="text-xs text-muted-foreground">
+            Não sabe por onde começar? A IA sugere um alvo a partir do objetivo, das atividades e das
+            competências comportamentais da função — sempre como prévia editável.
+          </p>
+          <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={sugerirIA} disabled={sugerindo}>
+            {sugerindo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Sugerir com IA
+          </Button>
         </div>
       )}
 

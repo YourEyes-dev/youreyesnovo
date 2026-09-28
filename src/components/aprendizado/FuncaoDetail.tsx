@@ -386,7 +386,7 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
           />
         </TabsContent>
         <TabsContent value="perfil" className="mt-4">
-          <PerfilIdealSection cargoId={cargo.id} cargoNome={cargo.nome} />
+          <PerfilIdealSection cargoId={cargo.id} cargoNome={cargo.nome} objetivoFuncao={cargo.objetivo_funcao} />
         </TabsContent>
       </Tabs>
       </>

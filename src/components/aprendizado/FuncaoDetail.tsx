@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, Brain, Shield, Briefcase, FileText, BarChart3, Wand2, Target, AlertTriangle, CheckCircle, Wrench, Users, BookOpen, Mic, Sparkles } from "lucide-react";
+import { ClipboardList, Brain, Shield, Briefcase, FileText, BarChart3, Wand2, Target, AlertTriangle, CheckCircle, Wrench, Users, BookOpen, Mic, Sparkles, Fingerprint } from "lucide-react";
 import { AtividadesSection } from "./AtividadesSection";
 import { CompetenciasSection } from "./CompetenciasSection";
 import { EpisSection } from "./EpisSection";
@@ -12,6 +12,7 @@ import { GerarPropostaSection } from "./GerarPropostaSection";
 import { GerarFuncaoIAModal } from "./GerarFuncaoIAModal";
 import { CompletudeResumo } from "./CompletudeChecklist";
 import { CentralPopsSection } from "./CentralPopsSection";
+import { PerfilIdealSection } from "./PerfilIdealSection";
 import { useCompletudeCargos } from "@/hooks/useCompletudeAprendizado";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -344,6 +345,9 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
           <TabsTrigger value="proposta" className="gap-1">
             <FileText className="w-4 h-4" /> Gerar Proposta
           </TabsTrigger>
+          <TabsTrigger value="perfil" className="gap-1">
+            <Fingerprint className="w-4 h-4" /> Perfil comportamental
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="atividades" className="mt-4">
@@ -380,6 +384,9 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
             cargoDescricao={cargo.descricao}
             responsabilidade={cargo.responsabilidade}
           />
+        </TabsContent>
+        <TabsContent value="perfil" className="mt-4">
+          <PerfilIdealSection cargoId={cargo.id} cargoNome={cargo.nome} />
         </TabsContent>
       </Tabs>
       </>

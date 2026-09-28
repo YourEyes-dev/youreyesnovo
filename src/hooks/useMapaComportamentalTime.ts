@@ -69,6 +69,36 @@ export function useVerMapa(mapaId: string | null) {
   });
 }
 
+export interface PerfilIdealDoCargo {
+  cargo_id: string;
+  cargo_nome: string | null;
+  tem_perfil: boolean;
+  arquetipo_ideal?: string | null;
+  motor_ideal?: string[] | null;
+  modo_ideal?: string | null;
+  algoritmo_versao?: string | null;
+}
+
+/**
+ * Perfil ideal do cargo que a pessoa (dona do mapa) ocupa, para a aderência de
+ * estilo (O3-B). Devolve só o alvo do CARGO (nível cargo, não pessoal); a
+ * aderência em si é calculada no front pela função pura determinística. Sem
+ * cargo/sem permissão → null (a ficha não quebra).
+ */
+export function useAderenciaFuncao(mapaId: string | null) {
+  const { tenantId } = useAuth();
+  return useQuery({
+    queryKey: ["mapa-comportamental", "aderencia-funcao", mapaId],
+    queryFn: async (): Promise<PerfilIdealDoCargo | null> => {
+      const { data, error } = await rpcUntyped("cargo_perfil_ideal_por_mapa", { p_mapa_id: mapaId });
+      if (error) throw error;
+      return (data ?? null) as PerfilIdealDoCargo | null;
+    },
+    enabled: !!tenantId && !!mapaId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 /**
  * Desdobramento (RF-012 / indicador-chave do doc): quantos mapas viraram ação
  * no Plano de Ação. Conta origem_id distintos das ações com origem no módulo.

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ResultadoMapa } from "./ResultadoMapa";
+import { AderenciaFuncaoCard } from "./AderenciaFuncaoCard";
 import { CriarAcaoAlertaModal } from "@/components/shared/CriarAcaoAlertaModal";
 import { useVerMapa } from "@/hooks/useMapaComportamentalTime";
 import { ARQUETIPO_LABEL, type Arquetipo } from "@/data/instrumentos/mapaComportamental";
@@ -61,6 +62,8 @@ export function FichaPessoa({ mapaId, nome, onVoltar }: Props) {
       ) : (
         <>
           <ResultadoMapa resultado={ficha.resultado} concluidoEm={ficha.concluido_em} />
+
+          <AderenciaFuncaoCard mapaId={mapaId} resultado={ficha.resultado} />
 
           {guia && (
             <Card className="max-w-2xl mx-auto">

@@ -13,6 +13,11 @@
 //
 // Baixa confiabilidade suprime "Como melhorar" e "Trabalhando com os outros
 // perfis" (RN-028). Perfil misto apresenta os dois arquétipos.
+//
+// Marca d'água (RF-028): nome do titular + data de emissão, em diagonal e
+// repetida, para desestimular a circulação indevida. Baixa opacidade para não
+// atrapalhar a leitura; se o jsPDF da build não expuser GState, cai para uma
+// cor cinza-clara equivalente.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { generatePdfFromHtml } from "@/utils/generatePdfFromHtml";
@@ -45,6 +50,47 @@ function dataBR(iso?: string | null): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("pt-BR");
+}
+
+// Marca d'água diagonal repetida em todas as páginas (RF-028). Desenhada por
+// cima do conteúdo (o conteúdo é uma imagem PNG de fundo branco; sob ela a
+// marca não apareceria). Opacidade baixa via GState quando disponível; senão,
+// cinza-claro. Nunca deixa o documento sem marca — o try/catch só troca a via.
+function aplicarMarcaDagua(pdf: import("jspdf").jsPDF, texto: string) {
+  const total = pdf.getNumberOfPages();
+  const w = pdf.internal.pageSize.getWidth();
+  const h = pdf.internal.pageSize.getHeight();
+  for (let p = 1; p <= total; p += 1) {
+    pdf.setPage(p);
+    let comOpacidade = false;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const GState = (pdf as any).GState;
+      if (GState) {
+        pdf.saveGraphicsState();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (pdf as any).setGState(new GState({ opacity: 0.08 }));
+        comOpacidade = true;
+      }
+    } catch {
+      comOpacidade = false;
+    }
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.setTextColor(comOpacidade ? 90 : 226);
+    // Ladrilha na diagonal cobrindo a folha inteira, margens incluídas.
+    for (let y = 24; y < h + 30; y += 46) {
+      for (let x = -12; x < w + 30; x += 82) {
+        pdf.text(texto, x, y, { angle: 32 });
+      }
+    }
+    if (comOpacidade) {
+      try { pdf.restoreGraphicsState(); } catch { /* segue sem restaurar */ }
+    }
+  }
+  // Deixa o estado tipográfico neutro para quem desenhar depois.
+  pdf.setTextColor(0);
+  pdf.setFont("helvetica", "normal");
 }
 
 // Folha de estilo do relatório. Definida por CLASSES (o normalizador do pipeline
@@ -226,5 +272,13 @@ export async function gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, v
     html,
     filenamePrefix: `meu-mapa-${titular}`,
   });
+
+  // Marca d'água (RF-028) aplicada DEPOIS da montagem, sobre todas as páginas.
+  aplicarMarcaDagua(pdf, `${titular} · ${emissao}`);
+
   pdf.save(filename);
+  // Regera o blob DEPOIS da marca d'água — o blob devolvido por
+  // generatePdfFromHtml é anterior a ela. Serve para arquivar no prontuário.
+  const blob = pdf.output("blob") as Blob;
+  return { blob, filename };
 }

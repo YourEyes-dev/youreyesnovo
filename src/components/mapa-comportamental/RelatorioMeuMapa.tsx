@@ -21,6 +21,7 @@ import {
 import { gerarRelatorioMeuMapaPdf } from "@/lib/mapaComportamentalRelatorioPdf";
 import { ContestarModal } from "./ContestarModal";
 import { useMinhasContestacoes } from "@/hooks/useMapaComportamentalContestacoes";
+import { useMapaComportamentalArquivo } from "@/hooks/useMapaComportamentalArquivo";
 import { compararMapas } from "@/data/instrumentos/mapaComportamentalComparativo";
 import { History, GraduationCap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -83,6 +84,7 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
   const [contestar, setContestar] = useState(false);
   const [pdiOpen, setPdiOpen] = useState(false);
   const { data: minhasContestacoes = [] } = useMinhasContestacoes();
+  const { arquivar } = useMapaComportamentalArquivo();
   const minhaContestacao = publico
     ? null
     : minhasContestacoes.find((c) => (mapaId ? c.mapa_id === mapaId : false)) ?? null;
@@ -99,7 +101,16 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
     if (gerandoPdf) return;
     setGerandoPdf(true);
     try {
-      await gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, venceEm, anterior });
+      const { blob } = await gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, venceEm, anterior });
+      // Arquiva uma cópia no prontuário (RF-028). Best-effort: o download já
+      // aconteceu; o arquivamento não pode travar a experiência. Só na versão
+      // autenticada do titular (nunca no link público).
+      if (!publico && mapaId) {
+        const r = await arquivar(blob, mapaId);
+        if (r.arquivado && !r.jaExistia) {
+          toast.success("Uma cópia foi arquivada no seu prontuário (Documentos).");
+        }
+      }
     } catch (e) {
       console.error("Falha ao gerar PDF do relatório:", e);
       toast.error("Não foi possível gerar o PDF agora.");
@@ -353,6 +364,12 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
             {gerandoPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Baixar em PDF
           </Button>
         </div>
+        {!publico && mapaId && (
+          <p className="text-xs text-muted-foreground pt-1">
+            O PDF sai com marca d'água (seu nome e a data). Ao baixar, uma cópia fica arquivada no seu
+            prontuário, na área de Documentos.
+          </p>
+        )}
       </Secao>
 
       {/* 15 — Sobre este resultado */}

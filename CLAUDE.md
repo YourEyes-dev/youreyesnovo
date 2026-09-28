@@ -56,6 +56,32 @@ na base. Detalhes em `docs/AMBIENTES.md`. **Isso não afrouxa nada fora dali**:
 staging, seeds, PDFs e qualquer documento que circule seguem sem dado real,
 sem exceção.
 
+## Toda alteração de recurso passa por três conferências (premissa da casa)
+
+Vale para QUALQUER mudança no comportamento do sistema ou recurso novo —
+configuração, botão, tela, módulo, rotina, regra, qualquer coisa. Assuma estas
+três conferências em toda alteração; nenhuma entrega fecha sem elas:
+
+1. **Onde a alteração afeta.** Antes de mexer, mapeie quais módulos e recursos
+   dependem do que você vai tocar. A mudança **não pode quebrar nada que já
+   funciona** — pense no efeito colateral primeiro, não depois do bug. Se não
+   souber quem consome aquilo, descubra antes de alterar.
+2. **Conferir a Documentação de Testes** (SuperAdmin → QA e testes →
+   Documentação de Testes; tabela `qa_casos_teste`). A mudança altera a forma do
+   sistema se comportar? Então a descrição do caso de teste correspondente
+   provavelmente ficou desatualizada — **atualize-a**. Se o recurso ainda não
+   tem caso de teste documentado, **crie o caso assim que a alteração for
+   concluída** (respeitando `nivel` `api`/`e2e` e as regras da seção QA abaixo).
+3. **Conferir a Execução de Testes** (SuperAdmin → QA e testes → Executar Testes
+   → Motor e Cypress). Verifique se a alteração afetou a execução existente e
+   **atualize** a rotina/`it()` afetada. Se não existir execução, crie-a com base
+   no caso do item 2 — rotina `qa_caso_<x>()` no motor SQL para casos `api`, ou
+   `it()` em `cypress/e2e/<modulo>.cy.ts` + ponte `qa_cobertura_e2e` para casos
+   `e2e`.
+
+Só considere a alteração pronta quando as três estiverem resolvidas. Os detalhes
+de como escrever caso e execução estão na seção **QA** mais abaixo.
+
 ## Mudanças de banco: migration + script de entrega
 
 Toda mudança de banco vira DUAS entregas:
@@ -224,6 +250,12 @@ ter conferido no teste antes.
   O merge dispara a esteira do staging automaticamente. (Nas respostas ao
   usuário, evite o jargão: fale em "registrar a mudança no projeto" e
   "ambiente de teste", não em branch/PR/merge/staging.)
+- **O merge para a `main` é feito pelo próprio Claude, por comando aqui na
+  sessão** (via ferramenta do GitHub) — o usuário NÃO precisa abrir o GitHub
+  para executá-lo. Quando o usuário aprovar/pedir o merge, o Claude o realiza
+  daqui. (Isto vale só para a `main`; a publicação em produção — avançar a
+  branch `producao` — segue sendo gesto manual do usuário, conforme as regras
+  dos dois ambientes acima.)
 - Antes de mexer em migrations, `git pull` — outras sessões também escrevem
   na `main`.
 - Respostas e PDFs de devolutiva para o usuário: didáticos, em português,

@@ -21,6 +21,8 @@ import {
 import { gerarRelatorioMeuMapaPdf } from "@/lib/mapaComportamentalRelatorioPdf";
 import { ContestarModal } from "./ContestarModal";
 import { useMinhasContestacoes } from "@/hooks/useMapaComportamentalContestacoes";
+import { compararMapas } from "@/data/instrumentos/mapaComportamentalComparativo";
+import { History } from "lucide-react";
 
 interface Props {
   resultado: MapaResultado;
@@ -32,6 +34,8 @@ interface Props {
   /** true quando exibido a um funcionário sem login (link público): esconde
    *  ações que exigem autenticação, como encaminhar ao Plano de Ação. */
   publico?: boolean;
+  /** Aplicação anterior (reaplicação) — habilita o bloco "o que mudou". */
+  anterior?: { resultado: MapaResultado; concluidoEm?: string | null } | null;
 }
 
 function Secao({ icon, titulo, children }: { icon: React.ReactNode; titulo: string; children: React.ReactNode }) {
@@ -65,7 +69,7 @@ function EixoBarra({ titulo, esq, dir, pontosA, pontosB, intensidade }: {
   );
 }
 
-export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm, onRefazer, publico = false }: Props) {
+export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm, onRefazer, publico = false, anterior = null }: Props) {
   const [encaminhar, setEncaminhar] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
@@ -81,12 +85,13 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
   const intensidadeBaixa = resultado.foco.misto || resultado.ritmo.misto;
   const custos = intensidadeBaixa ? lib.precos.slice(0, 2) : lib.precos;
   const modoKey = resultado.modo.resultado as Modo | "misto";
+  const comparativo = anterior ? compararMapas(resultado, anterior.resultado) : null;
 
   const baixarPdf = async () => {
     if (gerandoPdf) return;
     setGerandoPdf(true);
     try {
-      await gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, venceEm });
+      await gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, venceEm, anterior });
     } catch (e) {
       console.error("Falha ao gerar PDF do relatório:", e);
       toast.error("Não foi possível gerar o PDF agora.");
@@ -149,6 +154,37 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
             refazer com calma. As seções de recomendação foram omitidas até uma nova aplicação.
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Comparativo com a aplicação anterior (RF-015 / RF-030) */}
+      {comparativo && (
+        <Card className="border-indigo-200 bg-indigo-50/40 dark:bg-indigo-950/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <History className="w-4 h-4 text-indigo-600" /> O que mudou desde a última vez
+              {anterior?.concluidoEm && (
+                <span className="text-xs font-normal text-muted-foreground ml-auto">
+                  Comparado com {new Date(anterior.concluidoEm).toLocaleDateString("pt-BR")}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-muted-foreground">{comparativo.resumo}</p>
+            {comparativo.itens.length > 0 && (
+              <div className="space-y-1.5">
+                {comparativo.itens.map((it) => (
+                  <div key={it.rotulo} className="flex flex-wrap items-baseline gap-x-2 border-l-2 border-indigo-200 pl-3">
+                    <span className="font-medium">{it.rotulo}:</span>
+                    <span className="text-muted-foreground line-through">{it.de}</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    <span>{it.para}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* 2 — Em uma frase */}

@@ -18,7 +18,7 @@ import type { MapaResultado, MapaRespostas } from "@/data/instrumentos/mapaCompo
 type Fase = "inicio" | "aviso" | "respondendo" | "resultado";
 
 export function MeuMapaTab() {
-  const { mapaAtual, rascunho, isLoading, salvarRascunho, concluir } = useMapaComportamental();
+  const { mapaAtual, mapaAnterior, rascunho, isLoading, salvarRascunho, concluir } = useMapaComportamental();
   const { profile } = useAuth();
   const { data: campanhaPendente } = useMinhaCampanhaPendente();
   const [fase, setFase] = useState<Fase | null>(null);
@@ -89,6 +89,7 @@ export function MeuMapaTab() {
           mapaId={mapaAtual.id}
           concluidoEm={mapaAtual.concluido_em}
           venceEm={mapaAtual.vence_em}
+          anterior={mapaAnterior?.resultado ? { resultado: mapaAnterior.resultado, concluidoEm: mapaAnterior.concluido_em } : null}
           onRefazer={() => {
             setContinuando(false);
             setFase("aviso");

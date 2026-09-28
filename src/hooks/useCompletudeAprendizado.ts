@@ -80,6 +80,18 @@ export function useCompletudeCargos(cargos: CargoMini[]): {
     enabled: !!tenantId,
   });
 
+  // Perfil comportamental ideal definido por cargo (Onda 3).
+  const { data: perfilIdealPorCargo = {}, isLoading: l6 } = useQuery({
+    queryKey: ["completude_perfil_ideal", tenantId],
+    queryFn: async () => {
+      const { data } = await fromTable("cargo_perfil_ideal").select("cargo_id").eq("tenant_id", tenantId!) as { data: { cargo_id: string }[] | null };
+      const m: Record<string, boolean> = {};
+      (data || []).forEach((r) => { m[r.cargo_id] = true; });
+      return m;
+    },
+    enabled: !!tenantId,
+  });
+
   const completudePorCargo: Record<string, CompletudeResultado> = {};
   for (const cargo of cargos) {
     completudePorCargo[cargo.id] = calcularCompletude({
@@ -89,11 +101,12 @@ export function useCompletudeCargos(cargos: CargoMini[]): {
       atividadesComPop: popsPorCargo[cargo.id] || 0,
       episVinculados: epis[cargo.id] || 0,
       manualGerado: !!manuaisPorCargo[cargo.id],
+      perfilIdealDefinido: !!perfilIdealPorCargo[cargo.id],
     });
   }
 
   return {
     completudePorCargo,
-    isLoading: l1 || l2 || l3 || l4 || l5,
+    isLoading: l1 || l2 || l3 || l4 || l5 || l6,
   };
 }

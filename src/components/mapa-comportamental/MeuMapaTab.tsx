@@ -10,6 +10,8 @@ import { useMapaComportamental } from "@/hooks/useMapaComportamental";
 import { useMinhaCampanhaPendente } from "@/hooks/useMapaComportamentalCampanhas";
 import { useMeusAcessos } from "@/hooks/useMapaComportamentalTime";
 import { useAuth } from "@/hooks/useAuth";
+import { useColaboradores } from "@/hooks/useColaboradores";
+import { cleanCpf } from "@/lib/cpf";
 import { AvisoTratamento, AVISO_TRATAMENTO_VERSAO } from "./AvisoTratamento";
 import { ResponderMapa } from "./ResponderMapa";
 import { RelatorioMeuMapa } from "./RelatorioMeuMapa";
@@ -20,7 +22,15 @@ type Fase = "inicio" | "aviso" | "respondendo" | "resultado";
 export function MeuMapaTab() {
   const { mapaAtual, mapaAnterior, rascunho, isLoading, salvarRascunho, concluir } = useMapaComportamental();
   const { profile } = useAuth();
+  const { colaboradores } = useColaboradores();
   const { data: campanhaPendente } = useMinhaCampanhaPendente();
+
+  // Resolve o cadastro do colaborador logado pelo CPF do próprio mapa (carimbado
+  // no servidor). Habilita "Adicionar ao meu PDI"; ausente → o botão não aparece.
+  const meuCpf = cleanCpf(mapaAtual?.colaborador_cpf ?? "");
+  const meuColaborador = meuCpf
+    ? colaboradores.find((c) => cleanCpf(c.cpf) === meuCpf) ?? null
+    : null;
   const [fase, setFase] = useState<Fase | null>(null);
   const [resultadoRecem, setResultadoRecem] = useState<MapaResultado | null>(null);
   const [continuando, setContinuando] = useState(false);
@@ -90,6 +100,9 @@ export function MeuMapaTab() {
           concluidoEm={mapaAtual.concluido_em}
           venceEm={mapaAtual.vence_em}
           anterior={mapaAnterior?.resultado ? { resultado: mapaAnterior.resultado, concluidoEm: mapaAnterior.concluido_em } : null}
+          colaboradorId={meuColaborador?.id ?? null}
+          colaboradorCargo={meuColaborador?.cargo ?? null}
+          colaboradorDepartamento={meuColaborador?.departamento ?? null}
           onRefazer={() => {
             setContinuando(false);
             setFase("aviso");

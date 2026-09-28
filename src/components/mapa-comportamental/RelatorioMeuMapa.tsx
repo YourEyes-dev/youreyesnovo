@@ -22,7 +22,9 @@ import { gerarRelatorioMeuMapaPdf } from "@/lib/mapaComportamentalRelatorioPdf";
 import { ContestarModal } from "./ContestarModal";
 import { useMinhasContestacoes } from "@/hooks/useMapaComportamentalContestacoes";
 import { compararMapas } from "@/data/instrumentos/mapaComportamentalComparativo";
-import { History } from "lucide-react";
+import { History, GraduationCap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { CriarPdiMapaModal } from "./CriarPdiMapaModal";
 
 interface Props {
   resultado: MapaResultado;
@@ -36,6 +38,10 @@ interface Props {
   publico?: boolean;
   /** Aplicação anterior (reaplicação) — habilita o bloco "o que mudou". */
   anterior?: { resultado: MapaResultado; concluidoEm?: string | null } | null;
+  /** Cadastro do colaborador logado — habilita "Adicionar ao meu PDI" (RF-012/RF-026). */
+  colaboradorId?: string | null;
+  colaboradorCargo?: string | null;
+  colaboradorDepartamento?: string | null;
 }
 
 function Secao({ icon, titulo, children }: { icon: React.ReactNode; titulo: string; children: React.ReactNode }) {
@@ -69,11 +75,13 @@ function EixoBarra({ titulo, esq, dir, pontosA, pontosB, intensidade }: {
   );
 }
 
-export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm, onRefazer, publico = false, anterior = null }: Props) {
+export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm, onRefazer, publico = false, anterior = null, colaboradorId = null, colaboradorCargo = null, colaboradorDepartamento = null }: Props) {
+  const navigate = useNavigate();
   const [encaminhar, setEncaminhar] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [contestar, setContestar] = useState(false);
+  const [pdiOpen, setPdiOpen] = useState(false);
   const { data: minhasContestacoes = [] } = useMinhasContestacoes();
   const minhaContestacao = publico
     ? null
@@ -331,6 +339,16 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
               <Target className="w-4 h-4" /> Criar uma ação a partir deste mapa
             </Button>
           )}
+          {!baixa && !publico && colaboradorId && (
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => setPdiOpen(true)}>
+              <Target className="w-4 h-4" /> Adicionar ao meu PDI
+            </Button>
+          )}
+          {!publico && (
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => navigate("/trilhas")}>
+              <GraduationCap className="w-4 h-4" /> Ver trilhas de desenvolvimento
+            </Button>
+          )}
           <Button size="sm" variant="outline" className="gap-1" onClick={baixarPdf} disabled={gerandoPdf}>
             {gerandoPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Baixar em PDF
           </Button>
@@ -381,6 +399,19 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
 
       {!publico && (
         <ContestarModal open={contestar} onOpenChange={setContestar} mapaId={mapaId ?? null} onRefazer={onRefazer} />
+      )}
+
+      {!publico && colaboradorId && (
+        <CriarPdiMapaModal
+          open={pdiOpen}
+          onOpenChange={setPdiOpen}
+          colaboradorId={colaboradorId}
+          colaboradorNome={nome ?? "Colaborador(a)"}
+          colaboradorCargo={colaboradorCargo}
+          colaboradorDepartamento={colaboradorDepartamento}
+          contrapesos={lib.contrapesos}
+          arquetipoLabel={ARQUETIPO_LABEL[primario]}
+        />
       )}
     </div>
   );

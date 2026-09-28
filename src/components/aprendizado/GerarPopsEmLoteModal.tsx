@@ -62,6 +62,11 @@ export function GerarPopsEmLoteModal({
     }));
     setResultados(items);
 
+    // Contadores locais: o `sucessos`/`erros` derivados de estado ficam defasados
+    // dentro deste loop (setState é assíncrono), então o toast final usa estes.
+    let okLocal = 0;
+    let errosLocal = 0;
+
     for (let i = 0; i < atividadesSemPop.length; i++) {
       if (canceladoRef.current) break;
 
@@ -95,10 +100,12 @@ export function GerarPopsEmLoteModal({
           popContent: pop,
         });
 
+        okLocal++;
         setResultados(prev => prev.map((r, idx) =>
           idx === i ? { ...r, status: "sucesso" } : r
         ));
       } catch (err: any) {
+        errosLocal++;
         setResultados(prev => prev.map((r, idx) =>
           idx === i ? { ...r, status: "erro", erro: err.message || "Erro desconhecido" } : r
         ));
@@ -107,7 +114,11 @@ export function GerarPopsEmLoteModal({
 
     setGerando(false);
     setConcluido(true);
-    toast.success(`POPs gerados: ${sucessos + 1} de ${total}`);
+    if (errosLocal > 0) {
+      toast.warning(`POPs gerados: ${okLocal} de ${total} (${errosLocal} com erro)`);
+    } else {
+      toast.success(`POPs gerados: ${okLocal} de ${total}`);
+    }
   };
 
   const handleCancelar = () => {

@@ -315,7 +315,7 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
     // (centro_custo, gestor_imediato, matricula_esocial, cbo, etc.)
     const { data: full, error: fullErr } = await supabase
       .from("admissoes")
-      .select("id, nome_completo, cpf, email, celular, tipo_contrato, cargo, departamento, filial, centro_custo, gestor_imediato, data_admissao, matricula_esocial, cbo, foto_url, bate_ponto, art62_inciso, art62_documento, teletrabalho_modalidade")
+      .select("id, nome_completo, cpf, email, celular, tipo_contrato, cargo, cargo_id, departamento, filial, centro_custo, gestor_imediato, data_admissao, matricula_esocial, cbo, foto_url, bate_ponto, art62_inciso, art62_documento, teletrabalho_modalidade")
       .eq("id", colab.id)
       .maybeSingle();
 
@@ -333,6 +333,7 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
       celular: src.celular ?? colab.celular,
       tipo_contrato: src.tipo_contrato ?? colab.tipo_contrato,
       cargo: src.cargo ?? colab.cargo,
+      cargo_id: src.cargo_id ?? null,
       departamento: src.departamento ?? colab.departamento,
       filial: src.filial ?? colab.filial,
       centro_custo: src.centro_custo ?? null,

@@ -11,6 +11,7 @@ import { GerarVagaSection } from "./GerarVagaSection";
 import { GerarPropostaSection } from "./GerarPropostaSection";
 import { GerarFuncaoIAModal } from "./GerarFuncaoIAModal";
 import { CompletudeResumo } from "./CompletudeChecklist";
+import { CentralPopsSection } from "./CentralPopsSection";
 import { useCompletudeCargos } from "@/hooks/useCompletudeAprendizado";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -332,6 +333,9 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
           <TabsTrigger value="epis" className="gap-1">
             <Shield className="w-4 h-4" /> EPIs & Treinamento
           </TabsTrigger>
+          <TabsTrigger value="pops" className="gap-1">
+            <BookOpen className="w-4 h-4" /> POPs
+          </TabsTrigger>
           <span className="self-center mx-0.5 h-5 w-px bg-border" aria-hidden />
           <span className="self-center px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Usar</span>
           <TabsTrigger value="vaga" className="gap-1">
@@ -357,6 +361,9 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
             <Separator />
             <EpisSection cargoId={cargo.id} />
           </div>
+        </TabsContent>
+        <TabsContent value="pops" className="mt-4">
+          <CentralPopsSection cargoId={cargo.id} funcaoNome={cargo.nome} />
         </TabsContent>
         <TabsContent value="vaga" className="mt-4">
           <GerarVagaSection

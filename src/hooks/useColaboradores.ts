@@ -8,6 +8,7 @@ export interface Colaborador {
   nome_completo: string;
   cpf: string;
   cargo: string;
+  cargo_id?: string | null;
   departamento: string | null;
   email: string | null;
   celular: string | null;
@@ -41,7 +42,7 @@ export function useColaboradores(options: UseColaboradoresOptions = {}) {
 
       let query = supabase
         .from("admissoes")
-        .select("id, nome_completo, cpf, cargo, departamento, email, celular, filial, data_admissao, empresa_id, gestor_imediato, foto_url, tipo_contrato, bate_ponto, inativo")
+        .select("id, nome_completo, cpf, cargo, cargo_id, departamento, email, celular, filial, data_admissao, empresa_id, gestor_imediato, foto_url, tipo_contrato, bate_ponto, inativo")
         .eq("tenant_id", tenantId)
         .eq("status", "concluido");
 

@@ -60,11 +60,10 @@ BEGIN
       -- Primeiro mês deste colaborador: mantém o saldo anterior herdado e, se o
       -- saldo do mês não for zero, lança a absorção que o zera.
       v_anterior := COALESCE(rec.saldo_anterior_minutos, 0);
-      v_net := COALESCE((SELECT SUM(minutos) FILTER (WHERE tipo = 'credito')
-                              - SUM(minutos) FILTER (WHERE tipo = 'debito')
-                              - SUM(minutos) FILTER (WHERE tipo = 'compensacao')
-                         FROM public.ponto_banco_horas_movimentacoes
-                         WHERE banco_horas_id = rec.id), 0);
+      -- COALESCE em CADA soma (a ausência de um tipo tornaria o total NULL).
+      v_net := COALESCE((SELECT SUM(minutos) FROM public.ponto_banco_horas_movimentacoes WHERE banco_horas_id = rec.id AND tipo = 'credito'), 0)
+             - COALESCE((SELECT SUM(minutos) FROM public.ponto_banco_horas_movimentacoes WHERE banco_horas_id = rec.id AND tipo = 'debito'), 0)
+             - COALESCE((SELECT SUM(minutos) FROM public.ponto_banco_horas_movimentacoes WHERE banco_horas_id = rec.id AND tipo = 'compensacao'), 0);
       v_cur := v_anterior + v_net;
       IF v_cur < 0 AND NOT EXISTS (
            SELECT 1 FROM public.ponto_banco_horas_movimentacoes m

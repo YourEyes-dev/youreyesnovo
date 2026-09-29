@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 import { trackConversion } from "@/lib/metaConversions";
+import { enviarLeadHubspot } from "@/lib/hubspotLead";
+import { capturarOrigemDaVisita } from "@/lib/siteOrigem";
 import {
   ArrowRight,
   ArrowLeft,
@@ -31,6 +35,15 @@ import {
  *
  * O resultado termina no WhatsApp do comercial com a mensagem já escrita —
  * é onde a conversa acontece de fato em tráfego pago.
+ *
+ * Na conclusão, além da gravação, saem dois envios fire-and-forget (nenhum
+ * é aguardado e nenhuma falha deles chega à tela):
+ *  - conversão `Lead` no Pixel (só nos hosts de produção) e na função
+ *    `meta-capi`, com o MESMO event_id para a Meta deduplicar;
+ *  - contato na função `hubspot-lead` (token só no servidor). Para o HubSpot
+ *    vão os dados que a pessoa digitou, o porte, o ÍNDICE agregado e a origem
+ *    da campanha — nunca as respostas do questionário.
+ * As UTMs da primeira visita da sessão (`siteOrigem.ts`) acompanham o lead.
  */
 
 /**
@@ -281,11 +294,39 @@ export function DiagnosticoPsicossocial() {
     }
 
     const diag = calcular(respostas);
+    // Origem da campanha (UTMs da primeira visita desta sessão). Vai junto do
+    // lead no banco e no HubSpot — nunca como dado pessoal.
+    const origem = capturarOrigemDaVisita();
+    const emailNorm = email.trim().toLowerCase();
+
+    // Conversão (Pixel + servidor, mesmo event_id) e contato no HubSpot.
+    // Os dois são fire-and-forget: nada aqui é aguardado, e nenhuma falha
+    // deles chega à tela do visitante.
+    const registrarConversao = (enviarCrm: boolean) => {
+      trackConversion("Lead", {
+        email: emailNorm,
+        phone: tel,
+        url: typeof window !== "undefined" ? window.location.href : undefined,
+      });
+      if (!enviarCrm) return;
+      enviarLeadHubspot({
+        email: emailNorm,
+        nome: nome.trim(),
+        empresa: empresa.trim(),
+        cargo: cargo.trim() || null,
+        telefone: tel,
+        porte: porte || null,
+        score: diag.score,
+        formulario: "site-diagnostico-psicossocial",
+        origem,
+      });
+    };
+
     setEnviando(true);
     try {
       const { error } = await supabase.from("landing_leads").insert({
         nome: nome.trim(),
-        email: email.trim().toLowerCase(),
+        email: emailNorm,
         telefone: tel,
         empresa: empresa.trim(),
         cargo: cargo.trim() || null,
@@ -301,28 +342,21 @@ export function DiagnosticoPsicossocial() {
           perfil: diag.perfil,
           dimensoes: diag.porDim,
           contexto: { porte, setor },
+          // Roundtrip JSON: descarta campos vazios (undefined) e casa com o tipo Json.
+          origem: JSON.parse(JSON.stringify(origem)) as Json,
           concluido_em: new Date().toISOString(),
         },
       });
       if (error) throw error;
 
       setResultado(diag);
-      trackConversion("Lead", {
-        email: email.trim().toLowerCase(),
-        phone: tel,
-        url: typeof window !== "undefined" ? window.location.href : undefined,
-      });
+      registrarConversao(true);
     } catch (e) {
       // O lead é o produto desta tela: se o registro falhar, o visitante não
       // pode ficar sem saída. Mostramos o resultado assim mesmo e deixamos o
       // WhatsApp na frente dele — a conversa é o que interessa.
       console.error("Falha ao registrar lead do diagnóstico:", e);
       setResultado(diag);
-      trackConversion("Lead", {
-        email: email.trim().toLowerCase(),
-        phone: tel,
-        url: typeof window !== "undefined" ? window.location.href : undefined,
-      });
 
       // "Não deu certo" sem motivo é o pior aviso possível: quem lê não sabe
       // se tenta de novo, se corrige algo ou se desiste. Traduzimos o que o
@@ -330,6 +364,10 @@ export function DiagnosticoPsicossocial() {
       const err = e as { code?: string; message?: string };
       const limiteAtingido =
         err?.code === "23514" && /rate limit/i.test(err?.message ?? "");
+      // Trava de spam do banco (5 envios/10 min do mesmo acesso): não vira
+      // contato no CRM. Qualquer outra falha de gravação vira — assim o lead
+      // não se perde só porque o banco recusou.
+      registrarConversao(!limiteAtingido);
       toast.error(
         limiteAtingido
           ? "Muitos envios deste mesmo acesso."
@@ -616,6 +654,14 @@ export function DiagnosticoPsicossocial() {
             </>
           )}
         </button>
+        <p className="text-[11px] text-slate-500 text-center mt-3 leading-relaxed">
+          Ao ver o resultado, você concorda com a{" "}
+          <Link to="/politica-de-privacidade" className="underline hover:text-slate-300">
+            Política de Privacidade
+          </Link>{" "}
+          e em receber o contato de um especialista da YourEyes. Suas respostas ficam só com a
+          YourEyes; no nosso atendimento comercial usamos apenas o índice final.
+        </p>
       </>
     );
   };

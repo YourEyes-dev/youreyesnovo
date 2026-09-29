@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { DiagnosticoPsicossocial } from "@/components/site/DiagnosticoPsicossocial";
 import logoLocal from "@/assets/logo-youreyes.svg";
 import { capturarRefDaUrl, lerRef } from "@/lib/parceiroRef";
+import { capturarOrigemDaVisita } from "@/lib/siteOrigem";
 import { trackConversion } from "@/lib/metaConversions";
 import mascot from "@/assets/mascot-ye.png.asset.json";
 import {
@@ -237,6 +238,10 @@ export default function Site() {
   const [indicador, setIndicador] = useState<{ nome: string; cidade: string | null; uf: string | null } | null>(null);
   const [faixaFechada, setFaixaFechada] = useState(false);
   useEffect(() => {
+    // Tráfego pago: guarda as UTMs da primeira visita da sessão já na chegada,
+    // antes que a navegação (âncoras, login) apague a query. O diagnóstico as
+    // lê de volta ao gravar o lead.
+    capturarOrigemDaVisita();
     const ref = capturarRefDaUrl();
     if (!ref) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -28,15 +28,18 @@ DECLARE
   v_competencia text := '2026-08';        -- competência de encerramento
   v_cpfs text[] := ARRAY[
     -- Itapejara (26114701000145):
-    '071.542.019-40',   -- Leticia   (devedor)
-    '085.949.149-89',   -- Luciana   (devedor)
-    '117.626.459-12',   -- Luciani   (devedor)
-    '112.899.749-50',   -- Paulo     (devedor)
+    '071.542.019-40',   -- Leticia   (devedor -> absorcao)
+    '085.949.149-89',   -- Luciana   (devedor -> absorcao)
+    '117.626.459-12',   -- Luciani   (devedor -> absorcao)
+    '112.899.749-50',   -- Paulo     (devedor -> absorcao)
     '061.531.139-31',   -- Adriana   (ja 0 — sera pulada)
     '014.160.681-98',   -- Cleciane  (ja 0 — sera pulada)
-    '093.329.719-00'    -- Marina    (ja 0 — sera pulada)
-    -- Realeza (41085456000189):  AYLYN, DEISI  -> incluir CPFs
-    -- Dois Vizinhos (31219374000126): CAROL     -> incluir CPF
+    '093.329.719-00',   -- Marina    (ja 0 — sera pulada)
+    -- Realeza (41085456000189):
+    '088.906.489-02',   -- Aylyn     (ja 0 — sera pulada)
+    '084.805.319-24',   -- Deisi     (ja 0 — sera pulada)
+    -- Dois Vizinhos (31219374000126):
+    '116.474.459-30'    -- Carol     (ja 0 — sera pulada)
   ]::text[];
   v_zerar_credores boolean := false;      -- só true com decisão de DP
   v_fim date := (to_date(v_competencia || '-01', 'YYYY-MM-DD') + INTERVAL '1 month - 1 day')::date;
@@ -144,7 +147,7 @@ LEFT JOIN LATERAL public.ponto_banco_horas_oficial(
 WHERE b.competencia >= '2026-08'
   AND regexp_replace(COALESCE(b.colaborador_cpf,''), '[^0-9]', '', 'g') IN (
         '07154201940','08594914989','11762645912','11289974950',
-        '06153113931','01416068198','09332971900'
-        -- + CPFs de AYLYN, DEISI, CAROL quando incluídos
+        '06153113931','01416068198','09332971900',
+        '08890648902','08480531924','11647445930'
       )
 ORDER BY b.colaborador_nome, b.competencia;

@@ -33,6 +33,7 @@ export function MeuMapaTab() {
     : null;
   const [fase, setFase] = useState<Fase | null>(null);
   const [resultadoRecem, setResultadoRecem] = useState<MapaResultado | null>(null);
+  const [mapaIdRecem, setMapaIdRecem] = useState<string | null>(null);
   const [continuando, setContinuando] = useState(false);
 
   if (isLoading) {
@@ -50,8 +51,13 @@ export function MeuMapaTab() {
       <RelatorioMeuMapa
         resultado={resultadoRecem}
         nome={profile?.nome_completo}
+        mapaId={mapaIdRecem ?? undefined}
+        colaboradorId={meuColaborador?.id ?? null}
+        colaboradorCargo={meuColaborador?.cargo ?? null}
+        colaboradorDepartamento={meuColaborador?.departamento ?? null}
         onRefazer={() => {
           setResultadoRecem(null);
+          setMapaIdRecem(null);
           setContinuando(false);
           setFase("aviso");
         }}
@@ -76,13 +82,14 @@ export function MeuMapaTab() {
         onPausar={() => setFase(null)}
         concluindo={concluir.isPending}
         onConcluir={async (respostas, tempo) => {
-          const r = await concluir.mutateAsync({
+          const { resultado, mapaId } = await concluir.mutateAsync({
             respostas,
             avisoVersao: AVISO_TRATAMENTO_VERSAO,
             tempoTotalSegundos: tempo,
             campanhaId: campanhaPendente?.campanha_id ?? null,
           });
-          setResultadoRecem(r);
+          setResultadoRecem(resultado);
+          setMapaIdRecem(mapaId);
           setFase("resultado");
         }}
       />

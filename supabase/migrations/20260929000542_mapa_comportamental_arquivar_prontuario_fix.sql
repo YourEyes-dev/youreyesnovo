@@ -1,23 +1,16 @@
 -- ============================================================================
--- ENTREGA — Mapa Comportamental: arquivar o PDF "Meu Mapa" no prontuário (RF-028)
+-- Mapa Comportamental — correção do arquivamento no prontuário (RF-028).
 --
--- Cole este arquivo inteiro no SQL Editor do projeto (roda em UMA transação).
--- Idempotente: pode rodar mais de uma vez sem quebrar nem duplicar.
+-- A primeira versão resolvia o dono do prontuário por public.usuarios_base, mas
+-- as PASTAS de colaborador do módulo Documentos são chaveadas por admissoes.id
+-- (o app monta a árvore a partir de public.admissoes — ver useColaboradores /
+-- syncColaboradores). Com o id errado, documento_pasta_do_colaborador criava
+-- uma pasta PARALELA e o PDF não aparecia na pasta que o usuário vê.
 --
--- O que faz: cria a RPC que grava o registro do PDF do relatório em
--- public.documentos (o upload do arquivo em si é feito pelo app, no bucket
--- "documentos", com a chave começando pelo tenant). A RPC roda como
--- SECURITY DEFINER para permitir que o PRÓPRIO titular arquive o seu mapa —
--- a escrita normal em documentos exige manager+. Autoriza o titular do mapa
--- ou um gestor/RH do mesmo tenant.
---
--- O dono do prontuário é resolvido por public.admissoes (mesma chave das pastas
--- de colaborador do módulo Documentos), casando o empresa_id da admissão. O
--- arquivo é filiado à subpasta "Vida Funcional", NUNCA "Saúde Ocupacional"
--- (RN-009); a classificação é 'pessoal', não de saúde.
---
--- Este script NÃO cria tabela e NÃO altera nem apaga dado existente — apenas
--- cria função e documenta o caso de QA. Não requer backup prévio.
+-- Correção: resolver o colaborador por public.admissoes (CPF, status
+-- 'concluido') e usar o empresa_id da própria admissão para casar com a pasta
+-- existente. Continua indo para "Vida Funcional" (RN-009 — nunca Saúde) e com
+-- classificação 'pessoal'. Idempotente por caminho de storage.
 -- ============================================================================
 
 SET lock_timeout = '10s';
@@ -58,6 +51,7 @@ BEGIN
                  (SELECT colaborador_nome FROM public.mapa_comportamental_respostas WHERE id = p_mapa_id LIMIT 1),
                  'Colaborador(a)');
 
+  -- Autorização: titular do mapa OU gestor/RH do mesmo tenant.
   IF NOT (
         auth.uid() = v_auth
      OR (public.has_minimum_role(auth.uid(), 'manager'::app_role) AND v_tenant = public.get_user_tenant_id())
@@ -65,10 +59,12 @@ BEGIN
     RETURN json_build_object('ok', false, 'erro', 'sem permissao');
   END IF;
 
+  -- Defesa em profundidade: a chave do objeto tem de começar pelo tenant.
   IF p_storage_path IS NULL OR left(p_storage_path, length(v_tenant::text) + 1) <> v_tenant::text || '/' THEN
     RETURN json_build_object('ok', false, 'erro', 'caminho invalido');
   END IF;
 
+  -- Dono do prontuário: a ADMISSÃO (mesma chave das pastas do módulo Documentos).
   IF v_cpf IS NOT NULL THEN
     v_colab_id := (SELECT a.id FROM public.admissoes a
                    WHERE a.tenant_id = v_tenant
@@ -80,12 +76,15 @@ BEGIN
     v_nome := COALESCE((SELECT a.nome_completo FROM public.admissoes a WHERE a.id = v_colab_id LIMIT 1), v_nome);
   END IF;
 
+  -- Pasta "Vida Funcional" do colaborador (RN-009 — nunca Saúde), casando o
+  -- empresa_id com o da admissão (é como a pasta foi criada pelo app).
   IF v_colab_id IS NOT NULL THEN
     v_pasta := public.documento_pasta_do_colaborador(
       v_tenant, v_colab_id, v_nome, v_cpf, COALESCE(v_colab_emp, v_empresa), 'Vida Funcional'
     );
   END IF;
 
+  -- Idempotente por caminho de storage (a reexportação sobrescreve o objeto).
   v_doc_id := (SELECT id FROM public.documentos
                WHERE tenant_id = v_tenant AND storage_path = p_storage_path LIMIT 1);
   IF v_doc_id IS NOT NULL THEN
@@ -120,63 +119,3 @@ $fn$;
 
 REVOKE ALL ON FUNCTION public.mapa_comportamental_arquivar_no_prontuario(uuid, text, int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.mapa_comportamental_arquivar_no_prontuario(uuid, text, int) TO authenticated;
-
--- ── QA — MAPA-011 ────────────────────────────────────────────────────────────
-DO $doc$
-DECLARE v_mod uuid;
-BEGIN
-  v_mod := (SELECT id FROM public.qa_modulos WHERE path = 'desenvolvimento-performance/mapa-comportamental');
-  IF v_mod IS NULL THEN
-    RAISE NOTICE 'Módulo QA ausente — pulei o caso do arquivamento.';
-    RETURN;
-  END IF;
-  INSERT INTO public.qa_casos_teste
-    (modulo_id, codigo, titulo, tipo, prioridade, status, nivel, objetivo, pre_condicoes, passos, resultado_esperado, observacoes)
-  VALUES
-    (v_mod, 'MAPA-011', 'Arquivar o PDF do relatório no prontuário', 'feliz', 'alta', 'aprovado', 'api',
-     'A RPC de arquivamento existe e é executável pelo titular/gestor.',
-     'Migration do arquivamento aplicada.',
-     '[{"ordem":1,"acao":"Verificar a RPC de arquivamento e o grant a authenticated","resultado_esperado":"função presente e com EXECUTE para authenticated"}]'::jsonb,
-     'RPC presente e concedida.', 'RF-028; RN-009 (vai para Vida Funcional, nunca Saúde).')
-  ON CONFLICT (codigo) DO NOTHING;
-  RAISE NOTICE 'OK: caso MAPA-011 documentado.';
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'MAPA-011 doc: %', SQLERRM;
-END $doc$;
-
-CREATE OR REPLACE FUNCTION public.qa_caso_mapa_011()
-RETURNS public.qa_retorno
-LANGUAGE plpgsql
-AS $fn$
-DECLARE r public.qa_retorno; v_ok boolean;
-BEGIN
-  r.passo_ordem := 1;
-  r.passo_acao  := 'Verificar a RPC de arquivamento e o grant a authenticated';
-  r.esperado    := 'mapa_comportamental_arquivar_no_prontuario presente e com EXECUTE para authenticated';
-  v_ok := EXISTS (
-            SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-            WHERE n.nspname = 'public' AND p.proname = 'mapa_comportamental_arquivar_no_prontuario'
-          )
-      AND COALESCE(
-            has_function_privilege('authenticated',
-              'public.mapa_comportamental_arquivar_no_prontuario(uuid, text, int)', 'EXECUTE'),
-            false);
-  IF v_ok THEN r.situacao := 'passou'; r.obtido := 'RPC presente e concedida';
-  ELSE r.situacao := 'falhou'; r.obtido := 'RPC ausente ou sem grant'; END IF;
-  RETURN r;
-EXCEPTION WHEN OTHERS THEN
-  r.situacao := 'erro'; r.obtido := 'A rotina quebrou'; r.erro_tecnico := SQLERRM; RETURN r;
-END;
-$fn$;
-
-INSERT INTO public.qa_implementacoes (codigo, funcao_sql) VALUES ('MAPA-011', 'qa_caso_mapa_011')
-ON CONFLICT (codigo) DO UPDATE SET funcao_sql = EXCLUDED.funcao_sql, ativo = true;
-
--- ── Conferência final (o editor mostra só o último resultado) ────────────────
-SELECT
-  EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-          WHERE n.nspname = 'public' AND p.proname = 'mapa_comportamental_arquivar_no_prontuario') AS rpc_presente,
-  has_function_privilege('authenticated',
-    'public.mapa_comportamental_arquivar_no_prontuario(uuid, text, int)', 'EXECUTE') AS grant_authenticated,
-  (SELECT funcao_sql FROM public.qa_implementacoes WHERE codigo = 'MAPA-011') AS qa_rotina,
-  (SELECT nivel FROM public.qa_casos_teste WHERE codigo = 'MAPA-011') AS qa_nivel;

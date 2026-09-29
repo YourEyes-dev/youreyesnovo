@@ -124,7 +124,9 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
   const [relatorioOpen, setRelatorioOpen] = useState(false);
   // Confirmação detalhada e rastreável do envio ao GRO (item 4).
   const [confirmGRO, setConfirmGRO] = useState<{
-    count: number;
+    criados: number;
+    duplicados: number;
+    semRisco: boolean;
     campanhaNome: string;
     dimensoes: string[];
     situacoes: { setorNome: string; funcaoNome: string }[];
@@ -346,7 +348,7 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
       .filter(d => (isSiproCampanha ? d.value : 100 - d.value) >= 35)
       .map(d => d.subject);
 
-    const count = await importarDaCampanha.mutateAsync({
+    const res = await importarDaCampanha.mutateAsync({
       campanhaId: campanha.id,
       campanhaName: campanha.nome,
       dimensoes,
@@ -357,7 +359,9 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
 
     // Confirmação rastreável: o que foi enviado e para onde (item 4).
     setConfirmGRO({
-      count: count ?? 0,
+      criados: res.criados,
+      duplicados: res.duplicados,
+      semRisco: res.semRisco,
       campanhaNome: campanha.nome,
       dimensoes: dimensoesCriticas,
       situacoes: (situacoes ?? []).map(s => ({ setorNome: s.setorNome, funcaoNome: s.funcaoNome })),
@@ -720,26 +724,30 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
-              {confirmGRO && confirmGRO.count > 0
+              {confirmGRO && confirmGRO.criados > 0
                 ? "Riscos enviados ao GRO"
-                : "Nada foi enviado ao GRO"}
+                : confirmGRO && confirmGRO.duplicados > 0
+                  ? "Riscos já constavam no GRO"
+                  : "Nada foi enviado ao GRO"}
             </DialogTitle>
             <DialogDescription>
-              {confirmGRO && confirmGRO.count > 0 ? (
+              {confirmGRO && confirmGRO.criados > 0 ? (
                 <>Da campanha <strong>{confirmGRO.campanhaNome}</strong> para o Inventário GRO (módulo Ergonomia).</>
+              ) : confirmGRO && confirmGRO.duplicados > 0 ? (
+                <>Os {confirmGRO.duplicados} risco(s) desta campanha (<strong>{confirmGRO.campanhaNome}</strong>) já estavam no GRO — nada novo foi criado. O reenvio não duplica registros.</>
               ) : (
                 <>Nenhuma dimensão da campanha <strong>{confirmGRO?.campanhaNome}</strong> atingiu o limiar de risco (score ≥ 35), então nenhum risco foi criado no GRO.</>
               )}
             </DialogDescription>
           </DialogHeader>
 
-          {confirmGRO && confirmGRO.count > 0 && (
+          {confirmGRO && confirmGRO.criados > 0 && (
             <div className="space-y-3 text-sm">
               <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Riscos criados</span>
                   <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                    {confirmGRO.count}
+                    {confirmGRO.criados}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
@@ -778,7 +786,7 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
                     ))}
                   </ul>
                   <p className="text-[11px] text-muted-foreground mt-1.5">
-                    Cada dimensão de risco gera 1 registro por situação de trabalho — total de {confirmGRO.count}.
+                    Cada dimensão de risco gera 1 registro por situação de trabalho. Registros novos criados agora: {confirmGRO.criados}.
                   </p>
                 </div>
               )}
@@ -789,7 +797,7 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
             <Button variant="outline" onClick={() => setConfirmGRO(null)}>
               Fechar
             </Button>
-            {confirmGRO && confirmGRO.count > 0 && (
+            {confirmGRO && (confirmGRO.criados > 0 || confirmGRO.duplicados > 0) && (
               <Button
                 className="gap-2"
                 onClick={() => { setConfirmGRO(null); navigate("/ergonomia"); }}

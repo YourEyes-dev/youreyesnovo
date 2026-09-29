@@ -56,6 +56,7 @@ export function PontoBancoHorasTab() {
 
   const {
     useBancoHorasPorCompetencia,
+    useBancoHorasOficial,
     useMovimentacoes,
     adicionarMovimentacao,
     adicionandoMovimentacao,
@@ -77,6 +78,9 @@ export function PontoBancoHorasTab() {
   const { tenantId } = useAuth();
 
   const { data: bancos = [], isLoading } = useBancoHorasPorCompetencia(competencia);
+  // Fonte única ao vivo: mesma do detalhamento e do relatório. A tabela abaixo
+  // sobrepõe estes números na fotografia (que pode estar defasada).
+  const { data: bancoOficial = [] } = useBancoHorasOficial(competencia);
   const [selectedBanco, setSelectedBanco] = useState<BancoHoras | null>(null);
   const { data: movimentacoes = [] } = useMovimentacoes(selectedBanco?.id || null);
 
@@ -293,10 +297,32 @@ export function PontoBancoHorasTab() {
 
   const onlyDigits = (s: string) => (s || "").toString().replace(/\D/g, "");
 
+  // Sobrepõe os números OFICIAIS ao vivo (ponto_banco_horas_oficial) na
+  // fotografia, para a tabela principal bater com o detalhamento do colaborador
+  // e com o relatório. Sem correspondência oficial, mantém a fotografia.
+  const oficialPorCpf = new Map<string, any>();
+  (bancoOficial as any[]).forEach((o) => {
+    const cpf = onlyDigits(o.colaborador_cpf || "");
+    if (cpf) oficialPorCpf.set(cpf, o);
+  });
+  const linhaOficial = (b: any) => {
+    const o = oficialPorCpf.get(onlyDigits((b as any).colaborador_cpf || ""));
+    if (!o) return b;
+    return {
+      ...b,
+      saldo_anterior_minutos: o.saldo_anterior_min,
+      creditos_minutos: o.creditos_min,
+      debitos_minutos: o.debitos_min,
+      compensados_minutos: o.compensados_min,
+      saldo_atual_minutos: o.saldo_atual_min,
+    };
+  };
+  const bancosOfic = (bancos as any[]).map(linhaOficial);
+
   // Filtra bancos de colaboradores ativos (useColaboradores já exclui inativos/desligados)
   const cpfsAtivos = new Set(colaboradores.map(c => onlyDigits(c.cpf || "")));
   const idsAtivos = new Set(colaboradores.map(c => c.id));
-  const bancosAtivos = bancos.filter(b => {
+  const bancosAtivos = bancosOfic.filter(b => {
     const cpf = onlyDigits((b as any).colaborador_cpf || "");
     if (cpf && cpfsAtivos.has(cpf)) return true;
     if (b.colaborador_id && idsAtivos.has(b.colaborador_id)) return true;

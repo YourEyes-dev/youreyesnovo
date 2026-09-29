@@ -1,7 +1,8 @@
 -- ============================================================================
 -- ENTREGA: admissoes.cargo_id — vínculo canônico colaborador -> cargo (O2-A)
 -- Equivalente à migration 20260928121640_admissoes_cargo_id.sql
--- Cole INTEIRO no SQL Editor de PRODUÇÃO. Idempotente.
+-- Cole INTEIRO no SQL Editor (HOMOLOGAÇÃO primeiro; depois de conferido, PRODUÇÃO).
+-- Idempotente.
 --
 -- Por que: o envio de manual para assinatura casa colaborador x cargo por
 -- texto do nome do cargo; qualquer divergência de grafia esconde o colaborador.
@@ -13,11 +14,24 @@
 -- admissoes.cargo fica intacto). Por isso dispensa tabela de backup; a reversão
 -- é o UPDATE ... SET cargo_id = NULL no rodapé. Não cria TABELA nova, então não
 -- aciona o auxiliar de RLS do editor.
+--
+-- POR QUE SUSPENDE OS GATILHOS NO BACKFILL (aprendido a caro preço, 29/09):
+--   O backfill é um UPDATE em admissoes. A tabela tem gatilhos de FLUXO que
+--   disparam em qualquer UPDATE — em especial auto_criar_contrato_experiencia,
+--   que ao ser acionado tenta INSERIR um contrato de experiência usando
+--   NEW.data_admissao. Numa base com admissão sem data_admissao (dado fictício
+--   da homologação; e admissões antigas/incompletas em geral) isso viola o
+--   NOT NULL de contratos_experiencia.data_admissao e ABORTA o script inteiro.
+--   Preencher uma coluna de metadado (cargo_id) NÃO tem significado de fluxo e
+--   NÃO deve criar contratos. Por isso o backfill roda com os gatilhos de
+--   USUÁRIO suspensos — as travas de INTEGRIDADE (FK/constraints, inclusive a
+--   FK de cargo_id -> cargos) continuam valendo. Tudo em UMA transação: se algo
+--   falhar, o rollback restaura os gatilhos; no sucesso eles voltam na seção 3.
 -- ============================================================================
 
 SET lock_timeout = '10s';
 
--- 1) Coluna canônica + índice (aditivos, idempotentes).
+-- 1) Coluna canônica + índice (DDL — não dispara gatilhos de linha).
 ALTER TABLE public.admissoes
   ADD COLUMN IF NOT EXISTS cargo_id uuid REFERENCES public.cargos(id) ON DELETE SET NULL;
 
@@ -26,6 +40,9 @@ CREATE INDEX IF NOT EXISTS idx_admissoes_cargo_id ON public.admissoes (cargo_id)
 -- 2) Backfill: resolve pelo nome (case-insensitive, sem espaços nas pontas),
 --    escopado por tenant e compatível com a empresa. Só atribui quando há
 --    EXATAMENTE UM cargo correspondente (ambíguos ficam NULL).
+--    Gatilhos de usuário suspensos SÓ durante o backfill (ver cabeçalho).
+ALTER TABLE public.admissoes DISABLE TRIGGER USER;
+
 UPDATE public.admissoes a
    SET cargo_id = (
      SELECT c.id
@@ -45,6 +62,8 @@ UPDATE public.admissoes a
         AND lower(btrim(c.nome)) = lower(btrim(a.cargo))
         AND (c.empresa_id IS NULL OR a.empresa_id IS NULL OR c.empresa_id = a.empresa_id)
    ) = 1;
+
+ALTER TABLE public.admissoes ENABLE TRIGGER USER;
 
 -- 3) Conferência (único resultado) + relatório de não-resolvidos.
 --    pendentes_ambiguos: mesmo nome em 2+ cargos do escopo (resolver na tela).

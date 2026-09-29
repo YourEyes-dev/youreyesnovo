@@ -33,9 +33,24 @@ describe("Módulo Saúde Ocupacional (ASO)", () => {
     cy.contains("h1", "Saúde Ocupacional (ASO)", { timeout: 20000 }).should("be.visible");
   }
 
+  // O modal "Como você está hoje?" (humor) monta um overlay com scroll-lock que
+  // intercepta cliques e digitação. Sem dispensá-lo, cy.click()/cy.clear() falham
+  // com "page updated / element is covered" — foi o que derrubou os 4 it() de
+  // interação nas corridas #57 e #58. Dispensa antes de interagir (mesmo padrão
+  // dos outros specs: usuarios, aprendizado, cargos, ...).
+  function fecharHumorSePresente() {
+    cy.get("body", { timeout: 10000 }).then(($b) => {
+      if ($b.text().includes("Como você está hoje")) {
+        cy.get("body").type("{esc}", { force: true });
+        cy.wait(300);
+      }
+    });
+  }
+
   beforeEach(() => {
     login();
     goToModulo();
+    fecharHumorSePresente();
   });
 
   it("carrega o painel de ASOs com os cards de resumo", () => {
@@ -52,7 +67,7 @@ describe("Módulo Saúde Ocupacional (ASO)", () => {
 
   it("filtra a lista pela busca", () => {
     cy.get('input[placeholder="Buscar por colaborador ou médico..."]', { timeout: 20000 })
-      .should("be.visible").clear().type("Administrativo", { force: true });
+      .should("be.visible").clear({ force: true }).type("Administrativo", { force: true });
     cy.contains("Algo deu errado").should("not.exist");
   });
 
@@ -61,7 +76,7 @@ describe("Módulo Saúde Ocupacional (ASO)", () => {
     // force:true no type: a lista re-renderiza a cada tecla ao filtrar, e sem o
     // force o Cypress aborta com "the page updated while this command was executing".
     cy.get('input[placeholder="Buscar por colaborador ou médico..."]', { timeout: 20000 })
-      .should("be.visible").clear().type(inexistente, { force: true });
+      .should("be.visible").clear({ force: true }).type(inexistente, { force: true });
     cy.contains("Nenhum registro de ASO encontrado.").should("exist");
   });
 

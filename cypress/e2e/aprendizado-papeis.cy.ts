@@ -69,7 +69,8 @@ describe("Módulo Aprendizado & Papéis", () => {
   it("carrega o módulo Aprendizado & Papéis com as abas", () => {
     cy.contains('[role="tab"]', "Funções", { timeout: 20000 }).should("be.visible");
     cy.contains('[role="tab"]', "Assinaturas").should("exist");
-    cy.contains('[role="tab"]', "Indicadores").should("exist");
+    // A aba de indicadores (value="indicadores") é rotulada "Visão geral" na tela.
+    cy.contains('[role="tab"]', "Visão geral").should("exist");
     cy.contains('[role="tab"]', "Configurações").should("exist");
   });
 
@@ -81,7 +82,7 @@ describe("Módulo Aprendizado & Papéis", () => {
     cy.get('input[placeholder*="Buscar funções"]', { timeout: 20000 })
       .clear({ force: true })
       .type("zzz-nao-existe-999", { force: true });
-    cy.contains("Nenhuma função cadastrada", { timeout: 20000 }).should("be.visible");
+    cy.contains(/Nenhuma função encontrada/i, { timeout: 20000 }).should("be.visible");
     // Limpar a busca traz a lista de volta.
     cy.get('input[placeholder*="Buscar funções"]').clear({ force: true });
     cy.contains(CARGO_ILHA, { timeout: 20000 }).should("be.visible");
@@ -106,7 +107,8 @@ describe("Módulo Aprendizado & Papéis", () => {
 
   // APR-050
   it("a aba Indicadores monta com os cartões", () => {
-    abrirAba("Indicadores");
+    // A aba de indicadores é rotulada "Visão geral" na tela (conteúdo = cartões).
+    abrirAba("Visão geral");
     cy.contains("Total de Atividades", { timeout: 20000 }).should("be.visible");
     cy.contains("Funções sem Atividades").should("exist");
   });

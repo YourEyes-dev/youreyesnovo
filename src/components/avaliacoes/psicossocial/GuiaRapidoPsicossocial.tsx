@@ -88,9 +88,9 @@ const PASSOS = [
       "**Link público / QR Code**: distribuição massiva, mas sem segmentação por grupo",
       "Verificação via **código WhatsApp** garante 1 resposta por pessoa",
       "**Identidade nunca é salva** junto às respostas — só hash anônimo + snapshot do grupo",
-      "O snapshot é o que permite o **cruzamento por GHE / Setor / Cargo** depois (aba Segmentos)",
+      "O snapshot é o que permite o **cruzamento por GHE / Setor / Cargo** depois (menu **Resultados → Por GHE**)",
     ],
-    dica: "Use sempre que possível o convite individual. Ele preserva o anonimato (regra ≥5 por segmento) e habilita as análises cruzadas no dashboard.",
+    dica: "Use sempre que possível o convite individual. Ele preserva o anonimato (em questionários, a regra ≥5 por segmento) e habilita as análises cruzadas no dashboard.",
   },
   {
     id: "anonimato",
@@ -100,15 +100,16 @@ const PASSOS = [
     titulo: "Passo 3 — Regra do Anonimato",
     subtitulo: "Como o sistema protege os colaboradores",
     descricao:
-      "O sistema garante que nenhum colaborador seja identificado pelas suas respostas. A regra de confidencialidade ≥5 vale tanto para o resultado geral quanto para o cruzamento por segmento (GHE, Setor, Cargo).",
+      "O sistema garante que nenhum colaborador seja identificado pelas suas respostas. A trava de confidencialidade depende do tipo de instrumento: os questionários (SIPRO, COPSOQ, HSE, PROART) só exibem resultados com no mínimo 5 respondentes por grupo/segmento; as entrevistas guiadas e coletivas são liberadas a partir de 1 resposta, porque o material já é tratado de forma qualitativa e agregada.",
     acoes: [
-      "**Mínimo de 5 respondentes** por grupo (e por segmento) para exibir resultados",
-      "Segmentos com menos de 5 respostas aparecem como '**Amostra insuficiente**'",
-      "Se um grupo tem menos de 5: sistema **agrupa automaticamente** (Setor → Empresa)",
+      "**Questionários**: mínimo de **5 respondentes** por grupo (e por segmento) para exibir resultados",
+      "**Entrevistas guiadas / coletivas**: liberadas a partir de **1 resposta** — a trava de 5 não se aplica",
+      "Em questionários, segmentos com menos de 5 respostas aparecem como '**Amostra insuficiente**'",
+      "Se um grupo de questionário tem menos de 5: sistema **agrupa automaticamente** (Setor → Empresa)",
       "Para empresas com menos de 20 pessoas: use apenas o nível **Empresa**",
       "Resultados exibidos **somente em formato agregado** — nunca individual",
     ],
-    dica: "Esta regra segue a ISO 45003 e o COPSOQ III. O sistema aplica tudo automaticamente — inclusive nos cruzamentos por GHE/Setor/Cargo.",
+    dica: "A regra dos 5 segue a ISO 45003 e o COPSOQ III e vale apenas para questionários. As entrevistas guiadas e coletivas já nascem anônimas e agregadas, por isso liberam com 1 resposta. O sistema aplica tudo automaticamente.",
   },
   {
     id: "resultados",
@@ -118,15 +119,15 @@ const PASSOS = [
     titulo: "Passo 4 — Veja os Resultados",
     subtitulo: "Visão Geral, Dimensões, IA e Segmentos",
     descricao:
-      "Ao encerrar a campanha, o sistema calcula automaticamente o IRP-S (Índice de Risco Psicossocial) e classifica cada dimensão. Os resultados ficam organizados em abas: Visão Geral, Por Dimensão, IA, Contraprova, Ergonomia, Participação e Segmentos.",
+      "Ao encerrar a campanha, o sistema calcula automaticamente o IRP-S (Índice de Risco Psicossocial) e classifica cada dimensão. Os resultados de cada campanha ficam organizados em abas: Visão Geral, Por Dimensão, IA, Contraprova, Ergonomia e Participação (a aba Comparativo aparece quando há mais de uma campanha no recorte).",
     acoes: [
       "**IRP-S (Índice de Risco Psicossocial)**: score de 0 a 100 — **quanto maior, maior o risco**",
       "**0–20 = Saudável** · **21–35 = Estável** · **36–50 = Atenção** · **51–65 = Risco** · **66–100 = Crítico**",
-      "**Aba Segmentos**: tabela comparativa heatmap cruzando indicadores por **GHE, Setor e Cargo** (somente convites individuais alimentam essa visão)",
+      "**Cruzamento por GHE / Setor / Cargo**: o heatmap comparativo fica no menu **Resultados → Por GHE** (somente convites individuais alimentam essa visão)",
       "**Aba IA**: análise interpretativa gerada automaticamente com recomendações 5W2H",
-      "**Aba Contraprova**: validação cruzada entre instrumentos e checagem de consistência das respostas",
+      "**Aba Contraprova**: cruza a percepção dos trabalhadores com evidências operacionais de outros módulos (afastamentos, ocorrências) para validar ou questionar o resultado",
     ],
-    dica: "A aba Segmentos é o melhor caminho para identificar onde concentrar ações: ela mostra exatamente qual GHE ou Setor está em risco, sem expor pessoas.",
+    dica: "Para identificar onde concentrar ações, use o menu Resultados → Por GHE: ele mostra exatamente qual GHE ou Setor está em risco, sem expor pessoas.",
   },
   {
     id: "gro",

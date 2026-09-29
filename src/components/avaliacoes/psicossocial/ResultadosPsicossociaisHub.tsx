@@ -3,8 +3,7 @@ import { isEntrevistaInstrumento } from "@/types/psicossocial";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { LineChart, Users, Flame, BarChart3, MessagesSquare } from "lucide-react";
-import { IndicesDerivadosDashboard } from "./IndicesDerivadosDashboard";
+import { LineChart, Users, Flame, MessagesSquare } from "lucide-react";
 import { ResultadosPorGHEPanel } from "./ResultadosPorGHEPanel";
 import { RadaresPsicossocialSection } from "./RadaresPsicossocialSection";
 import { IPSHistoricoChart } from "./IPSHistoricoChart";
@@ -16,14 +15,13 @@ interface Props {
 }
 
 const SUB_TABS = [
-  { value: "geral", label: "Visão Geral", icon: BarChart3, desc: "Panorama executivo dos índices psicossociais." },
   { value: "ghe", label: "Por GHE", icon: Users, desc: "Resultados agrupados por Grupo Homogêneo de Exposição." },
   { value: "burnout", label: "Burnout & Boreout", icon: Flame, desc: "Indicadores de esgotamento e desengajamento." },
   { value: "historico", label: "Histórico IPS", icon: LineChart, desc: "Evolução do Índice Psicossocial ao longo do tempo." },
 ];
 
 export function ResultadosPsicossociaisHub({ campanhas }: Props) {
-  const [tab, setTab] = useState<string>("geral");
+  const [tab, setTab] = useState<string>("ghe");
   const current = SUB_TABS.find((t) => t.value === tab) ?? SUB_TABS[0];
 
   // Mescla agregados das entrevistas guiadas (resumo_ia) nas campanhas correspondentes,
@@ -72,7 +70,7 @@ export function ResultadosPsicossociaisHub({ campanhas }: Props) {
       </Card>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid grid-cols-2 md:grid-cols-4 h-auto bg-muted/60 p-1">
+        <TabsList className="grid grid-cols-1 sm:grid-cols-3 h-auto bg-muted/60 p-1">
           {SUB_TABS.map((t) => {
             const Icon = t.icon;
             return (
@@ -89,10 +87,6 @@ export function ResultadosPsicossociaisHub({ campanhas }: Props) {
         </TabsList>
 
         <p className="text-xs text-muted-foreground mt-2 px-1">{current.desc}</p>
-
-        <TabsContent value="geral" className="mt-4">
-          <IndicesDerivadosDashboard campanhas={campanhasEnriquecidas} />
-        </TabsContent>
 
         <TabsContent value="ghe" className="mt-4">
           <ResultadosPorGHEPanel />

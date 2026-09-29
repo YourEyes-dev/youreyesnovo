@@ -91,7 +91,11 @@ export function usePontoBancoHoras() {
    */
   const useBancoHorasOficial = (competencia: string) => {
     return useQuery({
-      queryKey: ["ponto-banco-horas-oficial", tenantId, competencia, empresaAtivaId],
+      // Prefixado sob "ponto-banco-horas" de propósito: assim toda invalidação
+      // de banco (apurar, reapurar, movimentar, editar) recarrega TAMBÉM o
+      // oficial. Sem isso, após apurar a fotografia atualizava mas o oficial
+      // ficava em cache velho e sobrescrevia o número novo na tela.
+      queryKey: ["ponto-banco-horas", "oficial", tenantId, competencia, empresaAtivaId],
       queryFn: async (): Promise<BancoHorasOficial[]> => {
         if (!tenantId) return [];
         const { data, error } = await (supabase.rpc as any)("ponto_banco_horas_oficial", {

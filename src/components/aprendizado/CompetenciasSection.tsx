@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const TIPO_LABELS: Record<string, string> = { tecnica: "Técnica", comportamental: "Comportamental", cognitiva: "Cognitiva" };
-const TIPO_COLORS: Record<string, string> = { tecnica: "bg-blue-100 text-blue-800", comportamental: "bg-green-100 text-green-800", cognitiva: "bg-purple-100 text-purple-800" };
+const TIPO_COLORS: Record<string, string> = { tecnica: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", comportamental: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300", cognitiva: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" };
 const CONTEUDO_LABELS: Record<string, string> = { manual: "Manual", pop: "POP", instrucao: "Instrução", video: "Vídeo", apresentacao: "Apresentação", documento: "Documento", link: "Link" };
 
 interface CompetenciasSectionProps {

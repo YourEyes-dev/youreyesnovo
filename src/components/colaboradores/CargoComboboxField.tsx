@@ -31,9 +31,11 @@ interface CargoComboboxFieldProps {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  /** Opcional: recebe o id canônico do cargo (O2-A). null quando limpo/sem match. */
+  onCargoIdChange?: (cargoId: string | null) => void;
 }
 
-export function CargoComboboxField({ value, onChange, disabled }: CargoComboboxFieldProps) {
+export function CargoComboboxField({ value, onChange, disabled, onCargoIdChange }: CargoComboboxFieldProps) {
   const [open, setOpen] = useState(false);
   const [showNovoCargo, setShowNovoCargo] = useState(false);
   const [novoNome, setNovoNome] = useState("");
@@ -51,8 +53,9 @@ export function CargoComboboxField({ value, onChange, disabled }: CargoComboboxF
     }
     setIsSaving(true);
     try {
-      await createCargo.mutateAsync({ nome: novoNome.trim(), ativo: true, descricao: null, departamento_id: null, nivel: null, faixa_salarial_min: null, faixa_salarial_max: null, periodicidade_exame_meses: null, exames_obrigatorios: null, insalubridade: false, insalubridade_grau: null, insalubridade_agente_nocivo: null, periculosidade: false, periculosidade_tipo: null, aposentadoria_especial: false, aposentadoria_especial_anos: null });
+      const novo = await createCargo.mutateAsync({ nome: novoNome.trim(), ativo: true, descricao: null, departamento_id: null, nivel: null, faixa_salarial_min: null, faixa_salarial_max: null, periodicidade_exame_meses: null, exames_obrigatorios: null, insalubridade: false, insalubridade_grau: null, insalubridade_agente_nocivo: null, periculosidade: false, periculosidade_tipo: null, aposentadoria_especial: false, aposentadoria_especial_anos: null });
       onChange(novoNome.trim());
+      onCargoIdChange?.((novo as { id?: string } | null)?.id ?? null);
       setShowNovoCargo(false);
       setNovoNome("");
       toast.success(`Função "${novoNome.trim()}" criada com sucesso`);
@@ -92,7 +95,9 @@ export function CargoComboboxField({ value, onChange, disabled }: CargoComboboxF
                       key={cargo.id}
                       value={cargo.nome}
                       onSelect={(val) => {
-                        onChange(val === value ? "" : cargo.nome);
+                        const limpar = val === value;
+                        onChange(limpar ? "" : cargo.nome);
+                        onCargoIdChange?.(limpar ? null : cargo.id);
                         setOpen(false);
                       }}
                     >

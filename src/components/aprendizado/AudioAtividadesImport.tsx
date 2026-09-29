@@ -116,7 +116,7 @@ export function AudioAtividadesImport({ funcaoNome, onImportar }: AudioAtividade
   };
 
   const selecionadasCount = atividades.filter(a => a.selecionada).length;
-  const complColor: Record<string, string> = { baixa: "bg-green-100 text-green-800", media: "bg-yellow-100 text-yellow-800", alta: "bg-red-100 text-red-800" };
+  const complColor: Record<string, string> = { baixa: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300", media: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300", alta: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" };
 
   return (
     <>
@@ -251,7 +251,7 @@ export function AudioAtividadesImport({ funcaoNome, onImportar }: AudioAtividade
                           <div className="flex gap-1.5 mt-2 flex-wrap">
                             <Badge variant="outline" className="text-xs">{FREQ_LABELS[at.frequencia] || at.frequencia}</Badge>
                             <Badge className={`text-xs ${complColor[at.complexidade] || ""}`}>{COMPL_LABELS[at.complexidade] || at.complexidade}</Badge>
-                            <Badge className="text-xs bg-blue-100 text-blue-800">{CLASS_LABELS[at.classificacao] || at.classificacao}</Badge>
+                            <Badge className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{CLASS_LABELS[at.classificacao] || at.classificacao}</Badge>
                           </div>
                         </div>
                       </div>

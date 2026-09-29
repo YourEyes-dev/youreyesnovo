@@ -47,6 +47,7 @@ export const PATH_TO_FEATURE: Record<string, string> = {
   "/aprendizado-papeis": "mod.trilhas",
   "/avaliacoes": "mod.avaliacoes",
   "/pdi": "mod.pdi",
+  "/mapa-comportamental": "mod.mapa_comportamental",
   "/felicidade": "mod.bem_estar",
   "/contratos-experiencia": "mod.contratos_exp",
   "/cultura-celebracoes": "mod.cultura",
@@ -92,6 +93,7 @@ export const FEATURE_PLAN_NAME: Record<string, string> = {
   "mod.contratos_exp": "Performance",
   "mod.avaliacoes": "Performance",
   "mod.pdi": "Performance",
+  "mod.mapa_comportamental": "Performance",
   "mod.bem_estar": "Performance",
   "mod.financeiro": "Performance",
   // Governança

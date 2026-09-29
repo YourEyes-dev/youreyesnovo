@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Search, Briefcase, ClipboardList, Brain, Shield, FileText, BookOpen, Loader2, Eye, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Search, Briefcase, ClipboardList, Brain, Shield, FileText, BookOpen, Loader2, Eye, ChevronDown, CheckCircle2, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,9 @@ import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { ManualFuncaoModal } from "./ManualFuncaoModal";
 import { toast } from "sonner";
 import { arquivarDocumento } from "@/utils/arquivarDocumento";
+import { CriarFuncaoRapidaDialog } from "./CriarFuncaoRapidaDialog";
+import { CompletudeBadgePopover } from "./CompletudeChecklist";
+import { useCompletudeCargos } from "@/hooks/useCompletudeAprendizado";
 import type { PopData } from "@/hooks/usePopAtividade";
 
 interface Cargo {
@@ -22,6 +26,7 @@ interface Cargo {
   nivel: string | null;
   departamento_id: string | null;
   descricao: string | null;
+  objetivo_funcao?: string | null;
   departamento?: { id: string; nome: string } | null;
 }
 
@@ -41,6 +46,7 @@ export function FuncaoList({ cargos, isLoading, onSelect }: FuncaoListProps) {
   const [manualTitulo, setManualTitulo] = useState("");
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [currentManualRef, setCurrentManualRef] = useState<string | null>(null);
+  const [criarOpen, setCriarOpen] = useState(false);
 
   // Load cached manuals
   const { data: cachedManuais = [], refetch: refetchManuais } = useQuery({
@@ -109,6 +115,8 @@ export function FuncaoList({ cargos, isLoading, onSelect }: FuncaoListProps) {
     enabled: !!tenantId,
   });
 
+  const { completudePorCargo } = useCompletudeCargos(cargos);
+
   const filtered = cargos.filter(
     (c) =>
       c.nome.toLowerCase().includes(search.toLowerCase()) ||
@@ -122,9 +130,9 @@ export function FuncaoList({ cargos, isLoading, onSelect }: FuncaoListProps) {
   };
 
   const nivelColor: Record<string, string> = {
-    operacional: "bg-blue-100 text-blue-800",
-    tatico: "bg-amber-100 text-amber-800",
-    estrategico: "bg-purple-100 text-purple-800",
+    operacional: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+    tatico: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+    estrategico: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
   };
 
   const saveManualCache = async (tipo: string, refId: string | null, titulo: string, html: string) => {
@@ -454,11 +462,35 @@ export function FuncaoList({ cargos, isLoading, onSelect }: FuncaoListProps) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Briefcase className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>Nenhuma função cadastrada.</p>
-          <p className="text-sm">Cadastre funções em Cadastros → Funções para começar.</p>
-        </div>
+        cargos.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Briefcase className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="text-foreground font-medium">Nenhuma função cadastrada ainda.</p>
+            <p className="text-sm mt-1">Crie a primeira função para começar a montar atividades, competências e POPs.</p>
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <Button onClick={() => setCriarOpen(true)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Criar primeira função
+              </Button>
+              <Link
+                to="/cadastros/cargos"
+                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                ou gerenciar em Cadastros → Funções
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-12 text-muted-foreground">
+            <Search className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>Nenhuma função encontrada para “{search}”.</p>
+            <p className="text-sm">Ajuste a busca ou crie uma nova função.</p>
+            <Button variant="outline" size="sm" onClick={() => setCriarOpen(true)} className="gap-2 mt-4">
+              <Plus className="w-4 h-4" />
+              Criar função
+            </Button>
+          </div>
+        )
       ) : (
         <div className="grid gap-3">
           {filtered.map((cargo) => {
@@ -519,6 +551,12 @@ export function FuncaoList({ cargos, isLoading, onSelect }: FuncaoListProps) {
                       <Shield className="w-3.5 h-3.5" />
                       {epiCounts[cargo.id] || 0}
                     </span>
+                    {completudePorCargo[cargo.id] && (
+                      <CompletudeBadgePopover
+                        resultado={completudePorCargo[cargo.id]}
+                        onNavegar={() => onSelect(cargo.id)}
+                      />
+                    )}
                     {cached && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -571,6 +609,12 @@ export function FuncaoList({ cargos, isLoading, onSelect }: FuncaoListProps) {
         onPdfGenerated={handlePdfArchive}
         cargoId={currentManualRef}
         cargoNome={currentManualRef ? (cargos.find((c) => c.id === currentManualRef)?.nome || null) : null}
+      />
+
+      <CriarFuncaoRapidaDialog
+        open={criarOpen}
+        onClose={() => setCriarOpen(false)}
+        onCreated={(id) => onSelect(id)}
       />
     </div>
   );

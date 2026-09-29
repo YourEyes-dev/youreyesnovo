@@ -720,6 +720,7 @@ export type Database = {
           banco: string | null
           bate_ponto: boolean
           cargo: string
+          cargo_id: string | null
           cbo: string | null
           celular: string | null
           centro_custo: string | null
@@ -814,6 +815,7 @@ export type Database = {
           banco?: string | null
           bate_ponto?: boolean
           cargo: string
+          cargo_id?: string | null
           cbo?: string | null
           celular?: string | null
           centro_custo?: string | null
@@ -908,6 +910,7 @@ export type Database = {
           banco?: string | null
           bate_ponto?: boolean
           cargo?: string
+          cargo_id?: string | null
           cbo?: string | null
           celular?: string | null
           centro_custo?: string | null

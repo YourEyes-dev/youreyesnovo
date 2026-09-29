@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useDepartamentos, useFiliais } from '@/hooks/useCadastros';
 import { useEmpresaAtiva } from '@/contexts/EmpresaAtivaContext';
 import { GestorComboboxField } from '@/components/colaboradores/GestorComboboxField';
+import { CargoComboboxField } from '@/components/colaboradores/CargoComboboxField';
 import { CBOAutocomplete } from '@/components/cbo/CBOAutocomplete';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
@@ -163,6 +164,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
   // Form for step 3 - Dados Profissionais
   const defaultProfissionais = {
     cargo: '',
+    cargo_id: null,
     departamento: '',
     filial: '',
     dataAdmissao: '',
@@ -313,7 +315,11 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
     if (usuarioEncontrado.data_nascimento) formPessoais.setValue('dataNascimento', usuarioEncontrado.data_nascimento);
     if (usuarioEncontrado.email_principal) formContato.setValue('email', usuarioEncontrado.email_principal);
     if (usuarioEncontrado.telefone_principal) formContato.setValue('celular', usuarioEncontrado.telefone_principal);
-    if (usuarioEncontrado.cargo_funcao) formProfissionais.setValue('cargo', usuarioEncontrado.cargo_funcao);
+    if (usuarioEncontrado.cargo_funcao) {
+      formProfissionais.setValue('cargo', usuarioEncontrado.cargo_funcao);
+      // Texto legado do usuário: sem id canônico — limpa para não herdar id errado.
+      formProfissionais.setValue('cargo_id', null);
+    }
     setDadosReaproveitados(true);
     toast.success('Dados do usuário aplicados ao cadastro!');
   }, [usuarioEncontrado, formPessoais, formContato, formProfissionais]);
@@ -997,10 +1003,10 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
             {/* Função — linha inteira */}
             <div>
               <Label htmlFor="cargo">Cargo *</Label>
-              <Input 
-                id="cargo"
-                {...formProfissionais.register('cargo')}
-                placeholder="Ex: Analista de RH"
+              <CargoComboboxField
+                value={formProfissionais.watch('cargo')}
+                onChange={(v) => formProfissionais.setValue('cargo', v, { shouldValidate: true })}
+                onCargoIdChange={(id) => formProfissionais.setValue('cargo_id', id)}
               />
               {formProfissionais.formState.errors.cargo && (
                 <p className="text-xs text-destructive mt-1">{formProfissionais.formState.errors.cargo.message}</p>

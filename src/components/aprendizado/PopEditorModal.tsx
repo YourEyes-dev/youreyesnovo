@@ -29,10 +29,10 @@ interface PopEditorModalProps {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  rascunho: { label: "Rascunho", color: "bg-yellow-100 text-yellow-800" },
-  em_revisao: { label: "Em revisão", color: "bg-blue-100 text-blue-800" },
-  publicado: { label: "Publicado", color: "bg-green-100 text-green-800" },
-  desatualizado: { label: "Desatualizado", color: "bg-red-100 text-red-800" },
+  rascunho: { label: "Rascunho", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" },
+  em_revisao: { label: "Em revisão", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+  publicado: { label: "Publicado", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+  desatualizado: { label: "Desatualizado", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
 };
 
 export function PopEditorModal({ open, onClose, pop, onSave, saving, buscarVersoes, reescreverTrechoIA }: PopEditorModalProps) {

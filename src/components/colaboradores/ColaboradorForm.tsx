@@ -63,6 +63,7 @@ const formSchema = z.object({
   celular: z.string().optional(),
   tipo_contrato: z.string().min(1, "Selecione o tipo de vínculo"),
   cargo: z.string().min(1, "Selecione um cargo"),
+  cargo_id: z.string().nullable().optional(),
   departamento: z.string().optional(),
   estabelecimento: z.string().optional(),
   centro_custo: z.string().optional(),
@@ -88,6 +89,7 @@ export interface ColaboradorEditData {
   celular: string | null;
   tipo_contrato: string | null;
   cargo: string;
+  cargo_id?: string | null;
   departamento: string | null;
   filial: string | null;
   centro_custo: string | null;
@@ -139,6 +141,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
       celular: "",
       tipo_contrato: "clt",
       cargo: "",
+      cargo_id: null,
       departamento: "",
       estabelecimento: "",
       centro_custo: "",
@@ -164,6 +167,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
         celular: colaborador.celular || "",
         tipo_contrato: colaborador.tipo_contrato || "clt",
         cargo: colaborador.cargo || "",
+        cargo_id: colaborador.cargo_id ?? null,
         departamento: colaborador.departamento || "",
         estabelecimento: colaborador.filial || "",
         centro_custo: colaborador.centro_custo || "",
@@ -185,6 +189,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
         celular: "",
         tipo_contrato: "clt",
         cargo: "",
+        cargo_id: null,
         departamento: "",
         estabelecimento: "",
         centro_custo: "",
@@ -243,6 +248,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
           celular: data.celular || null,
           tipo_contrato: data.tipo_contrato,
           cargo: data.cargo,
+          cargo_id: data.cargo_id ?? null,
           departamento: data.departamento || null,
           filial: data.estabelecimento || null,
           centro_custo: data.centro_custo || null,
@@ -301,6 +307,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
           celular: data.celular || null,
           tipo_contrato: data.tipo_contrato,
           cargo: data.cargo,
+          cargo_id: data.cargo_id ?? null,
           departamento: data.departamento || null,
           filial: data.estabelecimento || null,
           centro_custo: data.centro_custo || null,
@@ -715,6 +722,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
                       <CargoComboboxField
                         value={field.value}
                         onChange={field.onChange}
+                        onCargoIdChange={(id) => form.setValue("cargo_id", id)}
                         disabled={isSubmitting}
                       />
                     </FormControl>

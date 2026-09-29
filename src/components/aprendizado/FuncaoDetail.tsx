@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, Brain, Shield, Briefcase, FileText, BarChart3, Wand2, Target, AlertTriangle, CheckCircle, Wrench, Users, BookOpen } from "lucide-react";
+import { ClipboardList, Brain, Shield, Briefcase, FileText, BarChart3, Wand2, Target, AlertTriangle, CheckCircle, Wrench, Users, BookOpen, Mic, Sparkles, Fingerprint } from "lucide-react";
 import { AtividadesSection } from "./AtividadesSection";
 import { CompetenciasSection } from "./CompetenciasSection";
 import { EpisSection } from "./EpisSection";
@@ -10,6 +10,11 @@ import { ResponsabilidadeField } from "./ResponsabilidadeField";
 import { GerarVagaSection } from "./GerarVagaSection";
 import { GerarPropostaSection } from "./GerarPropostaSection";
 import { GerarFuncaoIAModal } from "./GerarFuncaoIAModal";
+import { CompletudeResumo } from "./CompletudeChecklist";
+import { CentralPopsSection } from "./CentralPopsSection";
+import { PerfilIdealSection } from "./PerfilIdealSection";
+import { useCompletudeCargos } from "@/hooks/useCompletudeAprendizado";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +47,8 @@ interface FuncaoDetailProps {
 
 export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
   const [iaModalOpen, setIaModalOpen] = useState(false);
+  const [iaEntrada, setIaEntrada] = useState<"texto" | "audio">("texto");
+  const [tabAtiva, setTabAtiva] = useState("atividades");
 
   const nivelLabel: Record<string, string> = {
     operacional: "Operacional",
@@ -50,6 +57,26 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
   };
 
   const hasEnrichedData = cargo.objetivo_funcao || cargo.escopo_geral || cargo.subordinacao;
+
+  const { completudePorCargo, isLoading: completudeLoading } = useCompletudeCargos([cargo]);
+  const completude = completudePorCargo[cargo.id];
+
+  // Estado guiado (O1-B): função sem dados enriquecidos, sem atividades e sem
+  // competências. Só decide depois que a completude carregou (evita flicker).
+  const semAtividades = !completude?.itens.find((i) => i.chave === "atividades")?.concluido;
+  const semCompetencias = !completude?.itens.find((i) => i.chave === "competencias")?.concluido;
+  const funcaoVazia = !hasEnrichedData && !completudeLoading && !!completude && semAtividades && semCompetencias;
+
+  const qc = useQueryClient();
+  const invalidarCompletude = () =>
+    qc.invalidateQueries({
+      predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("completude_"),
+    });
+
+  const abrirIA = (modo: "texto" | "audio") => {
+    setIaEntrada(modo);
+    setIaModalOpen(true);
+  };
 
   return (
     <div className="space-y-4">
@@ -67,15 +94,61 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
           variant="default"
           size="sm"
           className="gap-2"
-          onClick={() => setIaModalOpen(true)}
+          onClick={() => abrirIA("texto")}
         >
           <Wand2 className="w-4 h-4" />
-          {hasEnrichedData ? "Regerar com IA" : "Gerar Função com IA"}
+          {hasEnrichedData ? "Adicionar conteúdo com IA" : "Gerar Função com IA"}
         </Button>
       </div>
 
       {cargo.descricao && (
         <p className="text-sm text-muted-foreground">{cargo.descricao}</p>
+      )}
+
+      {/* Estado inicial guiado (O1-B): 3 caminhos para preencher a função vazia */}
+      {funcaoVazia ? (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <p className="text-sm font-medium text-foreground">Comece por aqui</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Esta função ainda está vazia. Escolha um caminho para gerar atividades, competências e
+              indicadores de uma vez — depois você refina cada aba.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => abrirIA("texto")}
+              className="text-left rounded-lg border bg-card p-4 hover:border-primary/60 hover:bg-primary/5 transition-colors"
+            >
+              <Sparkles className="w-6 h-6 text-primary mb-2" />
+              <p className="font-medium text-sm text-foreground">Gerar com IA</p>
+              <p className="text-xs text-muted-foreground mt-1">Descreva a função em poucas linhas e a IA monta o resto.</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => abrirIA("audio")}
+              className="text-left rounded-lg border bg-card p-4 hover:border-primary/60 hover:bg-primary/5 transition-colors"
+            >
+              <Mic className="w-6 h-6 text-primary mb-2" />
+              <p className="font-medium text-sm text-foreground">Gravar / enviar entrevista</p>
+              <p className="text-xs text-muted-foreground mt-1">Grave o colaborador narrando a rotina; a IA transcreve e estrutura.</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => abrirIA("texto")}
+              className="text-left rounded-lg border bg-card p-4 hover:border-primary/60 hover:bg-primary/5 transition-colors"
+            >
+              <FileText className="w-6 h-6 text-primary mb-2" />
+              <p className="font-medium text-sm text-foreground">Colar / subir descrição</p>
+              <p className="text-xs text-muted-foreground mt-1">Já tem uma job description? Cole o texto ou envie um arquivo.</p>
+            </button>
+          </div>
+        </div>
+      ) : (
+        completude && (
+          <CompletudeResumo resultado={completude} onNavegar={(aba) => setTabAtiva(aba)} />
+        )
       )}
 
       {/* Identification & Overview Cards */}
@@ -232,6 +305,8 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
         </div>
       )}
 
+      {!funcaoVazia && (
+      <>
       {/* Responsabilidade da Função */}
       <Card>
         <CardContent className="pt-4 pb-4">
@@ -244,8 +319,9 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="atividades">
-        <TabsList className="flex-wrap">
+      <Tabs value={tabAtiva} onValueChange={setTabAtiva}>
+        <TabsList className="flex-wrap h-auto gap-1">
+          <span className="self-center px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Construir</span>
           <TabsTrigger value="atividades" className="gap-1">
             <ClipboardList className="w-4 h-4" /> Atividades
           </TabsTrigger>
@@ -258,11 +334,19 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
           <TabsTrigger value="epis" className="gap-1">
             <Shield className="w-4 h-4" /> EPIs & Treinamento
           </TabsTrigger>
+          <TabsTrigger value="pops" className="gap-1">
+            <BookOpen className="w-4 h-4" /> POPs
+          </TabsTrigger>
+          <span className="self-center mx-0.5 h-5 w-px bg-border" aria-hidden />
+          <span className="self-center px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Usar</span>
           <TabsTrigger value="vaga" className="gap-1">
             <Briefcase className="w-4 h-4" /> Gerar Vaga
           </TabsTrigger>
           <TabsTrigger value="proposta" className="gap-1">
             <FileText className="w-4 h-4" /> Gerar Proposta
+          </TabsTrigger>
+          <TabsTrigger value="perfil" className="gap-1">
+            <Fingerprint className="w-4 h-4" /> Perfil comportamental
           </TabsTrigger>
         </TabsList>
 
@@ -282,6 +366,9 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
             <EpisSection cargoId={cargo.id} />
           </div>
         </TabsContent>
+        <TabsContent value="pops" className="mt-4">
+          <CentralPopsSection cargoId={cargo.id} funcaoNome={cargo.nome} />
+        </TabsContent>
         <TabsContent value="vaga" className="mt-4">
           <GerarVagaSection
             cargoId={cargo.id}
@@ -298,13 +385,20 @@ export function FuncaoDetail({ cargo }: FuncaoDetailProps) {
             responsabilidade={cargo.responsabilidade}
           />
         </TabsContent>
+        <TabsContent value="perfil" className="mt-4">
+          <PerfilIdealSection cargoId={cargo.id} cargoNome={cargo.nome} objetivoFuncao={cargo.objetivo_funcao} />
+        </TabsContent>
       </Tabs>
+      </>
+      )}
 
       <GerarFuncaoIAModal
         open={iaModalOpen}
         onClose={() => setIaModalOpen(false)}
         cargoId={cargo.id}
         cargoNome={cargo.nome}
+        entradaInicial={iaEntrada}
+        onSuccess={invalidarCompletude}
       />
     </div>
   );

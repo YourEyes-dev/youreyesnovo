@@ -9,18 +9,31 @@ import { Eye } from "lucide-react";
 import { useMapaComportamental } from "@/hooks/useMapaComportamental";
 import { useMinhaCampanhaPendente } from "@/hooks/useMapaComportamentalCampanhas";
 import { useMeusAcessos } from "@/hooks/useMapaComportamentalTime";
+import { useAuth } from "@/hooks/useAuth";
+import { useColaboradores } from "@/hooks/useColaboradores";
+import { cleanCpf } from "@/lib/cpf";
 import { AvisoTratamento, AVISO_TRATAMENTO_VERSAO } from "./AvisoTratamento";
 import { ResponderMapa } from "./ResponderMapa";
-import { ResultadoMapa } from "./ResultadoMapa";
+import { RelatorioMeuMapa } from "./RelatorioMeuMapa";
 import type { MapaResultado, MapaRespostas } from "@/data/instrumentos/mapaComportamental";
 
 type Fase = "inicio" | "aviso" | "respondendo" | "resultado";
 
 export function MeuMapaTab() {
-  const { mapaAtual, rascunho, isLoading, salvarRascunho, concluir } = useMapaComportamental();
+  const { mapaAtual, mapaAnterior, rascunho, isLoading, salvarRascunho, concluir } = useMapaComportamental();
+  const { profile } = useAuth();
+  const { colaboradores } = useColaboradores();
   const { data: campanhaPendente } = useMinhaCampanhaPendente();
+
+  // Resolve o cadastro do colaborador logado pelo CPF do próprio mapa (carimbado
+  // no servidor). Habilita "Adicionar ao meu PDI"; ausente → o botão não aparece.
+  const meuCpf = cleanCpf(mapaAtual?.colaborador_cpf ?? "");
+  const meuColaborador = meuCpf
+    ? colaboradores.find((c) => cleanCpf(c.cpf) === meuCpf) ?? null
+    : null;
   const [fase, setFase] = useState<Fase | null>(null);
   const [resultadoRecem, setResultadoRecem] = useState<MapaResultado | null>(null);
+  const [mapaIdRecem, setMapaIdRecem] = useState<string | null>(null);
   const [continuando, setContinuando] = useState(false);
 
   if (isLoading) {
@@ -32,13 +45,19 @@ export function MeuMapaTab() {
     );
   }
 
-  // Resultado recém-concluído tem prioridade.
+  // Resultado recém-concluído tem prioridade (RF-020: relatório na mesma sessão).
   if (fase === "resultado" && resultadoRecem) {
     return (
-      <ResultadoMapa
+      <RelatorioMeuMapa
         resultado={resultadoRecem}
+        nome={profile?.nome_completo}
+        mapaId={mapaIdRecem ?? undefined}
+        colaboradorId={meuColaborador?.id ?? null}
+        colaboradorCargo={meuColaborador?.cargo ?? null}
+        colaboradorDepartamento={meuColaborador?.departamento ?? null}
         onRefazer={() => {
           setResultadoRecem(null);
+          setMapaIdRecem(null);
           setContinuando(false);
           setFase("aviso");
         }}
@@ -63,13 +82,14 @@ export function MeuMapaTab() {
         onPausar={() => setFase(null)}
         concluindo={concluir.isPending}
         onConcluir={async (respostas, tempo) => {
-          const r = await concluir.mutateAsync({
+          const { resultado, mapaId } = await concluir.mutateAsync({
             respostas,
             avisoVersao: AVISO_TRATAMENTO_VERSAO,
             tempoTotalSegundos: tempo,
             campanhaId: campanhaPendente?.campanha_id ?? null,
           });
-          setResultadoRecem(r);
+          setResultadoRecem(resultado);
+          setMapaIdRecem(mapaId);
           setFase("resultado");
         }}
       />
@@ -80,9 +100,16 @@ export function MeuMapaTab() {
   if (mapaAtual?.resultado) {
     return (
       <div className="space-y-4">
-        <ResultadoMapa
+        <RelatorioMeuMapa
           resultado={mapaAtual.resultado}
+          nome={profile?.nome_completo}
+          mapaId={mapaAtual.id}
           concluidoEm={mapaAtual.concluido_em}
+          venceEm={mapaAtual.vence_em}
+          anterior={mapaAnterior?.resultado ? { resultado: mapaAnterior.resultado, concluidoEm: mapaAnterior.concluido_em } : null}
+          colaboradorId={meuColaborador?.id ?? null}
+          colaboradorCargo={meuColaborador?.cargo ?? null}
+          colaboradorDepartamento={meuColaborador?.departamento ?? null}
           onRefazer={() => {
             setContinuando(false);
             setFase("aviso");

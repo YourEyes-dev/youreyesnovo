@@ -13,6 +13,7 @@ import {
   useMapaComportamentalPolitica,
   type MapaCampanha,
 } from "@/hooks/useMapaComportamentalCampanhas";
+import { MapaLinkPublico } from "./MapaLinkPublico";
 
 const STATUS_BADGE: Record<MapaCampanha["status"], { label: string; variant: "secondary" | "outline" | "default" }> = {
   rascunho: { label: "Rascunho", variant: "outline" },
@@ -44,6 +45,10 @@ export function CampanhasTab() {
 
   return (
     <div className="space-y-4">
+      <MapaLinkPublico />
+
+      <div className="border-t pt-4" />
+
       {!politicaPublicada && (
         <Alert>
           <Info className="h-4 w-4" />

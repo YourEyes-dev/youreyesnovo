@@ -526,7 +526,7 @@ serve(async (req) => {
         cnae_principal: "6201501",
         cnae_descricao: "Desenvolvimento de programas de computador sob encomenda",
         grau_risco: 2,
-        tipo_pessoa: "juridica",
+        tipo_pessoa: "pj",
         tipo_unidade: "matriz",
         ativo: true,
       });

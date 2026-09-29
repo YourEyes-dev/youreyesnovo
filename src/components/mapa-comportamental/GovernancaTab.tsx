@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapaComportamentalPolitica } from "@/hooks/useMapaComportamentalCampanhas";
+import { ContestacoesGov } from "./ContestacoesGov";
 
 const AVISO_PADRAO =
   "O Mapa Comportamental é uma ferramenta de autopercepção e desenvolvimento. Você vê o seu resultado primeiro; ninguém mais vê o que você marcou em cada questão. Responder é voluntário e o resultado não é usado para admissão, promoção, remuneração ou desligamento.";
@@ -76,6 +77,8 @@ export function GovernancaTab() {
           </div>
         </CardContent>
       </Card>
+
+      <ContestacoesGov />
     </div>
   );
 }

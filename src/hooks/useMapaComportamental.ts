@@ -57,15 +57,14 @@ export function useMapaComportamental() {
   const qc = useQueryClient();
 
   // ── Meu último mapa concluído + rascunho em aberto ─────────────────────────
+  // Usa a RPC que cruza por auth_user_id OU CPF — assim o titular vê também o
+  // mapa que respondeu por link público (sem login) antes de ter acesso, desde
+  // que o CPF bata com o do seu cadastro.
   const { data: meusMapas = [], isLoading } = useQuery({
     queryKey: ["mapa-comportamental", "meus", tenantId, user?.id],
     queryFn: async (): Promise<MapaRespostaRow[]> => {
       if (!tenantId || !user?.id) return [];
-      const { data, error } = await fromTable(TABELA)
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .eq("auth_user_id", user.id)
-        .order("created_at", { ascending: false });
+      const { data, error } = await rpcUntyped("mapa_comportamental_meus", {});
       if (error) throw error;
       return (data ?? []) as MapaRespostaRow[];
     },
@@ -73,7 +72,10 @@ export function useMapaComportamental() {
   });
 
   const rascunho = meusMapas.find((m) => m.status === "rascunho") ?? null;
-  const mapaAtual = meusMapas.find((m) => m.status === "concluido") ?? null;
+  const concluidos = meusMapas.filter((m) => m.status === "concluido");
+  const mapaAtual = concluidos[0] ?? null;
+  // Aplicação imediatamente anterior (reaplicação) — para o bloco comparativo.
+  const mapaAnterior = concluidos[1] ?? null;
 
   // ── Salvar rascunho (pausa e retomada — RF-004) ────────────────────────────
   const salvarRascunho = useMutation({
@@ -112,7 +114,7 @@ export function useMapaComportamental() {
       tempoTotalSegundos: number;
       tempoPorItem?: Record<string, number>;
       campanhaId?: string | null;
-    }): Promise<MapaResultado> => {
+    }): Promise<{ resultado: MapaResultado; mapaId: string }> => {
       if (!tenantId) throw new Error("Tenant não encontrado");
       const resultado = calcularMapa(input.respostas, {
         tempoTotalSegundos: input.tempoTotalSegundos,
@@ -136,14 +138,17 @@ export function useMapaComportamental() {
         concluido_em: agora,
         vence_em: calcularVenceEm(24),
       };
+      let mapaId: string;
       if (rascunho) {
         const { error } = await fromTable(TABELA).update(payload).eq("id", rascunho.id);
         if (error) throw error;
+        mapaId = rascunho.id;
       } else {
-        const { error } = await fromTable(TABELA).insert(payload);
+        const { data, error } = await fromTable(TABELA).insert(payload).select("id").single();
         if (error) throw error;
+        mapaId = data.id as string;
       }
-      return resultado;
+      return { resultado, mapaId };
     },
     onSuccess: () => {
       // Invalida também campanha-pendente/cobertura para o banner sumir.
@@ -156,6 +161,7 @@ export function useMapaComportamental() {
   return {
     meusMapas,
     mapaAtual,
+    mapaAnterior,
     rascunho,
     isLoading,
     salvarRascunho,

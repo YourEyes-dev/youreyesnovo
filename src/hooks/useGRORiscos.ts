@@ -166,7 +166,7 @@ export function useGRORiscos() {
         return risco >= 35;
       });
 
-      if (dimensoesCriticas.length === 0) return 0;
+      if (dimensoesCriticas.length === 0) return { criados: 0, duplicados: 0, semRisco: true };
 
       // Para cada situação de trabalho + cada dimensão crítica = 1 risco GRO
       const riscos = situacoes.flatMap(sit =>
@@ -190,14 +190,36 @@ export function useGRORiscos() {
         }))
       );
 
+      // Idempotência: reenviar a mesma campanha não pode duplicar riscos.
+      // Um risco é o mesmo quando coincidem campanha + dimensão + setor + cargo.
+      const { data: existentes, error: errExistentes } = await fromTable("gro_riscos")
+        .select("dimensao_psicossocial, setor, cargo")
+        .eq("tenant_id", tenantId)
+        .eq("campanha_id", campanhaId)
+        .eq("subtipo", "psicossocial")
+        .eq("ativo", true);
+      if (errExistentes) throw errExistentes;
+
+      const chave = (r: { dimensao_psicossocial?: string | null; setor?: string | null; cargo?: string | null }) =>
+        `${r.dimensao_psicossocial ?? ""}||${r.setor ?? ""}||${r.cargo ?? ""}`;
+      const jaExiste = new Set((existentes ?? []).map(chave));
+      const novos = riscos.filter(r => !jaExiste.has(chave(r)));
+      const duplicados = riscos.length - novos.length;
+
+      if (novos.length === 0) return { criados: 0, duplicados, semRisco: false };
+
       const { error } = await fromTable("gro_riscos")
-        .insert(riscos);
+        .insert(novos);
       if (error) throw error;
-      return riscos.length;
+      return { criados: novos.length, duplicados, semRisco: false };
     },
-    onSuccess: (count) => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey });
-      toast.success(`${count} risco(s) psicossocial(is) importado(s) para o GRO com vínculo NR-17!`);
+      if (res.criados > 0) {
+        toast.success(`${res.criados} risco(s) psicossocial(is) importado(s) para o GRO com vínculo NR-17!`);
+      } else if (res.duplicados > 0) {
+        toast.info("Os riscos desta campanha já constavam no GRO — nada novo a importar.");
+      }
     },
     onError: (e: any) => toast.error(`Erro ao importar riscos: ${e.message}`),
   });

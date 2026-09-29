@@ -13,6 +13,9 @@ import {
   Lock,
   Pencil,
   Building2,
+  ChevronDown,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -100,6 +103,11 @@ export function PlanoAcaoPGR({ campanhas }: PlanoAcaoPGRProps) {
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
   const [editando, setEditando] = useState<AcaoPlanoPsicossocial | null>(null);
   const [exportando, setExportando] = useState(false);
+  // Estado de abertura das linhas por GHE (accordion). Guarda só os overrides
+  // do usuário; o padrão de cada GHE é calculado no render (abertoPadrao).
+  const [ghesAbertos, setGhesAbertos] = useState<Record<string, boolean>>({});
+  const toggleGhe = (gheKey: string, abertoPadrao: boolean) =>
+    setGhesAbertos(prev => ({ ...prev, [gheKey]: !(prev[gheKey] ?? abertoPadrao) }));
 
   const { resultadosPorGHE, isLoading: carregandoGHE } = usePsicossocialResultadosGHE(campanhaIds);
   const { data: severidades } = useSeveridadesCatalogo();
@@ -545,27 +553,124 @@ export function PlanoAcaoPGR({ campanhas }: PlanoAcaoPGRProps) {
           );
           const marcadasDoGhe = Array.from(marcadas).filter(k => k.startsWith(`${gheKey}::`)).length;
 
+          // Resumo por nível (cabeçalho) e status do plano deste GHE.
+          const resumoNiveis: Record<NivelGRO15, number> = {
+            critico: 0, alto: 0, medio: 0, baixo: 0, trivial: 0,
+          };
+          for (const f of ghe.fatores) resumoNiveis[f.nivelKey] += 1;
+          const planoGerado = acoesGhe.length > 0;
+          const temRiscoRelevante = resumoNiveis.critico + resumoNiveis.alto > 0;
+          // Abre por padrão quando é o único GHE ou quando ainda há risco
+          // crítico/alto sem plano — os que precisam de atenção ficam à mostra.
+          const abertoPadrao = ghes.length <= 1 || (ghe.liberado && !planoGerado && temRiscoRelevante);
+          const aberto = ghesAbertos[gheKey] ?? abertoPadrao;
+
           return (
             <Card key={gheKey}>
               <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      {ghe.ghe_nome}
-                      {ghe.ghe_codigo && (
-                        <Badge variant="outline" className="text-[10px]">
-                          {ghe.ghe_codigo}
-                        </Badge>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={aberto}
+                  onClick={() => toggleGhe(gheKey, abertoPadrao)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      toggleGhe(gheKey, abertoPadrao);
+                    }
+                  }}
+                  className="flex items-start justify-between gap-3 flex-wrap cursor-pointer select-none"
+                >
+                  <div className="flex items-start gap-2 min-w-0">
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 mt-0.5 shrink-0 text-muted-foreground transition-transform",
+                        aberto ? "" : "-rotate-90",
                       )}
-                    </CardTitle>
-                    <CardDescription className="text-xs mt-0.5">
-                      {ghe.count} respondente(s)
-                      {ghe.composicaoSetores.length > 0 && ` · ${ghe.composicaoSetores.join(", ")}`}
-                    </CardDescription>
+                    />
+                    <div className="min-w-0">
+                      <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
+                        {ghe.ghe_nome}
+                        {ghe.ghe_codigo && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {ghe.ghe_codigo}
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-0.5">
+                        {ghe.count} respondente(s)
+                        {ghe.composicaoSetores.length > 0 && ` · ${ghe.composicaoSetores.join(", ")}`}
+                      </CardDescription>
+                    </div>
                   </div>
 
-                  {ghe.liberado && (
-                    <div className="flex gap-2">
+                  {/* Resumo sempre visível: contagem de riscos + status do plano */}
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {ghe.liberado ? (
+                      <>
+                        {(["critico", "alto", "medio"] as NivelGRO15[]).map(nv =>
+                          resumoNiveis[nv] > 0 ? (
+                            <Badge
+                              key={nv}
+                              variant="outline"
+                              className={cn("text-[10px]", COR_BADGE[nv])}
+                            >
+                              {resumoNiveis[nv]} {NIVEL15_TOKENS[nv]}
+                            </Badge>
+                          ) : null,
+                        )}
+                        {!temRiscoRelevante && resumoNiveis.medio === 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200"
+                          >
+                            Sem risco relevante
+                          </Badge>
+                        )}
+                        {planoGerado ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] gap-1 bg-emerald-50 text-emerald-700 border-emerald-200"
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            Plano gerado ({acoesGhe.length})
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] gap-1 bg-orange-50 text-orange-700 border-orange-200"
+                          >
+                            <Clock className="h-3 w-3" />
+                            Plano pendente
+                          </Badge>
+                        )}
+                      </>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] bg-amber-50 text-amber-700 border-amber-200"
+                      >
+                        Amostra insuficiente
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+
+              {aberto && (
+              <CardContent className="space-y-4">
+                {!ghe.liberado ? (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-800">
+                    <Lock className="h-4 w-4 mt-0.5 shrink-0" />
+                    <p>
+                      Este GHE tem {ghe.count} resposta(s). São necessárias {minimoGrupo} para
+                      liberar a análise sem risco de reidentificação (ISO 45003).
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Ações do GHE: gerar por IA / limpar */}
+                    <div className="flex gap-2 justify-end flex-wrap">
                       {acoesGhe.length > 0 && (
                         <Button
                           variant="ghost"
@@ -595,21 +700,7 @@ export function PlanoAcaoPGR({ campanhas }: PlanoAcaoPGRProps) {
                         Sugerir ações com IA
                       </Button>
                     </div>
-                  )}
-                </div>
-              </CardHeader>
 
-              <CardContent className="space-y-4">
-                {!ghe.liberado ? (
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-800">
-                    <Lock className="h-4 w-4 mt-0.5 shrink-0" />
-                    <p>
-                      Este GHE tem {ghe.count} resposta(s). São necessárias {minimoGrupo} para
-                      liberar a análise sem risco de reidentificação (ISO 45003).
-                    </p>
-                  </div>
-                ) : (
-                  <>
                     {/* Fatores de risco do GHE */}
                     <div className="space-y-1.5">
                       {ghe.fatores.map(f => (
@@ -782,6 +873,7 @@ export function PlanoAcaoPGR({ campanhas }: PlanoAcaoPGRProps) {
                   </>
                 )}
               </CardContent>
+              )}
             </Card>
           );
         })

@@ -123,3 +123,10 @@ project_id = "diayjpsrcerycycyaxst"
     verify_jwt = false
   [functions.youreyes-run-agent]
     verify_jwt = false
+  # Site (tráfego pago): chamadas pelo navegador do visitante, sem login, em
+  # text/plain (sem preflight, para o keepalive funcionar). A proteção é a
+  # origem da chamada (SITE_HOSTS_PERMITIDOS; padrão: só youreyes.com.br).
+  [functions.meta-capi]
+    verify_jwt = false
+  [functions.hubspot-lead]
+    verify_jwt = false

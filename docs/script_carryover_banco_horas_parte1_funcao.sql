@@ -5,12 +5,14 @@
 -- Cole este arquivo INTEIRO no SQL Editor de PRODUÇÃO e rode. Depois rode a
 -- PARTE 2 (backup + reapuração).
 --
--- POR QUE DUAS PARTES: o SQL Editor tem um auxiliar "enable RLS on newly
--- created tables" que, quando o mesmo arquivo CRIA UMA TABELA, injeta
--- ALTER TABLE dentro do corpo das funções e corrompe o arquivo (erro de sintaxe
--- deslocado, longe da causa). Por isso a função (que usa SELECT ... INTO) vem
--- SOZINHA aqui, e o backup (que cria tabela) fica na parte 2. Script que só cria
--- FUNÇÃO não dispara o auxiliar.
+-- POR QUE ESTE ARQUIVO EVITA ATRIBUIR O RESULTADO DE UMA CONSULTA DIRETO A UMA
+-- VARIÁVEL: o SQL Editor tem um auxiliar "auto-RLS" que liga ao enxergar esse padrão no
+-- texto (ele não distingue variável de tabela nova) e passa a injetar ALTER
+-- TABLE dentro do
+-- corpo da função, corrompendo a marca de fim do corpo (erro de sintaxe deslocado,
+-- ex.: "syntax error at or near AND"). Por isso toda leitura vira atribuição
+-- por subconsulta escalar (v := (SELECT ... LIMIT 1)). Funcionalmente idêntico
+-- à migration equivalente (que roda por db push, onde essa pegadinha não existe).
 --
 -- O QUE FAZ: redefine apurar_banco_horas_colaborador para abrir a competência
 -- com o saldo do FECHAMENTO OFICIAL do mês anterior (o número impresso), e não
@@ -43,28 +45,47 @@ DECLARE
   v_prazo date;
   v_cpf text := regexp_replace(COALESCE(p_colaborador_cpf, ''), '[^0-9]', '', 'g');
 BEGIN
-  SELECT colaborador_id, colaborador_nome, empresa_id
-    INTO v_colaborador_id, v_colaborador_nome, v_empresa_id
-  FROM public.ponto_diario
-  WHERE tenant_id = p_tenant_id
-    AND regexp_replace(colaborador_cpf, '[^0-9]', '', 'g') = v_cpf
-    AND data BETWEEN v_ini AND v_fim
-  ORDER BY data DESC
-  LIMIT 1;
+  -- Colaborador do mês (última linha do ponto_diario na competência): três
+  -- subconsultas escalares sobre a mesma linha mais recente.
+  v_colaborador_id := (
+    SELECT colaborador_id FROM public.ponto_diario
+    WHERE tenant_id = p_tenant_id
+      AND regexp_replace(colaborador_cpf, '[^0-9]', '', 'g') = v_cpf
+      AND data BETWEEN v_ini AND v_fim
+    ORDER BY data DESC LIMIT 1);
 
   IF v_colaborador_id IS NULL THEN
     RETURN;
+  END IF;
+
+  v_colaborador_nome := (
+    SELECT colaborador_nome FROM public.ponto_diario
+    WHERE tenant_id = p_tenant_id
+      AND regexp_replace(colaborador_cpf, '[^0-9]', '', 'g') = v_cpf
+      AND data BETWEEN v_ini AND v_fim
+    ORDER BY data DESC LIMIT 1);
+
+  IF v_empresa_id IS NULL THEN
+    v_empresa_id := (
+      SELECT empresa_id FROM public.ponto_diario
+      WHERE tenant_id = p_tenant_id
+        AND regexp_replace(colaborador_cpf, '[^0-9]', '', 'g') = v_cpf
+        AND data BETWEEN v_ini AND v_fim
+      ORDER BY data DESC LIMIT 1);
   END IF;
   IF v_empresa_id IS NULL THEN
     v_empresa_id := COALESCE(public.ponto_empresa_do_cpf(p_tenant_id, p_colaborador_cpf), p_empresa_id);
   END IF;
 
-  SELECT
-    COALESCE(SUM(CASE WHEN s.saldo_min > 0 THEN s.saldo_min ELSE 0 END), 0),
-    COALESCE(SUM(CASE WHEN s.saldo_min < 0 THEN -s.saldo_min ELSE 0 END), 0)
-  INTO v_creditos, v_debitos
-  FROM public.ponto_saldo_dias_competencia(p_tenant_id, p_colaborador_cpf, p_competencia) s;
+  -- FONTE ÚNICA: soma dos saldos diários (crédito e débito), por subconsulta.
+  v_creditos := COALESCE((
+    SELECT SUM(CASE WHEN s.saldo_min > 0 THEN s.saldo_min ELSE 0 END)
+    FROM public.ponto_saldo_dias_competencia(p_tenant_id, p_colaborador_cpf, p_competencia) s), 0);
+  v_debitos := COALESCE((
+    SELECT SUM(CASE WHEN s.saldo_min < 0 THEN -s.saldo_min ELSE 0 END)
+    FROM public.ponto_saldo_dias_competencia(p_tenant_id, p_colaborador_cpf, p_competencia) s), 0);
 
+  -- Banco só com instrumento vigente + prazo de vencimento (CLT art. 59 §§2/5/6).
   v_regime := public.ponto_banco_regime_vigente(p_tenant_id, p_colaborador_cpf, v_colaborador_id, v_fim);
   IF v_regime.id IS NULL THEN
     v_creditos := 0;
@@ -76,16 +97,19 @@ BEGIN
 
   -- Saldo anterior = FECHAMENTO OFICIAL do mês anterior (o número impresso).
   v_comp_anterior := to_char(v_ini - INTERVAL '1 month', 'YYYY-MM');
-  SELECT o.saldo_atual_min INTO v_saldo_anterior
-  FROM public.ponto_banco_horas_oficial(p_tenant_id, v_comp_anterior, NULL, p_colaborador_cpf) o
-  LIMIT 1;
-  v_tem_anterior := FOUND;
+  v_saldo_anterior := (
+    SELECT o.saldo_atual_min
+    FROM public.ponto_banco_horas_oficial(p_tenant_id, v_comp_anterior, NULL, p_colaborador_cpf) o
+    LIMIT 1);
+  v_tem_anterior := (v_saldo_anterior IS NOT NULL);
   IF NOT v_tem_anterior THEN
-    SELECT saldo_anterior_minutos INTO v_saldo_anterior
-    FROM public.ponto_banco_horas
-    WHERE tenant_id = p_tenant_id
-      AND colaborador_cpf = p_colaborador_cpf
-      AND competencia = p_competencia;
+    -- Sem movimento nem fotografia no mês anterior: preserva o saldo anterior
+    -- lançado manualmente nesta competência (comportamento anterior).
+    v_saldo_anterior := (
+      SELECT saldo_anterior_minutos FROM public.ponto_banco_horas
+      WHERE tenant_id = p_tenant_id
+        AND colaborador_cpf = p_colaborador_cpf
+        AND competencia = p_competencia);
   END IF;
   v_saldo_anterior := COALESCE(v_saldo_anterior, 0);
 
@@ -102,17 +126,16 @@ BEGIN
     empresa_id = COALESCE(public.ponto_banco_horas.empresa_id, EXCLUDED.empresa_id),
     colaborador_nome = EXCLUDED.colaborador_nome,
     colaborador_id = EXCLUDED.colaborador_id,
-    updated_at = now()
-  RETURNING id INTO v_banco_id;
+    updated_at = now();
 
-  IF v_banco_id IS NULL THEN
-    SELECT id INTO v_banco_id
-    FROM public.ponto_banco_horas
+  -- id da linha (sem cláusula de retorno em variável), por subconsulta.
+  v_banco_id := (
+    SELECT id FROM public.ponto_banco_horas
     WHERE tenant_id = p_tenant_id
       AND colaborador_cpf = p_colaborador_cpf
-      AND competencia = p_competencia;
-  END IF;
+      AND competencia = p_competencia);
 
+  -- Remove as movimentações automáticas anteriores. Manuais são preservadas.
   DELETE FROM public.ponto_banco_horas_movimentacoes
   WHERE banco_horas_id = v_banco_id
     AND origem IN ('apuracao', 'apuracao_auto');
@@ -135,13 +158,16 @@ BEGIN
     );
   END IF;
 
-  SELECT
-    COALESCE(SUM(minutos) FILTER (WHERE tipo = 'credito'), 0),
-    COALESCE(SUM(minutos) FILTER (WHERE tipo = 'debito'), 0),
-    COALESCE(SUM(minutos) FILTER (WHERE tipo = 'compensacao'), 0)
-  INTO v_tot_cred, v_tot_deb, v_tot_comp
-  FROM public.ponto_banco_horas_movimentacoes
-  WHERE banco_horas_id = v_banco_id;
+  -- Totais das movimentações (crédito/débito/compensação), por subconsulta.
+  v_tot_cred := COALESCE((
+    SELECT SUM(minutos) FILTER (WHERE tipo = 'credito')
+    FROM public.ponto_banco_horas_movimentacoes WHERE banco_horas_id = v_banco_id), 0);
+  v_tot_deb := COALESCE((
+    SELECT SUM(minutos) FILTER (WHERE tipo = 'debito')
+    FROM public.ponto_banco_horas_movimentacoes WHERE banco_horas_id = v_banco_id), 0);
+  v_tot_comp := COALESCE((
+    SELECT SUM(minutos) FILTER (WHERE tipo = 'compensacao')
+    FROM public.ponto_banco_horas_movimentacoes WHERE banco_horas_id = v_banco_id), 0);
 
   UPDATE public.ponto_banco_horas
   SET creditos_minutos = v_tot_cred,
@@ -157,5 +183,4 @@ $function$;
 COMMENT ON FUNCTION public.apurar_banco_horas_colaborador(uuid, text, text, uuid) IS
   'Apura o banco de horas do colaborador. Saldo anterior = fechamento OFICIAL do mes anterior (ponto_banco_horas_oficial). So credita/debita com regime vigente e grava prazo_compensacao. CLT art. 59 §§2/5/6.';
 
--- Conferencia da parte 1: a funcao existe e foi atualizada.
 SELECT 'Parte 1 OK — funcao apurar_banco_horas_colaborador atualizada. Rode a PARTE 2.' AS status;

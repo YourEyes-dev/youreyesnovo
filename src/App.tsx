@@ -161,8 +161,16 @@ const RaizDoDominio = () => {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 2,
-      gcTime: 1000 * 60 * 5,
+      // staleTime: dentro dessa janela, navegar entre telas NÃO refaz a
+      // consulta — os dados já carregados aparecem na hora.
+      staleTime: 1000 * 60 * 5,
+      // gcTime: por quanto tempo o dado fica no cache mesmo sem nenhuma tela
+      // usando-o. Com o valor antigo (5 min), ao sair de uma tela e voltar
+      // pouco depois o cache já tinha sido descartado e a tela renascia
+      // vazia com o "carregando" de 1-3s. Segurando o cache pela sessão
+      // inteira, a REVISITA mostra o conteúdo instantaneamente (e, se estiver
+      // velho, atualiza em segundo plano, sem tela vazia).
+      gcTime: 1000 * 60 * 60,
       refetchOnWindowFocus: false,
       retry: 1,
     },

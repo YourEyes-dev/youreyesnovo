@@ -25,10 +25,22 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { AcaoGutPrioridade, AcaoTipo } from "@/types/planoAcao";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +67,17 @@ import {
 } from "@/types/psicossocial";
 import { cn } from "@/lib/utils";
 import { useMinRespostasCampanha } from "@/hooks/usePsicossocialMinRespostas";
+
+/** Rascunho 5W2H editável antes de efetivar a ação no Plano de Ação. */
+interface RascunhoAcao {
+  titulo: string;
+  descricao: string;
+  porque: string;
+  onde: string;
+  como: string;
+  prioridade: AcaoGutPrioridade;
+  tipo: AcaoTipo;
+}
 
 /**
  * Contraprova e Ergonomia cruzam dados de UMA campanha especifica (absenteismo,
@@ -140,6 +163,10 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
   const [analisandoIA, setAnalisandoIA] = useState(false);
   const [analiseIA, setAnaliseIA] = useState<string | null>(null);
   const [criandoAcao, setCriandoAcao] = useState(false);
+  // Rascunho editável da ação 5W2H sugerida pela IA. Enquanto != null, o modal
+  // de revisão está aberto; a gravação só ocorre ao confirmar (handleConfirmarAcao).
+  const [rascunhoAcao, setRascunhoAcao] = useState<RascunhoAcao | null>(null);
+  const [salvandoAcao, setSalvandoAcao] = useState(false);
 
   const isLoading = loadingStats || loadingRespostas;
 
@@ -246,7 +273,9 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
     }
   };
 
-  const handleCriarAcao = async () => {
+  // Passo 1: gera o rascunho 5W2H com a IA e abre o modal de revisão.
+  // NÃO grava nada — a criação só acontece no handleConfirmarAcao.
+  const handleGerarRascunho = async () => {
     if (!tenantId || !ips || !ipsClass) return;
     setCriandoAcao(true);
     try {
@@ -265,16 +294,42 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
       if (error) throw error;
 
       const sugestao = data?.sugestao_acao;
-      const { error: errAcao } = await supabase.from('plano_acoes').insert({
-        tenant_id: tenantId,
-        empresa_id: empresaAtivaId || null,
+      setRascunhoAcao({
         titulo: sugestao?.titulo || `Ação Psicossocial — ${campanhaRef.nome}`,
         descricao: sugestao?.descricao || `Ação gerada a partir da campanha psicossocial com IPS ${ips}.`,
         porque: sugestao?.porque || `IPS ${ips} — Classificação: ${ipsClass}`,
         onde: sugestao?.onde || 'Organização',
         como: sugestao?.como || 'Implementar ações de melhoria psicossocial conforme diagnóstico.',
-        tipo: 'preventiva' as const,
-        prioridade: (ips < 35 ? 'imediato' : ips < 50 ? 'urgente' : 'medio') as any,
+        prioridade: (ips < 35 ? 'imediato' : ips < 50 ? 'urgente' : 'medio'),
+        tipo: 'preventiva',
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao gerar rascunho da ação: " + (err instanceof Error ? err.message : ""));
+    } finally {
+      setCriandoAcao(false);
+    }
+  };
+
+  // Passo 2: grava a ação já revisada/editada pelo gestor no Plano de Ação.
+  const handleConfirmarAcao = async () => {
+    if (!rascunhoAcao || !tenantId) return;
+    if (!rascunhoAcao.titulo.trim()) {
+      toast.error("Informe um título para a ação.");
+      return;
+    }
+    setSalvandoAcao(true);
+    try {
+      const { error: errAcao } = await supabase.from('plano_acoes').insert({
+        tenant_id: tenantId,
+        empresa_id: empresaAtivaId || null,
+        titulo: rascunhoAcao.titulo.trim(),
+        descricao: rascunhoAcao.descricao,
+        porque: rascunhoAcao.porque,
+        onde: rascunhoAcao.onde,
+        como: rascunhoAcao.como,
+        tipo: rascunhoAcao.tipo,
+        prioridade: rascunhoAcao.prioridade,
         origem_modulo: 'psicossocial' as const,
         origem_descricao: `Campanha Psicossocial: ${campanhaRef.nome}`,
         criado_por: user?.id,
@@ -286,18 +341,20 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
         tempo_gasto_minutos: 0,
       });
       if (errAcao) throw errAcao;
-      toast.success("Ação criada no Plano de Ação com sugestão IA!");
-    } catch (err: any) {
+      toast.success("Ação criada no Plano de Ação!");
+      setRascunhoAcao(null);
+    } catch (err) {
       console.error(err);
-      toast.error("Erro ao criar ação: " + (err.message || ""));
+      toast.error("Erro ao criar ação: " + (err instanceof Error ? err.message : ""));
     } finally {
-      setCriandoAcao(false);
+      setSalvandoAcao(false);
     }
   };
 
   if (selecionadas.length === 0) return null;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -649,20 +706,20 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
                           Plano de Ação Preventivo
                         </CardTitle>
                         <CardDescription className="text-xs">
-                          Gere automaticamente uma ação 5W2H no Plano de Ação a partir deste diagnóstico
+                          A IA monta um rascunho 5W2H a partir deste diagnóstico. Você revisa e edita antes de criar a ação no Plano de Ação.
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
                         <Button
-                          onClick={handleCriarAcao}
+                          onClick={handleGerarRascunho}
                           disabled={criandoAcao}
                           variant="outline"
                           className="w-full gap-2 border-amber-300 hover:bg-amber-50"
                         >
                           {criandoAcao ? (
-                            <><Loader2 className="h-4 w-4 animate-spin" /> Criando ação...</>
+                            <><Loader2 className="h-4 w-4 animate-spin" /> Gerando rascunho...</>
                           ) : (
-                            <><Sparkles className="h-4 w-4 text-amber-600" /> Criar Ação no Plano de Ação</>
+                            <><Sparkles className="h-4 w-4 text-amber-600" /> Revisar e criar ação</>
                           )}
                         </Button>
                         <p className="text-xs text-muted-foreground mt-2 text-center">
@@ -866,5 +923,114 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Modal de revisão do rascunho 5W2H antes de criar a ação (item 2) */}
+    <Dialog open={rascunhoAcao !== null} onOpenChange={aberto => { if (!aberto) setRascunhoAcao(null); }}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-amber-600" />
+            Revisar ação antes de criar
+          </DialogTitle>
+          <DialogDescription>
+            Rascunho 5W2H sugerido pela IA a partir do diagnóstico de <strong>{campanhaRef.nome}</strong>.
+            Ajuste o que precisar e confirme para criar a ação no Plano de Ação. Nada é gravado até você confirmar.
+          </DialogDescription>
+        </DialogHeader>
+
+        {rascunhoAcao && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="rascunho-titulo" className="text-xs">O quê — Título da ação</Label>
+              <Input
+                id="rascunho-titulo"
+                value={rascunhoAcao.titulo}
+                onChange={e => setRascunhoAcao({ ...rascunhoAcao, titulo: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rascunho-descricao" className="text-xs">Descrição</Label>
+              <Textarea
+                id="rascunho-descricao"
+                rows={3}
+                value={rascunhoAcao.descricao}
+                onChange={e => setRascunhoAcao({ ...rascunhoAcao, descricao: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rascunho-porque" className="text-xs">Por quê</Label>
+              <Textarea
+                id="rascunho-porque"
+                rows={2}
+                value={rascunhoAcao.porque}
+                onChange={e => setRascunhoAcao({ ...rascunhoAcao, porque: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rascunho-onde" className="text-xs">Onde</Label>
+              <Input
+                id="rascunho-onde"
+                value={rascunhoAcao.onde}
+                onChange={e => setRascunhoAcao({ ...rascunhoAcao, onde: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rascunho-como" className="text-xs">Como</Label>
+              <Textarea
+                id="rascunho-como"
+                rows={2}
+                value={rascunhoAcao.como}
+                onChange={e => setRascunhoAcao({ ...rascunhoAcao, como: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Prioridade</Label>
+                <Select
+                  value={rascunhoAcao.prioridade}
+                  onValueChange={v => setRascunhoAcao({ ...rascunhoAcao, prioridade: v as AcaoGutPrioridade })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="imediato">Imediato</SelectItem>
+                    <SelectItem value="urgente">Urgente</SelectItem>
+                    <SelectItem value="medio">Médio</SelectItem>
+                    <SelectItem value="baixo">Baixo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tipo</Label>
+                <Select
+                  value={rascunhoAcao.tipo}
+                  onValueChange={v => setRascunhoAcao({ ...rascunhoAcao, tipo: v as AcaoTipo })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="preventiva">Preventiva</SelectItem>
+                    <SelectItem value="corretiva">Corretiva</SelectItem>
+                    <SelectItem value="melhoria">Melhoria</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={() => setRascunhoAcao(null)} disabled={salvandoAcao}>
+            Cancelar
+          </Button>
+          <Button onClick={handleConfirmarAcao} disabled={salvandoAcao} className="gap-2">
+            {salvandoAcao ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Criando...</>
+            ) : (
+              <><CheckCircle2 className="h-4 w-4" /> Confirmar e criar ação</>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

@@ -762,12 +762,14 @@ describe("Módulo Psicossocial NR-01", () => {
     openTab(TAB.pgr);
     cy.wait(1500);
 
+    // A exportação do inventário foi consolidada no botão "Relatório"
+    // (documento completo com metodologia); o "Exportar PDF" avulso foi removido.
     cy.get("button").filter(":visible").then(($btns) => {
       const exp = $btns.filter((_i, el) =>
-        /exportar|pdf|download/i.test(el.textContent || "")
+        /relatório|exportar|pdf|download/i.test(el.textContent || "")
       );
       if (exp.length > 0) {
-        cy.log("Botão de exportação PGR encontrado");
+        cy.log("Botão de relatório/exportação PGR encontrado");
       } else {
         cy.log("Inventário PGR sem dados para exportação — validação estrutural OK");
       }

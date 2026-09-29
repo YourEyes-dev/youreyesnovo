@@ -114,7 +114,7 @@ export function useMapaComportamental() {
       tempoTotalSegundos: number;
       tempoPorItem?: Record<string, number>;
       campanhaId?: string | null;
-    }): Promise<MapaResultado> => {
+    }): Promise<{ resultado: MapaResultado; mapaId: string }> => {
       if (!tenantId) throw new Error("Tenant não encontrado");
       const resultado = calcularMapa(input.respostas, {
         tempoTotalSegundos: input.tempoTotalSegundos,
@@ -138,14 +138,17 @@ export function useMapaComportamental() {
         concluido_em: agora,
         vence_em: calcularVenceEm(24),
       };
+      let mapaId: string;
       if (rascunho) {
         const { error } = await fromTable(TABELA).update(payload).eq("id", rascunho.id);
         if (error) throw error;
+        mapaId = rascunho.id;
       } else {
-        const { error } = await fromTable(TABELA).insert(payload);
+        const { data, error } = await fromTable(TABELA).insert(payload).select("id").single();
         if (error) throw error;
+        mapaId = data.id as string;
       }
-      return resultado;
+      return { resultado, mapaId };
     },
     onSuccess: () => {
       // Invalida também campanha-pendente/cobertura para o banner sumir.

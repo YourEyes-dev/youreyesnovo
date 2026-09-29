@@ -15,10 +15,20 @@ import {
   Filter,
   Users,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RelatorioModal } from "./RelatorioModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -109,8 +119,16 @@ interface InventarioItem {
 }
 
 export function InventarioPGR({ campanhas }: InventarioPGRProps) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const [relatorioOpen, setRelatorioOpen] = useState(false);
+  // Confirmação detalhada e rastreável do envio ao GRO (item 4).
+  const [confirmGRO, setConfirmGRO] = useState<{
+    count: number;
+    campanhaNome: string;
+    dimensoes: string[];
+    situacoes: { setorNome: string; funcaoNome: string }[];
+  } | null>(null);
   const { data: sevCatalogo } = useSeveridadesCatalogo();
   // Campanhas válidas (mín. anonimato para questionário, 1 para entrevista guiada)
   const campanhasValidas = useMemo(() =>
@@ -320,13 +338,29 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
       return;
     }
 
-    await importarDaCampanha.mutateAsync({
+    const isSiproCampanha = campanha.instrumento === 'sipro';
+    const dimensoes = radar.map(d => ({ subject: d.subject, value: d.value }));
+    // Mesmas dimensões que o hook transforma em risco GRO (score de risco ≥ 35),
+    // para mostrar ao gestor exatamente o que foi enviado.
+    const dimensoesCriticas = dimensoes
+      .filter(d => (isSiproCampanha ? d.value : 100 - d.value) >= 35)
+      .map(d => d.subject);
+
+    const count = await importarDaCampanha.mutateAsync({
       campanhaId: campanha.id,
       campanhaName: campanha.nome,
-      dimensoes: radar.map(d => ({ subject: d.subject, value: d.value })),
+      dimensoes,
       empresaId: null,
-      isSipro: campanha.instrumento === 'sipro',
+      isSipro: isSiproCampanha,
       situacoes,
+    });
+
+    // Confirmação rastreável: o que foi enviado e para onde (item 4).
+    setConfirmGRO({
+      count: count ?? 0,
+      campanhaNome: campanha.nome,
+      dimensoes: dimensoesCriticas,
+      situacoes: (situacoes ?? []).map(s => ({ setorNome: s.setorNome, funcaoNome: s.funcaoNome })),
     });
   };
 
@@ -679,6 +713,94 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
         campanhaIdInicial={filtroCampanha === "todos" ? undefined : filtroCampanha}
       />
       </Card>
+
+      {/* Item 4: confirmação rastreável do envio ao GRO */}
+      <Dialog open={confirmGRO !== null} onOpenChange={aberto => { if (!aberto) setConfirmGRO(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-emerald-600" />
+              {confirmGRO && confirmGRO.count > 0
+                ? "Riscos enviados ao GRO"
+                : "Nada foi enviado ao GRO"}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmGRO && confirmGRO.count > 0 ? (
+                <>Da campanha <strong>{confirmGRO.campanhaNome}</strong> para o Inventário GRO (módulo Ergonomia).</>
+              ) : (
+                <>Nenhuma dimensão da campanha <strong>{confirmGRO?.campanhaNome}</strong> atingiu o limiar de risco (score ≥ 35), então nenhum risco foi criado no GRO.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {confirmGRO && confirmGRO.count > 0 && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Riscos criados</span>
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                    {confirmGRO.count}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Base normativa</span>
+                  <span className="text-xs font-medium">NR-01 · NR-17 · ISO 45003</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Situação no GRO</span>
+                  <span className="text-xs font-medium">Identificado</span>
+                </div>
+              </div>
+
+              {confirmGRO.dimensoes.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                    Dimensões de risco enviadas ({confirmGRO.dimensoes.length})
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {confirmGRO.dimensoes.map(d => (
+                      <Badge key={d} variant="outline" className="text-[10px]">{d}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {confirmGRO.situacoes.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                    Situações de trabalho ({confirmGRO.situacoes.length})
+                  </p>
+                  <ul className="space-y-0.5 text-xs text-muted-foreground">
+                    {confirmGRO.situacoes.map((s, i) => (
+                      <li key={`${s.setorNome}-${s.funcaoNome}-${i}`}>
+                        • {s.funcaoNome} <span className="opacity-70">({s.setorNome})</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    Cada dimensão de risco gera 1 registro por situação de trabalho — total de {confirmGRO.count}.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setConfirmGRO(null)}>
+              Fechar
+            </Button>
+            {confirmGRO && confirmGRO.count > 0 && (
+              <Button
+                className="gap-2"
+                onClick={() => { setConfirmGRO(null); navigate("/ergonomia"); }}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Ver no GRO
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

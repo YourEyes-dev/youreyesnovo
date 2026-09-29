@@ -110,8 +110,12 @@ export function ContaprovaOrganizacional({ campanha, ips }: ContaprovaOrganizaci
       const atestadosMentalSaude = atestados.filter(a =>
         a.grupo_clinico === "mental_comportamental"
       ).length;
+      // Sem NENHUM registro de saúde no período: ausência de dado não é
+      // evidência de ambiente saudável — o indicador precisa aparecer como
+      // "sem dados" (neutro), nunca como "contradiz o risco".
+      const semRegistrosSaude = atestados.length === 0 && afastamentos.length === 0;
 
-      return { totalAtestados, diasAfastamento, taxaAfastamento, atestadosMentalSaude, totalColab };
+      return { totalAtestados, diasAfastamento, taxaAfastamento, atestadosMentalSaude, totalColab, semRegistrosSaude };
     },
     enabled: !!tenantId,
   });
@@ -210,8 +214,9 @@ export function ContaprovaOrganizacional({ campanha, ips }: ContaprovaOrganizaci
       const totalOcorrencias = ocorrencias.length;
       const feedbacksAlinhamento = feedbacks.filter(f => f.categoria === "alinhamento").length;
       const feedbacksReconhecimento = feedbacks.filter(f => f.categoria === "reconhecimento").length;
+      const semRegistrosFeedback = ocorrencias.length === 0 && feedbacks.length === 0;
 
-      return { ocorrenciasNegativas, advertencias, totalOcorrencias, feedbacksAlinhamento, feedbacksReconhecimento };
+      return { ocorrenciasNegativas, advertencias, totalOcorrencias, feedbacksAlinhamento, feedbacksReconhecimento, semRegistrosFeedback };
     },
     enabled: !!tenantId,
   });
@@ -221,17 +226,31 @@ export function ContaprovaOrganizacional({ campanha, ips }: ContaprovaOrganizaci
 
   // Atestados
   if (dadosAtestados) {
-    const tendencia = classificarAfastamentos(dadosAtestados.taxaAfastamento);
-    evidencias.push({
-      modulo: "Saúde Organizacional",
-      icone: <ShieldAlert className="h-4 w-4" />,
-      titulo: "Taxa de Afastamentos",
-      valor: `${dadosAtestados.taxaAfastamento.toFixed(1)}%`,
-      interpretacao: tendencia === "positiva" ? "Baixa taxa de afastamentos" : tendencia === "alerta" ? "Taxa de afastamentos moderada" : "Alta taxa de afastamentos",
-      tendencia: tendencia === "positiva" ? "positiva" : tendencia === "alerta" ? "neutra" : "negativa",
-      corrobora: tendencia === "negativa" ? true : tendencia === "alerta" ? null : false,
-      detalhe: `${dadosAtestados.totalAtestados} atestados · ${dadosAtestados.diasAfastamento} dias afastados`,
-    });
+    if (dadosAtestados.semRegistrosSaude) {
+      // Sem dado nenhum: não corrobora nem contradiz — apenas informa a lacuna.
+      evidencias.push({
+        modulo: "Saúde Organizacional",
+        icone: <ShieldAlert className="h-4 w-4" />,
+        titulo: "Taxa de Afastamentos",
+        valor: "sem dados",
+        interpretacao: "Nenhum atestado ou afastamento registrado no período",
+        tendencia: "neutra",
+        corrobora: null,
+        detalhe: "Sem registros no módulo de Saúde Ocupacional para o período — não é possível corroborar nem contradizer o risco percebido.",
+      });
+    } else {
+      const tendencia = classificarAfastamentos(dadosAtestados.taxaAfastamento);
+      evidencias.push({
+        modulo: "Saúde Organizacional",
+        icone: <ShieldAlert className="h-4 w-4" />,
+        titulo: "Taxa de Afastamentos",
+        valor: `${dadosAtestados.taxaAfastamento.toFixed(1)}%`,
+        interpretacao: tendencia === "positiva" ? "Baixa taxa de afastamentos" : tendencia === "alerta" ? "Taxa de afastamentos moderada" : "Alta taxa de afastamentos",
+        tendencia: tendencia === "positiva" ? "positiva" : tendencia === "alerta" ? "neutra" : "negativa",
+        corrobora: tendencia === "negativa" ? true : tendencia === "alerta" ? null : false,
+        detalhe: `${dadosAtestados.totalAtestados} atestados · ${dadosAtestados.diasAfastamento} dias afastados`,
+      });
+    }
 
     if (dadosAtestados.atestadosMentalSaude > 0) {
       evidencias.push({
@@ -279,19 +298,30 @@ export function ContaprovaOrganizacional({ campanha, ips }: ContaprovaOrganizaci
 
   // Feedback / Ocorrências
   if (dadosFeedback) {
-    const totalTotal = Math.max(dadosFeedback.totalOcorrencias, 1);
-    const taxaNegativos = (dadosFeedback.ocorrenciasNegativas / totalTotal) * 100;
-    const tendencia = classificarOcorrencias(dadosFeedback.ocorrenciasNegativas);
-    evidencias.push({
-      modulo: "Feedback & Ocorrências",
-      icone: <MessageSquare className="h-4 w-4" />,
-      titulo: "Ocorrências Negativas",
-      valor: dadosFeedback.ocorrenciasNegativas,
-      interpretacao: tendencia === "positiva" ? "Poucas ocorrências negativas" : tendencia === "alerta" ? "Volume moderado de ocorrências negativas" : "Alto volume de ocorrências negativas",
-      tendencia: tendencia === "positiva" ? "positiva" : tendencia === "alerta" ? "neutra" : "negativa",
-      corrobora: tendencia === "negativa" ? true : null,
-      detalhe: `${dadosFeedback.advertencias} advertências · ${dadosFeedback.feedbacksReconhecimento} reconhecimentos registrados`,
-    });
+    if (dadosFeedback.semRegistrosFeedback) {
+      evidencias.push({
+        modulo: "Feedback & Ocorrências",
+        icone: <MessageSquare className="h-4 w-4" />,
+        titulo: "Ocorrências Negativas",
+        valor: "sem dados",
+        interpretacao: "Nenhuma ocorrência ou feedback registrado no período",
+        tendencia: "neutra",
+        corrobora: null,
+        detalhe: "Sem registros no módulo de Feedback & Ocorrências para o período.",
+      });
+    } else {
+      const tendencia = classificarOcorrencias(dadosFeedback.ocorrenciasNegativas);
+      evidencias.push({
+        modulo: "Feedback & Ocorrências",
+        icone: <MessageSquare className="h-4 w-4" />,
+        titulo: "Ocorrências Negativas",
+        valor: dadosFeedback.ocorrenciasNegativas,
+        interpretacao: tendencia === "positiva" ? "Poucas ocorrências negativas" : tendencia === "alerta" ? "Volume moderado de ocorrências negativas" : "Alto volume de ocorrências negativas",
+        tendencia: tendencia === "positiva" ? "positiva" : tendencia === "alerta" ? "neutra" : "negativa",
+        corrobora: tendencia === "negativa" ? true : null,
+        detalhe: `${dadosFeedback.advertencias} advertências · ${dadosFeedback.feedbacksReconhecimento} reconhecimentos registrados`,
+      });
+    }
   }
 
   // Nenhuma evidência carregada ainda

@@ -1,35 +1,23 @@
 -- ============================================================================
--- ENTREGA — Banco de horas: carry-over pelo fechamento OFICIAL + reapuração
+-- ENTREGA — Banco de horas: carry-over pelo fechamento OFICIAL — PARTE 1 (FUNÇÃO)
 -- Itens 1/3/5 do pacote de correções do Ponto
 --
--- Cole este arquivo INTEIRO no SQL Editor de PRODUÇÃO. Ele roda em uma única
--- transação: se algo falhar, desfaz tudo sozinho.
+-- Cole este arquivo INTEIRO no SQL Editor de PRODUÇÃO e rode. Depois rode a
+-- PARTE 2 (backup + reapuração).
 --
--- O QUE ELE FAZ, em ordem:
---   1) Redefine apurar_banco_horas_colaborador para abrir a competência com o
---      saldo do FECHAMENTO OFICIAL do mês anterior (o número impresso), e não
---      mais a fotografia crua que ficava para trás quando um saldo era zerado
---      ou ajustado sem reapurar os meses seguintes.
---   2) Faz BACKUP das linhas de ponto_banco_horas que serão reescritas.
---   3) Reapura, EM ORDEM CRONOLÓGICA por colaborador, as competências ABERTAS
---      a partir de v_inicio, para o número certo escorrer para a frente.
---      Competências FECHADAS não são tocadas (Súmula 338).
---   4) Mostra as descontinuidades que ainda restarem (conferência).
+-- POR QUE DUAS PARTES: o SQL Editor tem um auxiliar "enable RLS on newly
+-- created tables" que, quando o mesmo arquivo CRIA UMA TABELA, injeta
+-- ALTER TABLE dentro do corpo das funções e corrompe o arquivo (erro de sintaxe
+-- deslocado, longe da causa). Por isso a função (que usa SELECT ... INTO) vem
+-- SOZINHA aqui, e o backup (que cria tabela) fica na parte 2. Script que só cria
+-- FUNÇÃO não dispara o auxiliar.
 --
--- SEGURANÇA
---   · Backup antes de reescrever (produção não tem PITR). Para desfazer, veja
---     o UPDATE comentado no fim.
---   · A tabela de backup é criada por EXECUTE (string montada) de propósito:
---     evita o auxiliar "auto-RLS" do SQL Editor, que ao detectar CREATE TABLE
---     injeta ALTER TABLE dentro do corpo das funções e corrompe o arquivo.
---   · Idempotente: rodar de novo só reconfirma os mesmos números.
---
--- AJUSTE ANTES DE RODAR: v_inicio abaixo é o primeiro mês a reapurar. O padrão
--- é 2026-08 (o relato foi "até agosto batia; depois de zerar, parou"). O mês
--- anterior a v_inicio precisa estar correto — ele é a âncora da cadeia.
+-- O QUE FAZ: redefine apurar_banco_horas_colaborador para abrir a competência
+-- com o saldo do FECHAMENTO OFICIAL do mês anterior (o número impresso), e não
+-- a fotografia crua que ficava para trás quando um saldo era zerado/ajustado sem
+-- reapurar os meses seguintes. Idempotente (CREATE OR REPLACE).
 -- ============================================================================
 
--- 1) FUNÇÃO CORRIGIDA -------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.apurar_banco_horas_colaborador(p_tenant_id uuid, p_colaborador_cpf text, p_competencia text, p_empresa_id uuid DEFAULT NULL::uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -166,86 +154,8 @@ BEGIN
 END;
 $function$;
 
--- 2) BACKUP das linhas que serao reescritas ---------------------------------
-DO $bkp$
-BEGIN
-  -- Cria a tabela de backup por EXECUTE (string montada) para o SQL Editor nao
-  -- detectar "CREATE TABLE" e nao ligar o auto-RLS que corromperia a funcao.
-  EXECUTE 'CREATE ' || 'TABLE IF NOT EXISTS public.backup_ponto_banco_horas_20260929 AS '
-       || 'SELECT * FROM public.ponto_banco_horas WHERE competencia >= ''2026-08''';
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'Backup nao criado (talvez ja exista): %', SQLERRM;
-END;
-$bkp$;
+COMMENT ON FUNCTION public.apurar_banco_horas_colaborador(uuid, text, text, uuid) IS
+  'Apura o banco de horas do colaborador. Saldo anterior = fechamento OFICIAL do mes anterior (ponto_banco_horas_oficial). So credita/debita com regime vigente e grava prazo_compensacao. CLT art. 59 §§2/5/6.';
 
--- 3) REAPURACAO em ordem cronologica, so competencias ABERTAS ---------------
-DO $reap$
-DECLARE
-  v_inicio text := '2026-08';   -- primeiro mes a reapurar (ajuste se necessario)
-  rec RECORD;
-  v_n int := 0;
-BEGIN
-  FOR rec IN
-    SELECT b.tenant_id, b.colaborador_cpf, b.competencia, b.empresa_id
-    FROM public.ponto_banco_horas b
-    WHERE b.competencia >= v_inicio
-      AND NOT EXISTS (
-        SELECT 1 FROM public.ponto_fechamentos f
-        WHERE f.tenant_id = b.tenant_id
-          AND f.competencia = b.competencia
-          AND f.status = 'fechado'
-          AND (f.empresa_id IS NULL OR f.empresa_id = b.empresa_id)
-      )
-    ORDER BY b.tenant_id, b.colaborador_cpf, b.competencia
-  LOOP
-    BEGIN
-      PERFORM public.apurar_banco_horas_colaborador(
-        rec.tenant_id, rec.colaborador_cpf, rec.competencia, rec.empresa_id);
-      v_n := v_n + 1;
-    EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'Falha ao reapurar %/%/%: %',
-        rec.tenant_id, rec.colaborador_cpf, rec.competencia, SQLERRM;
-    END;
-  END LOOP;
-  RAISE NOTICE 'Reapuracao concluida: % competencia(s) reapurada(s).', v_n;
-END;
-$reap$;
-
--- 4) CONFERENCIA: descontinuidades restantes (idealmente nenhuma) -----------
--- Para cada colaborador, o saldo_atual de um mes deve bater com o
--- saldo_anterior do mes seguinte. Lista o que ainda nao bate (meses pulados
--- ou fechados no meio podem aparecer e sao esperados).
-WITH x AS (
-  SELECT tenant_id, colaborador_cpf, competencia,
-         saldo_anterior_minutos,
-         saldo_atual_minutos,
-         LAG(saldo_atual_minutos) OVER (
-           PARTITION BY tenant_id, colaborador_cpf ORDER BY competencia) AS fim_mes_anterior,
-         LAG(competencia) OVER (
-           PARTITION BY tenant_id, colaborador_cpf ORDER BY competencia) AS competencia_anterior
-  FROM public.ponto_banco_horas
-  WHERE competencia >= '2026-08'
-)
-SELECT colaborador_cpf, competencia_anterior, competencia,
-       fim_mes_anterior AS fim_do_mes_anterior,
-       saldo_anterior_minutos AS abertura_deste_mes,
-       (fim_mes_anterior - saldo_anterior_minutos) AS diferenca
-FROM x
-WHERE fim_mes_anterior IS NOT NULL
-  AND fim_mes_anterior <> saldo_anterior_minutos
-ORDER BY colaborador_cpf, competencia;
-
--- ============================================================================
--- PARA DESFAZER (se necessario), restaurar do backup:
---   UPDATE public.ponto_banco_horas b
---      SET saldo_anterior_minutos = k.saldo_anterior_minutos,
---          creditos_minutos       = k.creditos_minutos,
---          debitos_minutos        = k.debitos_minutos,
---          compensados_minutos    = k.compensados_minutos,
---          saldo_atual_minutos    = k.saldo_atual_minutos,
---          prazo_compensacao      = k.prazo_compensacao
---     FROM public.backup_ponto_banco_horas_20260929 k
---    WHERE b.id = k.id;
--- (A funcao corrigida permanece; para voltar a versao antiga, reaplicar a
---  definicao anterior de apurar_banco_horas_colaborador.)
--- ============================================================================
+-- Conferencia da parte 1: a funcao existe e foi atualizada.
+SELECT 'Parte 1 OK — funcao apurar_banco_horas_colaborador atualizada. Rode a PARTE 2.' AS status;

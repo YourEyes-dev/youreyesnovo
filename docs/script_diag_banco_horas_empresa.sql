@@ -16,11 +16,16 @@
 -- ============================================================================
 
 WITH emp AS (
-  SELECT id AS empresa_id, tenant_id
+  SELECT id AS empresa_id, tenant_id, cnpj
   FROM public.empresa_cadastro
-  WHERE regexp_replace(COALESCE(cnpj, ''), '[^0-9]', '', 'g') = '26114701000145'
+  WHERE regexp_replace(COALESCE(cnpj, ''), '[^0-9]', '', 'g') IN (
+    '26114701000145',  -- Itapejara
+    '41085456000189',  -- Realeza
+    '31219374000126'   -- Dois Vizinhos
+  )
 )
 SELECT
+  emp.cnpj AS empresa_cnpj,
   b.competencia,
   b.colaborador_nome,
   b.colaborador_cpf,

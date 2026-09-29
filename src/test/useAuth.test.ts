@@ -41,7 +41,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: supabaseMock,
 }));
 
-import { useAuth } from "@/hooks/useAuth";
+// Exercita a máquina de estado pesada diretamente (sem provider). Nas telas,
+// o app usa `useAuth`, que lê o contexto montado uma única vez pelo
+// AuthProvider; aqui testamos a implementação subjacente isoladamente.
+import { useAuthState as useAuth } from "@/hooks/useAuth";
 
 // ============================================================
 // Helpers

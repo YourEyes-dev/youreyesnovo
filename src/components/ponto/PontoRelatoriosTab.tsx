@@ -48,6 +48,10 @@ export function PontoRelatoriosTab() {
   const [tipoRelatorio, setTipoRelatorio] = useState<ReportType>("espelho");
   const [formatoExport, setFormatoExport] = useState<"pdf" | "excel">("pdf");
   const [gerando, setGerando] = useState(false);
+  // Recorte do relatório: por departamento e por colaborador. "todos" = sem
+  // restrição. Não mudam a apuração — só restringem QUEM entra no documento.
+  const [departamentoFiltro, setDepartamentoFiltro] = useState<string>("todos");
+  const [colaboradorFiltro, setColaboradorFiltro] = useState<string>("todos");
 
   const { usePontoDiario } = usePonto();
   const { useEspelhos } = usePontoFechamento();
@@ -134,6 +138,51 @@ export function PontoRelatoriosTab() {
   const { data: bancoOficial = [] } = useBancoHorasOficial(competencia);
   const { colaboradores } = useColaboradores();
 
+  // Lista de departamentos existentes entre os colaboradores carregados
+  // (o campo `departamento` em admissoes é o NOME, não uma FK).
+  const departamentos = useMemo(() => {
+    const s = new Set<string>();
+    colaboradores.forEach((c: any) => {
+      const d = (c.departamento || "").trim();
+      if (d) s.add(d);
+    });
+    return Array.from(s).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [colaboradores]);
+
+  // Colaboradores oferecidos no seletor, já recortados pelo departamento
+  // escolhido (para o RH não caçar um nome numa lista inteira).
+  const colaboradoresDoFiltro = useMemo(
+    () =>
+      colaboradores
+        .filter(
+          (c: any) =>
+            departamentoFiltro === "todos" ||
+            (c.departamento || "").trim() === departamentoFiltro,
+        )
+        .slice()
+        .sort((a: any, b: any) =>
+          (a.nome_completo || "").localeCompare(b.nome_completo || "", "pt-BR"),
+        ),
+    [colaboradores, departamentoFiltro],
+  );
+
+  // Conjunto de CPFs que o filtro deixa passar. `null` = sem restrição (ambos
+  // em "todos"); é o que cada relatório usa para decidir quem imprime.
+  const cpfsPermitidos = useMemo(() => {
+    if (departamentoFiltro === "todos" && colaboradorFiltro === "todos") return null;
+    const alvo = colaboradores.filter((c: any) => {
+      const okDep =
+        departamentoFiltro === "todos" ||
+        (c.departamento || "").trim() === departamentoFiltro;
+      const okCol = colaboradorFiltro === "todos" || soDigitos(c.cpf) === colaboradorFiltro;
+      return okDep && okCol;
+    });
+    return new Set(alvo.map((c: any) => soDigitos(c.cpf)).filter(Boolean));
+  }, [colaboradores, departamentoFiltro, colaboradorFiltro]);
+
+  const cpfPermitido = (cpf?: string | null) =>
+    !cpfsPermitidos || cpfsPermitidos.has(soDigitos(cpf));
+
   const oficialPorCpf = useMemo(() => {
     const m = new Map<string, any>();
     (bancoOficial as any[]).forEach((o) => {
@@ -178,11 +227,20 @@ export function PontoRelatoriosTab() {
     const idsAtivos = new Set(colaboradores.map((c) => c.id));
     return bancosHorasTodos.filter((b: any) => {
       const cpf = soDigitos(b.colaborador_cpf);
-      if (cpf && cpfsAtivos.has(cpf)) return true;
-      return Boolean(b.colaborador_id && idsAtivos.has(b.colaborador_id));
+      const ativo =
+        (cpf && cpfsAtivos.has(cpf)) ||
+        Boolean(b.colaborador_id && idsAtivos.has(b.colaborador_id));
+      return ativo && cpfPermitido(b.colaborador_cpf);
     });
-  }, [bancosHorasTodos, colaboradores]);
+  }, [bancosHorasTodos, colaboradores, cpfsPermitidos]);
   const { data: registrosMes = [], isLoading: carregandoRegistros } = usePontoDiario(startDate, endDate);
+
+  // Batidas do mês recortadas pelo filtro de departamento/colaborador — é o que
+  // alimenta o resumo, o absenteísmo e a planilha padrão.
+  const registrosFiltrados = useMemo(
+    () => registrosMes.filter((r: any) => cpfPermitido(r.colaborador_cpf)),
+    [registrosMes, cpfsPermitidos],
+  );
 
   const formatMinutos = (min: number) => formatarHoraMinuto(Math.abs(min || 0));
 
@@ -281,7 +339,7 @@ export function PontoRelatoriosTab() {
           cpf,
         }));
 
-    const unicos = Array.from(new Map(base.filter(b => b.cpf).map(b => [b.cpf, b])).values())
+    const unicos = Array.from(new Map(base.filter(b => b.cpf && cpfPermitido(b.cpf)).map(b => [b.cpf, b])).values())
       .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
 
     // RN26 — todas as batidas da competência, com origem rastreável.
@@ -474,7 +532,7 @@ export function PontoRelatoriosTab() {
       return;
     }
 
-    const registros = marcacoes || [];
+    const registros = (marcacoes || []).filter((m: any) => cpfPermitido(m.colaborador_cpf));
     if (registros.length === 0) {
       toast.warning("Nenhuma marcação encontrada para esta competência.");
       return;
@@ -570,8 +628,8 @@ export function PontoRelatoriosTab() {
       return;
     }
 
-    const marcacoesDb: any[] = marcRes.data || [];
-    const ajustesDb: any[] = ajusteRes.data || [];
+    const marcacoesDb: any[] = (marcRes.data || []).filter((m: any) => cpfPermitido(m.colaborador_cpf));
+    const ajustesDb: any[] = (ajusteRes.data || []).filter((a: any) => cpfPermitido(a.colaborador_cpf));
     if (marcacoesDb.length === 0 && ajustesDb.length === 0) {
       toast.warning("Nenhuma jornada apurada nesta competência.");
       return;
@@ -858,7 +916,7 @@ export function PontoRelatoriosTab() {
       // O modelo atual apura saldo em minutos, não percentuais: imprimir
       // "0h 00min" em HE 50/100 afirmaria que não houve hora extra.
       const head = [["Colaborador", "Trabalhado", "Previsto", "Excedente do período"]];
-      const comExcedente = espelhos.filter(e => (e.banco_horas_saldo_minutos ?? 0) > 0);
+      const comExcedente = espelhos.filter(e => (e.banco_horas_saldo_minutos ?? 0) > 0 && cpfPermitido(e.colaborador_cpf));
       const body = comExcedente.length > 0
         ? comExcedente.map(e => [
             e.colaborador_nome,
@@ -888,7 +946,7 @@ export function PontoRelatoriosTab() {
         14, yFim + 10);
     } else if (tipoRelatorio === "absenteismo") {
       const head = [["Colaborador", "Faltas", "Atrasos"]];
-      const faltosos = registrosMes.filter(r => r.status === "falta" || r.status === "atraso");
+      const faltosos = registrosFiltrados.filter(r => r.status === "falta" || r.status === "atraso");
       const body: any[] = [];
       if (faltosos.length > 0) {
         const colabNames = Array.from(new Set(faltosos.map(f => f.colaborador_nome)));
@@ -1056,7 +1114,7 @@ export function PontoRelatoriosTab() {
         Competência: b.competencia,
       }));
     } else {
-      dados = registrosMes.map(r => ({
+      dados = registrosFiltrados.map(r => ({
         Data: r.data,
         Colaborador: r.colaborador_nome,
         CPF: r.colaborador_cpf,
@@ -1128,6 +1186,45 @@ export function PontoRelatoriosTab() {
         </div>
       </div>
 
+      {/* Recorte do relatório: departamento e colaborador. "Todos" não restringe. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Departamento</Label>
+          <Select
+            value={departamentoFiltro}
+            onValueChange={(v) => {
+              setDepartamentoFiltro(v);
+              // Trocar o departamento pode deixar o colaborador escolhido fora
+              // da lista — volta para "todos" para não filtrar por ninguém.
+              setColaboradorFiltro("todos");
+            }}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os departamentos</SelectItem>
+              {departamentos.map((d) => (
+                <SelectItem key={d} value={d}>{d}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Colaborador</Label>
+          <Select value={colaboradorFiltro} onValueChange={setColaboradorFiltro}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os colaboradores</SelectItem>
+              {colaboradoresDoFiltro.map((c: any) => {
+                const cpf = soDigitos(c.cpf);
+                return cpf ? (
+                  <SelectItem key={c.id} value={cpf}>{c.nome_completo}</SelectItem>
+                ) : null;
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {/* Data preview/summary */}
       {!carregandoRegistros && (
         <Card>
@@ -1137,16 +1234,16 @@ export function PontoRelatoriosTab() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <p className="text-2xl font-bold">{registrosMes.length}</p>
+                <p className="text-2xl font-bold">{registrosFiltrados.length}</p>
                 <p className="text-xs text-muted-foreground">Total de Batidas</p>
               </div>
               <div>
-                <p className="text-2xl font-bold">{new Set(registrosMes.map(r => r.colaborador_cpf)).size}</p>
+                <p className="text-2xl font-bold">{new Set(registrosFiltrados.map(r => r.colaborador_cpf)).size}</p>
                 <p className="text-xs text-muted-foreground">Colaboradores</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-red-500">
-                  {registrosMes.filter(r => r.status === "falta").length}
+                  {registrosFiltrados.filter(r => r.status === "falta").length}
                 </p>
                 <p className="text-xs text-muted-foreground">Faltas Identificadas</p>
               </div>

@@ -138,6 +138,43 @@ export function PontoRelatoriosTab() {
   const { data: bancoOficial = [] } = useBancoHorasOficial(competencia);
   const { colaboradores } = useColaboradores();
 
+  // Vigência do contrato: o ex-colaborador só entra no relatório dos meses em
+  // que o contrato estava vigente. data_admissao/data_desligamento vivem em
+  // admissoes; aqui incluímos desligados (ao contrário de useColaboradores, que
+  // já exclui inativos), para poder decidir mês a mês quem estava ativo.
+  const { data: vinculos = [] } = useQuery({
+    queryKey: ["ponto-relatorio-vinculos", tenantId, empresaAtivaId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      let q = fromTable("admissoes")
+        .select("cpf, data_admissao, data_desligamento, status")
+        .eq("tenant_id", tenantId)
+        .in("status", ["concluido", "desligado"]);
+      if (empresaAtivaId) q = q.eq("empresa_id", empresaAtivaId);
+      const { data, error } = (await q) as { data: any[] | null; error: any };
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // CPFs cujo contrato esteve vigente em ALGUM dia da competência: admitido até
+  // o fim do mês e (sem desligamento OU desligado a partir do início do mês).
+  const cpfsVigentes = useMemo(() => {
+    const ini = `${competencia}-01`;
+    const fim = `${competencia}-${String(new Date(year, month, 0).getDate()).padStart(2, "0")}`;
+    const s = new Set<string>();
+    (vinculos as any[]).forEach((v) => {
+      const adm = v.data_admissao ? String(v.data_admissao).slice(0, 10) : null;
+      const des = v.data_desligamento ? String(v.data_desligamento).slice(0, 10) : null;
+      const vigente = (!adm || adm <= fim) && (!des || des >= ini);
+      if (vigente) {
+        const c = soDigitos(v.cpf);
+        if (c) s.add(c);
+      }
+    });
+    return s;
+  }, [vinculos, competencia, year, month]);
+
   // Lista de departamentos existentes entre os colaboradores carregados
   // (o campo `departamento` em admissoes é o NOME, não uma FK).
   const departamentos = useMemo(() => {
@@ -180,8 +217,16 @@ export function PontoRelatoriosTab() {
     return new Set(alvo.map((c: any) => soDigitos(c.cpf)).filter(Boolean));
   }, [colaboradores, departamentoFiltro, colaboradorFiltro]);
 
-  const cpfPermitido = (cpf?: string | null) =>
-    !cpfsPermitidos || cpfsPermitidos.has(soDigitos(cpf));
+  // Vigência é SEMPRE aplicada (item: não trazer desligado fora do mês vigente).
+  // Se a lista de vínculos ainda não carregou (conjunto vazio), não restringe,
+  // para não zerar o relatório por engano enquanto os dados chegam.
+  const cpfVigente = (cpf?: string | null) =>
+    cpfsVigentes.size === 0 || cpfsVigentes.has(soDigitos(cpf));
+
+  const cpfPermitido = (cpf?: string | null) => {
+    if (!cpfVigente(cpf)) return false;
+    return !cpfsPermitidos || cpfsPermitidos.has(soDigitos(cpf));
+  };
 
   const oficialPorCpf = useMemo(() => {
     const m = new Map<string, any>();
@@ -232,14 +277,14 @@ export function PontoRelatoriosTab() {
         Boolean(b.colaborador_id && idsAtivos.has(b.colaborador_id));
       return ativo && cpfPermitido(b.colaborador_cpf);
     });
-  }, [bancosHorasTodos, colaboradores, cpfsPermitidos]);
+  }, [bancosHorasTodos, colaboradores, cpfsPermitidos, cpfsVigentes]);
   const { data: registrosMes = [], isLoading: carregandoRegistros } = usePontoDiario(startDate, endDate);
 
   // Batidas do mês recortadas pelo filtro de departamento/colaborador — é o que
   // alimenta o resumo, o absenteísmo e a planilha padrão.
   const registrosFiltrados = useMemo(
     () => registrosMes.filter((r: any) => cpfPermitido(r.colaborador_cpf)),
-    [registrosMes, cpfsPermitidos],
+    [registrosMes, cpfsPermitidos, cpfsVigentes],
   );
 
   const formatMinutos = (min: number) => formatarHoraMinuto(Math.abs(min || 0));

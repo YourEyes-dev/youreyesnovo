@@ -28,6 +28,7 @@ interface BHForm {
   exige_cct_act: boolean;
   acordo_id: string | null;
   escala_id: string | null;
+  data_inicio: string | null;
   ativo: boolean;
 }
 
@@ -43,6 +44,7 @@ const defaultForm: BHForm = {
   exige_cct_act: false,
   acordo_id: null,
   escala_id: null,
+  data_inicio: null,
   ativo: true,
 };
 
@@ -107,6 +109,7 @@ export function PontoBancoHorasConfigTab() {
       exige_cct_act: c.exige_cct_act ?? false,
       acordo_id: c.acordo_id || null,
       escala_id: c.escala_id || null,
+      data_inicio: c.data_inicio ? String(c.data_inicio).slice(0, 10) : null,
       ativo: c.ativo ?? true,
     });
     setEditId(c.id);
@@ -117,7 +120,7 @@ export function PontoBancoHorasConfigTab() {
     if (!tenantId) return;
     setSaving(true);
     try {
-      const payload = { ...form, tenant_id: tenantId, empresa_id: empresaAtivaId || null };
+      const payload = { ...form, data_inicio: form.data_inicio || null, tenant_id: tenantId, empresa_id: empresaAtivaId || null };
       if (editId) {
         await fromTable("ponto_banco_horas_config").update(payload as any).eq("id", editId);
         toast.success("Configuração atualizada");
@@ -176,6 +179,7 @@ export function PontoBancoHorasConfigTab() {
               <TableRow>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Escala</TableHead>
+                <TableHead className="text-center">Início</TableHead>
                 <TableHead className="text-center">Prazo (dias)</TableHead>
                 <TableHead className="text-center">Limite (h)</TableHead>
                 <TableHead className="text-center">Acordo</TableHead>
@@ -185,9 +189,9 @@ export function PontoBancoHorasConfigTab() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8">Carregando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8">Carregando...</TableCell></TableRow>
               ) : configs.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhuma configuração. Use os padrões CLT.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhuma configuração. Use os padrões CLT.</TableCell></TableRow>
               ) : configs.map((c: any) => {
                 const esc = escalas.find((e: any) => e.id === c.escala_id);
                 const ac = acordos.find((a: any) => a.id === c.acordo_id);
@@ -195,6 +199,11 @@ export function PontoBancoHorasConfigTab() {
                   <TableRow key={c.id}>
                     <TableCell><Badge variant="outline">{tipoLabel(c.tipo)}</Badge></TableCell>
                     <TableCell>{esc?.nome || <span className="text-muted-foreground text-xs">Todas</span>}</TableCell>
+                    <TableCell className="text-center text-xs">
+                      {c.data_inicio
+                        ? String(c.data_inicio).slice(0, 10).split("-").reverse().join("/")
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
                     <TableCell className="text-center">{c.prazo_compensacao_dias}</TableCell>
                     <TableCell className="text-center">{c.limite_acumulo_horas}</TableCell>
                     <TableCell className="text-center text-xs">{ac?.titulo || "—"}</TableCell>
@@ -259,6 +268,23 @@ export function PontoBancoHorasConfigTab() {
                     {acordos.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.titulo}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Data de início (opcional)</Label>
+                <Input
+                  type="date"
+                  value={form.data_inicio || ""}
+                  onChange={e => upd("data_inicio", e.target.value || null)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  O banco só acumula a partir desta data. Antes dela, as horas vão
+                  para a folha. Em branco = vale para todas as competências. Depois
+                  de definir, reapure as competências para aplicar (Banco de Horas →
+                  "Apurar agora" / "Reapurar fechadas").
+                </p>
               </div>
             </div>
 

@@ -11,6 +11,9 @@ import {
   INSTRUMENTOS,
   ESCALA_RESPOSTAS,
   BLOCOS_PSICOSSOCIAL,
+  getMinimoRespostas,
+  isEntrevistaInstrumento,
+  MINIMO_ANONIMATO_PADRAO,
 } from "@/types/psicossocial";
 
 describe("calcularIPSClassificacao (types)", () => {
@@ -157,5 +160,31 @@ describe("BLOCOS_PSICOSSOCIAL", () => {
     const ids = BLOCOS_PSICOSSOCIAL.flatMap(b => b.perguntas.map(p => p.id));
     const unique = new Set(ids);
     expect(unique.size).toBe(ids.length);
+  });
+});
+
+describe("getMinimoRespostas — trava de anonimato por tipo de instrumento", () => {
+  it("questionário exige o mínimo padrão (5 respondentes)", () => {
+    expect(MINIMO_ANONIMATO_PADRAO).toBe(5);
+    expect(getMinimoRespostas({ tipo_instrumento: "questionario" })).toBe(5);
+  });
+
+  it("entrevista guiada e coletiva liberam a partir de 1 resposta", () => {
+    expect(getMinimoRespostas({ tipo_instrumento: "entrevista_guiada" })).toBe(1);
+    expect(getMinimoRespostas({ tipo_instrumento: "entrevista_coletiva" })).toBe(1);
+  });
+
+  it("sem campanha ou tipo desconhecido, aplica o mínimo padrão", () => {
+    expect(getMinimoRespostas(null)).toBe(5);
+    expect(getMinimoRespostas(undefined)).toBe(5);
+    expect(getMinimoRespostas({})).toBe(5);
+  });
+
+  it("isEntrevistaInstrumento reconhece guiada e coletiva, e só elas", () => {
+    expect(isEntrevistaInstrumento("entrevista_guiada")).toBe(true);
+    expect(isEntrevistaInstrumento("entrevista_coletiva")).toBe(true);
+    expect(isEntrevistaInstrumento("questionario")).toBe(false);
+    expect(isEntrevistaInstrumento(null)).toBe(false);
+    expect(isEntrevistaInstrumento(undefined)).toBe(false);
   });
 });

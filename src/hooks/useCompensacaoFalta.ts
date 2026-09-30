@@ -91,25 +91,25 @@ export function useCompensacaoFalta() {
       enabled: !!tenantId && !!competencia,
     });
 
-  /** Faltas da competência (candidatas a compensação). */
+  /**
+   * Faltas da competência candidatas a compensação. Vem da função
+   * ponto_faltas_do_mes, que VALIDA A ESCALA (só dia com jornada prevista — sem
+   * sábado/domingo neutro) e o VÍNCULO (desligado só até a data de desligamento).
+   * Antes lia ponto_diario cru (status='falta'), o que trazia fim de semana e
+   * desligados após a data.
+   */
   const useFaltasDaCompetencia = (competencia: string) =>
     useQuery({
       queryKey: ["ponto-faltas-competencia", tenantId, competencia, empresaAtivaId],
       queryFn: async () => {
         if (!tenantId || !competencia) return [] as any[];
-        let q = fromTable("ponto_diario")
-          .select("data, colaborador_cpf, colaborador_nome, colaborador_id")
-          .eq("tenant_id", tenantId)
-          .eq("status", "falta")
-          .gte("data", `${competencia}-01`)
-          .lte("data", ultimoDiaDoMes(competencia));
-        if (empresaAtivaId) q = q.eq("empresa_id", empresaAtivaId);
-        const { data, error } = (await q.order("data", { ascending: false })) as {
-          data: any[] | null;
-          error: Error | null;
-        };
+        const { data, error } = await (supabase.rpc as any)("ponto_faltas_do_mes", {
+          p_tenant_id: tenantId,
+          p_empresa_id: empresaAtivaId || null,
+          p_competencia: competencia,
+        });
         if (error) throw error;
-        return data || [];
+        return (data || []) as any[];
       },
       enabled: !!tenantId && !!competencia,
     });

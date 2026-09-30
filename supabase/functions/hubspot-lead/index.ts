@@ -59,12 +59,18 @@ async function chamar(token: string, metodo: "PATCH" | "POST", url: string, prop
 }
 
 async function upsert(token: string, email: string, properties: Props) {
-  const urlEmail = `${API}/${encodeURIComponent(email)}?idProperty=email`;
-  let r = await chamar(token, "PATCH", urlEmail, properties);
-  if (r.status === 404) {
-    r = await chamar(token, "POST", API, properties);
-    // Corrida: outro envio criou o contato entre o PATCH e o POST.
-    if (r.status === 409) r = await chamar(token, "PATCH", urlEmail, properties);
+  // Cria primeiro. Se o e-mail já existe, o HubSpot responde 409 com
+  // "Existing ID: <id>" e aí atualiza por ID, sem reenviar o e-mail.
+  // (O PATCH por ?idProperty=email com o próprio email no corpo é recusado
+  // com 400 pelo HubSpot — foi o que travou o primeiro teste em 29/09/2026.)
+  let r = await chamar(token, "POST", API, properties);
+  if (r.status === 409) {
+    const msg = String(r.corpo?.message ?? "");
+    const id = msg.match(/Existing ID:\s*(\d+)/i)?.[1];
+    if (id) {
+      const { email: _e, ...semEmail } = properties;
+      r = await chamar(token, "PATCH", `${API}/${id}`, semEmail);
+    }
   }
   return r;
 }

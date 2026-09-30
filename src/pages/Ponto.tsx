@@ -11,7 +11,7 @@ import {
   History, FileText, Shield, UserCheck, Wallet, BarChart3,
   Bell, Lock, FileDown, Settings, HardDrive, FileSpreadsheet, Scale,
   MapPin, Loader2, Link2, HelpCircle, Search, Paperclip, Eye, Image as ImageIcon, CalendarDays,
-  AlertTriangle, ShieldAlert, ShieldCheck, FolderArchive, ArrowLeftRight, Building2,
+  AlertTriangle, ShieldAlert, ShieldCheck, FolderArchive, ArrowLeftRight, Building2, CalendarX2,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
@@ -66,6 +66,7 @@ import { PontoFeriadosTab } from "@/components/ponto/PontoFeriadosTab";
 import { PontoFeriadoExcecoesTab } from "@/components/ponto/PontoFeriadoExcecoesTab";
 import { PontoAcordosTab } from "@/components/ponto/PontoAcordosTab";
 import { PontoBancoHorasConfigTab } from "@/components/ponto/PontoBancoHorasConfigTab";
+import { PontoCompensacaoFaltaTab } from "@/components/ponto/PontoCompensacaoFaltaTab";
 import { AjustesAprovacaoPlanilha } from "@/components/ponto/AjustesAprovacaoPlanilha";
 import { SolicitarAjusteFolhaInterno } from "@/components/ponto/SolicitarAjusteFolhaInterno";
 import { MarcacaoBadge } from "@/components/ponto/MarcacaoBadge";
@@ -1358,15 +1359,17 @@ const Ponto = () => {
         {/* Apuração */}
         <TabsContent value="apuracao">
           <Tabs value={apuracaoTab} onValueChange={setApuracaoTab} className="w-full">
-            <TabsList className="grid w-full max-w-3xl grid-cols-5 mb-4">
+            <TabsList className="grid w-full max-w-4xl grid-cols-6 mb-4">
               <TabsTrigger value="banco" className="text-xs"><Wallet className="h-3.5 w-3.5 mr-1" />Banco Horas</TabsTrigger>
               <TabsTrigger value="banco_config" className="text-xs"><Settings className="h-3.5 w-3.5 mr-1" />Config BH</TabsTrigger>
+              <TabsTrigger value="compensacao_falta" className="text-xs"><CalendarX2 className="h-3.5 w-3.5 mr-1" />Comp. Faltas</TabsTrigger>
               <TabsTrigger value="fechamento" className="text-xs"><Lock className="h-3.5 w-3.5 mr-1" />Fechamento</TabsTrigger>
               <TabsTrigger value="folha" className="text-xs"><FileSpreadsheet className="h-3.5 w-3.5 mr-1" />Folha</TabsTrigger>
               <TabsTrigger value="relatorios" className="text-xs"><FileDown className="h-3.5 w-3.5 mr-1" />Relatórios</TabsTrigger>
             </TabsList>
             <TabsContent value="banco"><PontoBancoHorasTab /></TabsContent>
             <TabsContent value="banco_config"><PontoBancoHorasConfigTab /></TabsContent>
+            <TabsContent value="compensacao_falta"><PontoCompensacaoFaltaTab /></TabsContent>
             <TabsContent value="fechamento"><PontoFechamentoTab /></TabsContent>
             <TabsContent value="folha"><PontoFolhaTab /></TabsContent>
             <TabsContent value="relatorios"><PontoRelatoriosTab /></TabsContent>

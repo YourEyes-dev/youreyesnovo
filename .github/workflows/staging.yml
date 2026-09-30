@@ -24,7 +24,7 @@ on:
 
 jobs:
   banco:
-    name: Migrations e functions no staging
+    name: Migrations no staging
     runs-on: ubuntu-latest
     # Serializa SÓ o deploy de banco — dois `db push` nunca rodam concorrentes
     # (era o motivo da concorrência) —, sem que o job de testes de tela (`telas`,
@@ -67,19 +67,34 @@ jobs:
         run: |
           supabase link --project-ref "$STAGING_REF"
           supabase db push --include-all
-      - name: Login no ghcr.io (evita rate limit ao baixar a imagem de bundling)
-        # `supabase functions deploy` empacota as functions dentro de um container
-        # ghcr.io/supabase/edge-runtime. O pull ANONIMO dessa imagem estoura o
-        # limite do registro compartilhado dos runners ("toomanyrequests") e
-        # derruba o deploy — foi o que deixou a esteira vermelha por dias, mesmo
-        # com as migrations passando. O pull AUTENTICADO (com o GITHUB_TOKEN que a
-        # esteira ja tem) tem limite muito maior. Nao precisa de packages:read: a
-        # imagem e publica; basta a requisicao ser autenticada.
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+  # O deploy das Edge Functions fica num job SEPARADO, de propósito: ele às
+  # vezes falha por INFRA (o bundling do supabase CLI baixa a imagem
+  # public.ecr.aws/supabase/edge-runtime e estoura o limite anônimo do ECR,
+  # "toomanyrequests: Data limit exceeded"), e essa falha NÃO pode mais bloquear
+  # a publicação do site de teste/homologação — que é um build estático e não
+  # depende das functions. Antes, functions e migrations estavam no mesmo job e
+  # o `site` dependia dele: uma flake de infra no deploy de functions deixava o
+  # site (e a validação na tela) sem publicar. Agora a falha aqui fica VISÍVEL
+  # (job vermelho) sem travar o site.
+  funcoes:
+    name: Reimplantar Edge Functions no staging
+    needs: banco
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      STAGING_REF: bmehdgthciuvdbvutsdv
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.113.0
       - name: Reimplantar Edge Functions
-        # O empacotamento baixa dependências de CDNs públicos que às vezes
-        # falham momentaneamente (522/timeout) — tenta até 3 vezes.
+        # O empacotamento baixa dependências de CDNs públicos e a imagem de
+        # bundling de registros públicos, que às vezes falham momentaneamente
+        # (522/timeout, ou "toomanyrequests" do ECR) — tenta até 3 vezes.
         run: |
+          supabase link --project-ref "$STAGING_REF"
           for i in 1 2 3; do
             if supabase functions deploy --project-ref "$STAGING_REF"; then
               exit 0

@@ -26,6 +26,8 @@ interface AcordoForm {
   documento_url: string;
   observacoes: string;
   ativo: boolean;
+  permite_compensacao_falta: boolean;
+  colaborador_cpf: string;
 }
 
 const defaultForm: AcordoForm = {
@@ -36,6 +38,8 @@ const defaultForm: AcordoForm = {
   documento_url: "",
   observacoes: "",
   ativo: true,
+  permite_compensacao_falta: false,
+  colaborador_cpf: "",
 };
 
 export function PontoAcordosTab() {
@@ -73,6 +77,8 @@ export function PontoAcordosTab() {
       documento_url: a.documento_url || "",
       observacoes: a.observacoes || "",
       ativo: a.ativo ?? true,
+      permite_compensacao_falta: a.permite_compensacao_falta ?? false,
+      colaborador_cpf: a.colaborador_cpf || "",
     });
     setEditId(a.id);
     setOpen(true);
@@ -88,6 +94,7 @@ export function PontoAcordosTab() {
         empresa_id: empresaAtivaId || null,
         vigencia_inicio: form.vigencia_inicio || null,
         vigencia_fim: form.vigencia_fim || null,
+        colaborador_cpf: form.colaborador_cpf ? form.colaborador_cpf.replace(/\D/g, "") : null,
       };
       if (editId) {
         await fromTable("ponto_acordos").update(payload as any).eq("id", editId);
@@ -227,6 +234,37 @@ export function PontoAcordosTab() {
             <div className="space-y-2">
               <Label>Observações</Label>
               <Textarea value={form.observacoes} onChange={e => upd("observacoes", e.target.value)} rows={3} />
+            </div>
+
+            <div className="rounded-md border p-3 space-y-3 bg-muted/30">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="permite_compensacao_falta"
+                  checked={form.permite_compensacao_falta}
+                  onCheckedChange={v => upd("permite_compensacao_falta", v)}
+                />
+                <Label htmlFor="permite_compensacao_falta" className="cursor-pointer">
+                  Autoriza compensação de falta
+                </Label>
+              </div>
+              <p className="text-[11px] text-muted-foreground -mt-1">
+                Permite converter falta injustificada em débito do banco de horas (CLT art. 462). É
+                instituto distinto do acordo de banco — marque só em acordo que preveja essa cláusula.
+              </p>
+              {form.permite_compensacao_falta && (
+                <div className="space-y-2">
+                  <Label>CPF do colaborador (acordo individual)</Label>
+                  <Input
+                    value={form.colaborador_cpf}
+                    onChange={e => upd("colaborador_cpf", e.target.value)}
+                    placeholder="Só dígitos — deixe vazio para valer p/ toda a empresa (coletivo)"
+                  />
+                  <p className="text-[11px] text-muted-foreground -mt-1">
+                    Preenchido: o acordo vale só para este colaborador. Vazio: vale para todos os
+                    vínculos da empresa (use em ACT/CCT).
+                  </p>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

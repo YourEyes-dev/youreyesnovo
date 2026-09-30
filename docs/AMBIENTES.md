@@ -840,6 +840,34 @@ um helper `abrirFiltro` clica o gatilho e, se o portal do Radix não montou (cli
 interceptado pelo overlay do "humor"), dispensa o modal e re-clica antes de afirmar
 que o conteúdo (`[role="listbox"]` / o input de empresa) está visível.
 
+**Nota de flake conhecido (29/09/2026 — corridas #57/#58/#59).** Uma bateria da
+homologação rodada logo após vários merges (site ainda republicando) veio com 14
+falhas em 5 specs; comparando #57×#58×#59 (a suíte roda com `retries: runMode 2`,
+3 tentativas por teste) separou o que era ambiente do que persiste:
+- **Resolvido nesta leva (era teste desatualizado, não bug):**
+  - `aprendizado-papeis.cy.ts` — a aba `value="indicadores"` foi rotulada
+    **"Visão geral"** na tela (`AprendizadoPapeis.tsx`) e o vazio de busca virou
+    "Nenhuma função encontrada"; spec ajustado (títulos dos `it()` inalterados). ✅
+  - `saude-ocupacional.cy.ts` — era o **único spec de interação sem dispensar o
+    modal de humor**; o overlay com scroll-lock derrubava `click`/`clear`. Passou a
+    fechar o humor no `beforeEach` + `clear({force:true})`. ✅
+- **Flake que some sozinho (ambiente/lentidão do site):** `ponto.cy.ts` (4 falhas
+  na #57, 6/6 na #58) e `plano-acao.cy.ts` (verde na #58, 1 falha na #59, `cy.type`).
+  O retry normalmente cobre; não é bug.
+- **Flake do Radix que RESISTE (documentado, não perseguir às cegas):** em
+  `usuarios.cy.ts`, `"o filtro de tipo de usuário abre"` (`Select`→`[role="listbox"]`
+  monta mas não estabiliza `visible`) e `"o filtro por empresa abre"` (`Popover`+
+  `Command`, o input `"Buscar empresa..."` não monta). Falha nas **3 tentativas × 3
+  corridas**, apesar de dois endurecimentos do `abrirFiltro`. **Não** é seletor velho
+  nem tela quebrada: o filtro de **status**, gêmeo do de tipo (mesmo `Select`), passa;
+  os componentes existem e estão corretos (`Usuarios.tsx`). É a interação
+  Select/Popover do Radix que não estabiliza no ambiente da esteira. O print/vídeo da
+  falha (`cypress-evidencias-homologacao`) fica no artefato da corrida, mas **o
+  download do blob é bloqueado pela política de egresso** deste ambiente — o conserto
+  confiável é numa sessão que rode o **Cypress local/interativo** contra a homologação,
+  vendo o Radix ao vivo. Enquanto isso: **flake conhecido**, o retry cobre na maioria
+  das corridas; a suíte de conteúdo/estrutura (os demais 40 specs) fica verde.
+
 ## Testes de tela (Cypress) na homologação
 
 Por padrão a suíte Cypress roda só no **teste** (é lá que a tela nasce, e as duas

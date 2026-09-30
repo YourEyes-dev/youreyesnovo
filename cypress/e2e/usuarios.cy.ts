@@ -52,9 +52,17 @@ describe("Módulo Usuários", () => {
   function abrirFiltro(rotuloTrigger: string, seletorConteudo: string) {
     const trigger = () =>
       cy.contains('[role="combobox"]', rotuloTrigger, { timeout: 20000 });
+    // Garante que o overlay do "humor" não vai engolir o clique.
+    fecharHumorSePresente();
     trigger().should("be.visible").scrollIntoView().click({ force: true });
+    // O trigger do Radix é TOGGLE: re-clicar um menu que já abriu o FECHA (foi o
+    // flake). Só re-clica quando o menu comprovadamente NÃO abriu — nem expandiu
+    // (aria-expanded), nem montou o conteúdo — sinal de que o clique foi
+    // interceptado (overlay do humor). Aí dispensa o humor e clica de novo.
     cy.get("body").then(($b) => {
-      if ($b.find(seletorConteudo).length === 0) {
+      const expandiu = $b.find('[role="combobox"][aria-expanded="true"]').length > 0;
+      const montou = $b.find(seletorConteudo).length > 0;
+      if (!expandiu && !montou) {
         if ($b.text().includes("Como você está hoje")) {
           cy.get("body").type("{esc}", { force: true });
           cy.wait(200);

@@ -6,6 +6,9 @@
 // Visitante SEM login: a raiz do site de teste mostra o site. Cada it()
 // corresponde a um caso documentado (qa_casos_teste, nível e2e) ligado por
 // qa_cobertura_e2e. Casos cobertos: SITE-001, SITE-002, SITE-003.
+// SITE-004 (nada do app logado vai para a Meta) fica sem it(): o Pixel só
+// carrega em produção e o Cypress roda só no teste — coberto por testes
+// unitários (src/test/siteCapturaLead.test.ts) e conferido no Events Manager.
 //
 // Nada sai de verdade: a gravação do lead e as duas funções de servidor
 // (meta-capi, hubspot-lead) são interceptadas e respondidas aqui. O teste

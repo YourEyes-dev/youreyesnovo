@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { capturarRefDaUrl, lerRef } from "@/lib/parceiroRef";
+import { iniciarMetaPixel, pausarMetaPixel } from "@/lib/metaConversions";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Shield, AlertTriangle, CheckCircle, ArrowRight, Clock, 
@@ -79,7 +80,12 @@ const pulseGlow = {
 };
 
 export default function LandingPage() {
-  useEffect(() => { capturarRefDaUrl(); }, []);
+  // Pixel da Meta só no site público (e só em produção); pausa ao sair.
+  useEffect(() => {
+    capturarRefDaUrl();
+    iniciarMetaPixel();
+    return () => pausarMetaPixel();
+  }, []);
   const navigate = useNavigate();
   const [vagasRestantes, setVagasRestantes] = useState(4);
   const [nome, setNome] = useState("");

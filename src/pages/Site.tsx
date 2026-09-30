@@ -7,6 +7,7 @@ import { DiagnosticoPsicossocial } from "@/components/site/DiagnosticoPsicossoci
 import logoLocal from "@/assets/logo-youreyes.svg";
 import { capturarRefDaUrl, lerRef } from "@/lib/parceiroRef";
 import { capturarOrigemDaVisita } from "@/lib/siteOrigem";
+import { iniciarMetaPixel, pausarMetaPixel } from "@/lib/metaConversions";
 import { trackConversion } from "@/lib/metaConversions";
 import mascot from "@/assets/mascot-ye.png.asset.json";
 import {
@@ -242,16 +243,22 @@ export default function Site() {
     // antes que a navegação (âncoras, login) apague a query. O diagnóstico as
     // lê de volta ao gravar o lead.
     capturarOrigemDaVisita();
+    // Pixel da Meta: só aqui no site público (e só em produção). Ao desmontar
+    // — ex.: o visitante faz login na mesma aba e a raiz vira o painel — o
+    // Pixel é pausado e nada do app vai para a Meta.
+    iniciarMetaPixel();
     const ref = capturarRefDaUrl();
-    if (!ref) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).rpc("parceiro_ref_publico", { p_codigo: ref }).then(({ data }: { data: { nome: string; cidade: string | null; uf: string | null } | null }) => { if (data?.nome) setIndicador(data); });
+    if (ref) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).rpc("parceiro_ref_publico", { p_codigo: ref }).then(({ data }: { data: { nome: string; cidade: string | null; uf: string | null } | null }) => { if (data?.nome) setIndicador(data); });
+    }
     // Link "contratar" (#planos): rola até os planos depois que a página monta
     if (window.location.hash === "#planos") setTimeout(() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" }), 400);
     // Tráfego pago (#diagnostico): abre direto na seção do diagnóstico ao carregar.
     // Compara só o alvo do hash (descartando qualquer query string colada junto).
     const alvoHash = window.location.hash.replace(/^#/, "").split("?")[0];
     if (alvoHash === "diagnostico") setTimeout(() => document.getElementById("diagnostico")?.scrollIntoView({ behavior: "smooth" }), 400);
+    return () => pausarMetaPixel();
   }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [loadingPlano, setLoadingPlano] = useState<string | null>(null);

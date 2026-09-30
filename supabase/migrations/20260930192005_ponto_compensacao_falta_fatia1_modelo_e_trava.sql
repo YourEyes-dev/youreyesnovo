@@ -31,6 +31,15 @@ ALTER TABLE public.ponto_acordos
 COMMENT ON COLUMN public.ponto_acordos.permite_compensacao_falta IS
   'Quando true, este acordo (tipicamente individual) autoriza converter falta injustificada em débito do banco de horas (CLT art. 462; compensação de falta é instituto distinto do acordo de banco).';
 
+-- Um acordo INDIVIDUAL é do colaborador; um coletivo (ACT/CCT) vale para a
+-- empresa/categoria. colaborador_cpf preenchido restringe o acordo a essa
+-- pessoa; NULL = vale para todos os vínculos da empresa/tenant.
+ALTER TABLE public.ponto_acordos
+  ADD COLUMN IF NOT EXISTS colaborador_cpf text;
+
+COMMENT ON COLUMN public.ponto_acordos.colaborador_cpf IS
+  'Quando preenchido, restringe o acordo a este colaborador (acordo individual). NULL = coletivo (empresa/tenant).';
+
 -- ---------------------------------------------------------------------
 -- 2) Tabela de solicitação/estado da compensação de falta
 -- ---------------------------------------------------------------------
@@ -46,10 +55,11 @@ CREATE TABLE IF NOT EXISTS public.ponto_compensacao_falta (
   regime_id uuid REFERENCES public.ponto_banco_horas_config(id) ON DELETE SET NULL,
   prazo_compensacao_dias integer,
   prazo_ate date,
-  -- ciclo de vida: pendente_autorizacao -> autorizada -> ciente -> efetivada
+  -- ciclo de vida: pendente_autorizacao -> [pendente_homologacao] -> autorizada
+  --                -> efetivada (na ciência do colaborador)
   --                (ou recusada / cancelada em qualquer ponto antes de efetivar)
   status text NOT NULL DEFAULT 'pendente_autorizacao'
-    CHECK (status IN ('pendente_autorizacao','autorizada','ciente','efetivada','recusada','cancelada')),
+    CHECK (status IN ('pendente_autorizacao','pendente_homologacao','autorizada','efetivada','recusada','cancelada')),
   motivo text,
   -- autorização (D-17: gestor autoriza; RH homologa acima de um limite)
   autorizado_por uuid,
@@ -150,9 +160,13 @@ BEGIN
                     AND COALESCE(ac.ativo,true) = true
                     AND COALESCE(ac.permite_compensacao_falta,false) = true
                     AND (ac.empresa_id IS NULL OR ac.empresa_id = v_empresa)
+                    AND (ac.colaborador_cpf IS NULL
+                         OR regexp_replace(COALESCE(ac.colaborador_cpf,''),'[^0-9]','','g') = v_cpf)
                     AND (ac.vigencia_inicio IS NULL OR ac.vigencia_inicio <= p_data)
                     AND (ac.vigencia_fim IS NULL OR ac.vigencia_fim >= p_data)
-                  ORDER BY (ac.empresa_id IS NOT NULL) DESC, ac.vigencia_inicio DESC NULLS LAST
+                  ORDER BY (ac.colaborador_cpf IS NOT NULL) DESC,
+                           (ac.empresa_id IS NOT NULL) DESC,
+                           ac.vigencia_inicio DESC NULLS LAST
                   LIMIT 1);
   IF v_acordo_id IS NULL THEN
     v_motivos := v_motivos || ARRAY['Não há acordo de compensação de falta vigente e vinculado (CLT art. 462).'];
@@ -339,8 +353,8 @@ BEGIN
     (tenant_id, empresa_id, tipo, prazo_compensacao_dias, forma_compensacao, data_inicio, ativo)
   VALUES (v_t, v_empresa, 'mensal', 90, 'QA-COMPFALTA', v_dia - 30, true);
   INSERT INTO public.ponto_acordos
-    (tenant_id, empresa_id, tipo, titulo, vigencia_inicio, vigencia_fim, permite_compensacao_falta, ativo)
-  VALUES (v_t, v_empresa, 'individual', 'QA Acordo Compensacao Falta', v_dia - 30, v_dia + 300, true, true);
+    (tenant_id, empresa_id, colaborador_cpf, tipo, titulo, vigencia_inicio, vigencia_fim, permite_compensacao_falta, ativo)
+  VALUES (v_t, v_empresa, v_cpf, 'individual', 'QA Acordo Compensacao Falta', v_dia - 30, v_dia + 300, true, true);
 
   v_gate2 := public.ponto_falta_compensavel(v_t, v_cpf, v_dia);
   v_reg   := public.ponto_registrar_compensacao_falta(v_t, v_cpf, v_dia, 'Teste QA');

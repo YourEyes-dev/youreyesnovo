@@ -303,7 +303,7 @@ export function usePsicossocialResultadosGHE(campanhaIds: string[] | undefined) 
           new Set(campanhasGhe.map((c) => c.empresa_id).filter(Boolean) as string[])
         );
         let admQuery = fromTable("admissoes")
-          .select("cargo, departamento, status, empresa_id")
+          .select("cargo, cargo_id, departamento, status, empresa_id")
           .eq("tenant_id", tenantId);
         if (empresaIds.length > 0) {
           admQuery = admQuery.in("empresa_id", empresaIds);
@@ -315,9 +315,18 @@ export function usePsicossocialResultadosGHE(campanhaIds: string[] | undefined) 
           return !s || !["desligado", "demitido", "inativo"].includes(s);
         });
 
-        // pares cargo|depto por GHE
+        // Casamento por cargo_id (robusto) com o nome (cargo|depto) como reforço.
+        // O cargo digitado na admissão diverge do nome do catálogo, então casar
+        // só por texto subestimava os elegíveis — usamos o cargo_id, que é o
+        // vínculo canônico entre admissão e composição do GHE.
+        const cargoIdsPorGhe = new Map<string, Set<string>>();
         const paresPorGhe = new Map<string, Set<string>>();
         for (const gc of gheCargos) {
+          if (gc.cargo_id) {
+            const setId = cargoIdsPorGhe.get(gc.ghe_id) ?? new Set<string>();
+            setId.add(gc.cargo_id);
+            cargoIdsPorGhe.set(gc.ghe_id, setId);
+          }
           const cargo = (gc.cargo_id ? cargoNomeMap.get(gc.cargo_id) : "") || "";
           const dept = (gc.departamento_id ? deptNomeMap.get(gc.departamento_id) : "") || "";
           const key = `${cargo.trim().toLowerCase()}|${dept.trim().toLowerCase()}`;
@@ -326,11 +335,16 @@ export function usePsicossocialResultadosGHE(campanhaIds: string[] | undefined) 
           paresPorGhe.set(gc.ghe_id, set);
         }
         for (const gId of allGheIds) {
+          const cargoIds = cargoIdsPorGhe.get(gId);
           const pares = paresPorGhe.get(gId);
-          if (!pares) { elegiveisPorGhe.set(gId, 0); continue; }
+          if (!cargoIds && !pares) { elegiveisPorGhe.set(gId, 0); continue; }
           const n = ativos.filter((a: any) => {
-            const key = `${(a.cargo || "").trim().toLowerCase()}|${(a.departamento || "").trim().toLowerCase()}`;
-            return pares.has(key);
+            if (cargoIds && a.cargo_id && cargoIds.has(a.cargo_id)) return true;
+            if (pares) {
+              const key = `${(a.cargo || "").trim().toLowerCase()}|${(a.departamento || "").trim().toLowerCase()}`;
+              if (pares.has(key)) return true;
+            }
+            return false;
           }).length;
           elegiveisPorGhe.set(gId, n);
         }

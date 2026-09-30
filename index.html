@@ -21,30 +21,10 @@
   <meta property="og:description" content="Plataforma YourEyes de gestão de pessoas: colaboradores, ponto, férias, EPIs, documentos e inteligência organizacional.">
   <meta name="twitter:description" content="Plataforma YourEyes de gestão de pessoas: colaboradores, ponto, férias, EPIs, documentos e inteligência organizacional.">
 
-  <!-- Meta Pixel — SÓ nos hosts de produção.
-       Fora deles (site de teste no github.io, domínios do Lovable, localhost,
-       pré-visualizações da Vercel) o Pixel não carrega: esses acessos estavam
-       contaminando o dataset da Meta. Sem o Pixel, window.fbq não existe e o
-       rastreamento do app vira no-op (ver src/lib/metaConversions.ts).
-       A mesma lista está em src/lib/siteOrigem.ts (HOSTS_PRODUCAO): mudou
-       aqui, mude lá. O <noscript> foi retirado de propósito: ele não tem como
-       checar o host e dispararia PageView de qualquer lugar. -->
-  <script>
-    (function () {
-      var hostsProducao = ['youreyes.com.br', 'www.youreyes.com.br'];
-      if (hostsProducao.indexOf(String(window.location.hostname).toLowerCase()) === -1) return;
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
-      'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', '1366578955244006');
-      fbq('track', 'PageView');
-    })();
-  </script>
+  <!-- Meta Pixel: NÃO carrega aqui. O index.html serve o SPA inteiro, e o app
+       logado divide o domínio com o site — o Pixel global mandava cliques de
+       telas internas para a Meta. Quem liga o Pixel é o site público, por
+       iniciarMetaPixel() em src/lib/metaConversions.ts (só em produção). -->
 </head>
 
   <body>

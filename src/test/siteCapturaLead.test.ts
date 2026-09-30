@@ -8,7 +8,14 @@ import {
   lerOrigemGuardada,
 } from "@/lib/siteOrigem";
 import { montarCorpoHubspot } from "@/lib/hubspotLead";
-import { montarFbc, trackConversion } from "@/lib/metaConversions";
+import {
+  __reiniciarPixelParaTeste,
+  iniciarMetaPixel,
+  META_PIXEL_ID,
+  montarFbc,
+  pausarMetaPixel,
+  trackConversion,
+} from "@/lib/metaConversions";
 
 const URL_ANUNCIO =
   "https://www.youreyes.com.br/?utm_source=meta&utm_medium=paid&utm_campaign=sst_nr1_teste&utm_content=video1&fbclid=ABC123#diagnostico";
@@ -132,6 +139,7 @@ describe("metaConversions — Pixel e servidor com o mesmo event_id", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     delete window.fbq;
+    __reiniciarPixelParaTeste();
   });
 
   it("sem Pixel (fora da produção) não quebra e ainda chama o servidor", () => {
@@ -144,6 +152,8 @@ describe("metaConversions — Pixel e servidor com o mesmo event_id", () => {
   it("o event_id do Pixel é o mesmo enviado ao servidor", () => {
     const fbq = vi.fn();
     window.fbq = fbq;
+    iniciarMetaPixel("www.youreyes.com.br");
+    fbq.mockClear();
     const id = trackConversion("Lead", { email: "A@B.com.br ", phone: "(46) 99999-0000", url: URL_ANUNCIO });
     expect(fbq).toHaveBeenCalledWith("track", "Lead", {}, { eventID: id });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
@@ -163,6 +173,7 @@ describe("metaConversions — Pixel e servidor com o mesmo event_id", () => {
     window.fbq = () => {
       throw new Error("bloqueado");
     };
+    iniciarMetaPixel("www.youreyes.com.br");
     expect(() => trackConversion("Lead", {})).not.toThrow();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -170,5 +181,63 @@ describe("metaConversions — Pixel e servidor com o mesmo event_id", () => {
   it("sem cookie _fbc, monta o fbc pelo fbclid da chegada", () => {
     capturarOrigemDaVisita(URL_ANUNCIO);
     expect(montarFbc()).toMatch(/^fb\.1\.\d+\.ABC123$/);
+  });
+});
+
+describe("metaConversions — Pixel só no site público", () => {
+  beforeEach(() => {
+    delete window.fbq;
+    delete window._fbq;
+    __reiniciarPixelParaTeste();
+    document.querySelectorAll('script[src*="fbevents"]').forEach((el) => el.remove());
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("{}"))));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete window.fbq;
+    delete window._fbq;
+    __reiniciarPixelParaTeste();
+  });
+
+  it("fora do host de produção não carrega nada", () => {
+    expect(iniciarMetaPixel("youreyes-dev.github.io")).toBe(false);
+    expect(iniciarMetaPixel("seguramente.lovable.app")).toBe(false);
+    expect(iniciarMetaPixel()).toBe(false); // jsdom = localhost
+    expect(window.fbq).toBeUndefined();
+    expect(document.querySelector('script[src*="fbevents"]')).toBeNull();
+  });
+
+  it("em produção: autoConfig desligado ANTES do init, sem PageView de rota, e PageView explícito", () => {
+    expect(iniciarMetaPixel("www.youreyes.com.br")).toBe(true);
+    const fbq = window.fbq!;
+    expect(fbq.disablePushState).toBe(true);
+    const fila = (fbq.queue as unknown[][]).map((a) => Array.from(a));
+    expect(fila).toEqual([
+      ["set", "autoConfig", false, META_PIXEL_ID],
+      ["init", META_PIXEL_ID],
+      ["track", "PageView"],
+    ]);
+    expect(document.querySelectorAll('script[src*="fbevents"]').length).toBe(1);
+  });
+
+  it("depois de sair do site público (ex.: login na mesma aba) nada vai para o Pixel", () => {
+    iniciarMetaPixel("www.youreyes.com.br");
+    pausarMetaPixel();
+    const fbq = window.fbq!;
+    const antes = (fbq.queue as unknown[]).length;
+    trackConversion("Lead", { email: "a@b.com.br" });
+    const fila = (fbq.queue as unknown[][]).map((a) => Array.from(a));
+    expect(fila[antes - 1]).toEqual(["consent", "revoke"]);
+    expect(fila.length).toBe(antes); // nenhum track depois da pausa
+  });
+
+  it("voltar ao site público reativa sem recarregar a biblioteca", () => {
+    iniciarMetaPixel("www.youreyes.com.br");
+    pausarMetaPixel();
+    iniciarMetaPixel("www.youreyes.com.br");
+    const fila = (window.fbq!.queue as unknown[][]).map((a) => Array.from(a));
+    expect(fila.slice(-2)).toEqual([["consent", "grant"], ["track", "PageView"]]);
+    expect(fila.filter((a) => a[0] === "init").length).toBe(1);
+    expect(document.querySelectorAll('script[src*="fbevents"]').length).toBe(1);
   });
 });

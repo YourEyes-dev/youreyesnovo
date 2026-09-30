@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Mic,
   FileText,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -57,7 +58,7 @@ export function EntrevistasManagerModal({ open, onOpenChange, campanhaId, campan
   const gerar = useGerarEntrevista();
   const cancelar = useCancelarEntrevista();
   const excluir = useExcluirEntrevista();
-  const { colaboradores } = useColaboradores();
+  const { colaboradores, cpfsConflitantes } = useColaboradores();
   const { empresaAtiva, empresaAtivaId } = useEmpresaAtiva();
   const { user } = useAuthContext();
   const qc = useQueryClient();
@@ -191,6 +192,34 @@ export function EntrevistasManagerModal({ open, onOpenChange, campanhaId, campan
               : "Gerencie os links gerados para esta campanha."}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Aviso: CPF repetido entre pessoas distintas colapsa a lista de
+            colaboradores (cada CPF gera 1 link). É erro de cadastro. */}
+        {!isColetiva && cpfsConflitantes.length > 0 && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 space-y-1.5">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              Cadastro com CPF repetido
+            </div>
+            <p className="text-xs leading-relaxed">
+              Colaboradores diferentes estão cadastrados com o <strong>mesmo CPF</strong>.
+              O sistema usa o CPF como identidade, então eles são tratados como uma
+              pessoa só — cada CPF repetido gera <strong>apenas 1 link</strong>, e não
+              um por pessoa.
+            </p>
+            <ul className="text-xs list-disc pl-5 space-y-0.5">
+              {cpfsConflitantes.map((c) => (
+                <li key={c.cpf}>
+                  Mesmo CPF: <strong>{c.nomes.join(", ")}</strong>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs leading-relaxed">
+              Corrija o CPF de cada colaborador em <strong>Admissões / Colaboradores</strong>{" "}
+              para que cada um receba o seu próprio link.
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[220px]">

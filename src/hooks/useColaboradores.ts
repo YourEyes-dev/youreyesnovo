@@ -21,6 +21,34 @@ export interface Colaborador {
   inativo?: boolean | null;
 }
 
+/** CPF (só dígitos) que aparece em admissões com nomes DIFERENTES — sinal de
+ *  erro de cadastro: pessoas distintas gravadas com o mesmo CPF. Como o sistema
+ *  usa o CPF como identidade do colaborador, elas colapsam em uma só. */
+export interface CpfConflito {
+  cpf: string;
+  nomes: string[];
+}
+
+/** Detecta CPFs compartilhados por nomes distintos entre as linhas informadas.
+ *  Puro (sem I/O) para ser testável. Ignora CPF vazio e nome vazio. */
+export function detectarCpfsConflitantes(
+  rows: Array<{ cpf?: string | null; nome_completo?: string | null }>
+): CpfConflito[] {
+  const porCpf = new Map<string, Map<string, string>>(); // cpfDigitos -> (nomeLower -> nomeOriginal)
+  for (const r of rows) {
+    const cpf = (r.cpf || "").toString().replace(/\D/g, "");
+    const nome = (r.nome_completo || "").toString().trim();
+    if (!cpf || !nome) continue;
+    const nomes = porCpf.get(cpf) ?? new Map<string, string>();
+    const chave = nome.toLowerCase();
+    if (!nomes.has(chave)) nomes.set(chave, nome);
+    porCpf.set(cpf, nomes);
+  }
+  return Array.from(porCpf.entries())
+    .filter(([, nomes]) => nomes.size >= 2)
+    .map(([cpf, nomes]) => ({ cpf, nomes: Array.from(nomes.values()) }));
+}
+
 interface UseColaboradoresOptions {
   /** Exclui contratos PJ/Pró-labore/Terceiros (usado em módulos exclusivos CLT como Ponto e Férias). */
   excluirPJ?: boolean;
@@ -35,10 +63,10 @@ export function useColaboradores(options: UseColaboradoresOptions = {}) {
   const { tenantId } = useAuth();
   const { empresaAtivaId } = useEmpresaAtiva();
 
-  const { data: colaboradores = [], isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["colaboradores", tenantId, empresaAtivaId, excluirPJ, apenasBatePonto, excluirInativos],
-    queryFn: async (): Promise<Colaborador[]> => {
-      if (!tenantId) return [];
+    queryFn: async (): Promise<{ lista: Colaborador[]; cpfsConflitantes: CpfConflito[] }> => {
+      if (!tenantId) return { lista: [], cpfsConflitantes: [] };
 
       let query = supabase
         .from("admissoes")
@@ -91,14 +119,20 @@ export function useColaboradores(options: UseColaboradoresOptions = {}) {
         (a.nome_completo || "").localeCompare(b.nome_completo || "", "pt-BR", { sensitivity: "base" })
       );
 
+      // Detecta CPFs repetidos com nomes distintos sobre as MESMAS linhas
+      // filtradas (antes da dedup) — é o que colapsa a lista de colaboradores.
+      const cpfsConflitantes = detectarCpfsConflitantes(rows);
+
       // Remove campo auxiliar para manter o tipo público estável.
-      return deduped.map(({ tipo_contrato, ...rest }: any) => rest);
+      const lista = deduped.map(({ tipo_contrato, ...rest }: any) => rest) as Colaborador[];
+      return { lista, cpfsConflitantes };
     },
     enabled: !!tenantId,
   });
 
   return {
-    colaboradores,
+    colaboradores: data?.lista ?? [],
+    cpfsConflitantes: data?.cpfsConflitantes ?? [],
     isLoading,
     error: error?.message || null,
     refetch,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { trackConversion } from "@/lib/metaConversions";
 import { enviarLeadHubspot } from "@/lib/hubspotLead";
 import { capturarOrigemDaVisita } from "@/lib/siteOrigem";
+import { funilDiagnostico } from "@/lib/funilDiagnostico";
 import {
   ArrowRight,
   ArrowLeft,
@@ -264,6 +265,32 @@ export function DiagnosticoPsicossocial() {
   const [telefone, setTelefone] = useState("");
 
   const avancar = () => setPasso((p) => Math.min(passoContato, p + 1));
+
+  // Funil (Pixel, só no site público em produção; uma vez por etapa por
+  // sessão; só o NÚMERO da etapa, nunca a resposta). Ver funilDiagnostico.ts.
+  const concluirEtapa = (passoAtual: number) => {
+    if (passoAtual === 0) funilDiagnostico.iniciado();
+    funilDiagnostico.etapa(passoAtual + 1, totalPassos);
+    if (passoAtual + 1 === passoContato) funilDiagnostico.contato();
+  };
+
+  // ViewContent: a seção do diagnóstico apareceu na tela (1ª vez na sessão).
+  const raizRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = raizRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver(
+      (entradas) => {
+        if (entradas.some((e) => e.isIntersecting)) {
+          funilDiagnostico.visivel();
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.3 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
   const voltar = () => setPasso((p) => Math.max(0, p - 1));
 
   const enviar = async () => {
@@ -292,6 +319,9 @@ export function DiagnosticoPsicossocial() {
       toast.error("Algum campo está longo demais.", { description: "Reduza nome, empresa ou cargo." });
       return;
     }
+
+    // Última etapa do funil: contato preenchido e válido, envio disparado.
+    funilDiagnostico.etapa(totalPassos, totalPassos);
 
     const diag = calcular(respostas);
     // Origem da campanha (UTMs da primeira visita desta sessão). Vai junto do
@@ -558,6 +588,7 @@ export function DiagnosticoPsicossocial() {
             porte,
             (v) => {
               setPorte(v);
+              concluirEtapa(passo);
               avancar();
             },
             2,
@@ -578,6 +609,7 @@ export function DiagnosticoPsicossocial() {
             setor,
             (v) => {
               setSetor(v);
+              concluirEtapa(passo);
               avancar();
             },
             2,
@@ -600,6 +632,7 @@ export function DiagnosticoPsicossocial() {
             respostas[p.id] ?? "",
             (v) => {
               setRespostas((r) => ({ ...r, [p.id]: v as RespKey }));
+              concluirEtapa(passo);
               avancar();
             },
             1,
@@ -667,7 +700,7 @@ export function DiagnosticoPsicossocial() {
   };
 
   return (
-    <div className="border border-white/10 rounded-lg bg-white/[0.04] backdrop-blur p-6 md:p-8">
+    <div ref={raizRef} className="border border-white/10 rounded-lg bg-white/[0.04] backdrop-blur p-6 md:p-8">
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">

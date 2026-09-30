@@ -43,7 +43,7 @@ const PORTE_NUMERO: Record<string, number> = {
   "500_mais": 500,
 };
 
-const NATIVAS = new Set(["email", "firstname", "lastname", "company", "jobtitle", "phone", "numberofemployees"]);
+const NATIVAS = new Set(["email", "firstname", "lastname", "company", "jobtitle", "phone"]);
 
 type Props = Record<string, string>;
 
@@ -115,8 +115,10 @@ Deno.serve(async (req) => {
   if (cargo) props.jobtitle = cargo;
   const tel = telefoneE164(c.telefone);
   if (tel) props.phone = `+${tel}`;
+  // `numberofemployees` NÃO existe no CONTATO deste portal (só na empresa):
+  // mandá-lo fazia o HubSpot recusar o contato inteiro com 400 (staging,
+  // 29/09/2026). O porte fica no log até o contato ganhar empresa associada.
   const porte = PORTE_NUMERO[texto(c.porte, 20)];
-  if (porte) props.numberofemployees = String(porte);
 
   props.ye_sinal_intencao = sinal;
   const score = Number(c.score);
@@ -146,7 +148,7 @@ Deno.serve(async (req) => {
     }
     console.log(
       `[hubspot-lead] contato ${String(r.corpo?.id ?? "?")} gravado (@${dominioEmail(email)}) ` +
-        `angulo=${props.ye_angulo_dor ?? "-"} score=${props.ye_diagnostico_score ?? "-"} soNativas=${soNativas}`,
+        `angulo=${props.ye_angulo_dor ?? "-"} porte=${porte ?? "-"} score=${props.ye_diagnostico_score ?? "-"} soNativas=${soNativas}`,
     );
     return json(req, { enviado: true, contato_id: r.corpo?.id ?? null, so_nativas: soNativas });
   } catch (e) {

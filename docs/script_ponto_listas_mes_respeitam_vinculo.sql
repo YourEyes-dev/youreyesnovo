@@ -15,10 +15,10 @@
 --      (só dia com jornada prevista) e vínculo.
 --
 -- SEGURANÇA: só cria/substitui FUNÇÃO (não cria tabela, não altera/apaga dado).
--- Idempotente (CREATE OR REPLACE; os patches C/D só aplicam se ainda não
--- estiverem aplicados). Termina com conferência.
+-- Idempotente. Os patches C/D localizam a função pelo NOME (qualquer assinatura)
+-- e, se a âncora não bater (versão diferente do ambiente), apenas AVISAM e
+-- seguem — nunca abortam o script. Termina com conferência.
 -- ============================================================================
-
 
 -- ---------------------------------------------------------------------
 -- A) Regra única de vínculo ativo num período
@@ -35,10 +35,6 @@ STABLE
 SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
-  -- true quando: (a) o CPF não tem admissão efetivada registrada (não filtramos
-  -- quem não tem cadastro — salvaguarda do [vinculo-corte]); ou (b) existe uma
-  -- admissão efetivada cujo intervalo [data_admissao, data_desligamento|infinito]
-  -- cruza [p_ini, p_fim].
   SELECT
     NOT EXISTS (
       SELECT 1 FROM public.admissoes a
@@ -96,35 +92,41 @@ END;
 $todos$;
 
 -- ---------------------------------------------------------------------
--- C) Fechamento: ponto_espelho_resumo_empresa filtra por vínculo (patch)
+-- C) Fechamento: ponto_espelho_resumo_empresa filtra por vínculo
+--    Localiza a função pelo NOME (qualquer assinatura); se a âncora não bater,
+--    apenas avisa e segue.
 -- ---------------------------------------------------------------------
 DO $patchC$
 DECLARE
-  v_src text; v_novo text;
+  r record; v_src text; v_done boolean := false; v_achou_ancora boolean := false;
   v_alvo text := E'      AND COALESCE(pd.colaborador_cpf, \'\') <> \'\'';
   v_troca text := E'      AND COALESCE(pd.colaborador_cpf, \'\') <> \'\'\n'
-    || E'      -- [lista-respeita-vinculo] não traz desligado após a data\n'
-    || E'      AND public.ponto_vinculo_cobre_periodo(p_tenant_id, regexp_replace(pd.colaborador_cpf, \'[^0-9]\', \'\', \'g\'), v_ini, v_fim)';
+    || E'      AND public.ponto_vinculo_cobre_periodo(p_tenant_id, regexp_replace(pd.colaborador_cpf, \'[^0-9]\', \'\', \'g\'), v_ini, v_fim) /* [lista-respeita-vinculo] */';
 BEGIN
-  v_src := pg_get_functiondef('public.ponto_espelho_resumo_empresa(uuid,uuid,text)'::regprocedure);
-  IF position('[lista-respeita-vinculo]' IN v_src) > 0 THEN
-    RAISE NOTICE 'ponto_espelho_resumo_empresa ja filtra por vinculo — nada a fazer.'; RETURN;
+  FOR r IN
+    SELECT p.oid FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public' AND p.proname='ponto_espelho_resumo_empresa'
+  LOOP
+    v_src := pg_get_functiondef(r.oid);
+    IF position('[lista-respeita-vinculo]' IN v_src) > 0 THEN v_done := true; CONTINUE; END IF;
+    IF position(v_alvo IN v_src) = 0 THEN CONTINUE; END IF;
+    EXECUTE replace(v_src, v_alvo, v_troca);
+    v_done := true; v_achou_ancora := true;
+    RAISE NOTICE 'ponto_espelho_resumo_empresa: lista do mes passa a respeitar o vinculo.';
+  END LOOP;
+  IF NOT v_done THEN
+    RAISE NOTICE 'ATENCAO: ponto_espelho_resumo_empresa nao encontrada ou ancora ausente (versao diferente) — Fechamento NAO alterado; revisar.';
   END IF;
-  IF position(v_alvo IN v_src) = 0 THEN
-    RAISE NOTICE 'ATENCAO: ancora do loop de cpf em ponto_espelho_resumo_empresa nao encontrada; NADA alterado.'; RETURN;
-  END IF;
-  v_novo := replace(v_src, v_alvo, v_troca);
-  EXECUTE v_novo;
-  RAISE NOTICE 'ponto_espelho_resumo_empresa: lista do mes passa a respeitar o vinculo.';
 END;
 $patchC$;
 
 -- ---------------------------------------------------------------------
--- D) Banco: ponto_banco_horas_oficial filtra por vínculo (patch, 2 ramos)
+-- D) Banco: ponto_banco_horas_oficial filtra por vínculo (2 ramos)
+--    Idem C: por nome, tolerante a assinatura/versão.
 -- ---------------------------------------------------------------------
 DO $patchD$
 DECLARE
-  v_src text; v_novo text; v_ok boolean := true;
+  r record; v_src text; v_novo text; v_done boolean := false;
   v_alvo_b text := E'      AND (v_so_cpf IS NULL\n           OR regexp_replace(COALESCE(b.colaborador_cpf, \'\'), \'[^0-9]\', \'\', \'g\') = v_so_cpf)';
   v_troca_b text := E'      AND (v_so_cpf IS NULL\n           OR regexp_replace(COALESCE(b.colaborador_cpf, \'\'), \'[^0-9]\', \'\', \'g\') = v_so_cpf)\n'
     || E'      AND public.ponto_vinculo_cobre_periodo(p_tenant_id, regexp_replace(COALESCE(b.colaborador_cpf, \'\'), \'[^0-9]\', \'\', \'g\'), v_ini, v_fim) /* [lista-respeita-vinculo] */';
@@ -132,17 +134,22 @@ DECLARE
   v_troca_d text := E'        AND (v_so_cpf IS NULL\n             OR regexp_replace(COALESCE(pd.colaborador_cpf, \'\'), \'[^0-9]\', \'\', \'g\') = v_so_cpf)\n'
     || E'        AND public.ponto_vinculo_cobre_periodo(p_tenant_id, regexp_replace(COALESCE(pd.colaborador_cpf, \'\'), \'[^0-9]\', \'\', \'g\'), v_ini, v_fim) /* [lista-respeita-vinculo] */';
 BEGIN
-  v_src := pg_get_functiondef('public.ponto_banco_horas_oficial(uuid,text,uuid,text)'::regprocedure);
-  IF position('[lista-respeita-vinculo]' IN v_src) > 0 THEN
-    RAISE NOTICE 'ponto_banco_horas_oficial ja filtra por vinculo — nada a fazer.'; RETURN;
+  FOR r IN
+    SELECT p.oid FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public' AND p.proname='ponto_banco_horas_oficial'
+  LOOP
+    v_src := pg_get_functiondef(r.oid);
+    IF position('[lista-respeita-vinculo]' IN v_src) > 0 THEN v_done := true; CONTINUE; END IF;
+    IF position(v_alvo_b IN v_src) = 0 OR position(v_alvo_d IN v_src) = 0 THEN CONTINUE; END IF;
+    v_novo := replace(v_src, v_alvo_b, v_troca_b);
+    v_novo := replace(v_novo, v_alvo_d, v_troca_d);
+    EXECUTE v_novo;
+    v_done := true;
+    RAISE NOTICE 'ponto_banco_horas_oficial: lista do mes passa a respeitar o vinculo.';
+  END LOOP;
+  IF NOT v_done THEN
+    RAISE NOTICE 'AVISO: ponto_banco_horas_oficial nao alterada (versao diferente ou ancora ausente). O Banco ja esconde desligados no cliente; sem impacto no bug relatado.';
   END IF;
-  IF position(v_alvo_b IN v_src) = 0 OR position(v_alvo_d IN v_src) = 0 THEN
-    RAISE NOTICE 'ATENCAO: ancora(s) em ponto_banco_horas_oficial nao encontrada(s); NADA alterado.'; RETURN;
-  END IF;
-  v_novo := replace(v_src, v_alvo_b, v_troca_b);
-  v_novo := replace(v_novo, v_alvo_d, v_troca_d);
-  EXECUTE v_novo;
-  RAISE NOTICE 'ponto_banco_horas_oficial: lista do mes passa a respeitar o vinculo.';
 END;
 $patchD$;
 
@@ -202,10 +209,18 @@ COMMENT ON FUNCTION public.ponto_faltas_do_mes(uuid, uuid, text) IS
 REVOKE ALL ON FUNCTION public.ponto_faltas_do_mes(uuid, uuid, text) FROM anon;
 GRANT EXECUTE ON FUNCTION public.ponto_faltas_do_mes(uuid, uuid, text) TO authenticated;
 
--- Conferência (o editor mostra só o último resultado): tudo no lugar? (espera t)
+-- Conferência (o editor mostra só o último resultado): tudo no lugar? (espera t;
+-- banco_ok pode vir f se este ambiente tem uma versão antiga da função de banco —
+-- sem impacto no bug relatado, ver AVISO acima).
 SELECT
   to_regprocedure('public.ponto_vinculo_cobre_periodo(uuid,text,date,date)') IS NOT NULL AS regra_vinculo_ok,
   to_regprocedure('public.ponto_faltas_do_mes(uuid,uuid,text)') IS NOT NULL AS faltas_do_mes_ok,
-  position('[lista-respeita-vinculo]' IN pg_get_functiondef('public.ponto_espelho_resumo_empresa(uuid,uuid,text)'::regprocedure)) > 0 AS fechamento_ok,
-  position('[lista-respeita-vinculo]' IN pg_get_functiondef('public.ponto_banco_horas_oficial(uuid,text,uuid,text)'::regprocedure)) > 0 AS banco_ok,
-  position('[lista-respeita-vinculo]' IN pg_get_functiondef('public.consolidar_ponto_dia_todos(uuid,date)'::regprocedure)) > 0 AS materializacao_ok;
+  EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+          WHERE n.nspname='public' AND p.proname='ponto_espelho_resumo_empresa'
+            AND position('[lista-respeita-vinculo]' IN pg_get_functiondef(p.oid))>0) AS fechamento_ok,
+  EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+          WHERE n.nspname='public' AND p.proname='ponto_banco_horas_oficial'
+            AND position('[lista-respeita-vinculo]' IN pg_get_functiondef(p.oid))>0) AS banco_ok,
+  EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+          WHERE n.nspname='public' AND p.proname='consolidar_ponto_dia_todos'
+            AND position('[lista-respeita-vinculo]' IN pg_get_functiondef(p.oid))>0) AS materializacao_ok;

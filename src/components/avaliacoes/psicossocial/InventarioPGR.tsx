@@ -2,7 +2,6 @@ import { useMemo, useState, useEffect } from "react";
 import { isEntrevistaInstrumento } from "@/types/psicossocial";
 import {
   FileText,
-  Download,
   AlertTriangle,
   ShieldAlert,
   Info,
@@ -16,17 +15,25 @@ import {
   Filter,
   Users,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RelatorioModal } from "./RelatorioModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { CampanhaPsicossocial, RadarDimensao } from "@/types/psicossocial";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { useGRORiscos } from "@/hooks/useGRORiscos";
 import { resolverSituacoesTrabalho } from "@/utils/situacoesCampanha";
 import { usePsicossocialResultadosGHE } from "@/hooks/usePsicossocialResultadosGHE";
@@ -55,7 +62,6 @@ import {
 } from "@/data/catalogoRiscosPsicossociais";
 import { ExplicacaoPGRGRO } from "./ExplicacaoPGRGRO";
 import { EvidenciasEntrevistaPanel } from "./EvidenciasEntrevistaPanel";
-import { AcaoProtegida } from "@/components/shared/AcaoProtegida";
 
 interface InventarioPGRProps {
   campanhas: CampanhaPsicossocial[];
@@ -113,9 +119,18 @@ interface InventarioItem {
 }
 
 export function InventarioPGR({ campanhas }: InventarioPGRProps) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
-  const [exportando, setExportando] = useState(false);
   const [relatorioOpen, setRelatorioOpen] = useState(false);
+  // Confirmação detalhada e rastreável do envio ao GRO (item 4).
+  const [confirmGRO, setConfirmGRO] = useState<{
+    criados: number;
+    duplicados: number;
+    semRisco: boolean;
+    campanhaNome: string;
+    dimensoes: string[];
+    situacoes: { setorNome: string; funcaoNome: string }[];
+  } | null>(null);
   const { data: sevCatalogo } = useSeveridadesCatalogo();
   // Campanhas válidas (mín. anonimato para questionário, 1 para entrevista guiada)
   const campanhasValidas = useMemo(() =>
@@ -325,105 +340,32 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
       return;
     }
 
-    await importarDaCampanha.mutateAsync({
+    const isSiproCampanha = campanha.instrumento === 'sipro';
+    const dimensoes = radar.map(d => ({ subject: d.subject, value: d.value }));
+    // Mesmas dimensões que o hook transforma em risco GRO (score de risco ≥ 35),
+    // para mostrar ao gestor exatamente o que foi enviado.
+    const dimensoesCriticas = dimensoes
+      .filter(d => (isSiproCampanha ? d.value : 100 - d.value) >= 35)
+      .map(d => d.subject);
+
+    const res = await importarDaCampanha.mutateAsync({
       campanhaId: campanha.id,
       campanhaName: campanha.nome,
-      dimensoes: radar.map(d => ({ subject: d.subject, value: d.value })),
+      dimensoes,
       empresaId: null,
-      isSipro: campanha.instrumento === 'sipro',
+      isSipro: isSiproCampanha,
       situacoes,
     });
-  };
 
-  const handleExportarPDF = async () => {
-    if (inventario.length === 0) return;
-    setExportando(true);
-    try {
-      const doc = new jsPDF({ orientation: "landscape" });
-
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("INVENTÁRIO DE RISCOS PSICOSSOCIAIS — NR-01 / ISO 45003", 14, 18);
-
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        `Gerado em: ${new Date().toLocaleDateString("pt-BR")} | Campanhas: ${campanhasValidas.length} | Dados: Reais (radar agregado)`,
-        14, 26
-      );
-      doc.text(
-        `Instrumento: ${isSipro ? 'SIPRO' : (campanhasValidas[0]?.instrumento?.toUpperCase() ?? 'N/A')} | Score alto = maior risco`,
-        14, 32
-      );
-
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.text("1. INVENTÁRIO DE FATORES PSICOSSOCIAIS DE RISCO", 14, 42);
-
-      autoTable(doc, {
-        startY: 46,
-        head: [["Fator de Risco", "Dimensões do Instrumento", "Base Normativa", "Score Real", "Probabilidade", "Severidade", "Grau de Risco"]],
-        body: inventario.map(item => [
-          item.fator,
-          item.dimensoes.join(" • "),
-          item.norma,
-          `${item.scoreReal}%`,
-          item.probabilidadeLabel,
-          item.severidadeLabel,
-          item.nivelLabel,
-        ]),
-
-        headStyles: { fillColor: [88, 28, 135], textColor: 255, fontSize: 8 },
-        bodyStyles: { fontSize: 8 },
-        columnStyles: {
-          0: { cellWidth: 38 },
-          1: { cellWidth: 55 },
-          2: { cellWidth: 35 },
-          3: { cellWidth: 20 },
-          4: { cellWidth: 28 },
-          5: { cellWidth: 25 },
-          6: { cellWidth: 35 },
-        },
-        alternateRowStyles: { fillColor: [248, 245, 255] },
-        didParseCell: (data) => {
-          if (data.section === "body" && data.column.index === 6) {
-            const val = data.cell.raw as string;
-            if (val.includes("Crítico")) data.cell.styles.textColor = [185, 28, 28];
-            else if (val.includes("Alto")) data.cell.styles.textColor = [194, 65, 12];
-            else if (val.includes("Médio")) data.cell.styles.textColor = [180, 83, 9];
-            else data.cell.styles.textColor = [5, 122, 85];
-          }
-        },
-      });
-
-      const finalY = (doc as any).lastAutoTable.finalY + 10;
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.text("2. MATRIZ DE RISCO PSICOSSOCIAL (NR-01)", 14, finalY);
-
-      autoTable(doc, {
-        startY: finalY + 4,
-        head: [["Grau de Risco", "Qtde. de Dimensões", "Ação Recomendada", "Prazo"]],
-        body: [
-          ["Risco Crítico", String(criticos), "Intervenção imediata — revisão do PGR e plano de ação", "30 dias"],
-          ["Risco Alto", String(altos), "Implementar medidas preventivas prioritárias", "60 dias"],
-          ["Risco Médio", String(medios), "Monitoramento e ações de melhoria contínua", "90 dias"],
-          ["Risco Baixo", String(baixos), "Manter vigilância e registrar evidências", "180 dias"],
-          ["Risco Trivial", String(triviais), "Risco desprezível — manter registro documental", "—"],
-        ],
-        headStyles: { fillColor: [88, 28, 135], textColor: 255, fontSize: 8 },
-        bodyStyles: { fontSize: 8 },
-        alternateRowStyles: { fillColor: [248, 245, 255] },
-      });
-
-      doc.save(`Inventario_Riscos_Psicossociais_${new Date().toLocaleDateString("pt-BR").replace(/\//g, "-")}.pdf`);
-      toast.success("Inventário de Riscos exportado com sucesso!");
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao exportar PDF.");
-    } finally {
-      setExportando(false);
-    }
+    // Confirmação rastreável: o que foi enviado e para onde (item 4).
+    setConfirmGRO({
+      criados: res.criados,
+      duplicados: res.duplicados,
+      semRisco: res.semRisco,
+      campanhaNome: campanha.nome,
+      dimensoes: dimensoesCriticas,
+      situacoes: (situacoes ?? []).map(s => ({ setorNome: s.setorNome, funcaoNome: s.funcaoNome })),
+    });
   };
 
   const idsEntrevistaFallback = campanhas.filter((c: any) =>isEntrevistaInstrumento(c.tipo_instrumento)).map(c => c.id);
@@ -575,12 +517,6 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
               Enviar ao GRO
               {semEscopoGRO && <AlertTriangle className="h-3 w-3 text-amber-500" />}
             </Button>
-            <AcaoProtegida modulo="psicossocial" acao="exportar">
-              <Button variant="outline" size="sm" className="gap-2" onClick={handleExportarPDF} disabled={exportando}>
-                {exportando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                Exportar PDF
-              </Button>
-            </AcaoProtegida>
           </div>
         </div>
       </CardHeader>
@@ -781,6 +717,98 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
         campanhaIdInicial={filtroCampanha === "todos" ? undefined : filtroCampanha}
       />
       </Card>
+
+      {/* Item 4: confirmação rastreável do envio ao GRO */}
+      <Dialog open={confirmGRO !== null} onOpenChange={aberto => { if (!aberto) setConfirmGRO(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-emerald-600" />
+              {confirmGRO && confirmGRO.criados > 0
+                ? "Riscos enviados ao GRO"
+                : confirmGRO && confirmGRO.duplicados > 0
+                  ? "Riscos já constavam no GRO"
+                  : "Nada foi enviado ao GRO"}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmGRO && confirmGRO.criados > 0 ? (
+                <>Da campanha <strong>{confirmGRO.campanhaNome}</strong> para o Inventário GRO (módulo Ergonomia).</>
+              ) : confirmGRO && confirmGRO.duplicados > 0 ? (
+                <>Os {confirmGRO.duplicados} risco(s) desta campanha (<strong>{confirmGRO.campanhaNome}</strong>) já estavam no GRO — nada novo foi criado. O reenvio não duplica registros.</>
+              ) : (
+                <>Nenhuma dimensão da campanha <strong>{confirmGRO?.campanhaNome}</strong> atingiu o limiar de risco (score ≥ 35), então nenhum risco foi criado no GRO.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {confirmGRO && confirmGRO.criados > 0 && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Riscos criados</span>
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                    {confirmGRO.criados}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Base normativa</span>
+                  <span className="text-xs font-medium">NR-01 · NR-17 · ISO 45003</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Situação no GRO</span>
+                  <span className="text-xs font-medium">Identificado</span>
+                </div>
+              </div>
+
+              {confirmGRO.dimensoes.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                    Dimensões de risco enviadas ({confirmGRO.dimensoes.length})
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {confirmGRO.dimensoes.map(d => (
+                      <Badge key={d} variant="outline" className="text-[10px]">{d}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {confirmGRO.situacoes.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                    Situações de trabalho ({confirmGRO.situacoes.length})
+                  </p>
+                  <ul className="space-y-0.5 text-xs text-muted-foreground">
+                    {confirmGRO.situacoes.map((s, i) => (
+                      <li key={`${s.setorNome}-${s.funcaoNome}-${i}`}>
+                        • {s.funcaoNome} <span className="opacity-70">({s.setorNome})</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    Cada dimensão de risco gera 1 registro por situação de trabalho. Registros novos criados agora: {confirmGRO.criados}.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setConfirmGRO(null)}>
+              Fechar
+            </Button>
+            {confirmGRO && (confirmGRO.criados > 0 || confirmGRO.duplicados > 0) && (
+              <Button
+                className="gap-2"
+                onClick={() => { setConfirmGRO(null); navigate("/ergonomia"); }}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Ver no GRO
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

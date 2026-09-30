@@ -949,6 +949,10 @@ Secrets **não** são copiados entre projetos. Configure em `Project Settings > 
 | `WHATSAPI_BASE_URL` / `WHATSAPI_TOKEN` | OTP e ponto via WhatsApp |
 | `MERCADOPAGO_ACCESS_TOKEN` | Cobrança/assinaturas |
 | `CONSULTACRM_KEY` | Consulta de conselhos profissionais |
+| `META_CAPI_ACCESS_TOKEN` / `META_PIXEL_ID` | Função `meta-capi`: envia o Lead do site pela Conversions API da Meta (mesmo `event_id` do Pixel). Sem os dois, a função não envia nada e registra o motivo no log. Token: Events Manager → conjunto de dados → Configurações → "Gerar token de acesso". |
+| `META_TEST_EVENT_CODE` | Opcional. Código `TEST...` do Events Manager → Eventos de teste: com ele os eventos do servidor só aparecem na aba de teste. Apague depois de validar. |
+| `HUBSPOT_PRIVATE_APP_TOKEN` | Função `hubspot-lead`: cria/atualiza o contato do diagnóstico do site no HubSpot (Private App com `crm.objects.contacts.read` e `.write`). Sem ele, a função não envia nada. |
+| `SITE_HOSTS_PERMITIDOS` | Opcional. Hosts de onde `meta-capi` e `hubspot-lead` aceitam chamada (separados por vírgula). Padrão: `youreyes.com.br,www.youreyes.com.br`. No projeto de TESTE, use `youreyes-dev.github.io` só enquanto valida (junto com `META_TEST_EVENT_CODE`). |
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` são injetados automaticamente pela plataforma.
 

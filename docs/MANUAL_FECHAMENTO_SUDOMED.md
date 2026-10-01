@@ -15,15 +15,54 @@
 
 ## PARTE 0 — Entenda a situação antes de mexer
 
-### 0.1 O que já existe e o que falta
-Para ver, **sem risco**, o estado atual das 3 empresas (escalas, acordos, regime
-de banco, CCT, fechamentos e zeragens já feitas), rode o relatório de conferência
-`docs/script_sudomed_raiox_ponto.sql` no **SQL Editor** do projeto. Ele **só lê**,
-não altera nada. O resultado vem em seções numeradas. Onde aparecer
-"(nenhum … a configurar)", é um item deste manual ainda pendente.
+### 0.1 Situação atual da Sudomed (retrato do sistema)
+Este é o estado real das 3 empresas hoje, lido pelo relatório de conferência
+`docs/script_sudomed_raiox_ponto.sql` (ele **só lê**, não altera nada; rode-o de
+novo no **SQL Editor** sempre que quiser reconferir).
 
-Pelo que você descreveu, hoje faltam configurar: **a CCT**, os **acordos
-individuais** e o **regime de banco de horas**. As escalas já existem (algumas).
+**Empresas e pessoas (ponto ativo nas 3):**
+
+| Empresa | CNPJ | Colaboradores ativos |
+|---|---|---|
+| Barros & Nuernberg Engenharia Ltda | 26.114.701/0001-45 | 11 |
+| Sudoclin Medicina Ocupacional Ltda | 31.219.374/0001-26 | 2 |
+| Nuernberg & Barros Ltda | 41.085.456/0001-89 | 3 |
+| **Total** | | **16** |
+
+**O que já está certo** ✔
+- As 3 empresas estão com **controle de ponto ativo**.
+- As **escalas já existem** (8 no total) e o mecanismo do **sábado variável**
+  ("Equalização mensal") **já está ligado** nas escalas principais — ex.: a
+  *Escala Padrão* (10 pessoas) e a *Escala Semanal com Sábado Mês*. Isso está
+  **correto** para o caso de vocês.
+- Já existe um **regime de banco de horas ATIVO** com **prazo de 180 dias**
+  (= semestral) ✔.
+- **Junho e julho/2026 já foram fechados** nas 3 empresas.
+
+**O que falta ou precisa de atenção** ⚠ (a lista de tarefas deste manual)
+1. **Nenhum acordo individual cadastrado** (seção 4 do Raio-X vazia). É o Passo 6.
+2. **Nenhuma CCT cadastrada** (seção 6 vazia). É o Passo 5.
+3. **O regime de banco está como tipo "mensal" e NÃO exige acordo individual**
+   (nem tem acordo vinculado). Como vocês trabalham com **acordo individual**,
+   isso precisa ser ajustado — **mas na ordem certa** (veja o aviso no Passo 7):
+   primeiro cadastre TODOS os acordos, só depois ligue "Exige acordo individual".
+4. **Agosto e setembro/2026 ainda NÃO foram fechados.** Como já estamos em
+   outubro, **fechar agosto e setembro é a tarefa mais urgente** (Parte 2).
+5. **Arrumar as escalas** (detalhe em 0.4) — há nome duplicado, uma escala sem
+   ninguém e escalas nomeadas com nome de pessoa.
+
+### 0.4 Observações sobre as escalas (pequena faxina recomendada)
+- Existem **duas escalas com o mesmo nome** ("Escala Semanal com Sábado Mês"),
+  com configurações diferentes (uma com sábado útil, 4 pessoas; outra com sábado
+  folga, 1 pessoa). **Renomeie uma** para não confundir na hora de atribuir.
+- Há **1 escala sem nenhuma pessoa** atribuída. Reveja se ainda é necessária; se
+  não, **inative** (não precisa excluir).
+- Há **escalas nomeadas com nome de pessoa** (uso individual). Sugiro **renomear**
+  para algo descritivo (ex.: "Administrativo 44h", "Meio período 20h"), para o
+  cadastro ficar claro para quem vier depois.
+- As atribuições de escala somam **mais pessoas que o total de ativos** — sinal de
+  **atribuições antigas** ainda ligadas. Ao atribuir uma nova escala a alguém,
+  marque **"Substituir escala atual"** para não deixar duas ligadas.
 
 ### 0.2 Três conceitos que confundem (leia com calma)
 1. **Escala** = o horário de trabalho da pessoa (que dias, que horas, se tem
@@ -115,6 +154,13 @@ Você tem três situações. Configure assim:
   **"Compensações Mensais"** (posição fixa tipo "3º sábado") — ele só serve
   quando o sábado é **sempre** o mesmo.
 
+  > **Exemplo real da Sudomed:** a *Escala Padrão* (10 pessoas) tem jornada de
+  > **8h38 por dia**, trabalha de segunda a sexta (sábado **folga**) e está com a
+  > **Equalização mensal LIGADA**. Quando alguém dessa escala trabalha um sábado
+  > para fechar a carga do mês, o sistema reconhece sozinho — foi exatamente o que
+  > aconteceu em agosto, quando várias pessoas receberam a equalização do mês
+  > (≈ 3h20 cada). É esse o modelo a manter.
+
 - **Escala que trabalha sábado fixo toda semana:** aí sim marque **"Trab."** no
   sábado na grade, com os horários.
 
@@ -180,6 +226,15 @@ Menu **Ponto → Apuração → Config BH → "Nova Configuração"**:
 - Ligue **"Exige acordo individual"** (combina com o passo 6).
 - Salve.
 
+> **⚠ ATENÇÃO À ORDEM (situação atual da Sudomed):** hoje já existe um regime
+> **ATIVO** com prazo 180 dias, mas do tipo **"mensal"** e **sem** exigir acordo.
+> Como o banco **está acumulando para todos** com essa regra, **não ligue "Exige
+> acordo individual" antes de cadastrar os acordos de TODAS as pessoas** (Passo 6):
+> se ligar antes, o banco **para de acumular** para quem ainda não tiver acordo.
+> Sequência segura: (1) cadastre todos os acordos → (2) edite o regime para
+> **Individual** e vincule os acordos → (3) só então ligue "Exige acordo
+> individual". Em caso de dúvida, fale com o responsável pelo sistema antes.
+
 ### Passo 8 — Atribuir a escala a cada colaborador
 Menu **Ponto → Escalas → "Atribuir Escala"**:
 - Escolha a **"Escala"**, a **"Data Início"**, marque os colaboradores.
@@ -193,6 +248,12 @@ seções 3, 4, 5 e 6 agora aparecem preenchidas.
 ## PARTE 2 — ROTINA DE TODO MÊS (fechar o mês)
 
 > Faça nesta ordem, perto do fim do mês / início do mês seguinte.
+
+> **🔴 TAREFA URGENTE AGORA:** o Raio-X mostra que **junho e julho/2026** já estão
+> fechados, mas **agosto e setembro/2026 ainda NÃO**. Como já estamos em outubro,
+> **comece fechando agosto e depois setembro**, seguindo os passos abaixo (um mês
+> de cada vez, escolhendo a competência no seletor). Só depois siga a rotina
+> normal de outubro em diante.
 
 ### 1) Acompanhar o Espelho durante o mês
 Menu **Ponto → Espelho**. Veja as marcações do dia, por pessoa. Status possíveis:
@@ -275,6 +336,16 @@ Ao chegar no fim do semestre (o prazo de 180 dias / 6 meses do Passo 7):
 > uma a uma** — peça para o responsável técnico rodar o **script de zeragem
 > corretiva** no SQL Editor (ele guarda backup antes de mexer). Faça pela tela
 > apenas ajustes pontuais, de poucas pessoas.
+
+> **Não confunda "equalização" com "zeragem do banco":**
+> - **Equalização mensal** = o mecanismo do **sábado variável** (fecha a carga do
+>   mês). Aparece na **seção 9** do Raio-X. É automático e faz parte da rotina
+>   normal — foi o que rodou em junho e agosto para a Sudomed.
+> - **Zeragem/acerto do banco** = reduzir o **saldo acumulado** no fim do semestre.
+>   Aparece na **seção 10** do Raio-X ("ajustes manuais no banco"). É o que você
+>   faz no acerto semestral.
+> São coisas diferentes: a primeira é mensal e automática; a segunda é semestral e
+> deliberada.
 
 ### O calendário da Sudomed (a transição)
 - **2026 (agora até dezembro):** vocês estão **zerando aos poucos** os saldos

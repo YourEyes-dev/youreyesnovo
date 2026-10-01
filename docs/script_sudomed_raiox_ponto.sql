@@ -117,14 +117,25 @@ linhas AS (
   FROM public.ponto_fechamentos f
   WHERE f.empresa_id IN (SELECT id FROM emp)
 
-  -- 9. Zeragens / equalizações já lançadas (as "horas zeradas")
+  -- 9. Equalização mensal já lançada (o mecanismo do SÁBADO VARIÁVEL)
   UNION ALL
-  SELECT 9, '9. ZERAGENS (equalização mensal)',
+  SELECT 9, '9. EQUALIZACAO MENSAL (sabado variavel)',
          eq.competencia||' · '||COALESCE(eq.colaborador_nome, eq.colaborador_cpf),
          COALESCE(eq.total_equalizacao_min::text,'?')||'min · origem '||COALESCE(eq.origem,'?')
        ||' · em '||COALESCE(eq.data_equalizacao::text,'?')
   FROM public.ponto_equalizacao_mensal eq
   WHERE eq.empresa_id IN (SELECT id FROM emp)
+
+  -- 10. Ajustes MANUAIS no banco de horas (zeragens/correções de saldo)
+  UNION ALL
+  SELECT 10, '10. AJUSTES MANUAIS NO BANCO (zeragens/correcoes)',
+         COALESCE(mv.data_referencia::text,'?')||' · '||mv.tipo,
+         COALESCE(mv.minutos::text,'?')||'min · '||COALESCE(mv.descricao,'(sem descrição)')
+       ||' · origem '||COALESCE(mv.origem,'?')
+  FROM public.ponto_banco_horas_movimentacoes mv
+  JOIN public.ponto_banco_horas b ON b.id = mv.banco_horas_id
+  WHERE b.empresa_id IN (SELECT id FROM emp)
+    AND COALESCE(mv.origem,'') <> 'apuracao'
 )
 SELECT secao, item, detalhe
 FROM linhas

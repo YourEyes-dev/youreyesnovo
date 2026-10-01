@@ -97,6 +97,9 @@ export function SolicitarAjusteFolhaInterno({
   const [edits, setEdits] = useState<Record<string, DiaEdit>>({});
   const [enviando, setEnviando] = useState(false);
   const [done, setDone] = useState(false);
+  // Escala com intervalo pré-assinalado: o colaborador bate só entrada e saída
+  // (o intervalo é declarado, não batido). Nesse modo o ajuste mostra 1 par.
+  const [preAssinalado, setPreAssinalado] = useState(false);
 
   const colaborador = useMemo(
     () => colaboradores.find((c) => c.id === colaboradorId) || null,
@@ -160,6 +163,30 @@ export function SolicitarAjusteFolhaInterno({
         pend[a.data_referencia] = (pend[a.data_referencia] || 0) + 1;
       });
       setPendentesPorDia(pend);
+
+      // Pré-assinalação vigente p/ este colaborador (por CPF OU pela escala dele).
+      // Mesma config da aba "Intervalo pré-assinalado" (colaborador vence escala).
+      try {
+        const escR = cpfVars
+          ? await fromTable("ponto_escala_atribuicoes").select("escala_id")
+              .eq("tenant_id", tenantId).in("colaborador_cpf", cpfVars)
+          : await fromTable("ponto_escala_atribuicoes").select("escala_id")
+              .eq("tenant_id", tenantId).eq("colaborador_id", colaboradorId);
+        const escalaIds = new Set(((escR.data as any[]) || []).map((e) => e.escala_id).filter(Boolean));
+        const paR = await fromTable("ponto_pre_assinalacao")
+          .select("colaborador_cpf, escala_id, data_inicio, data_fim, ativa")
+          .eq("tenant_id", tenantId).eq("ativa", true);
+        const pa = ((paR.data as any[]) || []).some((r) => {
+          const vig = (!r.data_inicio || r.data_inicio <= fim) && (!r.data_fim || r.data_fim >= ini);
+          if (!vig) return false;
+          if (r.colaborador_cpf && cleanCpf(r.colaborador_cpf) === cpfDigits) return true;
+          if (r.escala_id && escalaIds.has(r.escala_id)) return true;
+          return false;
+        });
+        setPreAssinalado(pa);
+      } catch {
+        setPreAssinalado(false);
+      }
 
       setLoading(false);
     })();
@@ -584,16 +611,17 @@ export function SolicitarAjusteFolhaInterno({
                         });
                       }
                       // Renderiza a linha de UMA marcação (entrada/saída) pelo índice i.
-                      const renderMarcInput = (i: number) => {
+                      const renderMarcInput = (i: number, labelOverride?: TipoMarc) => {
                         const valor = marcs[i];
                         const orig = original[i] || "";
                         const novaMarc = i >= original.length;
                         const alterado = ed.marcacoes !== undefined && (valor || "") !== orig && !novaMarc;
-                        const tipo = tipoPorIndice(i);
+                        const tipo = labelOverride || tipoPorIndice(i);
+                        const label = labelOverride ? (labelOverride === "entrada" ? "Entrada" : "Saída") : tipoLabel(i);
                         return (
                           <div key={i} className="flex items-center gap-1">
                             <span className={`text-[9px] font-semibold w-12 shrink-0 ${tipo === "entrada" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-                              {tipoLabel(i)}
+                              {label}
                             </span>
                             <Input
                               type="time"
@@ -663,6 +691,46 @@ export function SolicitarAjusteFolhaInterno({
                                   Dia inteiro pela escala do colaborador (horários não editáveis).
                                 </div>
                                 <div>{renderJustBlock(data, DIA_KEY, "Dia inteiro")}</div>
+                              </div>
+                            ) : preAssinalado ? (
+                              /* Escala pré-assinalada: só 1 par (Entrada/Saída). O intervalo
+                                 é declarado, não batido. Num dia que já tenha batidas de almoço
+                                 no registro, elas ficam preservadas (Súmula 338 — marcação é
+                                 imutável), mas o ajuste mostra só a 1ª entrada e a última saída. */
+                              <div className="space-y-1.5">
+                                {marcs.length === 0 ? (
+                                  <div className="text-[10px] text-muted-foreground italic">Sem marcações</div>
+                                ) : (
+                                  <div className="grid grid-cols-[240fr_280fr] gap-2 items-start">
+                                    <div className="space-y-1">
+                                      {renderMarcInput(0, "entrada")}
+                                      {renderMarcInput(marcs.length > 1 ? marcs.length - 1 : 1, "saida")}
+                                    </div>
+                                    <div>
+                                      {paresAlterados.size > 0 ? (
+                                        Array.from(paresAlterados).sort((a, b) => a - b).map((p) => (
+                                          <div key={p}>{renderJustBlock(data, String(p), "Entrada / Saída")}</div>
+                                        ))
+                                      ) : (
+                                        <span className="text-[10px] text-muted-foreground italic">—</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                {marcs.length > 2 && (
+                                  <div className="text-[9px] text-muted-foreground italic">
+                                    Intervalo pré-assinalado: batidas de almoço preservadas no registro.
+                                  </div>
+                                )}
+                                {!futuro && marcs.length < 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => addMarcacao(data)}
+                                    className="flex items-center gap-1 text-[10px] text-primary hover:underline mt-0.5"
+                                  >
+                                    <Plus className="w-3 h-3" /> Adicionar {marcs.length % 2 === 0 ? "entrada" : "saída"}
+                                  </button>
+                                )}
                               </div>
                             ) : (
                               <div className="space-y-1.5">

@@ -80,6 +80,9 @@ export function SolicitarAjusteModal({ open, onOpenChange, token, cpf }: Props) 
   const [loading, setLoading] = useState(false);
   const [marcacoes, setMarcacoes] = useState<Marcacao[]>([]);
   const [ajustesPend, setAjustesPend] = useState<AjustePend[]>([]);
+  // Escala pré-assinalada (intervalo declarado, não batido): a folha mostra só
+  // 1 par Entrada/Saída. A flag vem da RPC pública (sem auth p/ ler config).
+  const [preAssinalado, setPreAssinalado] = useState(false);
   const [mesAtivo, setMesAtivo] = useState(() => `${hojeDate.getFullYear()}-${pad(hojeDate.getMonth()+1)}`);
   const [edits, setEdits] = useState<Record<string, DiaEdit>>({}); // por data
   const [files, setFiles] = useState<File[]>([]);
@@ -140,6 +143,7 @@ export function SolicitarAjusteModal({ open, onOpenChange, token, cpf }: Props) 
       if (r?.error) { toast.error(r.error); setLoading(false); return; }
       setMarcacoes((r?.marcacoes || []) as Marcacao[]);
       setAjustesPend((r?.ajustes || []) as AjustePend[]);
+      setPreAssinalado(!!r?.pre_assinalado);
       setLoading(false);
     })();
   }, [open, token, cpf]);
@@ -460,54 +464,96 @@ export function SolicitarAjusteModal({ open, onOpenChange, token, cpf }: Props) 
       );
     }
     const marcs = marcacoesEfetivas(data);
+
+    // Renderiza o campo de UMA posição i. labelOverride força Entrada/Saída
+    // (usado na folha pré-assinalada, onde a 2ª linha é sempre a Saída mesmo
+    // quando o índice real seria par — dia com nº ímpar de batidas).
+    const renderCampo = (i: number, labelOverride?: "entrada" | "saida") => {
+      const valor = marcs[i] || "";
+      const orig = original[i] || "";
+      const novaMarc = i >= original.length;
+      const alterado = ed.marcacoes !== undefined && (valor || "") !== orig && !novaMarc;
+      const tipo = labelOverride || tipoPorIndice(i);
+      const label = labelOverride ? (labelOverride === "entrada" ? "Entrada" : "Saída") : tipoLabelIndice(i);
+      const ehUltima = i === marcs.length - 1;
+      return (
+        <div key={i} className="flex flex-col gap-0.5">
+          <span className={`text-[9px] font-semibold ${tipo === "entrada" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+            {label}
+          </span>
+          <div className="flex items-center gap-1">
+            <Input
+              type="time"
+              value={valor || ""}
+              onChange={(e) => setMarcacao(data, i, e.target.value)}
+              className={`h-9 text-xs font-mono px-1 w-[92px] ${
+                novaMarc ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
+                : alterado ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30"
+                : ""
+              }`}
+            />
+            {/* Só a marcação ACRESCENTADA agora ganha o X — antes era a
+                última da lista, fosse ela real ou não, o que punha um
+                botão de excluir em cima de uma batida do relógio. Mesmo
+                critério da folha interna (`novaMarc`). */}
+            {novaMarc && ehUltima && (
+              <button
+                type="button"
+                onClick={() => removerMarcacao(data, i)}
+                className="text-muted-foreground hover:text-destructive shrink-0 p-1"
+                title="Remover marcação adicionada"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {orig && alterado && (
+            <div className="text-[9px] text-muted-foreground line-through">orig: {orig}</div>
+          )}
+        </div>
+      );
+    };
+
+    // Escala pré-assinalada: só 1 par (Entrada + Saída). O intervalo é
+    // declarado, não batido. Dias com batidas de almoço no registro ficam
+    // preservados (Súmula 338 — marcação é imutável); a folha mostra só a 1ª
+    // entrada e a última saída.
+    if (preAssinalado) {
+      return (
+        <div className="flex flex-col gap-1">
+          {marcs.length === 0 ? (
+            <span className="text-[10px] text-muted-foreground italic py-1.5">Sem marcações</span>
+          ) : (
+            <div className="flex flex-wrap items-start gap-2">
+              {renderCampo(0, "entrada")}
+              {renderCampo(marcs.length > 1 ? marcs.length - 1 : 1, "saida")}
+              {marcs.length < 2 && (
+                <button
+                  type="button"
+                  onClick={() => adicionarMarcacao(data)}
+                  className="h-9 mt-[14px] px-2 text-[10px] rounded border border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary shrink-0"
+                  title="Adicionar saída"
+                >
+                  + marcação
+                </button>
+              )}
+            </div>
+          )}
+          {marcs.length > 2 && (
+            <span className="text-[9px] text-muted-foreground italic">
+              Intervalo pré-assinalado: batidas de almoço preservadas no registro.
+            </span>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-wrap items-start gap-2">
         {marcs.length === 0 && (
           <span className="text-[10px] text-muted-foreground italic py-1.5">Sem marcações</span>
         )}
-        {marcs.map((valor, i) => {
-          const orig = original[i] || "";
-          const novaMarc = i >= original.length;
-          const alterado = ed.marcacoes !== undefined && (valor || "") !== orig && !novaMarc;
-          const tipo = tipoPorIndice(i);
-          const ehUltima = i === marcs.length - 1;
-          return (
-            <div key={i} className="flex flex-col gap-0.5">
-              <span className={`text-[9px] font-semibold ${tipo === "entrada" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-                {tipoLabelIndice(i)}
-              </span>
-              <div className="flex items-center gap-1">
-                <Input
-                  type="time"
-                  value={valor || ""}
-                  onChange={(e) => setMarcacao(data, i, e.target.value)}
-                  className={`h-9 text-xs font-mono px-1 w-[92px] ${
-                    novaMarc ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
-                    : alterado ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30"
-                    : ""
-                  }`}
-                />
-                {/* Só a marcação ACRESCENTADA agora ganha o X — antes era a
-                    última da lista, fosse ela real ou não, o que punha um
-                    botão de excluir em cima de uma batida do relógio. Mesmo
-                    critério da folha interna (`novaMarc`). */}
-                {novaMarc && ehUltima && (
-                  <button
-                    type="button"
-                    onClick={() => removerMarcacao(data, i)}
-                    className="text-muted-foreground hover:text-destructive shrink-0 p-1"
-                    title="Remover marcação adicionada"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              {orig && alterado && (
-                <div className="text-[9px] text-muted-foreground line-through">orig: {orig}</div>
-              )}
-            </div>
-          );
-        })}
+        {marcs.map((_, i) => renderCampo(i))}
         <button
           type="button"
           onClick={() => adicionarMarcacao(data)}

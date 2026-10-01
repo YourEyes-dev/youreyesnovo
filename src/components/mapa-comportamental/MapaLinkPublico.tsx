@@ -99,7 +99,7 @@ export function MapaLinkPublico() {
   const copiar = () => { navigator.clipboard.writeText(url); toast.success("Link copiado!"); };
   const whatsapp = () => {
     const msg = encodeURIComponent(
-      `Olá! 👋\n\nVocê foi convidado a responder o Mapa Comportamental (28 perguntas rápidas sobre o seu jeito de trabalhar). É voluntário e o resultado é seu.\n\n${url}\n\nBasta informar o seu CPF para começar.`,
+      `Olá! 👋\n\nVocê foi convidado a responder o MODUS™ — seu modo de operar (28 perguntas rápidas sobre o seu jeito de trabalhar). É voluntário e o resultado é seu.\n\n${url}\n\nBasta informar o seu CPF para começar.`,
     );
     window.open(`https://wa.me/?text=${msg}`, "_blank");
   };

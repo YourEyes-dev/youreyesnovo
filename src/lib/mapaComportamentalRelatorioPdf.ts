@@ -22,11 +22,15 @@
 
 import { generatePdfFromHtml } from "@/utils/generatePdfFromHtml";
 import type { MapaResultado, Modo } from "@/data/instrumentos/mapaComportamental";
-import { ARQUETIPO_LABEL, MOTOR_LABEL, MODO_LABEL } from "@/data/instrumentos/mapaComportamental";
+import {
+  ARQUETIPO_LABEL, MOTOR_LABEL, MODO_LABEL,
+  MAPA_INSTRUMENTO_VERSAO_LABEL,
+} from "@/data/instrumentos/mapaComportamental";
 import {
   PERFIL_RELATORIO, OUTROS_PERFIS, OUTRO_PERFIL_APRESENTACAO, PRESSAO_POR_MODO,
   MOTOR_RELATORIO, MODO_RELATORIO, textoIntensidade,
   RELATORIO_ABERTURA, RELATORIO_SOBRE, RELATORIO_BIBLIOTECA_VERSAO,
+  RELATORIO_MARCA, RELATORIO_MARCA_TAGLINE,
 } from "@/data/mapaComportamentalRelatorio";
 import { compararMapas } from "@/data/instrumentos/mapaComportamentalComparativo";
 
@@ -164,7 +168,7 @@ export async function gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, v
   // Cabeçalho
   partes.push(`
     <div class="cabecalho" style="${BOX.cabecalho}">
-      <p class="marca">Mapa Comportamental</p>
+      <p class="marca">${esc(RELATORIO_MARCA_TAGLINE)}</p>
       <p class="titular">Meu Mapa — ${esc(titular)}</p>
       <p class="datas">Emitido em ${esc(emissao)}${concluidoEm ? ` · respondido em ${esc(dataBR(concluidoEm))}` : ""}${venceEm ? ` · válido até ${esc(dataBR(venceEm))}` : ""}</p>
     </div>
@@ -264,7 +268,7 @@ export async function gerarRelatorioMeuMapaPdf({ resultado, nome, concluidoEm, v
     RELATORIO_SOBRE.map((p) => `<p class="sub">${esc(p)}</p>`).join("")));
 
   // Rodapé (marca d'água textual + versão)
-  partes.push(`<div class="rodape">Documento pessoal de ${esc(titular)} · emitido em ${esc(emissao)} · Mapa Comportamental — biblioteca ${esc(RELATORIO_BIBLIOTECA_VERSAO)} · algoritmo ${esc(resultado.algoritmoVersao)}</div>`);
+  partes.push(`<div class="rodape">Documento pessoal de ${esc(titular)} · emitido em ${esc(emissao)} · ${esc(RELATORIO_MARCA)} ${esc(MAPA_INSTRUMENTO_VERSAO_LABEL)} — biblioteca ${esc(RELATORIO_BIBLIOTECA_VERSAO)} · algoritmo ${esc(resultado.algoritmoVersao)}</div>`);
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${CSS}</style></head><body><div class="rel">${partes.join("\n")}</div></body></html>`;
 

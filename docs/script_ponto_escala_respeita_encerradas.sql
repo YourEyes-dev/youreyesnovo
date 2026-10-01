@@ -5,23 +5,23 @@
 --
 -- ACHADO: ao trocar a escala de um colaborador, a atribuição antiga é encerrada
 -- (data_fim + ativa=false). Os resolvedores "do dia" da apuração filtravam
--- "ativa=true" e, com isso, IGNORAVAM a atribuição encerrada mesmo para dias
--- DENTRO do período dela — caindo na escala ATUAL. Ex.: colaborador que passou
--- de 44h para 36h tinha agosto (ainda 44h) recalculado como 36h.
+-- "ativa=true" e IGNORAVAM a atribuição encerrada mesmo para dias DENTRO do
+-- período dela — caindo na escala ATUAL. Ex.: quem passou de 44h para 36h tinha
+-- agosto (ainda 44h) recalculado como 36h.
 --
 -- CORREÇÃO: honrar a atribuição ENCERRADA (ativa=false COM data_fim) nos dias do
 -- seu intervalo; manter ignoradas só as CANCELADAS (ativa=false SEM data_fim).
--- Troca, nos 6 resolvedores por dia, "COALESCE(a.ativa,true)=true" por
--- "(COALESCE(a.ativa,true)=true OR a.data_fim IS NOT NULL)".
+-- Troca, nos 6 resolvedores por dia, a condição "COALESCE(a.ativa,true)=true"
+-- por "(COALESCE(a.ativa,true)=true OR a.data_fim IS NOT NULL)".
+--
+-- Esta versão é INDEPENDENTE DE ESPAÇAMENTO (troca só o pedaço da condição, não
+-- depende de quebra de linha/recuo) — necessário porque em produção algumas
+-- dessas funções têm recuo diferente do repositório.
 --
 -- SEGURANÇA: só substitui FUNÇÃO (não cria tabela, não altera/apaga dado).
--- Cirúrgico e idempotente: parte da definição atual, injeta só a condição; se já
--- corrigida ou sem a âncora, apenas avisa. Só mexe no alias "a" (atribuição) —
--- não toca em "pa.ativa" (pré-assinalação). Termina com conferência.
---
--- EFEITO A SABER: depois de aplicar, o CÁLCULO AO VIVO (espelho/apuração) de
--- quem trocou de escala passa a refletir a escala certa de cada período. Os
--- saldos JÁ GRAVADOS no banco só mudam quando a competência for reapurada.
+-- Cirúrgico e idempotente: se já corrigida, pula; se não achar a condição,
+-- avisa. Só mexe no alias "a" (atribuição) — não toca em "pa.ativa"
+-- (pré-assinalação). Termina com conferência. Pode rodar quantas vezes quiser.
 -- ============================================================================
 DO $fix$
 DECLARE
@@ -36,10 +36,9 @@ DECLARE
   ];
   v_oid oid;
   v_src text;
-  v_anchor text := 'AND COALESCE(a.ativa, true) = true'
-                 || E'\n    AND a.data_inicio <= p_data';
-  v_fixed text := 'AND (COALESCE(a.ativa, true) = true OR a.data_fim IS NOT NULL)'
-                 || E'\n    AND a.data_inicio <= p_data';
+  v_alvo text  := 'COALESCE(a.ativa, true) = true';
+  v_feito text := 'COALESCE(a.ativa, true) = true OR a.data_fim IS NOT NULL';
+  v_novo text  := '(COALESCE(a.ativa, true) = true OR a.data_fim IS NOT NULL)';
 BEGIN
   FOREACH v_fn IN ARRAY v_funcs LOOP
     FOR v_oid IN
@@ -47,15 +46,15 @@ BEGIN
       WHERE n.nspname = 'public' AND p.proname = v_fn AND p.prokind = 'f'
     LOOP
       v_src := pg_get_functiondef(v_oid);
-      IF position(v_fixed IN v_src) > 0 THEN
+      IF position(v_feito IN v_src) > 0 THEN
         RAISE NOTICE '[%] já corrigida — nada a fazer.', v_fn;
         CONTINUE;
       END IF;
-      IF position(v_anchor IN v_src) = 0 THEN
-        RAISE NOTICE '[%] âncora não encontrada (confira manualmente) — pulada.', v_fn;
+      IF position(v_alvo IN v_src) = 0 THEN
+        RAISE NOTICE '[%] condição não encontrada (confira manualmente) — pulada.', v_fn;
         CONTINUE;
       END IF;
-      EXECUTE replace(v_src, v_anchor, v_fixed);
+      EXECUTE replace(v_src, v_alvo, v_novo);
       RAISE NOTICE '[%] corrigida.', v_fn;
     END LOOP;
   END LOOP;
@@ -63,8 +62,7 @@ END $fix$;
 
 
 -- ---------------------------------------------------------------------
--- CONFERÊNCIA: cada resolvedor deve conter a condição corrigida.
--- Espera-se corrigida = true para todas as linhas.
+-- CONFERÊNCIA: todas as linhas devem vir corrigida = true.
 -- ---------------------------------------------------------------------
 SELECT
   p.proname AS funcao,

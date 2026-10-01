@@ -33,3 +33,6 @@ cypress/downloads
 # fonte de nada.
 __pycache__/
 *.pyc
+
+# Estado local do Supabase CLI (projeto vinculado, versão) — nunca versionar.
+supabase/.temp/

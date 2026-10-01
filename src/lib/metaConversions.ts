@@ -118,6 +118,26 @@ export function pausarMetaPixel(): void {
   }
 }
 
+/**
+ * Evento só do Pixel (sem CAPI), para medições de funil. Só sai com o site
+ * público ativo em produção; fora disso não faz nada e devolve false.
+ * Nunca lança.
+ */
+export function trackPixelEvento(
+  nome: string,
+  params: Record<string, string | number> = {},
+  personalizado = false,
+): boolean {
+  if (!pixelAtivo || typeof window === "undefined" || !window.fbq) return false;
+  try {
+    window.fbq(personalizado ? "trackCustom" : "track", nome, params);
+    return true;
+  } catch (e) {
+    console.warn("[meta] Pixel indisponível:", e);
+    return false;
+  }
+}
+
 /** Só para teste: volta o módulo ao estado inicial. */
 export function __reiniciarPixelParaTeste(): void {
   pixelAtivo = false;

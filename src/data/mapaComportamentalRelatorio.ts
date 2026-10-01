@@ -486,9 +486,16 @@ export function textoIntensidade(intensidade: number): string {
   return "Você transita bem entre os dois lados. Isso é flexibilidade, não indefinição.";
 }
 
+// ── Marca do instrumento no relatório (ver docs/CONVENCAO_MODUS.md) ────────────
+// "Mapa Comportamental" é o módulo; "MODUS" é o instrumento (questionário,
+// algoritmo e resultado). No relatório aparece a marca do instrumento.
+export const RELATORIO_MARCA = "MODUS";
+export const RELATORIO_MARCA_TAGLINE = "MODUS™ — seu modo de operar";
+export const RELATORIO_ABERTURA_TAGLINE = "MODUS™ · Modo de operar, não medida de valor";
+
 // ── Texto fixo de abertura (seção 1) e de fechamento (seção 15) ────────────────
 export const RELATORIO_ABERTURA = [
-  "Este é o seu mapa comportamental. Ele mostra como você tende a trabalhar — não o quanto você é bom no que faz.",
+  "Este é o seu MODUS — o seu modo de operar. Ele mostra como você tende a trabalhar, não o quanto você é bom no que faz.",
   "Não existe perfil melhor ou pior. Existem jeitos diferentes de chegar ao resultado, cada um com forças e custos próprios.",
   "Este documento é seu. Seu gestor e o RH veem o resultado interpretado, mas ninguém vê o que você marcou em cada pergunta. Você pode consultar a qualquer momento quem acessou o seu mapa.",
   "Ele não é avaliação de desempenho, não é exame psicológico e não é usado para decidir promoção, salário ou desligamento.",

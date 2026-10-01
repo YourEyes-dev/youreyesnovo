@@ -102,7 +102,7 @@ export default function MapaComportamentalPublico() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Fingerprint className="w-5 h-5 text-indigo-600" /> Mapa Comportamental
+                <Fingerprint className="w-5 h-5 text-indigo-600" /> MODUS™ — seu modo de operar
               </CardTitle>
               {empresaNome && <p className="text-sm text-muted-foreground">{empresaNome}</p>}
             </CardHeader>

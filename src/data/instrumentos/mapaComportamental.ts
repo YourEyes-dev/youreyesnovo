@@ -15,6 +15,14 @@ export const MAPA_INSTRUMENTO_VERSAO = 1;
 export const MAPA_ALGORITMO_VERSAO = "v1";
 export const MAPA_TOTAL_ITENS = 28;
 
+// Marca do INSTRUMENTO (não do módulo). O módulo é "Mapa Comportamental"
+// (menu/rota/telas); o instrumento é "MODUS™ — seu modo de operar" (questionário,
+// algoritmo e resultado). A marca nunca entra em identificador de banco/código —
+// só como VALOR: gravada em cada resultado e exibida no relatório e na memória de
+// cálculo. Ver docs/CONVENCAO_MODUS.md.
+export const MAPA_INSTRUMENTO_MARCA = "MODUS";
+export const MAPA_INSTRUMENTO_VERSAO_LABEL = "1.0";
+
 /** Eixos e camadas medidos pelo instrumento. */
 export type MapaEixo = "foco" | "ritmo" | "motor" | "modo" | "controle";
 
@@ -399,6 +407,8 @@ export interface MotorResultado {
 }
 
 export interface MapaResultado {
+  /** Marca do instrumento gravada no resultado (RF/marca): "MODUS". */
+  instrumentoNome: string;
   instrumentoVersao: number;
   algoritmoVersao: string;
   // Arquétipo
@@ -586,6 +596,7 @@ export function calcularMapa(respostas: MapaRespostas, opcoes: CalcularMapaOpcoe
   const assinatura = [arqTxt, motorTxt].filter(Boolean).join("-") + `, ${modoTxt}`;
 
   return {
+    instrumentoNome: MAPA_INSTRUMENTO_MARCA,
     instrumentoVersao: MAPA_INSTRUMENTO_VERSAO,
     algoritmoVersao: MAPA_ALGORITMO_VERSAO,
     arquetipos,
@@ -609,6 +620,8 @@ export function calcularMapa(respostas: MapaRespostas, opcoes: CalcularMapaOpcoe
 /** Snapshot compacto do instrumento para versionamento/auditoria no banco. */
 export function instrumentoDefinicaoSnapshot() {
   return {
+    instrumento_nome: MAPA_INSTRUMENTO_MARCA,
+    instrumento_versao: MAPA_INSTRUMENTO_VERSAO_LABEL,
     versao: MAPA_INSTRUMENTO_VERSAO,
     algoritmo_versao: MAPA_ALGORITMO_VERSAO,
     total_itens: MAPA_TOTAL_ITENS,

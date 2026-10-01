@@ -16,7 +16,7 @@ import {
 import {
   PERFIL_RELATORIO, OUTROS_PERFIS, OUTRO_PERFIL_APRESENTACAO, PRESSAO_POR_MODO,
   MOTOR_RELATORIO, MODO_RELATORIO, textoIntensidade,
-  RELATORIO_ABERTURA, RELATORIO_SOBRE,
+  RELATORIO_ABERTURA, RELATORIO_SOBRE, RELATORIO_MARCA_TAGLINE,
 } from "@/data/mapaComportamentalRelatorio";
 import { gerarRelatorioMeuMapaPdf } from "@/lib/mapaComportamentalRelatorioPdf";
 import { ContestarModal } from "./ContestarModal";
@@ -137,11 +137,12 @@ export function RelatorioMeuMapa({ resultado, nome, mapaId, concluidoEm, venceEm
       <Card className="overflow-hidden">
         <div className="bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-600 p-6 text-white">
           <div className="flex items-center gap-2 text-white/90 text-sm mb-1">
-            <Sparkles className="w-4 h-4" /> Meu Mapa {nome ? `— ${nome}` : ""}
+            <Sparkles className="w-4 h-4" /> {RELATORIO_MARCA_TAGLINE}
           </div>
-          <h2 className="text-2xl font-bold">{resultado.assinatura}</h2>
+          <h2 className="text-2xl font-bold">Seu MODUS é {resultado.assinatura}</h2>
           <p className="text-white/80 text-xs mt-1">
-            {concluidoEm ? `Respondido em ${new Date(concluidoEm).toLocaleDateString("pt-BR")}` : ""}
+            Meu Mapa{nome ? ` — ${nome}` : ""}
+            {concluidoEm ? ` · Respondido em ${new Date(concluidoEm).toLocaleDateString("pt-BR")}` : ""}
             {venceEm ? ` · válido até ${new Date(venceEm).toLocaleDateString("pt-BR")}` : ""}
           </p>
         </div>

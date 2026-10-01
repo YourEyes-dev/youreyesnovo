@@ -12,7 +12,7 @@ WITH emp AS MATERIALIZED (
          COALESCE(usa_controle_ponto,false) AS ponto_on
   FROM public.empresa_cadastro
   WHERE regexp_replace(COALESCE(cnpj,''),'[^0-9]','','g')
-        IN ('26114701000145','31219374000126','41085456000189')
+        IN ('26114701000145','31219374000126','41085456000189','41085456000260')
 ),
 tn AS MATERIALIZED (SELECT DISTINCT tenant_id FROM emp),
 linhas AS (

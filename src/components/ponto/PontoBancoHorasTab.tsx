@@ -91,8 +91,8 @@ export function PontoBancoHorasTab() {
   const [importResumo, setImportResumo] = useState<{ ok: number; erros: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [criarForm, setCriarForm] = useState({ colaborador_id: "", tipo: "mensal" });
-  const [movForm, setMovForm] = useState({ tipo: "credito", minutos: 0, data_referencia: format(new Date(), "yyyy-MM-dd"), descricao: "" });
-  const [editMov, setEditMov] = useState<null | { id: string; tipo: string; minutos: number; data_referencia: string; descricao: string }>(null);
+  const [movForm, setMovForm] = useState({ tipo: "credito", horas: 0, mins: 0, data_referencia: format(new Date(), "yyyy-MM-dd"), descricao: "" });
+  const [editMov, setEditMov] = useState<null | { id: string; tipo: string; horas: number; mins: number; data_referencia: string; descricao: string }>(null);
   const [editBanco, setEditBanco] = useState<null | {
     id: string;
     colaborador_id: string;
@@ -153,17 +153,18 @@ export function PontoBancoHorasTab() {
 
 
   const handleMovimentacao = async () => {
-    if (!selectedBanco || movForm.minutos <= 0) { toast.error("Preencha os dados"); return; }
+    const totalMin = (movForm.horas || 0) * 60 + (movForm.mins || 0);
+    if (!selectedBanco || totalMin <= 0) { toast.error("Informe horas e/ou minutos (maior que zero)."); return; }
     await adicionarMovimentacao({
       bancoHorasId: selectedBanco.id,
       colaboradorCpf: selectedBanco.colaborador_cpf || "",
       dataReferencia: movForm.data_referencia,
       tipo: movForm.tipo,
-      minutos: movForm.minutos,
+      minutos: totalMin,
       descricao: movForm.descricao,
     });
     setShowMovimentacao(false);
-    setMovForm({ tipo: "credito", minutos: 0, data_referencia: format(new Date(), "yyyy-MM-dd"), descricao: "" });
+    setMovForm({ tipo: "credito", horas: 0, mins: 0, data_referencia: format(new Date(), "yyyy-MM-dd"), descricao: "" });
   };
 
   // Dias do colaborador em edição (ponto_diario da competência)
@@ -807,7 +808,7 @@ export function PontoBancoHorasTab() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button size="icon" variant="ghost" title="Editar" onClick={() => setEditMov({ id: m.id, tipo: m.tipo, minutos: m.minutos, data_referencia: m.data_referencia, descricao: m.descricao || "" })}>
+                        <Button size="icon" variant="ghost" title="Editar" onClick={() => setEditMov({ id: m.id, tipo: m.tipo, horas: Math.floor((m.minutos || 0) / 60), mins: (m.minutos || 0) % 60, data_referencia: m.data_referencia, descricao: m.descricao || "" })}>
                           <Pencil className="w-4 h-4" />
                         </Button>
                         <Button size="icon" variant="ghost" title="Excluir" onClick={async () => {
@@ -873,15 +874,29 @@ export function PontoBancoHorasTab() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data Referência</Label>
-                <Input type="date" value={movForm.data_referencia} onChange={e => setMovForm({ ...movForm, data_referencia: e.target.value })} />
+            <div className="space-y-2">
+              <Label>Data Referência</Label>
+              <Input type="date" value={movForm.data_referencia} onChange={e => setMovForm({ ...movForm, data_referencia: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Duração</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Input type="number" min={0} value={movForm.horas}
+                    onChange={e => setMovForm({ ...movForm, horas: Math.max(0, parseInt(e.target.value || "0", 10)) })}
+                    placeholder="Horas" />
+                  <p className="text-[11px] text-muted-foreground mt-1">Horas</p>
+                </div>
+                <div>
+                  <Input type="number" min={0} max={59} value={movForm.mins}
+                    onChange={e => setMovForm({ ...movForm, mins: Math.min(59, Math.max(0, parseInt(e.target.value || "0", 10))) })}
+                    placeholder="Minutos" />
+                  <p className="text-[11px] text-muted-foreground mt-1">Minutos</p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Minutos</Label>
-                <Input type="number" value={movForm.minutos} onChange={e => setMovForm({ ...movForm, minutos: +e.target.value })} />
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Equivalente a <span className="font-mono">{formatMinutos((movForm.horas || 0) * 60 + (movForm.mins || 0))}</span>.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Descrição</Label>
@@ -918,10 +933,26 @@ export function PontoBancoHorasTab() {
                   <Input type="date" value={editMov.data_referencia} onChange={e => setEditMov({ ...editMov, data_referencia: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Minutos</Label>
-                  <Input type="number" value={editMov.minutos} onChange={e => setEditMov({ ...editMov, minutos: +e.target.value })} />
+                  <Label>Duração</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Input type="number" min={0} value={editMov.horas}
+                        onChange={e => setEditMov({ ...editMov, horas: Math.max(0, parseInt(e.target.value || "0", 10)) })}
+                        placeholder="Horas" />
+                      <p className="text-[11px] text-muted-foreground mt-1">Horas</p>
+                    </div>
+                    <div>
+                      <Input type="number" min={0} max={59} value={editMov.mins}
+                        onChange={e => setEditMov({ ...editMov, mins: Math.min(59, Math.max(0, parseInt(e.target.value || "0", 10))) })}
+                        placeholder="Minutos" />
+                      <p className="text-[11px] text-muted-foreground mt-1">Minutos</p>
+                    </div>
+                  </div>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Equivalente a <span className="font-mono">{formatMinutos((editMov.horas || 0) * 60 + (editMov.mins || 0))}</span>.
+              </p>
               <div className="space-y-2">
                 <Label>Descrição</Label>
                 <Input value={editMov.descricao} onChange={e => setEditMov({ ...editMov, descricao: e.target.value })} placeholder="Opcional" />
@@ -931,14 +962,14 @@ export function PontoBancoHorasTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditMov(null)}>Cancelar</Button>
             <Button
-              disabled={editandoMovimentacao || !editMov || editMov.minutos <= 0}
+              disabled={editandoMovimentacao || !editMov || ((editMov.horas || 0) * 60 + (editMov.mins || 0)) <= 0}
               onClick={async () => {
                 if (!editMov || !selectedBanco) return;
                 await editarMovimentacao({
                   id: editMov.id,
                   bancoHorasId: selectedBanco.id,
                   tipo: editMov.tipo,
-                  minutos: editMov.minutos,
+                  minutos: (editMov.horas || 0) * 60 + (editMov.mins || 0),
                   data_referencia: editMov.data_referencia,
                   descricao: editMov.descricao,
                 });

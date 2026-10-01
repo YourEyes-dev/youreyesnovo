@@ -67,15 +67,18 @@ END $fix$;
 -- (uma vez). Valida que oficial E apuração passam a contar o débito
 -- 'compensacao_falta'.
 -- ---------------------------------------------------------------------
+-- modulo_id resolvido pelo path (o UUID do módulo varia por ambiente).
 INSERT INTO public.qa_casos_teste
   (codigo, modulo_id, titulo, objetivo, tipo, nivel, prioridade, status)
-VALUES (
-  'PONTO-485', 'ac0bac10-8321-463a-8d69-346d37dbb6e1',
+SELECT
+  'PONTO-485', m.id,
   'Compensação de falta efetivada entra no saldo do banco (uma vez)',
   'O débito gerado pela ciência da compensação de falta (tipo compensacao_falta) '
   || 'deve ser contado como débito pela fonte única (tela) e pela apuração — e só '
   || 'uma vez, pois a falta já fica fora do banco. Sem isso, o débito ficava invisível.',
-  'feliz', 'api', 'alta', 'aprovado')
+  'feliz', 'api', 'alta', 'aprovado'
+FROM public.qa_modulos m
+WHERE m.path = 'jornada-rotina/ponto'
 ON CONFLICT (codigo) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.qa_caso_ponto_485()

@@ -13,7 +13,7 @@ WITH emp AS MATERIALIZED (
   WHERE regexp_replace(COALESCE(cnpj,''),'[^0-9]','','g')
         IN ('26114701000145','31219374000126','41085456000189','41085456000260')
 ),
-comps(competencia) AS (VALUES ('2026-07'),('2026-08'))
+comps(competencia) AS (VALUES ('2026-06'),('2026-07'),('2026-08'),('2026-09'),('2026-10'))
 SELECT
   e.razao_social AS empresa,
   o.colaborador_nome AS colaborador,

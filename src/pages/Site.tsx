@@ -104,7 +104,7 @@ const PLANOS: Plano[] = [
       "Metas + Plano de Ação (5W2H)",
       "Avaliações de Desempenho",
       "PDI — Desenvolvimento Individual",
-      "Mapa Comportamental (análises inclusas conforme o plano)",
+      "Mapa Comportamental com MODUS™ (análises inclusas conforme o plano)",
       "Trilhas + Aprendizado & Competências",
       "Feedback, Ouvidoria e Cultura",
       "Bem-Estar / Clima",

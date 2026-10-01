@@ -15,7 +15,7 @@ WITH emp AS MATERIALIZED (
 dados AS (
   -- Bloco A: saldo por competência (a evolução do saldo)
   SELECT e.razao_social AS empresa,
-         COALESCE(b.colaborador_nome, b.colaborador_cpf) AS colaborador,
+         COALESCE(b.colaborador_nome,'?')||' · CPF '||regexp_replace(COALESCE(b.colaborador_cpf,''),'[^0-9]','','g') AS colaborador,
          'A. SALDO POR MÊS' AS bloco,
          b.competencia AS quando,
          'saldo anterior '
@@ -35,7 +35,7 @@ dados AS (
 
   -- Bloco B: movimentações manuais (zeragens/ajustes à mão)
   SELECT e.razao_social AS empresa,
-         COALESCE(b.colaborador_nome, mv.colaborador_cpf) AS colaborador,
+         COALESCE(b.colaborador_nome,'?')||' · CPF '||regexp_replace(COALESCE(mv.colaborador_cpf, b.colaborador_cpf,''),'[^0-9]','','g') AS colaborador,
          'B. MOVIMENTAÇÃO MANUAL' AS bloco,
          to_char(mv.data_referencia,'YYYY-MM-DD') AS quando,
          mv.tipo||' '

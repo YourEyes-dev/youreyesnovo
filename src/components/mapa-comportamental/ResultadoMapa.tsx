@@ -11,6 +11,7 @@ import {
   type Arquetipo,
   type Motor,
 } from "@/data/instrumentos/mapaComportamental";
+import { RELATORIO_MARCA_TAGLINE } from "@/data/mapaComportamentalRelatorio";
 
 // Descrições em linguagem de tendência/preferência — nunca de capacidade (RN-010).
 const ARQUETIPO_RESUMO: Record<Arquetipo, string> = {
@@ -50,9 +51,9 @@ export function ResultadoMapa({ resultado, concluidoEm, onRefazer }: Props) {
       <Card className="overflow-hidden">
         <div className="bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-600 p-6 text-white">
           <div className="flex items-center gap-2 text-white/90 text-sm mb-1">
-            <Sparkles className="w-4 h-4" /> A sua assinatura comportamental
+            <Sparkles className="w-4 h-4" /> {RELATORIO_MARCA_TAGLINE}
           </div>
-          <h2 className="text-2xl font-bold">{resultado.assinatura}</h2>
+          <h2 className="text-2xl font-bold">Seu MODUS é {resultado.assinatura}</h2>
           {concluidoEm && (
             <p className="text-white/80 text-xs mt-1">
               Respondido em {new Date(concluidoEm).toLocaleDateString("pt-BR")}
@@ -64,8 +65,8 @@ export function ResultadoMapa({ resultado, concluidoEm, onRefazer }: Props) {
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Este é um mapa de <strong>estilo</strong>, não uma medida de competência. Não existe perfil
-          melhor nem pior — só formas diferentes de trabalhar.
+          O MODUS mostra o seu <strong>modo de operar</strong>, não uma medida de competência. Não existe
+          perfil melhor nem pior — só formas diferentes de trabalhar.
         </AlertDescription>
       </Alert>
 

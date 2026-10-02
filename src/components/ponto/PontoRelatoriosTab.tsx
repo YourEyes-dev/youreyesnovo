@@ -333,6 +333,12 @@ export function PontoRelatoriosTab() {
      * folga acordada de falta (Súmula 338 do TST).
      */
     folga_compensatoria?: boolean;
+    /**
+     * Falta convertida em débito do banco (compensação efetivada): o banco é a
+     * única cobrança — a folha não desconta nem perde DSR. O documento marca
+     * como "Falta compensada em banco" para não parecer falta não justificada.
+     */
+    falta_compensada?: boolean;
   };
 
   const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
@@ -356,6 +362,7 @@ export function PontoRelatoriosTab() {
     if (d.equalizacao) return "Equalização";
     if (d.excedente_retido_min > 0) return "Excede limite diário";
     if (d.protegido) return d.trabalhado_min > 0 ? "Justificado (com trabalho)" : "Justificado";
+    if (d.falta_compensada && d.trabalhado_min === 0 && d.jornada_min > 0) return "Falta compensada em banco";
     if (d.trabalhado_min === 0 && d.jornada_min > 0) return "Falta";
     if (d.trabalhado_min === 0) return ehDomingo(d.dia) ? "DSR" : ehSabado(d.dia) ? "Sábado" : "Sem jornada";
     if (d.jornada_min === 0) return ehDomingo(d.dia) ? "DSR trabalhado" : "Trabalho fora da escala";
@@ -449,6 +456,24 @@ export function PontoRelatoriosTab() {
       });
     }
 
+    // Faltas convertidas em débito do banco (compensação EFETIVADA): o espelho
+    // marca o dia como "Falta compensada em banco" — a folha não desconta (o
+    // banco é a única cobrança), então não pode aparecer como falta não
+    // justificada (pareceria cobrança dupla).
+    const faltaCompensadaPorCpfDia = new Set<string>();
+    {
+      const { data: comps, error: errComp } = await fromTable("ponto_compensacao_falta")
+        .select("colaborador_cpf, data_falta, status")
+        .eq("tenant_id", tenantId)
+        .eq("status", "efetivada")
+        .gte("data_falta", `${competencia}-01`)
+        .lte("data_falta", `${competencia}-${String(ultimoDia).padStart(2, "0")}`) as { data: any[] | null; error: any };
+      if (errComp) throw errComp;
+      (comps || []).forEach((c: any) => {
+        faltaCompensadaPorCpfDia.add(`${soDigitos(c.colaborador_cpf)}|${c.data_falta}`);
+      });
+    }
+
     const porCpfDia = new Map<string, MarcacaoDia[]>();
     (marcacoesMes || []).forEach((m: any) => {
       const chave = `${soDigitos(m.colaborador_cpf)}|${m.data_marcacao}`;
@@ -495,6 +520,7 @@ export function PontoRelatoriosTab() {
           intervaloPorCpfDia.get(`${c.cpf}|${String(d.dia)}`)?.minutos ?? null,
         pendencia: pendenciaPorCpfDia.has(`${c.cpf}|${String(d.dia)}`),
         folga_compensatoria: folgaPorCpfDia.has(`${c.cpf}|${String(d.dia)}`),
+        falta_compensada: faltaCompensadaPorCpfDia.has(`${c.cpf}|${String(d.dia)}`),
       })).sort((a, b) => a.dia.localeCompare(b.dia));
 
       resultado.push({
@@ -506,7 +532,9 @@ export function PontoRelatoriosTab() {
         creditos: dias.reduce((s, d) => s + (d.saldo_min > 0 ? d.saldo_min : 0), 0),
         debitos: dias.reduce((s, d) => s + (d.saldo_min < 0 ? -d.saldo_min : 0), 0),
         saldo: dias.reduce((s, d) => s + d.saldo_min, 0),
-        faltas: dias.filter(d => !d.protegido && d.jornada_min > 0 && d.trabalhado_min === 0).length,
+        // Falta compensada em banco não conta como falta (vira débito no banco,
+        // não desconto de folha) — fica fora da contagem de faltas do resumo.
+        faltas: dias.filter(d => !d.protegido && !d.falta_compensada && d.jornada_min > 0 && d.trabalhado_min === 0).length,
         protegidos: dias.filter(d => d.protegido).length,
         // Extras separadas por percentual (RN28): 100% em domingo/dia sem
         // escala, 50% nos demais.

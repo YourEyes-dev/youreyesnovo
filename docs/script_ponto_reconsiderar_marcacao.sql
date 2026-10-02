@@ -135,7 +135,7 @@ SELECT
   || '(ex.: a saída real retirada junto com a duplicada), o RH precisa de um caminho de '
   || 'volta pela tela, sem SQL. Reconsiderar devolve a batida ao cálculo e reconsolida o dia; '
   || 'a batida nunca saiu do acervo (Portaria MTP 671/2021).',
-  'positivo', 'api', 'alta', 'aprovado',
+  'feliz', 'api', 'alta', 'aprovado',
   'CLT art. 74; Súmula 338 do TST; Portaria MTP 671/2021',
   jsonb_build_array(
     jsonb_build_object('ordem', 1,

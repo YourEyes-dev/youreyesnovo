@@ -142,7 +142,7 @@ SELECT
   || '(ex.: a saída real retirada junto com a duplicada), o RH precisa de um caminho de '
   || 'volta pela tela, sem SQL. Reconsiderar devolve a batida ao cálculo (desconsiderada '
   || '= false) e reconsolida o dia; a batida nunca saiu do acervo (Portaria MTP 671/2021).',
-  'positivo',
+  'feliz',
   'api',
   'alta',
   'aprovado',

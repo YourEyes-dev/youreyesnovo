@@ -681,6 +681,30 @@ export function usePonto() {
     },
   });
 
+  // Reconsiderar marcação (gestor/RH) — desfaz a desconsideração: a batida
+  // volta ao cálculo do dia. Para quando uma batida foi desconsiderada por
+  // engano (ex.: a saída real retirada junto com a duplicada). A trilha
+  // registra a reativação; a batida nunca saiu do acervo.
+  const reconsiderarMarcacaoMutation = useMutation({
+    mutationFn: async ({ marcacaoId, motivo }: { marcacaoId: string; motivo?: string }) => {
+      const { data, error } = await (supabase as any).rpc("reconsiderar_marcacao_ponto", {
+        p_marcacao_id: marcacaoId,
+        p_motivo: motivo?.trim() || null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ponto-marcacoes-dia"] });
+      queryClient.invalidateQueries({ queryKey: ["ponto-diario"] });
+      queryClient.invalidateQueries({ queryKey: ["ponto-marcacoes"] });
+      toast.success("Marcação reconsiderada (voltou ao cálculo do dia).");
+    },
+    onError: (error: Error) => {
+      toast.error("Erro ao reconsiderar marcação: " + error.message);
+    },
+  });
+
   return {
     // Hooks de query
     usePontoDiario,
@@ -706,6 +730,9 @@ export function usePonto() {
 
     excluirMarcacao: excluirMarcacaoMutation.mutateAsync,
     excluindoMarcacao: excluirMarcacaoMutation.isPending,
+
+    reconsiderarMarcacao: reconsiderarMarcacaoMutation.mutateAsync,
+    reconsiderandoMarcacao: reconsiderarMarcacaoMutation.isPending,
   };
 }
 

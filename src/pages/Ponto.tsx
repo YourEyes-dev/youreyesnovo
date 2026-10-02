@@ -86,6 +86,7 @@ const Ponto = () => {
     excluirAjuste, excluindoAjuste,
     editarMarcacao, editandoMarcacao,
     excluirMarcacao, excluindoMarcacao,
+    reconsiderarMarcacao, reconsiderandoMarcacao,
   } = usePonto();
 
 
@@ -153,7 +154,7 @@ const Ponto = () => {
     queryFn: async () => {
       if (!tenantIdAtivo) return [] as any[];
       let q = fromTable("ponto_marcacoes")
-        .select("id,colaborador_cpf,hora_marcacao,tipo_marcacao,marcacao_original,hash_marcacao,endereco_geolocalizacao,selfie_url,distancia_metros,dentro_cerca")
+        .select("id,colaborador_cpf,hora_marcacao,tipo_marcacao,marcacao_original,hash_marcacao,endereco_geolocalizacao,selfie_url,distancia_metros,dentro_cerca,desconsiderada,desconsiderada_motivo")
         .eq("tenant_id", tenantIdAtivo)
         .eq("data_marcacao", dataSelStr);
       // NÃO filtramos por empresa_id aqui de propósito. As marcações são
@@ -284,7 +285,7 @@ const Ponto = () => {
     return map;
   }, [desligados]);
   const marcacoesPorCpf = useMemo(() => {
-    const map = new Map<string, Array<{ id: string; hora: string; tipo: string; original: boolean; hash?: string; endereco?: string; selfieUrl?: string; distanciaMetros?: number | null; dentroCerca?: boolean | null }>>();
+    const map = new Map<string, Array<{ id: string; hora: string; tipo: string; original: boolean; hash?: string; endereco?: string; selfieUrl?: string; distanciaMetros?: number | null; dentroCerca?: boolean | null; desconsiderada?: boolean; desconsideradaMotivo?: string | null }>>();
     for (const m of marcacoesDoDia) {
       const k = onlyDigits(m.colaborador_cpf);
       if (!map.has(k)) map.set(k, []);
@@ -298,6 +299,8 @@ const Ponto = () => {
         selfieUrl: m.selfie_url,
         distanciaMetros: m.distancia_metros ?? null,
         dentroCerca: m.dentro_cerca ?? null,
+        desconsiderada: m.desconsiderada ?? false,
+        desconsideradaMotivo: m.desconsiderada_motivo ?? null,
       });
     }
     return map;
@@ -974,6 +977,12 @@ const Ponto = () => {
                     : (obs || undefined);
                   const cpfKey = onlyDigits(ponto.colaborador_cpf);
                   const marcs = marcacoesPorCpf.get(cpfKey) || [];
+                  // Batidas desconsideradas ficam FORA do cálculo e do pareamento
+                  // (iguais à apuração) e aparecem num bloco à parte, com a ação
+                  // "Reconsiderar". Assim a tela deixa de contar uma batida que a
+                  // conta não usa.
+                  const marcsAtivas = marcs.filter((m) => !m.desconsiderada);
+                  const marcsDescon = marcs.filter((m) => m.desconsiderada);
                   const atestadoRaw = atestadosPorCpf.get(cpfKey);
                   const atestadoInfo = atestadoRaw ? (() => {
                     const unidade = (atestadoRaw.unidade_afastamento || "dias");
@@ -1005,7 +1014,7 @@ const Ponto = () => {
                   // Calcula total a partir dos pares (entrada → saída), independente do label
                   let totalMin = 0;
                   let pendingEntry: string | null = null;
-                  for (const m of marcs) {
+                  for (const m of marcsAtivas) {
                     const isEntry = m.tipo === "entrada" || m.tipo === "retorno_almoco";
                     if (isEntry) {
                       pendingEntry = m.hora;
@@ -1019,7 +1028,7 @@ const Ponto = () => {
                   // Saldo apurado do dia (RPC) — mesma fonte do Banco de Horas.
                   const saldoApurado = saldoDiaPorCpf.get(cpfKey);
                   const totalDiaMin = saldoApurado ? saldoApurado.trabalhadoMin : Math.max(0, totalMin);
-                  const totalLabel = saldoApurado || marcs.length > 0
+                  const totalLabel = saldoApurado || marcsAtivas.length > 0
                     ? formatarHoraMinuto(totalDiaMin)
                     : formatInterval(ponto.horas_trabalhadas);
 
@@ -1125,7 +1134,7 @@ const Ponto = () => {
                         // seguinte (saída) fecha o par. Saídas órfãs ficam em linha própria.
                         const linhas: typeof marcs[] = [];
                         let atual: typeof marcs = [];
-                        for (const m of marcs) {
+                        for (const m of marcsAtivas) {
                           const isEntry = m.tipo === "entrada" || m.tipo === "retorno_almoco";
                           if (isEntry) {
                             if (atual.length > 0) linhas.push(atual);
@@ -1296,11 +1305,42 @@ const Ponto = () => {
                                   </div>
                                 );
                               })}
+                              {marcsDescon.length > 0 && (
+                                <div className="pt-1 mt-1 border-t border-dashed border-slate-200">
+                                  <p className="text-[11px] font-semibold text-slate-500 mb-1">
+                                    Batidas desconsideradas (fora do cálculo){podeEditarMarcacao ? " — clique para reconsiderar" : ""}
+                                  </p>
+                                  <div className="grid grid-cols-2 gap-1.5 max-w-[22rem]">
+                                    {marcsDescon.map((m) => {
+                                      const isEntry = m.tipo === "entrada" || m.tipo === "retorno_almoco";
+                                      return (
+                                        <MarcacaoBadge
+                                          key={m.id}
+                                          id={m.id}
+                                          hora={m.hora}
+                                          isEntry={isEntry}
+                                          original={m.original}
+                                          podeEditar={podeEditarMarcacao}
+                                          editando={editandoMarcacao}
+                                          onSalvar={editarMarcacao}
+                                          tipo={m.tipo}
+                                          desconsiderada
+                                          desconsideradaMotivo={m.desconsideradaMotivo}
+                                          onReconsiderar={podeEditarMarcacao ? reconsiderarMarcacao : undefined}
+                                          reconsiderando={reconsiderandoMarcacao}
+                                          tenantId={tenantIdAtivo}
+                                          colaboradorCpf={ponto.colaborador_cpf}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                               {/* Rodapé de total do dia */}
                               <div className={cn(gridCols, "pt-1 mt-1 border-t border-border")}>
                                 <div className="text-xs font-medium text-muted-foreground">Total do dia</div>
                                 <div className="text-center">
-                                  <Badge variant="outline" className="font-mono text-[11px]">{marcs.length}</Badge>
+                                  <Badge variant="outline" className="font-mono text-[11px]">{marcsAtivas.length}</Badge>
                                 </div>
                                <div
                                  className="text-center font-medium font-mono text-sm"

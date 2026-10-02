@@ -24,7 +24,7 @@ import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import {
   MARCA, ALTURA_CABECALHO, carregarLogo, desenharCabecalho, desenharRodape, estiloTabela,
 } from "@/lib/ponto/pdfMarca";
-import { desenharCartaoPonto } from "@/lib/ponto/cartaoPonto";
+import { desenharCartaoPonto, desenharEspelhoPonto } from "@/lib/ponto/cartaoPonto";
 import { gerarAFD671 } from "@/lib/ponto/afd671";
 import { gerarAEJ671, type AejMarcacao, type AejOcorrencia } from "@/lib/ponto/aej671";
 import { IncluirBancoHorasDialog } from "@/components/ponto/IncluirBancoHorasDialog";
@@ -34,7 +34,7 @@ type ReportType = "cartao_ponto" | "espelho" | "horas_extras" | "banco_horas" | 
 
 const REPORT_TYPES: { value: ReportType; label: string; desc: string }[] = [
   { value: "cartao_ponto", label: "Cartão Ponto", desc: "Modelo clássico dia a dia (H.D./H.N./H.E./H.C./H.A./F.N./F.J.)" },
-  { value: "espelho", label: "Espelho de Ponto", desc: "Detalhamento dia a dia por colaborador (modelo legal)" },
+  { value: "espelho", label: "Espelho de Ponto", desc: "Marcações de entrada/saída e saldo do dia (modelo legal, Portaria 671)" },
   { value: "horas_extras", label: "Horas Extras", desc: "Detalhamento de horas extras do período" },
   { value: "banco_horas", label: "Banco de Horas", desc: "Saldo e movimentações do banco de horas" },
   { value: "absenteismo", label: "Absenteísmo", desc: "Relatório de faltas e atrasos" },
@@ -931,7 +931,8 @@ export function PontoRelatoriosTab() {
           (b: any) => soDigitos(b.colaborador_cpf) === c.cpf,
         );
 
-        desenharCartaoPonto(doc, {
+        const desenhar = tipoRelatorio === "espelho" ? desenharEspelhoPonto : desenharCartaoPonto;
+        desenhar(doc, {
           incluirBanco: comBanco,
           empregador: {
             razaoSocial: empresaDoRelatorio || "—",

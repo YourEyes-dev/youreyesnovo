@@ -109,6 +109,14 @@ export interface CartaoPontoInput {
   /** false = não desenhar o painel de banco de horas (folha sem banco). */
   incluirBanco?: boolean;
   logoDataUrl?: string | null;
+  /**
+   * Leiaute do documento. "cartao" = modelo clássico do contador (colunas de
+   * siglas H.D./H.N./H.E./…). "espelho" = modelo legal (Portaria MTP 671/2021):
+   * marcações em colunas de entrada/saída e saldo do dia assinado. Mesma
+   * apuração e a mesma moldura (identificação, resumo, banco, assinaturas);
+   * muda só o título, o corpo da tabela e a legenda. Ausente = "cartao".
+   */
+  variante?: "cartao" | "espelho";
 }
 
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
@@ -126,6 +134,38 @@ const hm = (min: number) => {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return `${h}:${String(m).padStart(2, "0")}`;
+};
+
+/**
+ * Saldo do dia assinado, para o modelo espelho: "+H:MM" (crédito), "−H:MM"
+ * (débito) ou "" (dia neutro / sem apuração). Usa o sinal de menos tipográfico.
+ */
+const saldoAssinado = (min: number) => {
+  if (!min) return "";
+  const abs = Math.abs(min);
+  const t = `${Math.floor(abs / 60)}:${String(abs % 60).padStart(2, "0")}`;
+  // Hífen ASCII, não o sinal de menos tipográfico (U+2212): a fonte padrão do
+  // jsPDF (helvetica/WinAnsi) não tem o glifo de U+2212 e imprime um artefato.
+  return min < 0 ? `-${t}` : `+${t}`;
+};
+
+/**
+ * Marcações do dia em quatro colunas (1ª Entrada / 1ª Saída / 2ª Entrada /
+ * 2ª Saída) — o formato do espelho legal. Marcação incluída pelo RH ganha "*".
+ * Dia com intervalo pré-assinalado (não batido) mostra "(P)" nas colunas do
+ * intervalo (Súmula 338, III do TST). Batidas da 5ª em diante voltam em
+ * `extras`, para entrar como observação na coluna de ocorrência.
+ */
+const marcacoesSlots = (
+  d: CartaoDia,
+): { slots: [string, string, string, string]; extras: string } => {
+  const fmt = (m?: CartaoMarcacao) => (m ? `${m.hora}${m.origem === "A" ? "*" : ""}` : "");
+  const ms = d.marcacoes;
+  if (d.intervalo_origem === "pre_assinalado" && ms.length <= 2) {
+    return { slots: [fmt(ms[0]), "(P)", "(P)", fmt(ms[1])], extras: "" };
+  }
+  const extras = ms.length > 4 ? ms.slice(4).map((m) => fmt(m)).join(" ") : "";
+  return { slots: [fmt(ms[0]), fmt(ms[1]), fmt(ms[2]), fmt(ms[3])], extras };
 };
 
 /**
@@ -276,14 +316,21 @@ function faixaTitulo(doc: jsPDF, input: CartaoPontoInput, pagina: number) {
     }
   }
 
+  const ehEspelho = input.variante === "espelho";
   doc.setTextColor(...MARCA.branco);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text("CARTÃO PONTO", x, 8.5);
+  doc.text(ehEspelho ? "ESPELHO DE PONTO" : "CARTÃO PONTO", x, 8.5);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.6);
   doc.setTextColor(200, 214, 232);
-  doc.text("YourEyes · Gestão de Jornada · Portaria 671/2021 MTP", x, 13.5);
+  doc.text(
+    ehEspelho
+      ? "YourEyes · Espelho de Ponto Eletrônico · Portaria 671/2021 MTP (art. 94)"
+      : "YourEyes · Gestão de Jornada · Portaria 671/2021 MTP",
+    x,
+    13.5,
+  );
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
@@ -391,7 +438,9 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
   faixaTitulo(doc, input, pagina);
   const inicio = blocoIdentificacao(doc, input);
 
-  const totais = { hd: 0, hn: 0, he: 0, hc: 0, ha: 0, fn: 0, fj: 0 };
+  const ehEspelho = input.variante === "espelho";
+
+  const totais = { hd: 0, hn: 0, he: 0, hc: 0, ha: 0, fn: 0, fj: 0, saldo: 0 };
   const corpo = input.dias.map((d) => {
     const k = classificarDia(d, input.banco?.temRegime !== false);
     totais.hd += d.trabalhado_min;
@@ -401,6 +450,25 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
     totais.ha += k.ha;
     totais.fn += k.fn;
     totais.fj += k.fj;
+    totais.saldo += d.saldo_min;
+    if (ehEspelho) {
+      // Modelo legal: marcações em quatro colunas (entrada/saída) e o saldo do
+      // dia assinado, no lugar das siglas H.E./H.C./H.A./F.N./F.J. do cartão.
+      const { slots, extras } = marcacoesSlots(d);
+      const ocorr = extras ? `${k.ocorrencia}  ·  + ${extras}` : k.ocorrencia;
+      return [
+        dataCurta(d.dia),
+        diaSemana(d.dia),
+        slots[0],
+        slots[1],
+        slots[2],
+        slots[3],
+        hm(d.trabalhado_min),
+        hm(d.jornada_min),
+        saldoAssinado(d.saldo_min),
+        ocorr,
+      ];
+    }
     return [
       dataCurta(d.dia),
       diaSemana(d.dia),
@@ -419,7 +487,7 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
 
   const pageH = doc.internal.pageSize.getHeight();
 
-  // Espaço reservado abaixo da tabela para que o cartão de cada colaborador
+  // Espaço reservado abaixo da tabela para que o documento de cada colaborador
   // caiba em UMA única página: painel de horas (30,4) + faixa de banco (17)
   // + legenda (17 — três linhas, com a do intervalo pré-assinalado) +
   // declaração e assinaturas (30) + rodapé institucional (14). A tabela se
@@ -428,25 +496,37 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
   const espacoTabela = pageH - 14 - inicio - RESERVA_RODAPE;
 
 
-  // Linhas efetivas: dias com 5+ batidas ocupam mais de uma linha.
-  const linhasEfetivas = corpo.reduce(
-    (acc, l) => acc + String(l[2]).split("\n").length,
-    0,
+  // Linhas efetivas: no cartão, dias com 5+ batidas ocupam mais de uma linha
+  // (a coluna de marcações quebra). No espelho as batidas vão em colunas fixas,
+  // então cada dia é sempre uma linha.
+  const linhasEfetivas = (ehEspelho
+    ? corpo.length
+    : corpo.reduce((acc, l) => acc + String(l[2]).split("\n").length, 0)
   ) + 2; // cabeçalho + totalização
   const alturaLinha = espacoTabela / Math.max(linhasEfetivas, 1);
   const padding = alturaLinha < 4.4 ? 0.7 : 1.2;
   const fonte = Math.min(7, Math.max(4.6, (alturaLinha - 2 * padding) / 0.42));
 
+  const headEspelho = ["Data", "Dia", "1ª Ent.", "1ª Saí.", "2ª Ent.", "2ª Saí.", "Trab.", "Prev.", "Saldo", "Ocorrência"];
+  const headCartao = ["Data", "Sem", "Marcações", "Ocorrência", "H.D.", "H.N.", "H.E.", "A.N.", "H.C.", "H.A.", "F.N.", "F.J."];
+  const vazioEspelho = ["", "", "", "", "", "", "", "", "", "Sem dias apurados"];
+  const vazioCartao = ["", "", "Sem dias apurados", "", "", "", "", "", "", "", "", ""];
+  const footEspelho = [
+    "Totalização", "", "", "", "", "",
+    hm(totais.hd), hm(totais.hn), saldoAssinado(totais.saldo), "Resumo do período",
+  ];
+  const footCartao = [
+    "Totalização", "", "", "Resumo diário",
+    hm(totais.hd), hm(totais.hn), hm(totais.he), "",
+    hm(totais.hc), hm(totais.ha), hm(totais.fn), hm(totais.fj),
+  ];
+
   autoTable(doc, {
     startY: inicio,
     theme: "grid",
-    head: [["Data", "Sem", "Marcações", "Ocorrência", "H.D.", "H.N.", "H.E.", "A.N.", "H.C.", "H.A.", "F.N.", "F.J."]],
-    body: corpo.length > 0 ? corpo : [["", "", "Sem dias apurados", "", "", "", "", "", "", "", "", ""]],
-    foot: [[
-      "Totalização", "", "", "Resumo diário",
-      hm(totais.hd), hm(totais.hn), hm(totais.he), "",
-      hm(totais.hc), hm(totais.ha), hm(totais.fn), hm(totais.fj),
-    ]],
+    head: [ehEspelho ? headEspelho : headCartao],
+    body: corpo.length > 0 ? corpo : [ehEspelho ? vazioEspelho : vazioCartao],
+    foot: [ehEspelho ? footEspelho : footCartao],
     styles: {
       font: "helvetica",
       fontSize: fonte,
@@ -472,22 +552,51 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
       halign: "right",
     },
     alternateRowStyles: { fillColor: [250, 251, 253] },
-    columnStyles: {
-      0: { cellWidth: 11, halign: "center" },
-      1: { cellWidth: 9, halign: "center" },
-      2: { cellWidth: 42, halign: "center" },
-      3: { cellWidth: 30 },
-      4: { cellWidth: 10, halign: "right" },
-      5: { cellWidth: 10, halign: "right" },
-      6: { cellWidth: 10, halign: "right" },
-      7: { cellWidth: 10, halign: "right" },
-      8: { cellWidth: 10, halign: "right" },
-      9: { cellWidth: 10, halign: "right" },
-      10: { cellWidth: 10, halign: "right" },
-      11: { cellWidth: 10, halign: "right" },
-    },
+    columnStyles: ehEspelho
+      ? {
+          0: { cellWidth: 12, halign: "center" },
+          1: { cellWidth: 9, halign: "center" },
+          2: { cellWidth: 15, halign: "center" },
+          3: { cellWidth: 15, halign: "center" },
+          4: { cellWidth: 15, halign: "center" },
+          5: { cellWidth: 15, halign: "center" },
+          6: { cellWidth: 14, halign: "right" },
+          7: { cellWidth: 14, halign: "right" },
+          8: { cellWidth: 15, halign: "right" },
+          9: { halign: "left" },
+        }
+      : {
+          0: { cellWidth: 11, halign: "center" },
+          1: { cellWidth: 9, halign: "center" },
+          2: { cellWidth: 42, halign: "center" },
+          3: { cellWidth: 30 },
+          4: { cellWidth: 10, halign: "right" },
+          5: { cellWidth: 10, halign: "right" },
+          6: { cellWidth: 10, halign: "right" },
+          7: { cellWidth: 10, halign: "right" },
+          8: { cellWidth: 10, halign: "right" },
+          9: { cellWidth: 10, halign: "right" },
+          10: { cellWidth: 10, halign: "right" },
+          11: { cellWidth: 10, halign: "right" },
+        },
     didParseCell: (dados) => {
       if (dados.section !== "body") return;
+      if (ehEspelho) {
+        const texto = String(dados.row.raw?.[9] ?? "");
+        const saldo = String(dados.row.raw?.[8] ?? "");
+        if (texto === "DSR" || texto === "Feriado") dados.cell.styles.fillColor = [237, 242, 249];
+        if (dados.column.index === 8) {
+          if (saldo.startsWith("+")) dados.cell.styles.textColor = [22, 101, 52];
+          else if (saldo.startsWith("-")) dados.cell.styles.textColor = MARCA.vermelho;
+        }
+        if (dados.column.index === 9) {
+          if (texto === "Falta") dados.cell.styles.textColor = MARCA.vermelho;
+          else if (texto.startsWith("Falta compensada")) dados.cell.styles.textColor = [29, 78, 216];
+          else if (texto.startsWith("Pendência")) dados.cell.styles.textColor = [180, 83, 9];
+          else if (texto.startsWith("Folga")) dados.cell.styles.textColor = [29, 78, 216];
+        }
+        return;
+      }
       const texto = String(dados.row.raw?.[3] ?? "");
       if (texto === "DSR" || texto === "Feriado") dados.cell.styles.fillColor = [237, 242, 249];
       if (texto === "Falta") dados.cell.styles.textColor = MARCA.vermelho;
@@ -633,11 +742,18 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(5.4);
   doc.setTextColor(...MARCA.cinza);
-  [
-    "H.D. = Total de horas do dia   H.N. = Hora normal (prevista)   H.E. = Hora extra   A.N. = Adicional noturno   H.C. = Hora compensada",
-    "H.A. = Hora de ausência   F.N. = Falta não justificada   F.J. = Falta justificada   O = Marcação original   I = Marcação incluída pelo RH",
-    "(P) = Intervalo pré-assinalado: intervalo declarado formalmente, não batido (Súmula 338, III do TST; Portaria MTP 671/2021)",
-  ].forEach((linha, i) => doc.text(linha, 12, y + 3.2 + i * 2.8));
+  (ehEspelho
+    ? [
+        "Trab. = Horas trabalhadas no dia   Prev. = Jornada prevista   Saldo = Trab. menos Prev. (+ crédito / - débito no período)",
+        "1ª/2ª Ent. e Saí. = entradas e saídas registradas   * = marcação incluída pelo RH",
+        "(P) = Intervalo pré-assinalado: declarado formalmente, não batido (Súmula 338, III do TST; Portaria MTP 671/2021)",
+      ]
+    : [
+        "H.D. = Total de horas do dia   H.N. = Hora normal (prevista)   H.E. = Hora extra   A.N. = Adicional noturno   H.C. = Hora compensada",
+        "H.A. = Hora de ausência   F.N. = Falta não justificada   F.J. = Falta justificada   O = Marcação original   I = Marcação incluída pelo RH",
+        "(P) = Intervalo pré-assinalado: intervalo declarado formalmente, não batido (Súmula 338, III do TST; Portaria MTP 671/2021)",
+      ]
+  ).forEach((linha, i) => doc.text(linha, 12, y + 3.2 + i * 2.8));
 
   y += 11;
 
@@ -661,5 +777,15 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
 
   const total = doc.getNumberOfPages();
   desenharRodape(doc, doc.getCurrentPageInfo().pageNumber, total);
+}
+
+/**
+ * Espelho de Ponto Eletrônico (modelo legal, Portaria MTP 671/2021). Mesma
+ * apuração e a mesma moldura do cartão — muda o título, o corpo da tabela
+ * (marcações em colunas de entrada/saída + saldo do dia assinado) e a legenda.
+ * Atalho sobre `desenharCartaoPonto` com a variante "espelho".
+ */
+export function desenharEspelhoPonto(doc: jsPDF, input: CartaoPontoInput) {
+  desenharCartaoPonto(doc, { ...input, variante: "espelho" });
 }
 

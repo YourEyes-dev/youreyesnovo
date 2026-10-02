@@ -195,7 +195,11 @@ function classificarDia(d: CartaoDia, temRegimeBanco: boolean) {
     // registro que o próprio sistema sabe estar pela metade.
     ocorrencia = "Pendência — marcação incompleta";
   } else if (d.equalizacao) {
-    ocorrencia = "Compensado";
+    // Sábado de equalização: as horas FECHAM a carga do mês (compensação de
+    // jornada, CLT art. 59 §2º) — é cumprimento de jornada, não folga. O rótulo
+    // "Equalização" (igual ao da tela) deixa isso claro; antes dizia
+    // "Compensado", que dava a impressão errada de folga.
+    ocorrencia = "Equalização";
     hc = d.trabalhado_min;
   } else if (d.protegido && semTrabalho) {
     ocorrencia = "Justificado";
@@ -259,13 +263,16 @@ function faixaTitulo(doc: jsPDF, input: CartaoPontoInput, pagina: number) {
 
   let x = 12;
   if (input.logoDataUrl) {
+    // Reserva o espaço do logo SEMPRE que a caixa é desenhada — inclusive se a
+    // imagem falhar ao carregar. Antes o x só avançava DEPOIS do addImage; se
+    // ele lançasse, a caixa ficava desenhada e o título caía por cima dela.
+    doc.setFillColor(...MARCA.branco);
+    doc.roundedRect(10, 3, 13, 12, 1.8, 1.8, "F");
+    x = 27;
     try {
-      doc.setFillColor(...MARCA.branco);
-      doc.roundedRect(11, 3, 12, 12, 1.8, 1.8, "F");
-      doc.addImage(input.logoDataUrl, "PNG", 12.2, 4.2, 9.6, 9.6);
-      x = 26;
+      doc.addImage(input.logoDataUrl, "PNG", 11.2, 4.2, 10.6, 9.6);
     } catch {
-      /* sem logo */
+      /* sem a imagem: a caixa fica vazia, mas o título não sobrepõe */
     }
   }
 

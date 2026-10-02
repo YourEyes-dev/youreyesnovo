@@ -55,6 +55,13 @@ export interface CartaoDia {
    * (Súmula 338 do TST).
    */
   folga_compensatoria?: boolean;
+  /**
+   * Dia de falta que foi COMPENSADA pelo banco de horas (compensação efetivada):
+   * o débito no banco é a única cobrança — a folha não desconta o dia nem derruba
+   * o DSR (CLT art. 462; RQ-050/051). O cartão precisa marcar como "compensada em
+   * banco" para não parecer falta não justificada (cobrança dupla).
+   */
+  falta_compensada?: boolean;
 }
 
 export interface CartaoEmpregador {
@@ -193,6 +200,11 @@ function classificarDia(d: CartaoDia, temRegimeBanco: boolean) {
   } else if (d.protegido && semTrabalho) {
     ocorrencia = "Justificado";
     fj = d.jornada_min;
+  } else if (d.falta_compensada && semTrabalho && !semJornada) {
+    // Falta convertida em débito do banco (compensação efetivada): o banco é a
+    // única cobrança. NÃO entra como falta não justificada (senão pareceria
+    // cobrança dupla: banco + folha). Fica como informativo.
+    ocorrencia = "Falta compensada em banco";
   } else if (semTrabalho && !semJornada) {
     ocorrencia = "Falta";
     fn = d.jornada_min;
@@ -472,6 +484,7 @@ export function desenharCartaoPonto(doc: jsPDF, input: CartaoPontoInput) {
       const texto = String(dados.row.raw?.[3] ?? "");
       if (texto === "DSR" || texto === "Feriado") dados.cell.styles.fillColor = [237, 242, 249];
       if (texto === "Falta") dados.cell.styles.textColor = MARCA.vermelho;
+      if (texto.startsWith("Falta compensada")) dados.cell.styles.textColor = [29, 78, 216];
       if (texto.startsWith("Pendência")) dados.cell.styles.textColor = [180, 83, 9];
       if (texto.startsWith("Folga")) dados.cell.styles.textColor = [29, 78, 216];
       if (texto.startsWith("Soma")) dados.cell.styles.textColor = [22, 101, 52];

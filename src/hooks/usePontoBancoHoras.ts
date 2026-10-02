@@ -198,7 +198,9 @@ export function usePontoBancoHoras() {
       .eq("id", bancoHorasId)
       .single() as { data: any };
     const creditos = (movs || []).filter(m => m.tipo === "credito").reduce((s, m) => s + (m.minutos || 0), 0);
-    const debitos = (movs || []).filter(m => m.tipo === "debito").reduce((s, m) => s + (m.minutos || 0), 0);
+    // 'compensacao_falta' (débito gerado pela ciência da compensação de falta)
+    // conta como débito — igual à fonte única e à apuração no banco.
+    const debitos = (movs || []).filter(m => m.tipo === "debito" || m.tipo === "compensacao_falta").reduce((s, m) => s + (m.minutos || 0), 0);
     const compensados = (movs || []).filter(m => m.tipo === "compensacao").reduce((s, m) => s + (m.minutos || 0), 0);
     const saldoAtual = (bh?.saldo_anterior_minutos || 0) + creditos - debitos - compensados;
     await fromTable("ponto_banco_horas")

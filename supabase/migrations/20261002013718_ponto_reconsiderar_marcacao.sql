@@ -32,25 +32,30 @@ DECLARE
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'Não autenticado'; END IF;
 
-  SELECT * INTO v_marc FROM public.ponto_marcacoes WHERE id = p_marcacao_id;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Marcação não encontrada'; END IF;
+  -- Atribuições por subconsulta escalar (sem SELECT ... INTO): assim o
+  -- auxiliar "auto-RLS" do SQL Editor não confunde variável com tabela nova
+  -- se este corpo for colado junto de um CREATE TABLE (pegadinha do editor).
+  v_marc := (SELECT m FROM public.ponto_marcacoes m WHERE m.id = p_marcacao_id LIMIT 1);
+  IF v_marc.id IS NULL THEN RAISE EXCEPTION 'Marcação não encontrada'; END IF;
 
   -- Via 1: cadastro ativo no tenant
-  SELECT EXISTS (
+  v_has_access := EXISTS (
     SELECT 1 FROM public.usuarios_base ub
     WHERE ub.auth_user_id = v_uid AND ub.tenant_id = v_marc.tenant_id AND ub.status = 'ativo'
-  ) INTO v_has_access;
+  );
 
   -- Via 2: vínculo multi-empresa ativo no tenant
   IF NOT v_has_access THEN
-    SELECT uv.tipo_vinculo::text INTO v_vinculo_role
-    FROM public.usuario_vinculos uv
-    JOIN public.usuarios_base ub2 ON ub2.id = uv.usuario_id
-    WHERE ub2.auth_user_id = v_uid
-      AND uv.tenant_id = v_marc.tenant_id
-      AND uv.status = 'ativo'
-      AND (uv.data_fim IS NULL OR uv.data_fim >= CURRENT_DATE)
-    LIMIT 1;
+    v_vinculo_role := (
+      SELECT uv.tipo_vinculo::text
+      FROM public.usuario_vinculos uv
+      JOIN public.usuarios_base ub2 ON ub2.id = uv.usuario_id
+      WHERE ub2.auth_user_id = v_uid
+        AND uv.tenant_id = v_marc.tenant_id
+        AND uv.status = 'ativo'
+        AND (uv.data_fim IS NULL OR uv.data_fim >= CURRENT_DATE)
+      LIMIT 1
+    );
     IF v_vinculo_role IS NOT NULL THEN
       v_has_access := true;
       v_is_gestor := v_vinculo_role IN ('gestor','administrador','rh','rh_dp');
@@ -59,10 +64,10 @@ BEGIN
 
   -- Via 3: perfil no tenant
   IF NOT v_has_access THEN
-    SELECT EXISTS (
+    v_has_access := EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.user_id = v_uid AND p.tenant_id = v_marc.tenant_id
-    ) INTO v_has_access;
+    );
   END IF;
 
   IF NOT v_has_access THEN RAISE EXCEPTION 'Sem acesso a este tenant'; END IF;
@@ -76,11 +81,11 @@ BEGIN
       OR public.is_superadmin(v_uid);
   END IF;
   IF NOT v_is_gestor THEN
-    SELECT EXISTS (
+    v_is_gestor := EXISTS (
       SELECT 1 FROM public.usuarios_base ub3
       WHERE ub3.auth_user_id = v_uid
         AND ub3.tipo_usuario IN ('gestor','administrador','rh_dp')
-    ) INTO v_is_gestor;
+    );
   END IF;
   IF NOT v_is_gestor THEN
     RAISE EXCEPTION 'Apenas gestor/RH pode reconsiderar marcações';
@@ -137,7 +142,7 @@ SELECT
   || '(ex.: a saída real retirada junto com a duplicada), o RH precisa de um caminho de '
   || 'volta pela tela, sem SQL. Reconsiderar devolve a batida ao cálculo (desconsiderada '
   || '= false) e reconsolida o dia; a batida nunca saiu do acervo (Portaria MTP 671/2021).',
-  'positivo',
+  'feliz',
   'api',
   'alta',
   'aprovado',

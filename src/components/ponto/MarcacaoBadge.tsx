@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogIn, LogOut, Pencil, Loader2, EyeOff, MapPin, Camera, Clock } from "lucide-react";
+import { LogIn, LogOut, Pencil, Loader2, EyeOff, Eye, MapPin, Camera, Clock } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,11 +28,18 @@ interface Props {
   /** Tenant e CPF do dono da marcação — para registrar quem viu a selfie. */
   tenantId?: string | null;
   colaboradorCpf?: string | null;
+  /** Batida desconsiderada: mantida no acervo, fora do cálculo do dia. */
+  desconsiderada?: boolean;
+  desconsideradaMotivo?: string | null;
+  /** Reativa a batida (desfaz a desconsideração) — volta ao cálculo do dia. */
+  onReconsiderar?: (args: { marcacaoId: string; motivo: string }) => Promise<unknown>;
+  reconsiderando?: boolean;
 }
 
-export function MarcacaoBadge({ 
+export function MarcacaoBadge({
   id, hora, isEntry, original, podeEditar, editando, onSalvar, onExcluir, excluindo,
-  endereco, selfieUrl, tipo, distanciaMetros, dentroCerca, tenantId, colaboradorCpf
+  endereco, selfieUrl, tipo, distanciaMetros, dentroCerca, tenantId, colaboradorCpf,
+  desconsiderada, desconsideradaMotivo, onReconsiderar, reconsiderando
 }: Props) {
   const [open, setOpen] = useState(false);
   // LGPD arts. 11 e 46 (PONTO-397): a selfie é dado pessoal sensível. Fica
@@ -63,9 +70,11 @@ export function MarcacaoBadge({
 
   const badgeClasses = cn(
     "flex items-center justify-between p-2 rounded-lg border transition-all w-full",
-    isEntry
-      ? "bg-emerald-50 text-emerald-700 border-emerald-100 hover:border-emerald-300"
-      : "bg-rose-50 text-rose-700 border-rose-100 hover:border-rose-300",
+    desconsiderada
+      ? "bg-slate-50 text-slate-400 border-slate-200 border-dashed hover:border-slate-400"
+      : isEntry
+        ? "bg-emerald-50 text-emerald-700 border-emerald-100 hover:border-emerald-300"
+        : "bg-rose-50 text-rose-700 border-rose-100 hover:border-rose-300",
     podeEditar && "cursor-pointer"
   );
 
@@ -80,11 +89,12 @@ export function MarcacaoBadge({
       
       <div className="flex-1">
         <div className="flex items-center gap-2">
-          <span className="font-mono font-bold text-sm">{hora?.substring(0, 5)}</span>
+          <span className={cn("font-mono font-bold text-sm", desconsiderada && "line-through")}>{hora?.substring(0, 5)}</span>
           <span className="text-[10px] uppercase font-semibold opacity-70">
             {tipo === 'batida' ? (isEntry ? 'Entrada' : 'Saída') : (tipo || (isEntry ? 'Entrada' : 'Saída'))}
           </span>
-          {!original && <span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded">Ajustado</span>}
+          {desconsiderada && <span className="text-[9px] bg-slate-200 text-slate-600 px-1 rounded font-semibold">Desconsiderada</span>}
+          {!original && !desconsiderada && <span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded">Ajustado</span>}
           {podeEditar && dentroCerca === true && (
             <span
               className="text-[9px] bg-emerald-100 text-emerald-700 px-1 rounded font-semibold"
@@ -140,6 +150,78 @@ export function MarcacaoBadge({
       {podeEditar && <Pencil className="w-3 h-3 opacity-40" />}
     </div>
   );
+
+  // Batida desconsiderada: está fora do cálculo do dia. A única ação possível
+  // é RECONSIDERAR (desfazer a desconsideração) — nunca retificar/desconsiderar
+  // de novo. Serve para quando a batida foi tirada por engano.
+  if (desconsiderada) {
+    if (!podeEditar || !onReconsiderar) {
+      return (
+        <div
+          className={badgeClasses}
+          title={desconsideradaMotivo ? `Desconsiderada: ${desconsideradaMotivo}` : "Marcação desconsiderada (fora do cálculo do dia)"}
+        >
+          {content}
+        </div>
+      );
+    }
+    return (
+      <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setMotivo(""); }}>
+        <PopoverTrigger asChild>
+          <button type="button" className={badgeClasses} title="Marcação desconsiderada — clique para reconsiderar">
+            {content}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 max-w-[calc(100vw-2rem)] p-3" align="start" collisionPadding={16}>
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">Reconsiderar marcação</p>
+              <p className="text-[11px] text-muted-foreground">
+                Esta batida está fora do cálculo do dia. Reconsiderar faz ela voltar ao cálculo — a prova sempre esteve no acervo (Portaria MTP 671/2021).
+              </p>
+            </div>
+            {desconsideradaMotivo && (
+              <p className="text-[11px] text-muted-foreground">
+                <span className="font-semibold">Motivo da desconsideração:</span> {desconsideradaMotivo}
+              </p>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Justificativa (opcional)</Label>
+              <Textarea
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                placeholder="Ex.: saída real retirada por engano junto com a duplicada"
+                rows={2}
+                className="text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="ghost" className="flex-1 px-2" onClick={() => setOpen(false)} disabled={reconsiderando}>
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 px-2"
+                disabled={reconsiderando}
+                onClick={async () => {
+                  setOpen(false);
+                  const ok = await confirm({
+                    title: "Reconsiderar marcação?",
+                    description: `A marcação das ${hora?.substring(0, 5)} volta ao cálculo da jornada do dia.`,
+                    confirmLabel: "Reconsiderar",
+                  });
+                  if (ok) await onReconsiderar({ marcacaoId: id, motivo: motivo.trim() });
+                }}
+                title="Reativar esta marcação — volta ao cálculo do dia"
+              >
+                {reconsiderando ? <Loader2 className="w-3 h-3 animate-spin" /> : (<><Eye className="w-3.5 h-3.5 mr-1" /> Reconsiderar</>)}
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
 
   if (!podeEditar) {
     return (

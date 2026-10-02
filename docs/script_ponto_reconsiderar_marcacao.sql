@@ -1,8 +1,13 @@
 -- ============================================================================
 -- ENTREGA (produção) — Reconsiderar marcação: desfazer uma desconsideração
 -- ----------------------------------------------------------------------------
--- Cole no SQL Editor de PRODUÇÃO. Idempotente (roda duas vezes sem quebrar).
--- Só cria FUNÇÃO (não cria tabela) — não aciona o auto-RLS do editor.
+-- Cole no SQL Editor de PRODUÇÃO, SOZINHO (aba vazia). Idempotente.
+-- Só cria FUNÇÃO (não cria tabela). IMPORTANTE: não cole este script na MESMA
+-- aba de um script que tenha "CREATE TABLE" (ex.: o conserto que cria a tabela
+-- backup_...). O editor liga o auto-RLS ao ver um CREATE TABLE e injeta
+-- "ALTER TABLE ... ENABLE RLS" no texto todo, quebrando o corpo da função.
+-- Por garantia, a função abaixo NÃO usa "SELECT ... INTO" (usa subconsulta
+-- escalar), então sobrevive mesmo se colada junto por engano.
 --
 -- Cria reconsiderar_marcacao_ponto(id, motivo): devolve ao cálculo do dia uma
 -- batida que havia sido desconsiderada (desconsiderada = false), registra a
@@ -30,23 +35,26 @@ DECLARE
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'Não autenticado'; END IF;
 
-  SELECT * INTO v_marc FROM public.ponto_marcacoes WHERE id = p_marcacao_id;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Marcação não encontrada'; END IF;
+  -- Subconsulta escalar (sem SELECT ... INTO): imune ao auto-RLS do editor.
+  v_marc := (SELECT m FROM public.ponto_marcacoes m WHERE m.id = p_marcacao_id LIMIT 1);
+  IF v_marc.id IS NULL THEN RAISE EXCEPTION 'Marcação não encontrada'; END IF;
 
-  SELECT EXISTS (
+  v_has_access := EXISTS (
     SELECT 1 FROM public.usuarios_base ub
     WHERE ub.auth_user_id = v_uid AND ub.tenant_id = v_marc.tenant_id AND ub.status = 'ativo'
-  ) INTO v_has_access;
+  );
 
   IF NOT v_has_access THEN
-    SELECT uv.tipo_vinculo::text INTO v_vinculo_role
-    FROM public.usuario_vinculos uv
-    JOIN public.usuarios_base ub2 ON ub2.id = uv.usuario_id
-    WHERE ub2.auth_user_id = v_uid
-      AND uv.tenant_id = v_marc.tenant_id
-      AND uv.status = 'ativo'
-      AND (uv.data_fim IS NULL OR uv.data_fim >= CURRENT_DATE)
-    LIMIT 1;
+    v_vinculo_role := (
+      SELECT uv.tipo_vinculo::text
+      FROM public.usuario_vinculos uv
+      JOIN public.usuarios_base ub2 ON ub2.id = uv.usuario_id
+      WHERE ub2.auth_user_id = v_uid
+        AND uv.tenant_id = v_marc.tenant_id
+        AND uv.status = 'ativo'
+        AND (uv.data_fim IS NULL OR uv.data_fim >= CURRENT_DATE)
+      LIMIT 1
+    );
     IF v_vinculo_role IS NOT NULL THEN
       v_has_access := true;
       v_is_gestor := v_vinculo_role IN ('gestor','administrador','rh','rh_dp');
@@ -54,10 +62,10 @@ BEGIN
   END IF;
 
   IF NOT v_has_access THEN
-    SELECT EXISTS (
+    v_has_access := EXISTS (
       SELECT 1 FROM public.profiles p
       WHERE p.user_id = v_uid AND p.tenant_id = v_marc.tenant_id
-    ) INTO v_has_access;
+    );
   END IF;
 
   IF NOT v_has_access THEN RAISE EXCEPTION 'Sem acesso a este tenant'; END IF;
@@ -70,11 +78,11 @@ BEGIN
       OR public.is_superadmin(v_uid);
   END IF;
   IF NOT v_is_gestor THEN
-    SELECT EXISTS (
+    v_is_gestor := EXISTS (
       SELECT 1 FROM public.usuarios_base ub3
       WHERE ub3.auth_user_id = v_uid
         AND ub3.tipo_usuario IN ('gestor','administrador','rh_dp')
-    ) INTO v_is_gestor;
+    );
   END IF;
   IF NOT v_is_gestor THEN
     RAISE EXCEPTION 'Apenas gestor/RH pode reconsiderar marcações';

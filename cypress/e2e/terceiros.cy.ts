@@ -74,6 +74,12 @@ describe("Módulo Prestadores / Terceiros", () => {
   // TERC-TELA-07
   it("mostra o estado vazio orientando a cadastrar o primeiro terceiro", () => {
     abrirAba("Terceiros");
+    // A ilha de teste é COMPARTILHADA e pode já ter terceiros — então forçamos o
+    // estado vazio por busca (um termo que não casa com nada), do mesmo jeito que
+    // USR-TELA-05 faz em Usuários. A lista é filtrada por esse campo, então a
+    // orientação do vazio aparece sem depender de a base estar realmente zerada.
+    cy.get('input[placeholder*="Buscar por razão social"]', { timeout: 20000 })
+      .should("exist").type("zzz-nao-existe-999", { force: true });
     cy.contains("Nenhum terceiro cadastrado", { timeout: 20000 }).should("be.visible");
   });
 });

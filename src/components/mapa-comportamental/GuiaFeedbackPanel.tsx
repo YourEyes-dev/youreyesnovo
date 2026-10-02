@@ -50,8 +50,8 @@ export function GuiaFeedbackPanel({ cpf }: Props) {
             </div>
           ))}
         <p className="text-xs text-muted-foreground">
-          Orientação de estilo para adaptar a conversa — não é medida de competência e não muda o
-          conteúdo do feedback. Baseada no Mapa Comportamental que essa pessoa respondeu.
+          Orientação do MODUS™ para adaptar a conversa — não é medida de competência e não muda o
+          conteúdo do feedback. Baseada no MODUS que essa pessoa respondeu.
         </p>
       </CardContent>
     </Card>

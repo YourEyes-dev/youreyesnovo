@@ -82,7 +82,7 @@ export function FichaPessoa({ mapaId, nome, onVoltar }: Props) {
                     </div>
                   ))}
                 <p className="text-xs text-muted-foreground">
-                  Orientação de estilo para adaptar a sua liderança — não é medida de competência. Veja a
+                  Orientação do MODUS para adaptar a sua liderança — não é medida de competência. Veja a
                   aba Guia do Líder para o conteúdo completo.
                 </p>
               </CardContent>

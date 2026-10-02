@@ -4,7 +4,7 @@
 // Conteúdo curado dos quatro perfis + camadas complementares. É o insumo do
 // RF-007 e o ativo que dá valor ao módulo. Escrito em TENDÊNCIA/PREFERÊNCIA,
 // nunca em capacidade ou limitação (RN-010). Cada perfil abre com a frase de
-// enquadramento: "este é um mapa de estilo, não uma medida de competência".
+// enquadramento MODUS: "o seu modo de operar, não uma medida de competência".
 //
 // Biblioteca FIXA (padrão YourEyes) nesta fase — edição pelo cliente (RF-017)
 // fica para uma evolução.
@@ -13,7 +13,7 @@
 import type { Arquetipo } from "@/data/instrumentos/mapaComportamental";
 
 export const GUIA_ENQUADRAMENTO =
-  "Este é um mapa de estilo, não uma medida de competência. Use a orientação abaixo para adaptar a sua liderança — não para rotular a pessoa. Não existe perfil melhor nem pior.";
+  "O MODUS™ mostra o modo de operar da pessoa, não uma medida de competência. Use a orientação abaixo para adaptar a sua liderança — não para rotular a pessoa. Não existe perfil melhor nem pior.";
 
 export interface BlocoGuia {
   chave: string;

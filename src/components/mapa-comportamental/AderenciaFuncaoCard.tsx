@@ -124,7 +124,7 @@ export function AderenciaFuncaoCard({ mapaId, resultado }: Props) {
         <div className="flex items-start gap-2 rounded-md bg-muted/50 p-2.5 text-xs text-muted-foreground">
           <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span>
-            Aderência de <strong>estilo</strong>, em linguagem de tendência — onde a pessoa tende a fluir e onde pode
+            Aderência do <strong>MODUS</strong>, em linguagem de tendência — onde a pessoa tende a fluir e onde pode
             precisar de mais apoio/energia. Não é medida de competência e <strong>não serve para movimentação,
             promoção ou desligamento</strong>.
           </span>

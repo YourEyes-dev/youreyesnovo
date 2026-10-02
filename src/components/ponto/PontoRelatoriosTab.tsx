@@ -396,6 +396,13 @@ export function PontoRelatoriosTab() {
       const { data: pagina, error: errMarc } = await fromTable("ponto_marcacoes")
         .select("colaborador_cpf, data_marcacao, hora_marcacao, tipo_marcacao, marcacao_original, origem_marcacao")
         .eq("tenant_id", tenantId)
+        // Batida desconsiderada (duplicada/incorreta) sai do cálculo do dia em
+        // TODA a apuração (_ponto_calc_dia, corte da virada, reordenação). O
+        // espelho é a jornada APURADA que o trabalhador assina — tem de mostrar
+        // as MESMAS batidas que a conta usou. Listá-la aqui deixava a sequência
+        // ímpar e o dia "incompleto" no documento, mesmo com a conta já certa.
+        // A prova não se perde: a batida fica no acervo e no AFD (REP bruto).
+        .eq("desconsiderada", false)
         .gte("data_marcacao", `${competencia}-01`)
         .lte("data_marcacao", `${competencia}-${String(ultimoDia).padStart(2, "0")}`)
         .order("data_marcacao")
@@ -642,6 +649,10 @@ export function PontoRelatoriosTab() {
       filtrarEmpresa(
         fromTable("ponto_marcacoes")
           .select("colaborador_cpf, colaborador_nome, data_marcacao, hora_marcacao, origem_marcacao")
+          // O AEJ é a jornada APURADA (Portaria MTP 671/2021): só entram as
+          // batidas que a conta reconhece. A batida desconsiderada (duplicada/
+          // incorreta) fica de fora — ela segue preservada no AFD (REP bruto).
+          .eq("desconsiderada", false)
           .gte("data_marcacao", inicio)
           .lte("data_marcacao", fim)
           .limit(50000),

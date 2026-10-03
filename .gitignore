@@ -36,3 +36,7 @@ __pycache__/
 
 # Estado local do Supabase CLI (projeto vinculado, versão) — nunca versionar.
 supabase/.temp/
+
+# Rede de Segurança: o snapshot de cada corrida é subproduto (a baseline,
+# essa sim, é versionada). Ver docs/REDE_SEGURANCA_QA.md.
+qa-harness/resultado-atual.tsv

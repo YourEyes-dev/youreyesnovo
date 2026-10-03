@@ -1,0 +1,9 @@
+# Extensão-FALSA de pg_net, só para o banco efêmero da Rede de Segurança.
+# NÃO é o pg_net de verdade: dá corpo a net.http_post/get para que as
+# migrations que disparam HTTP atravessem um Postgres puro. Nenhuma
+# requisição sai de fato — devolve um id fictício. Em produção/staging o
+# pg_net REAL é usado.
+default_version = '0.9'
+comment = 'stub de pg_net para a Rede de Segurança (CI/réplica local)'
+relocatable = false
+schema = pg_catalog

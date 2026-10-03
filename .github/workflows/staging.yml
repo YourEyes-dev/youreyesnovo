@@ -355,6 +355,31 @@ jobs:
             exit 1
           fi
 
+      - name: Semear a empresa de demonstração (Metalúrgica Exemplo)
+        # Empresa fictícia para prints de marketing e demos de venda, num
+        # cliente (tenant) PRÓPRIO — a conta-robô do Cypress não a enxerga.
+        # A função recusa qualquer projeto que não seja o de TESTE. Idempotente.
+        # NÃO-FATAL: se falhar, só avisa; a suíte segue igual.
+        env:
+          DEMO_URL: https://bmehdgthciuvdbvutsdv.supabase.co/functions/v1/seed-demo-empresa
+          QA_E2E_TOKEN: ${{ secrets.QA_E2E_TOKEN }}
+          DEMO_SENHA: ${{ secrets.DEMO_SENHA }}
+        run: |
+          if [ -z "$QA_E2E_TOKEN" ]; then
+            echo "::warning::QA_E2E_TOKEN ausente — empresa de demonstração não semeada."
+            exit 0
+          fi
+          S="$DEMO_SENHA" python3 -c 'import json,os;s=os.environ.get("S","");open("/tmp/demo.json","w").write(json.dumps({"senha":s} if s else {}))'
+          CODE=$(curl -sS -o /tmp/demo.out -w "%{http_code}" -X POST "$DEMO_URL" \
+            -H "Content-Type: application/json" \
+            -H "x-qa-token: $QA_E2E_TOKEN" \
+            --data-binary @/tmp/demo.json) || CODE=000
+          echo "Resposta (HTTP $CODE): $(cat /tmp/demo.out 2>/dev/null)"
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 300 ]; then
+            echo "::warning::Empresa de demonstração não semeada (HTTP $CODE). A suíte segue."
+          fi
+          exit 0
+
       - name: Rodar a suíte
         run: npm run test:e2e
       - name: Guardar prints e vídeos da corrida

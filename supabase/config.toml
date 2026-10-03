@@ -99,6 +99,9 @@ project_id = "diayjpsrcerycycyaxst"
   # por isso dispensa o JWT do gateway.
   [functions.seed-e2e-user]
     verify_jwt = false
+  # Empresa de demonstração (só TESTE): fechada pelo x-qa-token, como a acima.
+  [functions.seed-demo-empresa]
+    verify_jwt = false
   [functions.sst-pdf-extract]
     verify_jwt = false
   [functions.trilha-notificacoes]

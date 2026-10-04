@@ -190,11 +190,11 @@ CARGO-TELA-04	nao_implementado
 CARGO-TELA-05	nao_implementado
 CARGO-TELA-06	nao_implementado
 CARGO-TELA-07	nao_implementado
-CENTRAL-001	nao_implementado
-CENTRAL-002	nao_implementado
-CENTRAL-003	nao_implementado
-CENTRAL-004	nao_implementado
-CENTRAL-005	nao_implementado
+CENTRAL-001	passou
+CENTRAL-002	passou
+CENTRAL-003	passou
+CENTRAL-004	passou
+CENTRAL-005	passou
 CERT-001	passou
 CERT-010	passou
 CERT-011	passou
@@ -1145,7 +1145,7 @@ PONTO-251	passou
 PONTO-252	passou
 PONTO-253	passou
 PONTO-254	nao_implementado
-PONTO-270	falhou
+PONTO-270	passou
 PONTO-271	passou
 PONTO-290	passou
 PONTO-291	passou

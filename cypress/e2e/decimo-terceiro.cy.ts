@@ -141,4 +141,12 @@ describe("13º Salário", () => {
     cy.get('[role="dialog"]').contains("a partir da admissão").should("exist");
     fecharDialog();
   });
+
+  // DEC13-042 — depende de um 13º já calculado (seed-folha-fixture): o FGTS
+  // de 8% aparece discriminado no DETALHE de cada parcela.
+  it("o detalhe de um 13º calculado discrimina o FGTS", () => {
+    cy.get('[title="Detalhe"]', { timeout: 20000 }).first().click({ force: true });
+    cy.get('[role="dialog"]', { timeout: 15000 }).contains("FGTS").should("exist");
+    cy.get("body").type("{esc}", { force: true });
+  });
 });

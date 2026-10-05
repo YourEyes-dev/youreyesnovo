@@ -60,6 +60,11 @@ describe("Módulo Saúde Ocupacional (ASO)", () => {
   });
 
   it("abre o formulário de Novo ASO", () => {
+    // O painel carrega os ASOs de forma assíncrona e re-renderiza o cabeçalho
+    // quando os dados chegam; clicar antes disso perdia o botão (detached from
+    // DOM). Espera o resumo carregar e estabilizar antes de clicar.
+    cy.contains("Total de ASOs", { timeout: 20000 }).should("be.visible");
+    cy.wait(500);
     cy.contains("button", "Novo ASO", { timeout: 20000 }).should("be.visible").click();
     cy.get('[role="dialog"]', { timeout: 15000 }).should("exist");
     cy.get("body").type("{esc}");
@@ -73,6 +78,11 @@ describe("Módulo Saúde Ocupacional (ASO)", () => {
 
   it("mostra vazio orientativo quando a busca não acha", () => {
     const inexistente = `zzz-sem-resultado-${Date.now()}`;
+    // Espera o painel carregar e estabilizar antes de digitar: a lista
+    // re-renderiza quando os dados chegam e isso soltava o input do DOM no meio
+    // do type (detached from DOM).
+    cy.contains("Total de ASOs", { timeout: 20000 }).should("be.visible");
+    cy.wait(500);
     // force:true no type: a lista re-renderiza a cada tecla ao filtrar, e sem o
     // force o Cypress aborta com "the page updated while this command was executing".
     cy.get('input[placeholder="Buscar por colaborador ou médico..."]', { timeout: 20000 })

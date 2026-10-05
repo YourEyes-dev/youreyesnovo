@@ -380,6 +380,31 @@ jobs:
           fi
           exit 0
 
+      - name: Semear a fixture de folha (13º calculado) na Empresa Staging
+        # Gera as 1ª/2ª parcelas do 13º do ano corrente para os colaboradores
+        # que a conta-robô já plantou — assim a aba 13º tem linhas e o detalhe
+        # mostra INSS/IRRF/FGTS (caso DEC13-042). Roda DEPOIS da conta-robô
+        # (que cria os colaboradores). A função recusa projeto que não seja de
+        # teste e é idempotente. NÃO-FATAL: se falhar, só avisa; mas os testes
+        # que dependem do dado (FGTS) vão falhar e apontar a causa.
+        env:
+          FOLHA_FIXTURE_URL: https://bmehdgthciuvdbvutsdv.supabase.co/functions/v1/seed-folha-fixture
+          QA_E2E_TOKEN: ${{ secrets.QA_E2E_TOKEN }}
+        run: |
+          if [ -z "$QA_E2E_TOKEN" ]; then
+            echo "::warning::QA_E2E_TOKEN ausente — fixture de folha não semeada."
+            exit 0
+          fi
+          CODE=$(curl -sS -o /tmp/folha.out -w "%{http_code}" -X POST "$FOLHA_FIXTURE_URL" \
+            -H "Content-Type: application/json" \
+            -H "x-qa-token: $QA_E2E_TOKEN" \
+            --data-binary '{}') || CODE=000
+          echo "Resposta (HTTP $CODE): $(cat /tmp/folha.out 2>/dev/null)"
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 300 ]; then
+            echo "::warning::Fixture de folha não semeada (HTTP $CODE). Testes com dado (FGTS) podem falhar."
+          fi
+          exit 0
+
       - name: Rodar a suíte
         run: npm run test:e2e
       - name: Guardar prints e vídeos da corrida

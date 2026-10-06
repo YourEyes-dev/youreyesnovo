@@ -70,23 +70,31 @@ describe("Módulo Saúde Ocupacional (ASO)", () => {
     cy.get("body").type("{esc}");
   });
 
+  // Digitar na busca com segurança. A lista de ASOs chega async e re-renderiza o
+  // campo quando os dados carregam; além disso, o clear() dispara o filtro e
+  // re-renderiza a lista. Por isso: (1) espera o resumo ("Total de ASOs")
+  // estabilizar antes de tocar na busca (padrão do #776 para ASO-010/021) e
+  // (2) NUNCA encadeia clear().type() no MESMO cy.get — re-consulta o input
+  // entre os dois, para o type pegar um handle novo em vez de um elemento solto
+  // do DOM (detached from DOM — foi o que derrubou "filtra a lista pela busca"
+  // na corrida #3 do cypress; o force:true pula actionability, não resolve
+  // subject destacado).
+  const SELETOR_BUSCA = 'input[placeholder="Buscar por colaborador ou médico..."]';
+  function digitarNaBusca(texto: string) {
+    cy.contains("Total de ASOs", { timeout: 20000 }).should("be.visible");
+    cy.wait(500);
+    cy.get(SELETOR_BUSCA, { timeout: 20000 }).should("be.visible").clear({ force: true });
+    cy.get(SELETOR_BUSCA).type(texto, { force: true });
+  }
+
   it("filtra a lista pela busca", () => {
-    cy.get('input[placeholder="Buscar por colaborador ou médico..."]', { timeout: 20000 })
-      .should("be.visible").clear({ force: true }).type("Administrativo", { force: true });
+    digitarNaBusca("Administrativo");
     cy.contains("Algo deu errado").should("not.exist");
   });
 
   it("mostra vazio orientativo quando a busca não acha", () => {
     const inexistente = `zzz-sem-resultado-${Date.now()}`;
-    // Espera o painel carregar e estabilizar antes de digitar: a lista
-    // re-renderiza quando os dados chegam e isso soltava o input do DOM no meio
-    // do type (detached from DOM).
-    cy.contains("Total de ASOs", { timeout: 20000 }).should("be.visible");
-    cy.wait(500);
-    // force:true no type: a lista re-renderiza a cada tecla ao filtrar, e sem o
-    // force o Cypress aborta com "the page updated while this command was executing".
-    cy.get('input[placeholder="Buscar por colaborador ou médico..."]', { timeout: 20000 })
-      .should("be.visible").clear({ force: true }).type(inexistente, { force: true });
+    digitarNaBusca(inexistente);
     cy.contains("Nenhum registro de ASO encontrado.").should("exist");
   });
 

@@ -33,9 +33,12 @@ tela não cumpre fica **pendente e documentado aqui**, nunca "coberto" por um
 > (tabela `gro_riscos`, subtipo `fisico`, fonte `manual`). O `nivel_risco`
 > (criticidade) é calculado pelo trigger `calcular_nivel_gro_risco` no banco. O
 > `RiscoForm` não mudou de UI; só o destino da escrita. Consequência: o risco
-> cadastrado pela tela agora aparece no Inventário GRO e nos cards, destravando
-> **ERGO-010** (coberto no Cypress) e os seguintes, que passam a ser escrevíveis:
-> **ERGO-014/015/020/024/061**. A tabela antiga `ergonomia_riscos` vira legado (o
+> cadastrado pela tela agora aparece no Inventário GRO e nos cards. Destravou de
+> fato **ERGO-010**, **ERGO-014** (criticidade na linha do Inventário GRO) e
+> **ERGO-061** (cards de estatística) — todos cobertos no Cypress. Os demais que
+> eu havia listado como destravados (**ERGO-015/020/024**) têm, na verdade,
+> descompasso de produto PRÓPRIO, documentado abaixo (Bloqueios 2, 3 e 4) — não
+> foram resolvidos por esta correção. A tabela antiga `ergonomia_riscos` vira legado (o
 > painel `ErgonomiaStats`, único leitor, não é renderizado em lugar nenhum). O
 > **eixo** (físico/cognitivo/organizacional) e os **impactos potenciais** do
 > formulário não têm campo no modelo GRO e ficam fora do registro unificado — por
@@ -128,13 +131,81 @@ Enquanto não houver decisão, ERGO-021 fica pendente (não implementado).
 
 ---
 
+### BLOQUEIO 3 — a aba "Riscos Prioritários" não lê o inventário GRO
+
+**Gravidade:** média. **Status:** aberto.
+**Trava:** ERGO-015 ("Risco de alta criticidade aparece na aba Prioritários").
+
+**O que acontece.** A aba "Riscos Prioritários" (`#tab-ergo-prioritarios`)
+renderiza `<InventarioRiscos analises={analises} />`, que lista os riscos
+extraídos das **análises AEP** (`useErgonomiaAnalises` → `analise.riscos_identificados`).
+Um risco crítico cadastrado pelo "Novo Risco" (que agora vai para `gro_riscos`)
+**não aparece** nessa aba — ela é alimentada só pela AEP. O card do topo "Riscos
+Prioritários" conta de `gro_riscos`, mas a ABA não.
+
+**Evidência:** `src/pages/Ergonomia.tsx` (TabsContent "prioritarios" →
+`InventarioRiscos analises={analises}`); `src/components/ergonomia/InventarioRiscos.tsx`
+(prop `analises: ErgonomiaAnalise[]`, expande `riscos_identificados`).
+
+**Opções:** a aba Prioritários passar a listar os `gro_riscos` de nível
+`alto`/`critico` (sozinha ou somada às análises AEP). Feito isso, ERGO-015 vira
+teste que semeia (criar risco crítico → aparece em Prioritários).
+
+---
+
+### BLOQUEIO 4 — não dá para vincular uma ação a um risco do GRO pela tela
+
+**Gravidade:** média. **Status:** aberto.
+**Trava:** ERGO-020 ("Criar ação vinculada a um risco do inventário").
+
+**O que acontece.** O `AcaoForm` tem um select "Vinculada ao Risco" que recebe
+`riscos?: ErgonomiaRisco[]` (entidade antiga) — e o `Ergonomia.tsx` **não passa**
+esse prop ao renderizar o form. Então a lista de riscos para vincular está
+sempre vazia, e nem é da entidade do GRO. Não há como, pela tela, criar uma ação
+vinculada a um risco do Inventário GRO.
+
+**Evidência:** `src/components/ergonomia/AcaoForm.tsx` (prop `riscos?: ErgonomiaRisco[]`,
+select "Vinculada ao Risco"); `src/pages/Ergonomia.tsx` (`<AcaoForm>` sem prop `riscos`).
+
+**Opções:** passar `riscos={groRiscos}` ao `AcaoForm` e tipar o vínculo na
+entidade GRO, gravando a ação com o `acao_id`/vínculo no `gro_risco` (casa com
+`useGRORiscos.vincularAcao`). Feito isso, ERGO-020 vira teste que semeia.
+
+---
+
+### BLOQUEIO 5 — não há como encerrar/arquivar um risco do GRO pela tela
+
+**Gravidade:** média. **Status:** aberto.
+**Trava:** ERGO-024 ("Encerramento de risco crítico sem ação vinculada é impedido").
+
+**O que acontece.** A regra existe no hook (`useGRORiscos.inativarRisco` bloqueia
+arquivar risco `alto`/`critico` sem `acao_id`), mas **nenhuma UI a aciona**: o
+`GROPainel` (que lista os `gro_riscos`) só tem o seletor de ciclo (`status_gro`) e
+não oferece "encerrar/arquivar". O único "arquivar" da tela é o de **análises AEP**
+(`RegistrosErgonomicos` → `arquivarAnalise`), outra entidade. Sem botão, o caso
+não é exercitável pela tela.
+
+**Evidência:** `src/components/ergonomia/GROPainel.tsx` (sem ação de arquivar);
+`src/hooks/useGRORiscos.ts` (`inativarRisco` com a regra de bloqueio);
+`src/pages/Ergonomia.tsx` (`onArquivar={arquivarAnalise}` é só para análises AEP).
+
+**Opções:** expor no `GROPainel` um "Encerrar/Arquivar risco" que chame
+`inativarRisco` — que já devolve o erro de bloqueio quando o risco é alto/crítico
+sem ação. Feito isso, ERGO-024 vira teste (tentar arquivar crítico sem ação →
+bloqueio; vincular ação → permite).
+
+---
+
 ## O que NÃO está bloqueado (já entregue)
 
 - **ERGO-001** — "inicializa a base NR-17 e abre as 7 abas do fluxo GRO":
   implementado semeando o inventário NR-17 pela própria tela (botão
   "Inicializar Itens NR-17", idempotente no backend). Prova que a abordagem de
   teste que semeia funciona; o que falta nos demais casos é a tela cumprir o
-  caso (Bloqueio 1) — não a técnica de teste.
+  caso — não a técnica de teste.
+- **ERGO-010/014/061** — cobertos no Cypress após a resolução do Bloqueio 1
+  (criar risco → aparece no Inventário GRO; criticidade composta na linha; cards
+  de estatística refletem o inventário).
 
 ---
 

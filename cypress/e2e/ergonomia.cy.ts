@@ -23,16 +23,24 @@
 //   porém, o ERGO-072 (estado vazio de primeiro acesso) sem como reproduzir
 //   nesta mesma ilha — ele segue pendente e exigirá um tenant recém-criado.
 //
-// ERGO-010: o Bloqueio 1 foi resolvido — o "Novo Risco" da tela agora grava no
-// inventário unificado `gro_riscos` (via useGRORiscos.criarRisco), então o risco
-// cadastrado APARECE no Inventário GRO, como o caso pede. O it() abaixo semeia e
-// confere isso de ponta a ponta. (Ver docs/BLOQUEIOS_PRODUTO_QA_E2E.md.)
+// ERGO-010/014/061: o Bloqueio 1 foi resolvido — o "Novo Risco" da tela agora
+// grava no inventário unificado `gro_riscos` (via useGRORiscos.criarRisco), então
+// o risco cadastrado APARECE no Inventário GRO (ERGO-010), com a criticidade
+// composta por severidade+probabilidade (ERGO-014) e refletida nos cards de
+// estatística (ERGO-061). Os it() abaixo semeiam e conferem isso de ponta a ponta.
 //
-// Ainda NÃO cobertos (agora destravados; follow-up) ou por descompasso real:
-//   • ERGO-014/015/020/024/061 — destravados pela mesma correção (leem/alimentam
-//     `gro_riscos`); faltam escrever os it() correspondentes.
-//   • ERGO-012 — "eixo ergonômico classifica o risco": o modelo GRO não guarda o
-//     eixo (físico/cognitivo/organizacional), então segue sem suporte.
+// Ainda NÃO cobertos, por descompasso de produto (reportados em
+// docs/BLOQUEIOS_PRODUTO_QA_E2E.md — NÃO mascarados com teste):
+//   • ERGO-015 — a aba "Riscos Prioritários" lê das análises AEP
+//     (InventarioRiscos(analises)), não do inventário gro_riscos; risco criado à
+//     mão não aparece lá (Bloqueio 3).
+//   • ERGO-020 — o AcaoForm não recebe a lista de riscos e seu select de vínculo
+//     é tipado na entidade antiga; não dá pra vincular ação a um risco do GRO
+//     pela tela (Bloqueio 4).
+//   • ERGO-024 — não há botão na tela para encerrar/arquivar um risco do GRO (a
+//     regra existe em useGRORiscos.inativarRisco, mas nada a aciona) (Bloqueio 5).
+//   • ERGO-012 — o modelo GRO não guarda o "eixo" (físico/cognitivo/
+//     organizacional), então a classificação por eixo segue sem suporte.
 //   • ERGO-021 — o caso pede "Responsável exigido na ação", mas o AcaoForm só
 //     trava o salvar por falta de título (responsável é opcional na tela).
 // =====================================================================
@@ -123,5 +131,58 @@ describe("Gestão de Risco Ergonômico (/ergonomia)", () => {
     // E o risco aparece no Inventário GRO — o que o Bloqueio 1 impedia.
     cy.get("#tab-ergo-inventario", { timeout: 20000 }).click({ force: true });
     cy.contains(titulo, { timeout: 20000 }).should("be.visible");
+  });
+
+  // ERGO-014
+  it("a criticidade exibida vem da severidade e da probabilidade", () => {
+    cy.get("body", { timeout: 20000 }).then(($b) => {
+      if ($b.text().includes("Inicializar Itens NR-17")) {
+        cy.contains("button", "Inicializar Itens NR-17").click({ force: true });
+      }
+    });
+    const titulo = `[E2E] Risco crítico ${Date.now()}`;
+    cy.get("#btn-ergo-novo-risco").click({ force: true });
+    cy.get('[role="dialog"]', { timeout: 20000 })
+      .should("be.visible")
+      .and("contain.text", "Cadastrar Risco Ergonômico");
+    cy.get("#titulo").clear().type(titulo);
+    // Severidade = Crítico e Probabilidade = Crítico compõem "Risco Crítico"
+    // (o nivel_risco é calculado pelo trigger calcular_nivel_gro_risco no banco).
+    cy.get('[role="dialog"]').contains("label", "Severidade").parent()
+      .find('[role="combobox"]').click({ force: true });
+    cy.contains('[role="option"]', /^Crítico$/, { timeout: 10000 }).click({ force: true });
+    cy.get('[role="dialog"]').contains("label", "Probabilidade").parent()
+      .find('[role="combobox"]').click({ force: true });
+    cy.contains('[role="option"]', /^Crítico$/, { timeout: 10000 }).click({ force: true });
+    cy.contains("button", "Cadastrar Risco").click({ force: true });
+    cy.contains("Risco registrado no GRO", { timeout: 20000 }).should("be.visible");
+    // A linha do risco no Inventário GRO exibe a criticidade composta.
+    cy.get("#tab-ergo-inventario", { timeout: 20000 }).click({ force: true });
+    cy.contains("tr", titulo, { timeout: 20000 }).should("contain.text", "Risco Crítico");
+  });
+
+  // ERGO-061
+  it("os cards de estatística refletem o inventário GRO", () => {
+    cy.get("body", { timeout: 20000 }).then(($b) => {
+      if ($b.text().includes("Inicializar Itens NR-17")) {
+        cy.contains("button", "Inicializar Itens NR-17").click({ force: true });
+      }
+    });
+    const titulo = `[E2E] Risco p/ estatística ${Date.now()}`;
+    cy.get("#btn-ergo-novo-risco").click({ force: true });
+    cy.get('[role="dialog"]', { timeout: 20000 })
+      .should("be.visible")
+      .and("contain.text", "Cadastrar Risco Ergonômico");
+    cy.get("#titulo").clear().type(titulo);
+    cy.contains("button", "Cadastrar Risco").click({ force: true });
+    cy.contains("Risco registrado no GRO", { timeout: 20000 }).should("be.visible");
+    cy.get("#tab-ergo-inventario", { timeout: 20000 }).click({ force: true });
+    // O risco entrou no inventário...
+    cy.contains("tr", titulo, { timeout: 20000 }).should("be.visible");
+    // ...e o card "Total de Riscos" reflete um inventário não vazio.
+    cy.contains("span", "Total de Riscos", { timeout: 20000 })
+      .closest("div").parent().find(".text-2xl")
+      .invoke("text")
+      .then((t) => expect(Number(t.trim())).to.be.greaterThan(0));
   });
 });

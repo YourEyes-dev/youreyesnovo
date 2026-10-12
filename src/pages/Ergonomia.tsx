@@ -57,7 +57,60 @@ import {
   type ErgonomiaStatus,
   type ErgonomiaCategoria,
   type AcaoStatus,
+  type RiscoSeveridade,
 } from "@/types/ergonomia";
+import type { NovoGRORisco, GROSeveridade, GROProbabilidade } from "@/types/gro";
+
+// ── Ponte Ergonomia → GRO unificado ──────────────────────────────────────────
+// O cadastro de risco da tela sempre foi "físico/ergonômico", então ele alimenta
+// o inventário unificado gro_riscos (subtipo 'fisico'), que é o que o Inventário
+// GRO, os cards de prioridade e as ações leem. Antes, o form gravava em
+// ergonomia_riscos — tabela que a tela não exibe (ver docs/BLOQUEIOS_PRODUTO_QA_E2E.md,
+// Bloqueio 1). As escalas diferem: a Ergonomia usa 4 níveis; o GRO usa 4 de
+// severidade e 5 de probabilidade. O nivel_risco (criticidade) NÃO é enviado —
+// o trigger calcular_nivel_gro_risco o calcula no banco.
+const SEVERIDADE_ERGO_PARA_GRO: Record<RiscoSeveridade, GROSeveridade> = {
+  baixo: "leve",
+  medio: "moderada",
+  alto: "grave",
+  critico: "gravissima",
+};
+const PROBABILIDADE_ERGO_PARA_GRO: Record<RiscoSeveridade, GROProbabilidade> = {
+  baixo: "baixa",
+  medio: "moderada",
+  alto: "alta",
+  critico: "muito_alta",
+};
+
+// Observação de modelo: o GRO não tem campo para o "eixo" (físico/cognitivo/
+// organizacional) nem para "impactos potenciais"; esses ficam fora do registro
+// unificado (ERGO-012 — classificação por eixo — segue sem suporte no GRO).
+function riscoFormParaGRO(data: {
+  titulo: string;
+  descricao?: string;
+  severidade: RiscoSeveridade;
+  probabilidade: RiscoSeveridade;
+  fonte?: string;
+  departamento?: string;
+  setor?: string;
+  medidas_existentes?: string[];
+  medidas_recomendadas?: string[];
+}): NovoGRORisco {
+  return {
+    subtipo: "fisico",
+    fonte: "manual",
+    titulo: data.titulo,
+    descricao: data.descricao || undefined,
+    perigo_identificado: data.fonte || undefined,
+    setor: data.setor || undefined,
+    unidade: data.departamento || undefined,
+    probabilidade: PROBABILIDADE_ERGO_PARA_GRO[data.probabilidade],
+    severidade: SEVERIDADE_ERGO_PARA_GRO[data.severidade],
+    medidas_existentes: data.medidas_existentes?.length ? data.medidas_existentes : undefined,
+    medidas_recomendadas: data.medidas_recomendadas?.length ? data.medidas_recomendadas : undefined,
+    base_normativa: ["NR-01", "NR-17"],
+  };
+}
 
 const CATEGORIAS_ORDENADAS: ErgonomiaCategoria[] = [
   "organizacao_trabalho",
@@ -78,7 +131,7 @@ export default function Ergonomia() {
   const [aepMode, setAepMode] = useState<"simples" | "multi">("simples");
   const [showGuiaRapido, setShowGuiaRapido] = useState(false);
 
-  const { riscos: groRiscos } = useGRORiscos();
+  const { riscos: groRiscos, criarRisco: criarRiscoGRO } = useGRORiscos();
 
   const {
     itensNR17,
@@ -91,12 +144,10 @@ export default function Ergonomia() {
     isLoadingAcoes,
     initializeItens,
     updateItemStatus,
-    createRisco,
     createAcao,
     updateAcaoStatus,
     isInitializing,
     isUpdatingStatus,
-    isCreatingRisco,
     isCreatingAcao,
     refetchItens,
   } = useErgonomia();
@@ -534,10 +585,11 @@ export default function Ergonomia() {
         open={showRiscoForm}
         onOpenChange={setShowRiscoForm}
         onSubmit={async (data) => {
-          await createRisco(data);
+          // Grava no inventário unificado (gro_riscos), que é o que a tela exibe.
+          await criarRiscoGRO.mutateAsync(riscoFormParaGRO(data));
           setShowRiscoForm(false);
         }}
-        isLoading={isCreatingRisco}
+        isLoading={criarRiscoGRO.isPending}
       />
       <AcaoForm
         open={showAcaoForm}

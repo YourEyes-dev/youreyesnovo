@@ -23,13 +23,16 @@
 //   porém, o ERGO-072 (estado vazio de primeiro acesso) sem como reproduzir
 //   nesta mesma ilha — ele segue pendente e exigirá um tenant recém-criado.
 //
-// NÃO coberto aqui, por descompasso doc×código real (reportado ao time, não
-// mascarado com teste):
-//   • ERGO-010/014/061 — o botão "Novo Risco" grava em `ergonomia_riscos`
-//     (useErgonomia.createRisco), mas o Inventário GRO e os cards de
-//     prioridade leem de `gro_riscos` (useGRORiscos). O risco criado pela tela
-//     não aparece no Inventário GRO como o caso pede — logo não há asserção
-//     fiel possível até a tela ser religada à entidade unificada do GRO.
+// ERGO-010: o Bloqueio 1 foi resolvido — o "Novo Risco" da tela agora grava no
+// inventário unificado `gro_riscos` (via useGRORiscos.criarRisco), então o risco
+// cadastrado APARECE no Inventário GRO, como o caso pede. O it() abaixo semeia e
+// confere isso de ponta a ponta. (Ver docs/BLOQUEIOS_PRODUTO_QA_E2E.md.)
+//
+// Ainda NÃO cobertos (agora destravados; follow-up) ou por descompasso real:
+//   • ERGO-014/015/020/024/061 — destravados pela mesma correção (leem/alimentam
+//     `gro_riscos`); faltam escrever os it() correspondentes.
+//   • ERGO-012 — "eixo ergonômico classifica o risco": o modelo GRO não guarda o
+//     eixo (físico/cognitivo/organizacional), então segue sem suporte.
 //   • ERGO-021 — o caso pede "Responsável exigido na ação", mas o AcaoForm só
 //     trava o salvar por falta de título (responsável é opcional na tela).
 // =====================================================================
@@ -96,5 +99,29 @@ describe("Gestão de Risco Ergonômico (/ergonomia)", () => {
       .should("be.visible")
       .and("contain.text", "Cadastrar Risco Ergonômico");
     cy.contains("button", "Cadastrar Risco").should("be.disabled");
+  });
+
+  // ERGO-010
+  it("cadastra um risco e ele aparece no Inventário GRO", () => {
+    // O Inventário GRO (como as outras abas) só monta com a base NR-17; garante.
+    cy.get("body", { timeout: 20000 }).then(($b) => {
+      if ($b.text().includes("Inicializar Itens NR-17")) {
+        cy.contains("button", "Inicializar Itens NR-17").click({ force: true });
+      }
+    });
+    // Título único por execução, pra a asserção não colidir com riscos antigos.
+    const titulo = `[E2E] Risco ergonômico ${Date.now()}`;
+    cy.get("#btn-ergo-novo-risco").click({ force: true });
+    cy.get('[role="dialog"]', { timeout: 20000 })
+      .should("be.visible")
+      .and("contain.text", "Cadastrar Risco Ergonômico");
+    // Título é o obrigatório; eixo/severidade/probabilidade já vêm com padrão.
+    cy.get("#titulo").clear().type(titulo);
+    cy.contains("button", "Cadastrar Risco").should("not.be.disabled").click({ force: true });
+    // A app confirma a persistência no inventário unificado (gro_riscos).
+    cy.contains("Risco registrado no GRO", { timeout: 20000 }).should("be.visible");
+    // E o risco aparece no Inventário GRO — o que o Bloqueio 1 impedia.
+    cy.get("#tab-ergo-inventario", { timeout: 20000 }).click({ force: true });
+    cy.contains(titulo, { timeout: 20000 }).should("be.visible");
   });
 });

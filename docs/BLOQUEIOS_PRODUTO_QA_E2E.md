@@ -26,7 +26,20 @@ tela não cumpre fica **pendente e documentado aqui**, nunca "coberto" por um
 ### BLOQUEIO 1 — "Novo Risco" grava em `ergonomia_riscos`, mas o Inventário GRO lê de `gro_riscos`
 
 **Gravidade:** alta (trava o coração do módulo: inventário, priorização, PGR).
-**Status:** aberto — decisão do dono do produto.
+**Status:** ✅ RESOLVIDO em 12/10/2026 (opção 1 — religar a tela ao GRO unificado).
+
+> **Resolução.** O `onSubmit` do "Novo Risco" (em `src/pages/Ergonomia.tsx`) passou
+> a mapear o formulário para o modelo do GRO e gravar via `useGRORiscos.criarRisco`
+> (tabela `gro_riscos`, subtipo `fisico`, fonte `manual`). O `nivel_risco`
+> (criticidade) é calculado pelo trigger `calcular_nivel_gro_risco` no banco. O
+> `RiscoForm` não mudou de UI; só o destino da escrita. Consequência: o risco
+> cadastrado pela tela agora aparece no Inventário GRO e nos cards, destravando
+> **ERGO-010** (coberto no Cypress) e os seguintes, que passam a ser escrevíveis:
+> **ERGO-014/015/020/024/061**. A tabela antiga `ergonomia_riscos` vira legado (o
+> painel `ErgonomiaStats`, único leitor, não é renderizado em lugar nenhum). O
+> **eixo** (físico/cognitivo/organizacional) e os **impactos potenciais** do
+> formulário não têm campo no modelo GRO e ficam fora do registro unificado — por
+> isso o **ERGO-012** ("eixo classifica o risco") segue sem suporte.
 
 **O que acontece.** O botão **"Novo Risco"** da tela (e também o "Novo" de
 dentro da aba Inventário GRO) abre o mesmo formulário `RiscoForm`, cujo submit

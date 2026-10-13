@@ -197,7 +197,8 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
     const totalRespondentes = stats?.concluidos ?? 0;
     if (situacoes.length === 0) return null; // sem segmentação — usa proteção global
     const contagem = estimarContagemPorGrupo(totalRespondentes, situacoes);
-    return aplicarRegrasPrivacidade(situacoes, contagem, totalRespondentes);
+    // Fase 0.4: contagem por grupo é estimada (respostas anônimas) → sinaliza.
+    return aplicarRegrasPrivacidade(situacoes, contagem, totalRespondentes, { estimado: true });
   }, [campanhaRef.situacoes_trabalho, stats?.concluidos]);
 
   // Dimensões por resposta → agregar média por dimensão

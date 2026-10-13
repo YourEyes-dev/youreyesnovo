@@ -175,7 +175,8 @@ export function InventarioPGR({ campanhas }: InventarioPGRProps) {
     const situacoes = campanhaAtual.situacoes_trabalho ?? [];
     const totalRespondentes = campanhaAtual.total_respostas ?? 0;
     const contagem = estimarContagemPorGrupo(totalRespondentes, situacoes);
-    return aplicarRegrasPrivacidade(situacoes, contagem, totalRespondentes);
+    // Fase 0.4: contagem por grupo é estimada (respostas anônimas) → sinaliza.
+    return aplicarRegrasPrivacidade(situacoes, contagem, totalRespondentes, { estimado: true });
   }, [campanhaAtual]);
 
   // Agregação por GHE (respostas com ghe_id_snapshot). Permite filtrar o inventário

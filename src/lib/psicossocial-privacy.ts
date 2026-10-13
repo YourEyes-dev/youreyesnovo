@@ -59,6 +59,12 @@ export interface ResultadoPrivacidade {
   nivelEfetivo: NivelAgrupamento;
   /** Resumo para exibição ao usuário */
   resumoPrivacidade: string;
+  /**
+   * true quando a contagem por grupo veio de uma ESTIMATIVA (distribuição
+   * uniforme), não de contagem real. Nesse caso a decisão de privacidade por
+   * grupo é uma referência, não uma garantia — a UI deve avisar. (Fase 0.4)
+   */
+  baseadoEmEstimativa: boolean;
 }
 
 /** Contagem de respondentes por par setor+função */
@@ -121,9 +127,13 @@ export function aplicarRegrasPrivacidade(
   situacoes: SituacaoTrabalhoCampanha[],
   contagemPorGrupo: ContagemPorGrupo,
   totalCampanha: number,
+  opts: { estimado?: boolean } = {},
 ): ResultadoPrivacidade {
   const grupos: GrupoAnalise[] = [];
   const MIN = MINIMO_RESPONDENTES_GRUPO;
+  const estimado = !!opts.estimado;
+  const avisoEstimativa =
+    " ⚠️ Distribuição por grupo ESTIMADA (as respostas são anônimas e não têm contagem real por Setor+Função). Use como referência — não é garantia de anonimato por grupo. A contagem real por grupo (respostas × convites) é a correção definitiva.";
 
   if (situacoes.length === 0) {
     // Campanha sem segmentação — usa nível empresa
@@ -145,6 +155,8 @@ export function aplicarRegrasPrivacidade(
       resumoPrivacidade: ok
         ? `Análise liberada — ${totalCampanha} respondentes (nível empresa).`
         : `Dados insuficientes: ${totalCampanha} de ${MIN} respondentes mínimos para garantir anonimato.`,
+      // Sem segmentação, o nível empresa usa o total real de respondentes.
+      baseadoEmEstimativa: false,
     };
   }
 
@@ -232,7 +244,8 @@ export function aplicarRegrasPrivacidade(
     gruposBloqueados: bloqueados,
     agrupamentoAutomaticoAtivado: agrupamentoAtivado,
     nivelEfetivo,
-    resumoPrivacidade: resumo,
+    resumoPrivacidade: estimado ? resumo + avisoEstimativa : resumo,
+    baseadoEmEstimativa: estimado,
   };
 }
 

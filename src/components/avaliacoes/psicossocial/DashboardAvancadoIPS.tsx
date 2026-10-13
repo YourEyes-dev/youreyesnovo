@@ -43,6 +43,7 @@ import { RadaresPsicossocialSection } from "./RadaresPsicossocialSection";
 import { AnaliseSegmentadaSection } from "./AnaliseSegmentadaSection";
 import type { CampanhaPsicossocial } from "@/types/psicossocial";
 import { calcularIPSClassificacao, getIPSLabel, getIPSColor, isEntrevistaInstrumento } from "@/types/psicossocial";
+import { radarParaIPS } from "@/lib/psicossocial-direcao";
 import { 
   BarChart, 
   Bar, 
@@ -88,7 +89,14 @@ export function DashboardAvancadoIPS({ open, onOpenChange, campanhas }: Dashboar
 
   const radarData = useMemo(() => {
     if (!ultimaCampanha?.radar_data) return [];
-    return ultimaCampanha.radar_data as any[];
+    // Régua única de saúde (alto=melhor): normaliza o radar bruto, pois SIPRO e
+    // entrevistas vêm orientados a risco (alto=pior). Corrige barData, radar,
+    // "pior dimensão" e os cards por dimensão de uma vez.
+    return radarParaIPS(
+      ultimaCampanha.radar_data as any[],
+      ultimaCampanha.instrumento,
+      (ultimaCampanha as any).tipo_instrumento,
+    );
   }, [ultimaCampanha]);
 
   // Gráfico de Barras: Comparativo de Dimensões

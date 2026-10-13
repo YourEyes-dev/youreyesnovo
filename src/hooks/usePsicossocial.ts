@@ -206,11 +206,14 @@ export function calcularIndicadores(
   return {
     IPS: ips,
     IPS_classificacao: classificacao,
-    IRP_S: ips,
-    IBO_S: ips,
-    IBD_S: ips,
-    IREC_S: ips,
-    ICOP_S: ips,
+    // B1 (corrigido): instrumentos padrão não têm os sub-índices próprios do
+    // SIPRO. Expõe o risco geral = 100 - IPS (alto=pior), coerente com a escala
+    // de risco desses campos. Antes gravava = IPS (saúde) sob nome de risco.
+    IRP_S: 100 - ips,
+    IBO_S: 100 - ips,
+    IBD_S: 100 - ips,
+    IREC_S: 100 - ips,
+    ICOP_S: 100 - ips,
     detalhes,
     radar,
   };
@@ -762,8 +765,11 @@ export function usePsicossocial() {
           radarFromEntrevistas.reduce((a, b) => a + b.value, 0) / radarFromEntrevistas.length
         );
         radar = radarFromEntrevistas;
-        // SIPRO/IRP-S: score = risco direto (maior = pior).
-        ips = riscoMedio;
+        // B2 (corrigido): stats.ips é SAÚDE (alto=melhor) para TODOS os
+        // instrumentos. A entrevista usa 100 - risco médio, alinhado a
+        // useEntrevistasGuiadasAggregates e usePsicossocialResultadosGHE (que já
+        // faziam 100 - risco). O radar segue em risco e é normalizado na exibição.
+        ips = 100 - riscoMedio;
       }
     }
 

@@ -24,7 +24,6 @@ interface SystemData {
   totalSetores: number;
   temTurnoNoturno: boolean;
   temTurnoRevezamento: boolean;
-  mediaHorasExtras: number; // minutos por semana
   totalAfastamentosSaudeMental: number;
   totalAfastamentos: number;
   totalCampanhasAnteriores: number;
@@ -202,13 +201,11 @@ function calcularScores(sys: SystemData, c: ChecklistRespostas): InstrumentoScor
     motivosSipro.push("turnos/revezamento — Bloco CET Ritmo Biológico incluso no SIPRO");
   }
 
-  if (sys.mediaHorasExtras > 180) {
-    proart += 12; sipro += 8; copsoq += 6;
-    motivosProart.push("horas extras elevadas — PROART avalia sobrecarga e danos");
-  } else if (sys.mediaHorasExtras > 80) {
-    sipro += 8; copsoq += 6;
-    motivosSipro.push("horas extras moderadas — dimensão Ritmo & Carga inclusa");
-  }
+  // Fase 0.5: o critério de horas extras foi removido do scoring. O assistente
+  // não carrega dado real de jornada (viria do módulo Ponto), então o valor
+  // ficava fixo em 0 e o critério nunca disparava — pontuação enganosa. Quando
+  // a integração com o Ponto alimentar a média real de horas extras (Fase 1),
+  // reintroduzir aqui uma faixa baseada nesse dado.
 
   if (sys.grauRisco >= 3) {
     proart += 10; sipro += 8; copsoq += 5;
@@ -409,7 +406,6 @@ export function AssistenteSelecaoInstrumento({
         totalSetores: totalSetoresCount,
         temTurnoNoturno: temNoturno || !!empresa?.possui_terceiro_turno,
         temTurnoRevezamento: temRevezamento || !!empresa?.possui_escalas_especiais,
-        mediaHorasExtras: 0,
         totalAfastamentosSaudeMental: afastSaudeMental,
         totalAfastamentos: afastamentos.length,
         totalCampanhasAnteriores: campanhas.length,
@@ -433,7 +429,7 @@ export function AssistenteSelecaoInstrumento({
     } catch {
       setSysData({
         totalColaboradores: 0, totalSetores: 0, temTurnoNoturno: false,
-        temTurnoRevezamento: false, mediaHorasExtras: 0, totalAfastamentosSaudeMental: 0,
+        temTurnoRevezamento: false, totalAfastamentosSaudeMental: 0,
         totalAfastamentos: 0, totalCampanhasAnteriores: 0, temEscalaIrregular: false, grauRisco: 2,
         possuiTerceiroTurno: false, trabalhoAltura: false, espacoConfinado: false,
         insalubridade: false, periculosidade: false, aposentadoriaEspecial: false, cnae: null,

@@ -206,11 +206,14 @@ export function calcularIndicadores(
   return {
     IPS: ips,
     IPS_classificacao: classificacao,
-    IRP_S: ips,
-    IBO_S: ips,
-    IBD_S: ips,
-    IREC_S: ips,
-    ICOP_S: ips,
+    // B1 (corrigido): instrumentos padrão não têm os sub-índices próprios do
+    // SIPRO. Expõe o risco geral = 100 - IPS (alto=pior), coerente com a escala
+    // de risco desses campos. Antes gravava = IPS (saúde) sob nome de risco.
+    IRP_S: 100 - ips,
+    IBO_S: 100 - ips,
+    IBD_S: 100 - ips,
+    IREC_S: 100 - ips,
+    ICOP_S: 100 - ips,
     detalhes,
     radar,
   };
@@ -348,7 +351,7 @@ export function usePsicossocial() {
                 .maybeSingle();
 
               if (!logExist) {
-                const { scoreToProbabilidade, scoreToSeveridade } = await import("@/types/gro");
+                const { psicossocialDimensaoParaGRO } = await import("@/types/gro");
                 const isSipro = campanha.instrumento === 'sipro';
                 const radar = campanha.radar_data as { subject: string; value: number }[];
 
@@ -368,8 +371,8 @@ export function usePsicossocial() {
                       descricao: `Exportação automática ao encerrar campanha "${campanha.nome}". Dimensão: ${d.subject}. Score: ${d.value}%.`,
                       dimensao_psicossocial: d.subject,
                       score_dimensao: d.value,
-                      probabilidade: scoreToProbabilidade(d.value, isSipro),
-                      severidade: scoreToSeveridade(d.value, isSipro),
+                      // Fase 0.1: severidade do catálogo + nível da matriz única (não do score)
+                      ...psicossocialDimensaoParaGRO(d.subject, d.value, isSipro),
                       campanha_id: id,
                       setor: sit.setorNome,
                       cargo: sit.funcaoNome,
@@ -762,8 +765,11 @@ export function usePsicossocial() {
           radarFromEntrevistas.reduce((a, b) => a + b.value, 0) / radarFromEntrevistas.length
         );
         radar = radarFromEntrevistas;
-        // SIPRO/IRP-S: score = risco direto (maior = pior).
-        ips = riscoMedio;
+        // B2 (corrigido): stats.ips é SAÚDE (alto=melhor) para TODOS os
+        // instrumentos. A entrevista usa 100 - risco médio, alinhado a
+        // useEntrevistasGuiadasAggregates e usePsicossocialResultadosGHE (que já
+        // faziam 100 - risco). O radar segue em risco e é normalizado na exibição.
+        ips = 100 - riscoMedio;
       }
     }
 

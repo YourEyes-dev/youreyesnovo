@@ -438,6 +438,7 @@ export async function gerarDocumentoFatoresRiscoPsicossocial({
 
   const escreverResumoNiveis = (itens: ItemDiagnosticoPsicossocial[]) => {
     const avaliados = somenteAvaliados(itens);
+    const naoAvaliados = itens.length - avaliados.length;
     const contagem = (Object.keys(NIVEL15_LABELS) as NivelGRO15[]).reduce(
       (acc, nivel) => ({ ...acc, [nivel]: avaliados.filter((i) => i.nivelKey === nivel).length }),
       {} as Record<NivelGRO15, number>
@@ -446,10 +447,9 @@ export async function gerarDocumentoFatoresRiscoPsicossocial({
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(35, 35, 35);
+    const base = `Resumo: ${contagem.critico} crítico(s) · ${contagem.alto} alto(s) · ${contagem.medio} médio(s) · ${contagem.baixo} baixo(s) · ${contagem.trivial} trivial(is)`;
     doc.text(
-      s(
-        `Resumo: ${contagem.critico} crítico(s) · ${contagem.alto} alto(s) · ${contagem.medio} médio(s) · ${contagem.baixo} baixo(s) · ${contagem.trivial} trivial(is)`
-      ),
+      s(naoAvaliados > 0 ? `${base} · ${naoAvaliados} não avaliado(s)` : base),
       marginX,
       y
     );
@@ -462,11 +462,17 @@ export async function gerarDocumentoFatoresRiscoPsicossocial({
     writeSubTitle("I.1. Consolidado da campanha (todos os GHEs)");
   }
   const inventarioAvaliado = somenteAvaliados(inventario);
+  const naoAvaliadosConsolidado = inventario.length - inventarioAvaliado.length;
   writeParagraph(
-    `Diagnóstico psicossocial da campanha "${campanha.nome}": ${inventarioAvaliado.length} fator(es) do catálogo NR-01 / ISO 45003 avaliado(s) pelos itens do instrumento aplicado e inventariado(s) pela Matriz GRO (Probabilidade x Severidade), com severidade fixa do catálogo.`
+    `Diagnóstico psicossocial da campanha "${campanha.nome}": ${inventarioAvaliado.length} fator(es) do catálogo NR-01 / ISO 45003 avaliado(s) pelos itens do instrumento aplicado e inventariado(s) pela Matriz GRO (Probabilidade x Severidade), com severidade fixa do catálogo.` +
+      (naoAvaliadosConsolidado > 0
+        ? ` Os ${naoAvaliadosConsolidado} fator(es) restante(s) do catálogo são listados como "Não avaliado" porque o instrumento aplicado não possui item para eles — mantidos no inventário para rastreabilidade dos 13 fatores padrão (o instrumento não mede o que não pergunta; sua ausência não equivale a risco inexistente).`
+        : "")
   );
-  renderTabelaInventario(inventarioAvaliado);
-  escreverResumoNiveis(inventarioAvaliado);
+  // Fase 0.6: listar os 13 fatores (os não cobertos marcados como "Não avaliado"),
+  // em vez de omiti-los — inventário honesto e completo, sem fabricar medição.
+  renderTabelaInventario(inventario);
+  escreverResumoNiveis(inventario);
 
 
   // Estratificação obrigatória por GHE (NR-01 / NR-17): cada grupo tem o seu

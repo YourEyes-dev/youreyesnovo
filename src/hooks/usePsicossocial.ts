@@ -348,7 +348,7 @@ export function usePsicossocial() {
                 .maybeSingle();
 
               if (!logExist) {
-                const { scoreToProbabilidade, scoreToSeveridade } = await import("@/types/gro");
+                const { psicossocialDimensaoParaGRO } = await import("@/types/gro");
                 const isSipro = campanha.instrumento === 'sipro';
                 const radar = campanha.radar_data as { subject: string; value: number }[];
 
@@ -368,8 +368,8 @@ export function usePsicossocial() {
                       descricao: `Exportação automática ao encerrar campanha "${campanha.nome}". Dimensão: ${d.subject}. Score: ${d.value}%.`,
                       dimensao_psicossocial: d.subject,
                       score_dimensao: d.value,
-                      probabilidade: scoreToProbabilidade(d.value, isSipro),
-                      severidade: scoreToSeveridade(d.value, isSipro),
+                      // Fase 0.1: severidade do catálogo + nível da matriz única (não do score)
+                      ...psicossocialDimensaoParaGRO(d.subject, d.value, isSipro),
                       campanha_id: id,
                       setor: sit.setorNome,
                       cargo: sit.funcaoNome,

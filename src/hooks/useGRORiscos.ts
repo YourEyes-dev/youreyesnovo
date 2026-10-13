@@ -158,7 +158,7 @@ export function useGRORiscos() {
         );
       }
 
-      const { scoreToProbabilidade, scoreToSeveridade } = await import("@/types/gro");
+      const { psicossocialDimensaoParaGRO } = await import("@/types/gro");
 
       // Dimensões que configuram risco (≥35 no score de risco)
       const dimensoesCriticas = dimensoes.filter(d => {
@@ -179,8 +179,8 @@ export function useGRORiscos() {
           descricao: `Risco psicossocial identificado na campanha "${campanhaName}". Dimensão: ${d.subject}. Score: ${d.value}%. Situação de trabalho: ${sit.funcaoNome} no setor ${sit.setorNome}.`,
           dimensao_psicossocial: d.subject,
           score_dimensao: d.value,
-          probabilidade: scoreToProbabilidade(d.value, isSipro),
-          severidade: scoreToSeveridade(d.value, isSipro),
+          // Fase 0.1: severidade do catálogo + nível da matriz única (não do score)
+          ...psicossocialDimensaoParaGRO(d.subject, d.value, isSipro),
           campanha_id: campanhaId,
           setor: sit.setorNome,
           cargo: sit.funcaoNome,

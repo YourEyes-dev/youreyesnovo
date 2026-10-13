@@ -31,9 +31,7 @@ import {
   GRO_NIVEL_RISCO_COLORS,
   GRO_PROBABILIDADE_LABELS,
   GRO_SEVERIDADE_LABELS,
-  scoreToProbabilidade,
-  scoreToSeveridade,
-  calcularNivelGRO,
+  psicossocialDimensaoParaGRO,
 } from "@/types/gro";
 import {
   resolverFatorPorSubject,
@@ -68,9 +66,9 @@ interface GHEAvaliado extends ResultadoGHE {
 function avaliarFatores(radar: ResultadoGHE['radar'], isSipro: boolean): FatorAvaliado[] {
   return radar.map(d => {
     const score = d.value;
-    const prob = scoreToProbabilidade(score, isSipro);
-    const sev = scoreToSeveridade(score, isSipro);
-    const nivel = calcularNivelGRO(prob, sev);
+    // Fase 0.1: severidade do catálogo + nível da matriz única (não do score)
+    const { probabilidade: prob, severidade: sev, nivel_risco: nivel } =
+      psicossocialDimensaoParaGRO(d.subject, score, isSipro);
     const fator = resolverFatorPorSubject(d.subject);
     return {
       subject: d.subject,

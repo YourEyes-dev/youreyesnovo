@@ -55,13 +55,12 @@ export const SEVERIDADE_ESCALA: SeveridadeInfo[] = [
   },
 ];
 
-export const PROBABILIDADE_ESCALA = [
-  { valor: 1, label: "Improvável", criterio: "Situação controlada, raramente ocorre. Histórico sem registros nos últimos 2 anos." },
-  { valor: 2, label: "Possível", criterio: "Pode ocorrer em circunstâncias específicas. Registro esporádico ou relato isolado." },
-  { valor: 3, label: "Provável", criterio: "Ocorre com alguma frequência. Relatos recorrentes, dados de afastamento." },
-  { valor: 4, label: "Muito Provável", criterio: "Ocorre frequentemente. Alta frequência, padrão sistêmico identificado." },
-  { valor: 5, label: "Certo", criterio: "Está ocorrendo ou ocorrerá em breve. Situação ativa e confirmada." },
-];
+// NOTA (Fase 0.2): a escala de probabilidade canônica vive em
+// src/lib/groPsicossocial15.ts (PROB15_LABELS / probDisplay), usada pelo
+// Inventário PGR, pelo relatório e pela matriz 4.1/4.3. A antiga
+// PROBABILIDADE_ESCALA deste arquivo (rótulos "Improvável/Possível/..." )
+// divergia daqueles rótulos e não era referenciada em lugar nenhum, então
+// foi removida para não haver duas escalas de probabilidade no módulo.
 
 export function getSeveridadeInfo(valor: number | null | undefined): SeveridadeInfo | null {
   if (!valor) return null;

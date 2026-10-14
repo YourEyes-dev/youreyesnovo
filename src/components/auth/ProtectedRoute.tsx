@@ -5,7 +5,7 @@ import { Loader2, Ban, ShieldOff } from "lucide-react";
 import { useUsuarioStatus } from "@/hooks/useUsuarioStatus";
 import { Button } from "@/components/ui/button";
 import { usePerfilPermissions } from "@/hooks/usePerfilPermissions";
-import { getModuloForPath, ALWAYS_ALLOWED_PATHS, isAdminPath } from "@/lib/moduleAccess";
+import { getModulosForPath, ALWAYS_ALLOWED_PATHS, isAdminPath } from "@/lib/moduleAccess";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -108,15 +108,15 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     !loadingPerfil &&
     !ALWAYS_ALLOWED_PATHS.has(location.pathname.split("?")[0].split("#")[0])
   ) {
-    const modulo = getModuloForPath(location.pathname);
+    const modulos = getModulosForPath(location.pathname);
     const requerAdmin = isAdminPath(location.pathname);
     // Gating estrito:
     //  - rota sem módulo mapeado → bloqueada
     //  - rota administrativa → exige permissão com escopo ≠ proprio_usuario
     //  - demais rotas → basta ter qualquer permissão no módulo
     const blocked =
-      !modulo ||
-      (requerAdmin ? !temAcessoModuloAdmin(modulo) : !temAcessoModulo(modulo));
+      !modulos ||
+      (requerAdmin ? !temAcessoModuloAdmin(modulos) : !temAcessoModulo(modulos));
     if (blocked) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">

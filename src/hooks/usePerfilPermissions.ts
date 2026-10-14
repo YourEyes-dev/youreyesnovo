@@ -104,11 +104,16 @@ export function usePerfilPermissions() {
   /**
    * Verifica se o usuário tem acesso a qualquer ação de um módulo (qualquer escopo).
    * Use para telas de auto-serviço (ex.: meu PDI, minhas trilhas).
+   *
+   * Aceita um módulo ou uma LISTA deles (basta UM bater). A lista existe porque
+   * uma rota pode ser liberada tanto pelo módulo grosso/legado quanto pelo
+   * granular do editor (ver `getModulosForPath` em moduleAccess).
    */
   const temAcessoModulo = useMemo(() => {
-    return (modulo: string): boolean => {
+    return (modulo: string | string[]): boolean => {
       if (isOwner) return true;
-      return permissoes.some((p) => p.modulo === modulo);
+      const alvos = Array.isArray(modulo) ? modulo : [modulo];
+      return permissoes.some((p) => alvos.includes(p.modulo));
     };
   }, [permissoes, isOwner]);
 
@@ -118,12 +123,15 @@ export function usePerfilPermissions() {
    * de listagem/gestão (ex.: /colaboradores, /cadastros/*). Um colaborador com
    * `colaboradores:visualizar` no escopo `proprio_usuario` deve ver apenas o
    * próprio perfil — NÃO a listagem completa.
+   *
+   * Aceita um módulo ou uma lista (basta UM bater), pelo mesmo motivo acima.
    */
   const temAcessoModuloAdmin = useMemo(() => {
-    return (modulo: string): boolean => {
+    return (modulo: string | string[]): boolean => {
       if (isOwner) return true;
+      const alvos = Array.isArray(modulo) ? modulo : [modulo];
       return permissoes.some(
-        (p) => p.modulo === modulo && p.escopo !== "proprio_usuario"
+        (p) => alvos.includes(p.modulo) && p.escopo !== "proprio_usuario"
       );
     };
   }, [permissoes, isOwner]);

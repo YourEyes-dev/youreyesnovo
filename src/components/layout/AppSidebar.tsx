@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { usePerfilPermissions } from "@/hooks/usePerfilPermissions";
-import { getModuloForPath, ALWAYS_ALLOWED_PATHS, isAdminPath } from "@/lib/moduleAccess";
+import { getModulosForPath, ALWAYS_ALLOWED_PATHS, isAdminPath } from "@/lib/moduleAccess";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -618,11 +618,11 @@ export const AppSidebar = ({ isCollapsed, onToggle, isMobile, onClose }: AppSide
       if (isSuperAdmin || isOwner || !perfilVinculado) return true;
       const cleanPath = path.split("?")[0].split("#")[0];
       if (ALWAYS_ALLOWED_PATHS.has(cleanPath)) return true;
-      const modulo = getModuloForPath(path);
-      if (!modulo) return false;
+      const modulos = getModulosForPath(path);
+      if (!modulos) return false;
       // Rotas administrativas exigem escopo ≠ proprio_usuario
-      if (isAdminPath(path)) return temAcessoModuloAdmin(modulo);
-      return temAcessoModulo(modulo);
+      if (isAdminPath(path)) return temAcessoModuloAdmin(modulos);
+      return temAcessoModulo(modulos);
     };
   }, [isSuperAdmin, isOwner, perfilVinculado, temAcessoModulo, temAcessoModuloAdmin]);
 

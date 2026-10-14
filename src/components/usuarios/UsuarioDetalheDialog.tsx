@@ -33,34 +33,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CpfInput } from "@/components/ui/cpf-input";
 import { cleanCpf, formatCpf } from "@/lib/cpf";
 import { mapTipoUsuarioToAppRole } from "@/lib/userRoleMap";
+import { mensagemDaFuncao } from "@/lib/supabaseFunctions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { usePerfisAcesso, type PerfilAcesso } from "@/hooks/usePerfisAcesso";
-
-/**
- * Extrai a mensagem REAL de uma edge function que falhou.
- *
- * O supabase-js embrulha qualquer resposta non-2xx em "Edge Function returned
- * a non-2xx status code" e guarda o corpo original em `error.context`. Como as
- * funções deste projeto respondem { error: "motivo" }, jogar fora o corpo
- * transforma toda falha — permissão, e-mail duplicado, senha curta — na mesma
- * mensagem genérica, e o diagnóstico vira caça ao log.
- */
-async function mensagemDaFuncao(error: any, data: any): Promise<string> {
-  if (data?.error) return String(data.error);
-  try {
-    const ctx = error?.context;
-    if (ctx && typeof ctx.clone === "function") {
-      const corpo = await ctx.clone().json().catch(() => null);
-      if (corpo?.error) return String(corpo.error);
-      const texto = await ctx.clone().text().catch(() => "");
-      if (texto) return texto.slice(0, 300);
-    }
-  } catch {
-    // corpo ilegível — cai na mensagem genérica abaixo
-  }
-  return error?.message || "Falha ao chamar a função";
-}
 
 function EmpresaSearchSelect({ empresas, value, onChange }: { empresas: any[]; value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);

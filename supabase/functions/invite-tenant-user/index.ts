@@ -162,13 +162,30 @@ serve(async (req) => {
 
   const tenantId = callerProfile.tenant_id;
 
-  // Check if email already exists
+  // Check if email already exists.
+  // listUsers é paginado: varrer só a primeira página (perPage 1000) deixava
+  // e-mails já existentes na base passarem como "novos" quando o Auth tem mais
+  // de 1000 contas (é uma base multi-tenant). Aí o ramo de usuário novo chamava
+  // generateLink type "invite", o Auth recusava com "already been registered" e
+  // a função devolvia 500 — o cadastro travava de forma intermitente e sem
+  // motivo visível. Percorre todas as páginas até achar o e-mail ou acabar.
+  const emailAlvo = email.toLowerCase();
   let existingUser: any = null;
   try {
-    const { data: allUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
-    existingUser = allUsers?.users?.find(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    );
+    const PER_PAGE = 1000;
+    for (let page = 1; page <= 100; page++) {
+      const { data: pageData, error: listError } = await admin.auth.admin.listUsers({
+        page,
+        perPage: PER_PAGE,
+      });
+      if (listError) {
+        console.error("Error listing users (page " + page + "):", listError.message);
+        break;
+      }
+      const lote = pageData?.users ?? [];
+      existingUser = lote.find((u) => u.email?.toLowerCase() === emailAlvo);
+      if (existingUser || lote.length < PER_PAGE) break;
+    }
   } catch (e) {
     console.error("Error checking existing users:", e);
   }

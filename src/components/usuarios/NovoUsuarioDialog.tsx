@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { cleanCpf, formatCpf, validateCpf } from "@/lib/cpf";
 import { CpfInput } from "@/components/ui/cpf-input";
 import { mapTipoUsuarioToAppRole } from "@/lib/userRoleMap";
+import { mensagemDaFuncao } from "@/lib/supabaseFunctions";
 import { useGruposEconomicos } from "@/hooks/useGruposEconomicos";
 
 const schemaEtapa1 = z.object({
@@ -251,8 +252,14 @@ export function NovoUsuarioDialog({ open, onOpenChange }: Props) {
         },
       });
 
-      if (authError) throw new Error(authError.message);
-      if ((authData as any)?.error) throw new Error((authData as any).error);
+      // Em falha non-2xx o supabase-js embrulha tudo em "Edge Function returned
+      // a non-2xx status code" e guarda o motivo real em error.context. Sem
+      // extrair esse corpo, o usuário vê sempre a mesma mensagem genérica — e o
+      // motivo verdadeiro (e-mail já em outra organização, sem permissão, falha
+      // no link de convite) nunca aparece na tela.
+      if (authError || (authData as any)?.error) {
+        throw new Error(await mensagemDaFuncao(authError, authData));
+      }
 
       const authUserId = (authData as any)?.userId as string | undefined;
       if (!authUserId) throw new Error("Não foi possível provisionar o acesso no sistema.");

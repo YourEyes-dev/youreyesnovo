@@ -196,19 +196,35 @@ export const ACOES_DISPONIVEIS = [
   { id: "ver_individual", label: "Dados Individualizados", sensivel: true },
 ];
 
+/**
+ * `aplicado` diz se o escopo é de fato HONRADO hoje pelo filtro de dados.
+ *
+ * A trava real (função `perfil_permite_modulo`, nas políticas RESTRICTIVE das
+ * tabelas sensíveis) só distingue "próprio usuário" de "mais que isso": tudo
+ * que não é `proprio_usuario` libera a leitura da empresa ativa inteira. Os
+ * recortes intermediários (subordinados diretos, setor, unidade,
+ * estabelecimento, equipe, grupo, carteira, customizado) NÃO viram filtro — se
+ * comportam como "empresa inteira". Enquanto esse filtro não existir, o editor
+ * marca esses escopos como `aplicado: false` ("em breve") para não prometer um
+ * recorte que não acontece (risco de LGPD: expor mais do que o admin acredita).
+ */
 export const ESCOPOS_DISPONIVEIS = [
-  { id: "proprio_usuario", label: "Próprio usuário" },
-  { id: "subordinados_diretos", label: "Subordinados diretos" },
-  { id: "equipe_direta_indireta", label: "Equipe direta e indireta" },
-  { id: "setor", label: "Setor" },
-  { id: "unidade", label: "Unidade" },
-  { id: "estabelecimento", label: "Estabelecimento/Obra" },
-  { id: "empresa_inteira", label: "Empresa inteira" },
-  { id: "grupo_economico", label: "Grupo econômico" },
-  { id: "multiplas_empresas", label: "Múltiplas empresas" },
-  { id: "carteira_clientes", label: "Carteira de clientes" },
-  { id: "customizado", label: "Customizado" },
+  { id: "proprio_usuario", label: "Próprio usuário", aplicado: true },
+  { id: "subordinados_diretos", label: "Subordinados diretos", aplicado: false },
+  { id: "equipe_direta_indireta", label: "Equipe direta e indireta", aplicado: false },
+  { id: "setor", label: "Setor", aplicado: false },
+  { id: "unidade", label: "Unidade", aplicado: false },
+  { id: "estabelecimento", label: "Estabelecimento/Obra", aplicado: false },
+  { id: "empresa_inteira", label: "Empresa inteira", aplicado: true },
+  { id: "grupo_economico", label: "Grupo econômico", aplicado: false },
+  { id: "multiplas_empresas", label: "Múltiplas empresas", aplicado: false },
+  { id: "carteira_clientes", label: "Carteira de clientes", aplicado: false },
+  { id: "customizado", label: "Customizado", aplicado: false },
 ];
+
+/** Escopos cujo filtro de dados já funciona hoje (ver nota em ESCOPOS_DISPONIVEIS). */
+export const ESCOPO_APLICADO = (id?: string | null): boolean =>
+  ESCOPOS_DISPONIVEIS.find((e) => e.id === id)?.aplicado ?? false;
 
 // Combos que geram alerta de risco
 export const COMBOS_RISCO = [

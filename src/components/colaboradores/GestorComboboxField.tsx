@@ -20,10 +20,17 @@ import { useColaboradores } from "@/hooks/useColaboradores";
 interface GestorComboboxFieldProps {
   value: string;
   onChange: (value: string) => void;
+  /**
+   * Opcional: recebe o ID do colaborador escolhido (a admissão do gestor), ou
+   * null ao limpar. É o que permite guardar o vínculo ESTRUTURADO de chefia
+   * (admissoes.gestor_admissao_id), em vez de só o nome em texto. Callers que
+   * não precisam do vínculo podem ignorar.
+   */
+  onChangeId?: (id: string | null) => void;
   disabled?: boolean;
 }
 
-export function GestorComboboxField({ value, onChange, disabled }: GestorComboboxFieldProps) {
+export function GestorComboboxField({ value, onChange, onChangeId, disabled }: GestorComboboxFieldProps) {
   const [open, setOpen] = useState(false);
   const { colaboradores } = useColaboradores();
 
@@ -54,7 +61,9 @@ export function GestorComboboxField({ value, onChange, disabled }: GestorCombobo
                   key={col.id}
                   value={col.nome_completo}
                   onSelect={() => {
-                    onChange(col.nome_completo === value ? "" : col.nome_completo);
+                    const limpar = col.nome_completo === value;
+                    onChange(limpar ? "" : col.nome_completo);
+                    onChangeId?.(limpar ? null : col.id);
                     setOpen(false);
                   }}
                 >

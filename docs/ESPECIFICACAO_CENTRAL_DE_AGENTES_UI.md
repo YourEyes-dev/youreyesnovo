@@ -596,6 +596,44 @@ Link "Ver política de erros e responsabilidades" (termo de uso).
 
 **Dúvidas novas [REGRA]:** política de compensação (crédito, estorno, prazo); valores de N e X do disjuntor; limite de responsabilidade no termo; prazo e fluxo de incidente de LGPD (ANPD e titulares); SLA de resposta da casa por gravidade; se mensagem corretiva a colaborador pode sair no nível C ou sempre exige OK.
 
+### 13.11 Backup antes da ação do agente — viabilidade
+
+**Conclusão: viável na forma de "imagem anterior" (before-image) por ação; inviável como backup do banco/empresa a cada ação.**
+
+| Opção | Viável? | Por quê |
+|---|---|---|
+| **A. Imagem anterior da linha tocada, gravada na mesma transação da ação** | **Sim — recomendada** | Custo baixo, restauração precisa, não afeta o trabalho legítimo de outras pessoas. É o mesmo princípio que a casa já usa nos scripts de entrega (`backup_<assunto>_<data>` antes de `UPDATE`/`DELETE`, CLAUDE.md), aplicado por ação |
+| B. Backup completo da empresa antes de cada ação | **Não** | Volume e tempo inviáveis; restaurar devolveria também o que os humanos fizeram depois; o Supabase de produção não tem Point-in-Time Recovery contratado (CLAUDE.md, 08/2026); o backup diário restaura "o dia inteiro de todos os clientes" |
+| C. Ponto de restauração por empresa (snapshot lógico sob demanda) | **Não agora** | Exigiria PITR ou rotina própria de exportação por tenant; custo e LGPD altos. Reavaliar se o PITR for contratado **[REGRA: custo]** |
+| D. Cópia de efeitos externos (e-mail, WhatsApp enviados) | **Impossível** | Não se recolhe mensagem enviada; por isso existe a **mensagem corretiva** (§13.2) |
+
+**Como funciona a opção A**
+1. O agente **não tem permissão de escrita livre**: só chama RPCs estreitas (`SECURITY DEFINER`), uma por tipo de ação permitida (Discovery §5.3).
+2. Toda RPC que **altera ou apaga** dado existente grava, **na mesma transação**, a imagem anterior em `agente_acao_antes` (`acao_id`, `tabela`, `chave`, `colunas_antes` em JSON só com as colunas tocadas). Se a gravação falhar, a ação **não acontece**.
+3. Ação que apenas **cria** (lembrete, ação no Plano de Ação, minuta em rascunho) não precisa de imagem: o desfazer é remover/anular o que foi criado.
+4. **"Desfazer"** (§13.5) usa a imagem anterior. Antes de restaurar, o sistema compara o estado atual com o que o agente deixou: se um humano **alterou depois**, não sobrescreve; mostra a diferença e pede decisão (restaurar mesmo assim, manter ou editar).
+5. **Lote** (acima de N linhas) gera uma imagem por linha ligada ao mesmo `lote_id`, e o desfazer em lote respeita o item 4 linha a linha.
+6. O Diário e o dossiê mostram o selo **"Cópia guardada"** na ação e o botão **Restaurar** (mesma permissão de Desfazer).
+
+**Limites e cuidados**
+- **LGPD**: a imagem anterior pode conter dado pessoal. Guardar só as colunas tocadas, com a mesma política de acesso (RLS + RESTRICTIVE) e **o mesmo prazo de retenção da ação**; expurgo remove a imagem sem quebrar a cadeia de hash (a cadeia guarda o hash, não o conteúdo).
+- **Dado de saúde/psicossocial**: agentes não alteram esses dados (paradas duras e acesso só a agregados); portanto não há imagem anterior desse tipo.
+- **Custo de armazenamento**: proporcional ao nº de ações que alteram dados, que no catálogo atual são poucas (marcar lembrete enviado, mudar status de pendência). Medir em `agente_resultados_dia` e ajustar retenção **[REGRA]**.
+- **Não substitui** o backup diário da plataforma nem o botão de incidente; é a camada fina entre os dois.
+- **Honestidade na Ficha**: o texto promete "guardamos uma cópia do dado antes de alterar e você pode restaurar", e **não** promete "desfazemos qualquer coisa".
+
+**Critérios de aceite**
+- **CA-UX-059** Toda ação que altera ou apaga dado existente grava imagem anterior na mesma transação; se a gravação falhar, a ação é recusada.
+- **CA-UX-060** A ação exibe o selo "Cópia guardada" e o botão Restaurar para quem tem permissão.
+- **CA-UX-061** Restaurar não sobrescreve alteração humana posterior sem mostrar a diferença e pedir decisão.
+- **CA-UX-062** A restauração é registrada na trilha como nova linha ligada à original.
+- **CA-UX-063** A imagem anterior respeita isolamento entre empresas e perfil de acesso, e é expurgada no mesmo prazo da ação.
+- **CA-UX-064** O agente não tem como escrever em tabela fora das RPCs permitidas (teste de permissão).
+
+**QA adicional:** `AGENTES-018` imagem anterior gravada atomicamente (falha de gravação aborta a ação); `-019` restauração com conflito mostra diferença e não sobrescreve; `-020` agente sem acesso de escrita direto às tabelas dos módulos.
+
+**Dúvidas novas [REGRA]:** prazo de retenção das imagens; limite N para considerar "lote"; se vale contratar o PITR da produção (hoje não contratado) para oferecer a opção C no futuro.
+
 ---
 
 ## Avaliação crítica do agente (10 perguntas)

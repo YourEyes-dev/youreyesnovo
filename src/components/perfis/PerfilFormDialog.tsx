@@ -188,9 +188,11 @@ export function PerfilFormDialog({ open, onClose, perfilInicial, onSubmit, loadi
                       <div>
                         <FormLabel className="text-[13px] font-medium">Pode ver salário</FormLabel>
                         <p className="text-[11px] text-muted-foreground">
-                          Quando desligado, o salário e os valores de remuneração ficam
-                          ocultos em todas as telas para quem tem este perfil — mesmo nas
-                          telas a que ele tem acesso (cadastro, folha, férias…).
+                          Quando desligado, esconde o salário e os valores de remuneração
+                          para quem tem este perfil. Já aplicado na <strong>Folha / holerite
+                          / rescisão / 13º / provisões</strong> (o registro não aparece para
+                          quem não pode ver; o próprio holerite continua visível). Cadastro,
+                          cargos e férias estão sendo incluídos.
                         </p>
                       </div>
                     </FormItem>

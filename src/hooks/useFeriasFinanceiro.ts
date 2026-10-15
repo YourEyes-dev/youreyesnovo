@@ -58,7 +58,8 @@ export function useFeriasFinanceiro() {
     queryKey: ["ferias-salarios", tenantId, empresaAtivaId],
     enabled: !!tenantId,
     queryFn: async () => {
-      let q = fromTable("admissoes")
+      // View mascarada: salário vem nulo para quem não pode ver (server-side).
+      let q = fromTable("admissoes_segura")
         .select("cpf, salario, dependentes_irrf")
         .eq("tenant_id", tenantId)
         .eq("status", "concluido");

@@ -222,9 +222,24 @@ export const ESCOPOS_DISPONIVEIS = [
   { id: "customizado", label: "Customizado", aplicado: false },
 ];
 
-/** Escopos cujo filtro de dados já funciona hoje (ver nota em ESCOPOS_DISPONIVEIS). */
-export const ESCOPO_APLICADO = (id?: string | null): boolean =>
-  ESCOPOS_DISPONIVEIS.find((e) => e.id === id)?.aplicado ?? false;
+/**
+ * Módulos em que o filtro "subordinados diretos" JÁ está implementado no banco
+ * (RLS por linha). Cresce a cada entrega de módulo. Fora desta lista, o escopo
+ * subordinados ainda se comporta como "empresa inteira" e segue marcado como
+ * "em breve" no editor.
+ */
+export const MODULOS_COM_SUBORDINADOS = new Set<string>(["ferias"]);
+
+/**
+ * O escopo já filtra os dados hoje? Depende do módulo para 'subordinados_diretos'
+ * (implementado por módulo). 'proprio_usuario' e 'empresa_inteira' valem sempre;
+ * os demais recortes seguem não aplicados. Sem módulo informado, usa o default
+ * global (flag `aplicado`), em que subordinados conta como não aplicado.
+ */
+export const ESCOPO_APLICADO = (id?: string | null, modulo?: string | null): boolean => {
+  if (id === "subordinados_diretos") return !!modulo && MODULOS_COM_SUBORDINADOS.has(modulo);
+  return ESCOPOS_DISPONIVEIS.find((e) => e.id === id)?.aplicado ?? false;
+};
 
 // Combos que geram alerta de risco
 export const COMBOS_RISCO = [

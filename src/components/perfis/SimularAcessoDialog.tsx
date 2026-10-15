@@ -75,16 +75,16 @@ export function SimularAcessoDialog({ open, onClose, perfil }: SimularAcessoDial
                                   variant="outline"
                                   className={cn(
                                     "text-[10px] h-4 px-1.5",
-                                    !ESCOPO_APLICADO(escopo) && "border-amber-300 text-amber-600"
+                                    !ESCOPO_APLICADO(escopo, modulo.id) && "border-amber-300 text-amber-600"
                                   )}
                                   title={
-                                    ESCOPO_APLICADO(escopo)
+                                    ESCOPO_APLICADO(escopo, modulo.id)
                                       ? undefined
-                                      : "Este recorte ainda não filtra os dados — hoje o módulo se comporta como Empresa inteira."
+                                      : "Este recorte ainda não filtra os dados neste módulo — comporta-se como Empresa inteira."
                                   }
                                 >
                                   {getEscopoLabel(escopo)}
-                                  {!ESCOPO_APLICADO(escopo) && " · como empresa inteira"}
+                                  {!ESCOPO_APLICADO(escopo, modulo.id) && " · como empresa inteira"}
                                 </Badge>
                               )}
                             </div>

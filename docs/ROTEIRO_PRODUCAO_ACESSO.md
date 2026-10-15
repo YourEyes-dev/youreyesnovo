@@ -328,8 +328,8 @@ Arquivo: `script_acesso_fase2e_escrita_13o_rescisoes.sql` · Pré-req.: Etapa 8.
 
 ## Etapa 13 — Fechar as tabelas de backup (opcional, só se a 0.2 mostrar `backups_sem_rls_esperado_0 > 0`)
 
-Arquivo: `script_backups_sem_rls.sql` — liga RLS e fecha a API nas tabelas
-`backup_*`. Não apaga nada. Desfazer: comentado no cabeçalho do arquivo.
+Arquivo: `script_backups_fechar_todos_sem_rls.sql` (substitui o `script_backups_sem_rls.sql`
+de lista fixa) — liga RLS e fecha a API em **toda** tabela `backup_*` que esteja aberta. Não apaga nada. Desfazer: comentado no cabeçalho do arquivo.
 
 ---
 

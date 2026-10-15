@@ -150,6 +150,7 @@ export const ALWAYS_ALLOWED_PATHS = new Set<string>([
   "/meu-perfil",
   "/meu-plano", // autosserviço: cada empresa vê o próprio plano/consumo
   "/suporte",
+  "/sobre-sistema", // página informativa, está no menu de todos; sem módulo mapeado ela ficava bloqueada para quem tem perfil
   "/pendencias",
   "/configuracoes", // a página em si filtra por role; necessário p/ auto-serviço
   "/onboarding-rh-self",

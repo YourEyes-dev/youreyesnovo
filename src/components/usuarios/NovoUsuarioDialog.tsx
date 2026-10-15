@@ -586,11 +586,12 @@ export function NovoUsuarioDialog({ open, onOpenChange }: Props) {
                     </Select>
                     <p className="text-xs text-muted-foreground">
                       Define o nível de acesso e permissões deste usuário no sistema.
-                      Se nenhum perfil for selecionado, o perfil{" "}
-                      <strong>Colaborador (padrão)</strong> é aplicado
-                      automaticamente — auto-serviço apenas: a pessoa vê o
-                      próprio ponto, atestados e holerites, sem acesso a dados
-                      de outros colaboradores.
+                      Se nenhum perfil for selecionado, é aplicado automaticamente o
+                      <strong> modelo do tipo escolhido</strong>: Administrador e Gestor
+                      entram com acesso amplo (empresa inteira); os demais entram com o
+                      <strong> Colaborador (padrão)</strong> — auto-serviço apenas
+                      (próprio ponto, atestados e holerites). O modelo pode ser ajustado
+                      depois em Perfis de acesso.
                     </p>
                   </div>
 
@@ -617,13 +618,28 @@ export function NovoUsuarioDialog({ open, onOpenChange }: Props) {
                 {!watchedValues.perfil_acesso_id && (
                   <div className="flex gap-2 items-start p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm">
                     <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
-                    <span>
-                      <strong>Sem perfil de acesso selecionado.</strong> A pessoa
-                      entrará com o perfil <strong>Colaborador (padrão)</strong>:
-                      auto-serviço apenas (próprio ponto, atestados e holerites),
-                      sem acesso a dados de outros colaboradores. Volte à etapa
-                      anterior se ela precisar de mais acesso.
-                    </span>
+                    {["administrador", "gestor"].includes(watchedValues.tipo_usuario) ? (
+                      <span>
+                        <strong>Sem perfil de acesso selecionado.</strong> A pessoa
+                        entrará com o modelo{" "}
+                        <strong>
+                          {watchedValues.tipo_usuario === "administrador"
+                            ? "Administrador (padrão)"
+                            : "Gestor (padrão)"}
+                        </strong>
+                        : acesso amplo (empresa inteira) a todos os módulos. Você pode
+                        ajustar esse modelo depois em Perfis de acesso, ou voltar e
+                        escolher um perfil específico.
+                      </span>
+                    ) : (
+                      <span>
+                        <strong>Sem perfil de acesso selecionado.</strong> A pessoa
+                        entrará com o perfil <strong>Colaborador (padrão)</strong>:
+                        auto-serviço apenas (próprio ponto, atestados e holerites),
+                        sem acesso a dados de outros colaboradores. Volte à etapa
+                        anterior se ela precisar de mais acesso.
+                      </span>
+                    )}
                   </div>
                 )}
 

@@ -59,6 +59,16 @@ jobs:
           # Versão FIXA, mesmo motivo das outras esteiras: "latest" consulta o
           # GitHub sem autenticação a cada corrida e estoura o rate limit.
           version: 2.113.0
+      - name: Diagnóstico - qual token está em uso e quais projetos ele enxerga
+        # Não revela segredo: mostra só SE o segredo da homologação existe e a LISTA de projetos
+        # (nome e ref) que o token consegue ver. Não-fatal: serve para achar a causa de um 403.
+        env:
+          TEM_TOKEN_HOMOLOGACAO: ${{ secrets.HOMOLOGACAO_ACCESS_TOKEN != '' }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.HOMOLOGACAO_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          echo "Segredo HOMOLOGACAO_ACCESS_TOKEN existe: $TEM_TOKEN_HOMOLOGACAO"
+          echo "Projetos que o token em uso enxerga:"
+          supabase projects list || echo "(a listagem também foi recusada)"
       - name: Publicar as Edge Functions na homologação
         env:
           # Token PRÓPRIO da homologação, se existir: a homologação vive numa organização

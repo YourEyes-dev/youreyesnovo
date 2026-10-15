@@ -19,8 +19,8 @@ citados estão na pasta `docs/` do projeto.
 2. **Se a conferência não bater, PARE.** Não aplique a próxima. Avise e me mande o
    resultado.
 3. **Nunca reaplique uma etapa antiga depois de uma mais nova.** Em especial: se
-   o script das *Etapas 3–5* (fundação de subordinados, Fase 1a, 2a) rodar de
-   novo **depois** das Fases 1a/2a, ele recoloca a versão antiga das funções
+   o script da fundação de subordinados (Etapa 2.1) rodar de novo **depois**
+   das Etapas 4 e 6 (Fases 1a/2a), ele recoloca a versão antiga das funções
    centrais de acesso. Cada script é seguro de rodar duas vezes **em sequência
    correta**; a ordem é o que protege.
 4. **Escolha um horário calmo** (fim do dia ou fim de semana) para as Etapas 5 e
@@ -190,9 +190,9 @@ escopo "subordinados diretos".
 - **Muda para os usuários:** só perfil de Férias/Ponto com escopo *subordinados
   diretos* (passa de "empresa inteira" para "os meus + dos meus subordinados").
   Quem tem acesso amplo continua igual.
-- **Desfazer:** reaplicar a versão anterior das políticas (`script_perfil_ferias.sql`
-  e `script_perfil_restringe_tabelas_sensiveis_faltantes.sql` recriam as de
-  antes); a coluna `gestor_cpf` pode ficar.
+- **Desfazer:** recriar as políticas `perfil_restringe_leitura_ferias_*` e
+  `perfil_restringe_leitura_ponto_*` na versão anterior (eu extraio do histórico
+  do projeto se precisar); a coluna `gestor_cpf` pode ficar.
 - ⚠️ **Nunca rode 2.1 depois da Etapa 4 em diante** (regra de ouro 3).
 
 ## Etapa 3 — Documentos "somente o próprio usuário"
@@ -230,8 +230,9 @@ Arquivo: `script_acesso_fase1b_tipo_vira_modelo.sql`
   (Administrador/Gestor = acesso amplo editável; Colaborador = próprio). **Usuários
   existentes não são tocados.**
 - **Conferência:** `funcs_modelo_esperado_3=3, vincular_ok_esperado_1=1, substituir_ok_esperado_1=1`.
-- **Desfazer:** `CREATE OR REPLACE` das duas funções de gatilho com a versão
-  anterior (`script_perfil_padrao_parte1.sql`/`parte2.sql`); usuários criados nesse
+- **Desfazer:** `CREATE OR REPLACE` das duas funções de gatilho
+  (`trg_vincular_perfil_padrao`, `trg_substituir_perfil_padrao`) com a versão
+  anterior (eu extraio do histórico); usuários criados nesse
   intervalo mantêm o vínculo automático (inofensivo).
 
 ## Etapa 6 — Acesso Fase 2a: correções de segurança + **backfill** da gestão
@@ -341,7 +342,7 @@ Banco novo com tela antiga funciona; **tela nova com banco antigo, não.**
    `e*` das etapas aplicadas `> 0`.
 2. **Revisar o que mais vai junto.** A `producao` está **~90 commits atrás da
    `main`** (último commit publicado: `60ace353`). Publicar leva **tudo** o que
-   entrou na `main`, não só o Acesso. Além dos scripts deste roteiro, há **13
+   entrou na `main`, não só o Acesso. Além dos scripts deste roteiro, há **12
    scripts fora do escopo dele** que as telas/rotinas novas podem pressupor:
    `script_central_eventos_erro_rotinas`, `script_ponto_compfalta_guard_bypass_qa_modo`,
    `script_psicossocial_gro_severidade_catalogo_fonte_unica`,

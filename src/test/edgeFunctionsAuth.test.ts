@@ -53,6 +53,16 @@ describe("Edge Functions de IA: autenticação", () => {
     expect(src).toMatch(/Deno\.env\.get\("QA_AGENT_PASSWORD"\)/);
   });
 
+  it("ai-qa-agent só escreve na ilha de QA e nunca na empresa vinda do corpo", () => {
+    const src = ler("ai-qa-agent");
+    expect(src).toMatch(/TENANT_ILHA_QA/);
+    expect(src).toMatch(/authTenantId === TENANT_ILHA_QA/);
+    // a empresa não é lida do corpo da requisição nem serve de alternativa ao login
+    expect(src).not.toMatch(/\{[^}]*\btenantId\b[^}]*\}\s*=\s*await req\.json\(\)/);
+    expect(src).not.toMatch(/authTenantId\s*=\s*[^;\n]*\|\|\s*tenantId/);
+    expect(src).not.toMatch(/effectiveTenant\s*=\s*authTenantId\s*\|\|/);
+  });
+
   it("auxiliar de autenticação confere o login no Auth e não decodifica o token na mão", () => {
     const src = readFileSync(resolve(FUNCOES, "_shared/auth.ts"), "utf8");
     expect(src).toMatch(/auth\.getUser\(\)/);

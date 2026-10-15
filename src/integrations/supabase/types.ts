@@ -768,7 +768,7 @@ export type Database = {
           funcao_periculosa: boolean
           genero: string | null
           gestor_imediato: string | null
-          gestor_admissao_id: string | null
+          gestor_cpf: string | null
           id: string
           inativado_em: string | null
           inativado_por: string | null
@@ -864,7 +864,7 @@ export type Database = {
           funcao_periculosa?: boolean
           genero?: string | null
           gestor_imediato?: string | null
-          gestor_admissao_id?: string | null
+          gestor_cpf?: string | null
           id?: string
           inativado_em?: string | null
           inativado_por?: string | null
@@ -960,7 +960,7 @@ export type Database = {
           funcao_periculosa?: boolean
           genero?: string | null
           gestor_imediato?: string | null
-          gestor_admissao_id?: string | null
+          gestor_cpf?: string | null
           id?: string
           inativado_em?: string | null
           inativado_por?: string | null

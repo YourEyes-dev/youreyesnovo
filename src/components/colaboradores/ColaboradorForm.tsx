@@ -68,6 +68,9 @@ const formSchema = z.object({
   estabelecimento: z.string().optional(),
   centro_custo: z.string().optional(),
   gestor_imediato: z.string().optional(),
+  // Vínculo estruturado de chefia (admissoes.gestor_admissao_id) — guardado
+  // junto com o nome em texto, para o escopo "subordinados diretos".
+  gestor_admissao_id: z.string().nullable().optional(),
   data_admissao: z.string().min(1, "Data de admissão é obrigatória"),
   matricula_esocial: z.string().optional(),
   cbo: z.string().optional(),
@@ -94,6 +97,7 @@ export interface ColaboradorEditData {
   filial: string | null;
   centro_custo: string | null;
   gestor_imediato: string | null;
+  gestor_admissao_id?: string | null;
   data_admissao: string | null;
   matricula_esocial?: string | null;
   cbo?: string | null;
@@ -146,6 +150,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
       estabelecimento: "",
       centro_custo: "",
       gestor_imediato: "",
+      gestor_admissao_id: null,
       data_admissao: new Date().toISOString().split("T")[0],
       matricula_esocial: "",
       cbo: "",
@@ -172,6 +177,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
         estabelecimento: colaborador.filial || "",
         centro_custo: colaborador.centro_custo || "",
         gestor_imediato: colaborador.gestor_imediato || "",
+        gestor_admissao_id: colaborador.gestor_admissao_id ?? null,
         data_admissao: colaborador.data_admissao || "",
         matricula_esocial: colaborador.matricula_esocial || "",
         cbo: colaborador.cbo || "",
@@ -253,6 +259,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
           filial: data.estabelecimento || null,
           centro_custo: data.centro_custo || null,
           gestor_imediato: data.gestor_imediato || null,
+          gestor_admissao_id: data.gestor_admissao_id ?? null,
           data_admissao: data.data_admissao,
           matricula_esocial: data.matricula_esocial || null,
           cbo: normalizeCBO(data.cbo) || null,
@@ -312,6 +319,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
           filial: data.estabelecimento || null,
           centro_custo: data.centro_custo || null,
           gestor_imediato: data.gestor_imediato || null,
+          gestor_admissao_id: data.gestor_admissao_id ?? null,
           data_admissao: data.data_admissao,
           empresa_id: empresaAtivaId || null,
           status: "concluido",
@@ -781,6 +789,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
                       <GestorComboboxField
                         value={field.value || ""}
                         onChange={field.onChange}
+                        onChangeId={(id) => form.setValue("gestor_admissao_id", id)}
                         disabled={isSubmitting}
                       />
                     </FormControl>

@@ -20185,6 +20185,7 @@ export type Database = {
           icone: string | null
           id: string
           is_perfil_assistido: boolean | null
+          pode_ver_salario: boolean | null
           nivel_risco: string | null
           nome: string
           permite_acumulo: boolean
@@ -20206,6 +20207,7 @@ export type Database = {
           icone?: string | null
           id?: string
           is_perfil_assistido?: boolean | null
+          pode_ver_salario?: boolean | null
           nivel_risco?: string | null
           nome: string
           permite_acumulo?: boolean
@@ -20227,6 +20229,7 @@ export type Database = {
           icone?: string | null
           id?: string
           is_perfil_assistido?: boolean | null
+          pode_ver_salario?: boolean | null
           nivel_risco?: string | null
           nome?: string
           permite_acumulo?: boolean

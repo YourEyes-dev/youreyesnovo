@@ -24,6 +24,7 @@ const schema = z.object({
   icone: z.string().optional(),
   expira_em: z.string().optional(),
   is_perfil_assistido: z.boolean().optional(),
+  pode_ver_salario: z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -59,6 +60,8 @@ export function PerfilFormDialog({ open, onClose, perfilInicial, onSubmit, loadi
       icone: perfilInicial?.icone || "",
       expira_em: perfilInicial?.expira_em ? perfilInicial.expira_em.substring(0, 10) : "",
       is_perfil_assistido: perfilInicial?.is_perfil_assistido || false,
+      // Default TRUE: perfis novos e existentes veem salário até ser desligado.
+      pode_ver_salario: perfilInicial?.pode_ver_salario ?? true,
     },
   });
 
@@ -173,6 +176,24 @@ export function PerfilFormDialog({ open, onClose, perfilInicial, onSubmit, loadi
                       <div>
                         <FormLabel className="text-[13px] font-medium">Perfil assistido (sem login)</FormLabel>
                         <p className="text-[11px] text-muted-foreground">Para colaboradores cadastrados que não acessam o sistema diretamente</p>
+                      </div>
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="pode_ver_salario" render={({ field }) => (
+                    <FormItem className="flex items-center gap-3 rounded-lg border border-border p-3">
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <div>
+                        <FormLabel className="text-[13px] font-medium">Pode ver salário</FormLabel>
+                        <p className="text-[11px] text-muted-foreground">
+                          Quando desligado, esconde o salário e os valores de remuneração
+                          para quem tem este perfil. Já aplicado na <strong>Folha / holerite
+                          / rescisão / 13º / provisões</strong> (o registro não aparece para
+                          quem não pode ver; o próprio holerite continua visível). Cadastro,
+                          cargos e férias estão sendo incluídos.
+                        </p>
                       </div>
                     </FormItem>
                   )} />

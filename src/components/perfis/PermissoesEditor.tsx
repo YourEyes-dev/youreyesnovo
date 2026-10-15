@@ -119,28 +119,31 @@ export function PermissoesEditor({ permissoes, onChange }: PermissoesEditorProps
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {ESCOPOS_DISPONIVEIS.map((e) => (
-                                  <SelectItem
-                                    key={e.id}
-                                    value={e.id}
-                                    // Escopo ainda sem filtro de dados: não deixa escolher
-                                    // (mas continua selecionável se o perfil JÁ o tiver, para
-                                    // não travar a edição de perfis antigos).
-                                    disabled={!e.aplicado && e.id !== escopo}
-                                    className="text-[12px]"
-                                  >
-                                    {e.label}
-                                    {!e.aplicado && (
-                                      <span className="ml-1 text-muted-foreground">(em breve)</span>
-                                    )}
-                                  </SelectItem>
-                                ))}
+                                {ESCOPOS_DISPONIVEIS.map((e) => {
+                                  // "aplicado" é por módulo (subordinados diretos já vale em
+                                  // alguns módulos, em outros ainda não). Não deixa escolher o
+                                  // que não filtra, mas mantém selecionável o que o perfil já tem.
+                                  const aplicadoAqui = ESCOPO_APLICADO(e.id, modulo.id);
+                                  return (
+                                    <SelectItem
+                                      key={e.id}
+                                      value={e.id}
+                                      disabled={!aplicadoAqui && e.id !== escopo}
+                                      className="text-[12px]"
+                                    >
+                                      {e.label}
+                                      {!aplicadoAqui && (
+                                        <span className="ml-1 text-muted-foreground">(em breve)</span>
+                                      )}
+                                    </SelectItem>
+                                  );
+                                })}
                               </SelectContent>
                             </Select>
                           </div>
                         )}
                       </div>
-                      {ativo && !ESCOPO_APLICADO(escopo) && (
+                      {ativo && !ESCOPO_APLICADO(escopo, modulo.id) && (
                         <div className="ml-6 flex items-start gap-1.5 text-[10px] text-amber-600">
                           <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
                           <span>
@@ -199,10 +202,12 @@ export function PermissoesEditor({ permissoes, onChange }: PermissoesEditorProps
       <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/40 border border-border rounded-lg p-2">
         <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
         <span>
-          Por enquanto, só os recortes <strong>Próprio usuário</strong> e{" "}
-          <strong>Empresa inteira</strong> filtram os dados. Os demais (subordinados
-          diretos, setor, unidade, estabelecimento…) ainda estão em desenvolvimento
-          e, se escolhidos, o módulo se comporta como <strong>Empresa inteira</strong>.
+          <strong>Próprio usuário</strong> e <strong>Empresa inteira</strong> filtram
+          os dados em todos os módulos. <strong>Subordinados diretos</strong> já
+          filtra nos módulos onde foi liberado (ex.: Férias) e aparece como
+          "(em breve)" nos demais. Os outros recortes (setor, unidade,
+          estabelecimento…) ainda estão em desenvolvimento e, se escolhidos, o
+          módulo se comporta como <strong>Empresa inteira</strong>.
         </span>
       </div>
     </div>

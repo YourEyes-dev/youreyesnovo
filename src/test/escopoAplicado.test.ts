@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ESCOPOS_DISPONIVEIS, ESCOPO_APLICADO } from "@/hooks/usePerfisAcesso";
+import { ESCOPOS_DISPONIVEIS, ESCOPO_APLICADO, MODULOS_COM_SUBORDINADOS } from "@/hooks/usePerfisAcesso";
 
 /**
  * Trava de honestidade: hoje o filtro de dados (perfil_permite_modulo) só
@@ -17,9 +17,8 @@ describe("ESCOPO_APLICADO — só o que o filtro de dados honra hoje", () => {
     expect(aplicados).toEqual([...aplicadosEsperados].sort());
   });
 
-  it("os recortes intermediários continuam marcados como não aplicados", () => {
+  it("os recortes ainda sem filtro continuam não aplicados (sem módulo)", () => {
     for (const id of [
-      "subordinados_diretos",
       "equipe_direta_indireta",
       "setor",
       "unidade",
@@ -30,12 +29,28 @@ describe("ESCOPO_APLICADO — só o que o filtro de dados honra hoje", () => {
       "customizado",
     ]) {
       expect(ESCOPO_APLICADO(id)).toBe(false);
+      expect(ESCOPO_APLICADO(id, "ferias")).toBe(false);
     }
   });
 
-  it("ESCOPO_APLICADO trata id desconhecido/nulo como não aplicado", () => {
+  it("subordinados_diretos é aplicado SÓ nos módulos liberados", () => {
+    // sem módulo ou módulo não liberado → não aplicado
+    expect(ESCOPO_APLICADO("subordinados_diretos")).toBe(false);
+    expect(ESCOPO_APLICADO("subordinados_diretos", "ponto")).toBe(false);
+    // módulo liberado (ferias) → aplicado
+    expect(MODULOS_COM_SUBORDINADOS.has("ferias")).toBe(true);
+    expect(ESCOPO_APLICADO("subordinados_diretos", "ferias")).toBe(true);
+    // todo módulo listado como liberado realmente retorna true
+    for (const m of MODULOS_COM_SUBORDINADOS) {
+      expect(ESCOPO_APLICADO("subordinados_diretos", m)).toBe(true);
+    }
+  });
+
+  it("próprio/empresa valem sempre; id desconhecido/nulo não", () => {
     expect(ESCOPO_APLICADO(undefined)).toBe(false);
     expect(ESCOPO_APLICADO("inexistente")).toBe(false);
     expect(ESCOPO_APLICADO("empresa_inteira")).toBe(true);
+    expect(ESCOPO_APLICADO("empresa_inteira", "ponto")).toBe(true);
+    expect(ESCOPO_APLICADO("proprio_usuario", "ferias")).toBe(true);
   });
 });

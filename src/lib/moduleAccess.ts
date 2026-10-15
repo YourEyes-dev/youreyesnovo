@@ -121,7 +121,9 @@ export const ADMIN_PATHS = new Set<string>([
   "/feedback-ocorrencias",
   "/analise-jornada",
   "/ponto",
-  "/documentos",
+  // /documentos NÃO é admin-only: com escopo "próprio usuário" a pessoa acessa
+  // a tela para ver apenas a própria pasta (a RLS e a própria tela já limitam o
+  // que aparece). Admin-only aqui esconderia o módulo de quem tem escopo próprio.
   "/financeiro",
   "/financeiro/beneficios",
   "/hub-contabil",

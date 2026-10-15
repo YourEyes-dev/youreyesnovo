@@ -91,8 +91,10 @@ export function useFerias() {
     queryKey: ["ferias_solicitacoes", tenantId, empresaAtivaId],
     queryFn: async () => {
       if (!tenantId) return [];
+      // View mascarada: valores (salário-base, valor de férias…) vêm nulos para
+      // quem não pode ver salário (server-side). Escritas seguem na tabela base.
       let query = supabase
-        .from("ferias_solicitacoes" as any)
+        .from("ferias_solicitacoes_segura" as any)
         .select("*")
         .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false });

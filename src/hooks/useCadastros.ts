@@ -189,8 +189,10 @@ export function useCargos(options?: { skipEmpresaFilter?: boolean }) {
   const { data: cargos = [], isLoading, error } = useQuery({
     queryKey: ["cargos", tenantId, skipEmpresa ? "all" : empresaAtivaId],
     queryFn: async () => {
+      // View mascarada: faixa salarial vem nula para quem não pode ver salário
+      // (server-side). Escritas (criar/editar/excluir cargo) seguem na tabela base.
       let query = supabase
-        .from("cargos")
+        .from("cargos_segura" as any)
         .select(`*, departamento:departamentos(id, nome), responsabilidade`)
         .eq("tenant_id", tenantId!)
         .order("nome");

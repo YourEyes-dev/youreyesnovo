@@ -191,8 +191,9 @@ export function PerfilFormDialog({ open, onClose, perfilInicial, onSubmit, loadi
                           Quando desligado, esconde o salário e os valores de remuneração
                           para quem tem este perfil, no servidor. Aplicado no
                           <strong> cadastro de colaboradores</strong>, <strong>cargos</strong>
-                          (faixa salarial) e <strong>férias</strong> — o registro aparece, só
-                          o valor fica oculto; e na <strong>Folha / holerite / rescisão / 13º /
+                          (faixa salarial), <strong>férias</strong> (inclusive os totais) e
+                          <strong> benefícios</strong> (valor e desconto) — o registro aparece,
+                          só o valor fica oculto; e na <strong>Folha / holerite / rescisão / 13º /
                           provisões</strong>, onde o registro inteiro não aparece (o próprio
                           holerite da pessoa continua visível).
                         </p>

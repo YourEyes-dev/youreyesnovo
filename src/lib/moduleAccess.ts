@@ -11,66 +11,92 @@
  * RESTRITA (bloqueada). Para usuários sem perfil vinculado, vale a hierarquia
  * de roles (definida no ProtectedRoute / AppSidebar).
  */
-export const PATH_TO_MODULO: Record<string, string> = {
+/**
+ * Cada rota aceita UM OU MAIS módulos. A trava libera a rota se o perfil tiver
+ * QUALQUER um deles.
+ *
+ * Por que uma lista, e não um módulo só: o editor de perfis (MODULOS_SISTEMA em
+ * usePerfisAcesso) oferece módulos granulares — "empresa", "filiais", "cargos",
+ * "ponto", "ferias", "metas"… — e grava exatamente esse id em
+ * `perfil_permissoes.modulo`. Antes, este mapa guardava só o id GROSSO
+ * ("configuracoes", "colaboradores", "admissoes", "avaliacoes", "bem_estar"),
+ * então marcar "Empresa", "Ponto" ou "Metas" no editor não surtia efeito: a
+ * trava nunca checava esses ids, e o usuário com perfil ficava SEM as telas que
+ * o administrador havia liberado ("faltou acesso"). Agora cada rota lista o id
+ * grosso legado (mantém TODOS os perfis antigos funcionando, sem regressão) MAIS
+ * o(s) id(s) granular(es) do editor (faz a definição do perfil valer de fato). É
+ * aditivo: só ACRESCENTA formas de liberar a rota, nunca remove acesso.
+ *
+ * O primeiro id de cada lista é o grosso/legado (usado por `getModuloForPath`).
+ */
+export const PATH_TO_MODULOS: Record<string, string[]> = {
   // Estrutura organizacional
-  "/empresa": "configuracoes",
-  "/cadastros/filiais": "configuracoes",
-  "/cadastros/departamentos": "configuracoes",
-  "/cadastros/cargos": "configuracoes",
-  "/colaboradores": "colaboradores",
+  "/empresa": ["configuracoes", "empresa"],
+  "/cadastros/filiais": ["configuracoes", "filiais"],
+  "/cadastros/departamentos": ["configuracoes", "departamentos"],
+  "/cadastros/cargos": ["configuracoes", "cargos"],
+  "/colaboradores": ["colaboradores"],
   // "/marketplace" — acesso global (ver ALWAYS_ALLOWED_PATHS)
 
   // Estratégia & Governança (link de topo do sidebar)
-  "/estrategia": "configuracoes",
+  "/estrategia": ["configuracoes", "identidade_estrategica", "planejamento_estrategico"],
 
   // Saúde & Segurança
-  "/compliance-sst": "sst",
+  "/compliance-sst": ["sst"],
   // Faltava no mapa, e rota fora do mapa é rota BLOQUEADA para quem tem
   // perfil vinculado: ninguém com perfil alcançava Saúde Ocupacional.
   // Achado ao revisar as ressalvas do parecer de 07/08.
-  "/saude-ocupacional": "sst",
-  "/incidentes-acidentes": "incidentes",
-  "/ergonomia": "ergonomia",
-  "/psicossocial": "psicossocial",
-  "/epis": "epi",
-  "/terceiros": "sst",
+  "/saude-ocupacional": ["sst"],
+  "/incidentes-acidentes": ["incidentes"],
+  "/ergonomia": ["ergonomia"],
+  "/psicossocial": ["psicossocial"],
+  "/epis": ["epi"],
+  "/terceiros": ["sst", "terceiros"],
 
   // Planos & Desenvolvimento
-  "/metas": "avaliacoes",
-  "/plano-acao": "plano_acao",
-  "/avaliacoes": "avaliacoes",
-  "/pdi": "pdi",
-  "/mapa-comportamental": "mapa_comportamental",
+  "/metas": ["avaliacoes", "metas"],
+  "/plano-acao": ["plano_acao"],
+  "/avaliacoes": ["avaliacoes"],
+  "/pdi": ["pdi"],
+  "/mapa-comportamental": ["mapa_comportamental"],
 
   // Pessoas
-  "/cultura-celebracoes": "bem_estar",
-  "/contratos-experiencia": "admissoes",
-  "/onboarding-rh": "admissoes",
-  "/ferias": "colaboradores",
-  "/atestados": "atestados",
-  "/felicidade": "bem_estar",
-  "/feedback-ocorrencias": "feedback",
-  "/ouvidoria": "ouvidoria",
-  "/aprendizado-papeis": "trilhas",
-  "/trilhas": "trilhas",
-  "/feed": "bem_estar",
-  "/ponto": "colaboradores",
-  "/analise-jornada": "colaboradores",
+  "/cultura-celebracoes": ["bem_estar", "cultura_celebracoes"],
+  "/contratos-experiencia": ["admissoes", "contratos_experiencia"],
+  "/onboarding-rh": ["admissoes", "onboarding"],
+  "/ferias": ["colaboradores", "ferias"],
+  "/atestados": ["atestados"],
+  "/felicidade": ["bem_estar"],
+  "/feedback-ocorrencias": ["feedback"],
+  "/ouvidoria": ["ouvidoria"],
+  "/aprendizado-papeis": ["trilhas", "aprendizado"],
+  "/trilhas": ["trilhas"],
+  "/feed": ["bem_estar", "feed"],
+  "/ponto": ["colaboradores", "ponto"],
+  "/analise-jornada": ["colaboradores", "analise_jornada"],
 
   // Documentos
-  "/documentos": "configuracoes",
+  "/documentos": ["configuracoes", "documentos"],
 
   // Gestão de usuários — também faltava no mapa, com o mesmo efeito.
-  "/usuarios": "configuracoes",
+  "/usuarios": ["configuracoes", "usuarios"],
 
   // Financeiro
-  "/financeiro": "financeiro",
-  "/financeiro/beneficios": "beneficios",
-  "/hub-contabil": "hub_contabil",
+  "/financeiro": ["financeiro"],
+  "/financeiro/beneficios": ["beneficios"],
+  "/hub-contabil": ["hub_contabil"],
 
   // Academia (acessível via perfil/roles)
-  "/academia": "trilhas",
+  "/academia": ["trilhas", "academia"],
 };
+
+/**
+ * Compatibilidade: versão achatada (rota → módulo grosso/legado), para quem
+ * ainda consome um id único. É o PRIMEIRO item de cada lista acima.
+ */
+export const PATH_TO_MODULO: Record<string, string> = Object.fromEntries(
+  Object.entries(PATH_TO_MODULOS).map(([path, modulos]) => [path, modulos[0]])
+);
 
 /**
  * Rotas administrativas: exigem que o perfil tenha pelo menos UMA permissão
@@ -138,21 +164,30 @@ export const ALWAYS_ALLOWED_PATHS = new Set<string>([
  *   2) caso contrário, exigir mapeamento em `PATH_TO_MODULO` e validar a permissão
  *      Rotas não mapeadas para usuários COM perfil vinculado devem ser BLOQUEADAS.
  */
-export function getModuloForPath(pathname: string): string | null {
+export function getModulosForPath(pathname: string): string[] | null {
   // Normaliza: remove query string e hash
   const cleanPath = pathname.split("?")[0].split("#")[0];
 
   // Match exato
-  if (PATH_TO_MODULO[cleanPath]) return PATH_TO_MODULO[cleanPath];
+  if (PATH_TO_MODULOS[cleanPath]) return PATH_TO_MODULOS[cleanPath];
 
   // Match por prefixo (mais longo primeiro)
-  const sortedKeys = Object.keys(PATH_TO_MODULO).sort((a, b) => b.length - a.length);
+  const sortedKeys = Object.keys(PATH_TO_MODULOS).sort((a, b) => b.length - a.length);
   for (const key of sortedKeys) {
     if (cleanPath === key || cleanPath.startsWith(key + "/")) {
-      return PATH_TO_MODULO[key];
+      return PATH_TO_MODULOS[key];
     }
   }
   return null;
+}
+
+/**
+ * Compatibilidade: devolve só o módulo grosso/legado (primeiro da lista).
+ * Prefira `getModulosForPath` para o gating, que considera também os módulos
+ * granulares do editor.
+ */
+export function getModuloForPath(pathname: string): string | null {
+  return getModulosForPath(pathname)?.[0] ?? null;
 }
 
 /**

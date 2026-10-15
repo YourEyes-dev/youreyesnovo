@@ -88,16 +88,17 @@ const Documentos = () => {
   const colaboradorIdFromUrl = searchParams.get("colaborador");
   const { tenantId, hasMinimumRole } = useAuth();
   const { empresaAtivaId } = useEmpresaAtiva();
-  const { temAcessoModuloAdmin, isOwner } = usePerfilPermissions();
+  const { temAcessoModuloAdmin, isOwner, perfilVinculado } = usePerfilPermissions();
 
-  // Acesso AMPLO ao módulo (espelha perfil_permite_modulo no servidor):
-  // superadmin/owner, manager+ ou um perfil com escopo <> proprio_usuario.
-  // Quem NÃO é amplo tem o módulo só como "próprio usuário" — vê apenas a
-  // própria pasta (a RLS já limita os dados) e nenhuma visão de empresa.
+  // Acesso AMPLO ao módulo — espelha perfil_permite_modulo no servidor (Fase 1):
+  // superadmin/owner acima; um perfil com escopo <> proprio_usuario dá amplo;
+  // e papel manager+ só concede amplo quando NÃO há perfil vinculado (sem
+  // perfil = comportamento legado). Com perfil vinculado, o perfil decide —
+  // então um gestor com perfil "próprio usuário" vê só a própria pasta.
   const podeGerirDocumentos =
     isOwner ||
-    hasMinimumRole("manager") ||
-    temAcessoModuloAdmin(["documentos", "configuracoes", "colaboradores"]);
+    temAcessoModuloAdmin(["documentos", "configuracoes", "colaboradores"]) ||
+    (!perfilVinculado && hasMinimumRole("manager"));
 
   const [activeTab, setActiveTab] = useState("arvore");
   const [searchTerm, setSearchTerm] = useState("");

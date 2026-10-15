@@ -16,22 +16,57 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { empresa_id, tenant_id } = await req.json();
-
-    if (!empresa_id || !tenant_id) {
-      return new Response(JSON.stringify({ error: "empresa_id e tenant_id são obrigatórios" }), {
-        status: 400,
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+
+    // Autenticação: o tenant vem do usuário logado, nunca do corpo da requisição.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) return json({ error: "Não autenticado" }, 401);
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) return json({ error: "Não autenticado" }, 401);
+
+    const { empresa_id, tenant_id: bodyTenantId } = await req.json();
+    if (!empresa_id) return json({ error: "empresa_id é obrigatório" }, 400);
+
+    const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: isSuper } = await admin.rpc("is_superadmin", { _user_id: userData.user.id });
+
+    let tenant_id: string | null = null;
+    if (isSuper === true && bodyTenantId) {
+      tenant_id = bodyTenantId;
+    } else {
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("tenant_id")
+        .eq("user_id", userData.user.id)
+        .maybeSingle();
+      tenant_id = profile?.tenant_id ?? null;
+      if (bodyTenantId && bodyTenantId !== tenant_id) return json({ error: "Acesso negado" }, 403);
     }
+    if (!tenant_id) return json({ error: "Tenant não identificado" }, 403);
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurada");
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    // A empresa precisa pertencer ao tenant do usuário.
+    const { data: empresa } = await admin
+      .from("empresa_cadastro")
+      .select("id")
+      .eq("id", empresa_id)
+      .eq("tenant_id", tenant_id)
+      .maybeSingle();
+    if (!empresa) return json({ error: "Empresa não encontrada" }, 404);
+
+    // Leituras pelo cliente do usuário: a RLS (tenant e perfil de acesso) também vale aqui.
+    const supabase = userClient;
 
     // Buscar PGR cadastrado no Compliance SST
     const { data: pgr, error: pgrError } = await supabase
@@ -53,6 +88,7 @@ serve(async (req) => {
         .from("sst_documentos")
         .select("id, arquivo_url, arquivo_nome, analise_ia, profissional_responsavel, data_emissao")
         .eq("tenant_id", tenant_id)
+        .is("empresa_id", null)
         .eq("tipo", "pgr")
         .order("created_at", { ascending: false })
         .limit(1)
@@ -168,7 +204,7 @@ Seja conservador e inclua apenas riscos que sejam razoavelmente esperados com ba
 
     // Cachear os riscos identificados na análise do documento
     if (riscos.length > 0) {
-      await supabase
+      await admin
         .from("sst_documentos")
         .update({
           analise_ia: {
@@ -177,7 +213,8 @@ Seja conservador e inclua apenas riscos que sejam razoavelmente esperados com ba
             riscos_extraidos_em: new Date().toISOString(),
           }
         })
-        .eq("id", documento.id);
+        .eq("id", documento.id)
+        .eq("tenant_id", tenant_id);
     }
 
     return new Response(JSON.stringify({

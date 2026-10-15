@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { autenticar, HttpError, respostaDeErro } from "../_shared/auth.ts";
 import pdf from "npm:pdf-parse@1.1.1/lib/pdf-parse.js";
 
 const corsHeaders = {
@@ -309,10 +310,19 @@ serve(async (req) => {
   }
 
   try {
+    // Login conferido e empresa lida do cadastro do usuário.
+    const { tenantId } = await autenticar(req);
+
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurada");
 
     const { documento_tipo, documento_nome, empresa_emissora, profissional_responsavel, arquivo_url } = await req.json();
+
+    // O arquivo é baixado com a chave de serviço (ignora o RLS do storage). Por isso só
+    // aceita caminho da PRÓPRIA empresa: os uploads de SST gravam `<tenant>/sst/...`.
+    if (arquivo_url && (typeof arquivo_url !== "string" || arquivo_url.includes("..") || !arquivo_url.startsWith(`${tenantId}/`))) {
+      throw new HttpError(403, "Arquivo não pertence à sua empresa");
+    }
 
     let pdfText: string | null = null;
     let pdfPageCount = 0;
@@ -422,9 +432,6 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
-    console.error("ai-sst-analise error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return respostaDeErro(e, corsHeaders);
   }
 });

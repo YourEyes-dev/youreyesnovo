@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { getSupabaseFunctionUrl } from "@/lib/supabaseFunctions";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -39,10 +40,16 @@ export function useChatIA() {
     try {
       const allMessages = [...messages, userMsg];
       
+      // A função só responde a usuário logado (antes aceitava qualquer chamada).
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sessão expirada. Entre novamente para usar o assistente.");
+
       const response = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "",
         },
         body: JSON.stringify({ messages: allMessages })
       });

@@ -5,6 +5,8 @@
 -- Limites: so enxerga objetos criados por CREATE literal nas migrations; tabela criada
 -- por EXECUTE com texto montado (padrao dos scripts de entrega) pode aparecer como
 -- "so_producao" sem ser drift real. Comparacao por NOME (sobrecarga de funcao nao distingue).
+-- ATENCAO: a parte de CRON desta conferencia nao e confiavel (a extracao dos nomes de job nas
+-- migrations pegou so 13 e acusa todos como so_producao). Para cron use direto SELECT jobname FROM cron.job.
 -- Para ver tambem o que as migrations tem e a producao nao, troque false por true na
 -- primeira CTE (parametro).
 -- =====================================================================

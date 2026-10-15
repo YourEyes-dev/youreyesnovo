@@ -205,3 +205,15 @@ Critério de promoção de nível: taxa de aceitação humana ≥ meta definida 
 
 ### Pendências [VERIFICAR] consolidadas
 Drift de cron entre ambientes (§1.3: `ponto-links-vencidos` faltando em produção; homologação sem 7 jobs) · se há consumidor de `hub_notificacao_config` e de `folha_alertas_prazo` · canal de envio do link de assinatura de férias · existência de holerite em lote · S-1200 emitido? · features metered de IA em `features` · Faciliti · quem chama `ai-pdi-from-avaliacao`, `ai-gerar-vaga`, `ai-psicossocial-entrevista`, `ai-pgr-riscos` · rota de `PerfisAcesso` · página que hospeda afastamentos · origem exata do `plano_acao_abrir` para psicossocial.
+
+---
+
+## Anexo — Conferência produção × migrations (15/10/2026, `docs/diagnostico_producao_vs_migrations.sql`)
+
+69 linhas. A parte de cron do SQL é falha minha (acusou todos os jobs); o único cron realmente fora das migrations segue sendo `trilha-notificacoes-diario`.
+
+- **Funções fora das migrations (9):** `_add_feriado_nacional`, `_ponto_class_feriado`, `gerar_feriados_nacionais`, `bloquear_exclusao_cargo_vinculado` (+ trigger `trg_bloquear_exclusao_cargo` em `cargos`), `sync_ultimo_acesso_usuario`, `qa_caso_ponto_210/301/321/394_corpo`.
+- **Triggers fora das migrations (7):** o acima mais `update_beneficios_*_updated_at` em 6 tabelas de benefícios.
+- **Tabelas fora das migrations, não-backup (4):** `admissoes_limpeza_duplicidade`, `ponto_efeito_apuracao`, `ponto_entrega_volume`, `ponto_retrato_pre`.
+- **Tabelas `backup_*` (39):** esperadas (regra da casa de guardar linhas antes de UPDATE/DELETE). **8 estão sem RLS:** `backup_conf_deslig_foto_20260929`, `backup_conf_deslig_movs_20260929`, `backup_encerra_deslig_afast_20260929`, `backup_escala_desligados_20260929`, `backup_features_20260925`, `backup_features_nomes_20260925`, `backup_ouv_pontes_20260925`, `backup_plan_entitlements_20260925`. Em `public` do Supabase, tabela sem RLS pode ser lida pela API com a chave anon se os grants padrão estiverem ativos [VERIFICAR grants]. Cópias de afastamento/ponto/ouvidoria exigem atenção (LGPD).
+- Nenhuma tabela criada por migration está sem RLS em produção; nenhuma view fora das migrations.

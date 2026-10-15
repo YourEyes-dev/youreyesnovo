@@ -37,6 +37,8 @@ export interface PerfilAcesso {
   expira_em?: string;
   nivel_risco?: "normal" | "elevado" | "critico";
   is_perfil_assistido?: boolean;
+  /** Quando false, o salário/valores de remuneração são mascarados para quem tem este perfil. */
+  pode_ver_salario?: boolean;
   total_usuarios: number;
   criado_por?: string;
   criado_por_nome?: string;

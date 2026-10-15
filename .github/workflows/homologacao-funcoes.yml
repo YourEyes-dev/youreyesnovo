@@ -29,6 +29,8 @@
 # homologação é um recurso compartilhado).
 #
 # SEGREDOS (os MESMOS que o homologacao.yml já usa — nada novo a cadastrar):
+#   HOMOLOGACAO_ACCESS_TOKEN   (opcional) token pessoal do Supabase de uma conta que enxerga a
+#                              organização da homologação; se faltar, usa o SUPABASE_ACCESS_TOKEN;
 #   SUPABASE_ACCESS_TOKEN      token pessoal do Supabase (deploy das functions);
 #   HOMOLOGACAO_DB_PASSWORD    senha do banco da homologação (a CLI lê no link).
 # =====================================================================
@@ -59,7 +61,11 @@ jobs:
           version: 2.113.0
       - name: Publicar as Edge Functions na homologação
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # Token PRÓPRIO da homologação, se existir: a homologação vive numa organização
+          # Supabase separada (YourEyes_Hom), e o token do teste pode ser de uma conta que
+          # não enxerga essa organização (erro 403 "does not have the necessary privileges").
+          # Sem o segredo novo, cai no token de sempre: nada muda para quem já funciona.
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.HOMOLOGACAO_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
           # A CLI lê esta variável no `link` (o config.toml traz o project_id
           # da produção; o link + --project-ref garantem o alvo certo).
           SUPABASE_DB_PASSWORD: ${{ secrets.HOMOLOGACAO_DB_PASSWORD }}

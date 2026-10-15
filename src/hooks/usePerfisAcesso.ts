@@ -228,7 +228,7 @@ export const ESCOPOS_DISPONIVEIS = [
  * subordinados ainda se comporta como "empresa inteira" e segue marcado como
  * "em breve" no editor.
  */
-export const MODULOS_COM_SUBORDINADOS = new Set<string>(["ferias"]);
+export const MODULOS_COM_SUBORDINADOS = new Set<string>(["ferias", "ponto"]);
 
 /**
  * O escopo já filtra os dados hoje? Depende do módulo para 'subordinados_diretos'

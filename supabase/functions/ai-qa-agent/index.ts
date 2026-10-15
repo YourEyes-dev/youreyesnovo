@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { exigirSuperadmin, respostaDeErro } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,9 +25,10 @@ interface FlowResult {
   total_duration_ms: number;
 }
 
-// Test credentials
-const TEST_EMAIL = "wallasmonteirobarros@gmail.com";
-const TEST_PASSWORD = "12345678";
+// Conta de teste do agente de QA: vem dos segredos da função (Supabase > Edge Functions >
+// Secrets), nunca do código. Sem os dois segredos a função recusa rodar.
+const TEST_EMAIL = Deno.env.get("QA_AGENT_EMAIL") ?? "";
+const TEST_PASSWORD = Deno.env.get("QA_AGENT_PASSWORD") ?? "";
 
 async function runStep(stepName: string, action: string, fn: () => Promise<string>): Promise<StepResult> {
   const start = Date.now();
@@ -42,6 +44,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Roda com chave de serviço e escreve dados: só superadmin.
+    await exigirSuperadmin(req);
     const { flow, tenantId, stream } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -54,6 +58,9 @@ serve(async (req) => {
 
     // ═══ Authenticate as test user ═══
     async function getAuthenticatedClient() {
+      if (!TEST_EMAIL || !TEST_PASSWORD) {
+        throw new Error("Conta de teste do agente de QA não configurada (QA_AGENT_EMAIL / QA_AGENT_PASSWORD).");
+      }
       const client = createClient(SUPABASE_URL, ANON_KEY);
       const { data, error } = await client.auth.signInWithPassword({
         email: TEST_EMAIL,
@@ -1349,9 +1356,6 @@ Seja direto e técnico. Português do Brasil.`,
       },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message || "Erro interno" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return respostaDeErro(e, corsHeaders);
   }
 });

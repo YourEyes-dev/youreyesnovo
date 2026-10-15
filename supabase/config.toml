@@ -92,8 +92,6 @@ project_id = "diayjpsrcerycycyaxst"
     verify_jwt = false
   [functions.pdi-assinatura]
     verify_jwt = false
-  [functions.seed-test-user]
-    verify_jwt = false
   # Semeia a conta-robô da suíte Cypress. Autenticada pelo header x-qa-token
   # (mesmo QA_E2E_TOKEN da qa-registrar-e2e) + trava de ambiente interna —
   # por isso dispensa o JWT do gateway.

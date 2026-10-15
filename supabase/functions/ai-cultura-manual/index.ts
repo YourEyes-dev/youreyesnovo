@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { getCompanyContext } from '../_shared/ai-helper.ts'
+import { autenticar, respostaDeErro } from '../_shared/auth.ts'
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,9 +14,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // A empresa vem do cadastro do usuário logado, nunca do corpo da requisição.
+    const { tenantId } = await autenticar(req);
     const {
       missao, visao, valores, principios, comportamentos_esperados, comportamentos_nao_tolerados,
-      empresa_nome, organograma, tenantId,
+      empresa_nome, organograma,
       proposito, carta_boas_vindas, tom_de_voz, codigo_conduta, dress_code, modelo_trabalho,
       documentos_cultura,
     } = await req.json();
@@ -205,10 +208,6 @@ Retorne APENAS o HTML completo sem explicações, markdown ou code blocks. O HTM
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return respostaDeErro(error, corsHeaders);
   }
 });

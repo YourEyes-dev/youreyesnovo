@@ -664,6 +664,29 @@ Ou seja: a garantia é sobre o **raio de dano** e a **rastreabilidade**, não so
 | S11 | Tabelas `backup_*` sem RLS foram tratadas em `20261015165521_backups_sem_rls_fechar_acesso.sql`; conferir se **cobre todas** as 8 do diagnóstico | Cópias de afastamento/ponto/ouvidoria expostas | Média [VERIFICAR] |
 Correção ao Discovery §1.8: **`ai-pgr-riscos` já foi corrigida** (agora valida o usuário, deriva o tenant do perfil e confere que a empresa pertence ao tenant). O padrão correto já existe no repositório e deve virar o **modelo único** (§14.4).
 
+#### 14.2.1 Status das correções e retificações (atualizado em 15/10/2026)
+**Retificações à tabela acima, após conferir o código chamador e o `config.toml`:**
+- **S3:** das 11 funções com chave de serviço e sem validação de usuário, **7 estão realmente expostas** (`verify_jwt = false`): `ai-cultura-manual`, `ai-cultura-sugestao`, `ai-pop-generator`, `ai-sst-analise`, `ai-qa-scan`, `ai-qa-agent`, `ai-psicossocial-entrevista`. As outras 4 (`ai-gerar-funcao-completa`, `ai-manual-funcao`, `ai-responsabilidade-funcao`, `ai-texto-atividades`) **não constam no `config.toml`**, ficam atrás da verificação do gateway e só decodificam o token depois dela. Não é falha explorável hoje, mas depende de a configuração nunca mudar; migrar para o auxiliar único.
+- **S2:** `verify_jwt = false` vale para **30 das 38** funções `ai-*`.
+- **S6:** `seed-e2e-user` e `seed-demo-empresa` **já são fechadas** por token secreto (`x-qa-token`) e trava de ambiente. O achado vale **só para `seed-test-user`**, que nenhuma tela, teste ou esteira chamava.
+- **`ai-psicossocial-entrevista`** é chamada por página **pública** (`/entrevista/:token`, com a chave anon). Não dá para exigir login; o controle correto é validar o **token do convite** no servidor. Fica para a próxima entrega.
+
+| Item | Situação | O que foi feito |
+|---|---|---|
+| Auxiliar único de autenticação | **Feito** | `supabase/functions/_shared/auth.ts`: confere o login no Auth (`getUser`), deriva a empresa de `profiles.tenant_id`, exige superadmin quando for o caso |
+| S2/S3 `ai-cultura-manual`, `ai-cultura-sugestao`, `ai-pop-generator` | **Feito** | Exigem login; `tenantId` do corpo deixou de existir |
+| S2/S3 `ai-sst-analise` | **Feito** | Exige login e só baixa arquivo da própria empresa (caminho `<tenant>/...`); antes baixava qualquer arquivo do bucket com a chave de serviço |
+| S2 `ai-chat` | **Feito** | Exige login; a tela passou a enviar o token do usuário. Antes qualquer pessoa com a URL gastava a chave da OpenAI |
+| S3 `ai-qa-scan`, `ai-qa-agent` | **Feito** | Exigem superadmin (antes varriam dados de todas as empresas sem login) |
+| S5 credencial fixa em `ai-qa-agent` | **Feito no código** | Credencial sai do código e vem dos segredos `QA_AGENT_EMAIL` e `QA_AGENT_PASSWORD`; sem eles a função recusa rodar. **Ação humana pendente:** trocar a senha da conta que estava exposta (continua no histórico do git) |
+| S6 `seed-test-user` | **Feito** | Função e entrada do `config.toml` removidas (ninguém chamava) |
+| Teste de guarda | **Feito** | `src/test/edgeFunctionsAuth.test.ts` falha se alguém desfizer essas proteções |
+| S3 `ai-psicossocial-entrevista` | **Pendente** | Validar token do convite no servidor; sem acesso a identificação |
+| S2 demais `ai-*` (≈ 23 restantes) | **Pendente** | Migrar para `_shared/auth.ts` em ordem de risco |
+| S8 log de uso e custo de IA | **Pendente** | Entrega própria (migration + script de entrega) |
+| S4 padrão `youreyes-run-agent` (anon key como autorização) | **Pendente** | Trocar por segredo próprio ou disparo interno antes de qualquer agente de cliente |
+| Produção | **Pendente** | Funções em produção só mudam quando forem publicadas pelo caminho que a casa usa para funções; `seed-test-user`, se existir lá, precisa ser removida |
+
 ### 14.3 Modelo de ameaças dos agentes
 | Ameaça | Cenário | Controle principal | Prova |
 |---|---|---|---|

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { exigirUsuario, respostaDeErro } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,10 @@ serve(async (req) => {
   }
 
   try {
+    // Sem login a IA não responde: antes qualquer pessoa com a URL gastava a
+    // chave da OpenAI da casa.
+    await exigirUsuario(req);
+
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY não configurada");
@@ -91,12 +96,6 @@ ${contexto ? `Contexto adicional do usuário: ${contexto}` : ""}`;
     });
 
   } catch (error) {
-    console.error("Erro no chat IA:", error);
-    return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : "Erro desconhecido" 
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return respostaDeErro(error, corsHeaders);
   }
 });

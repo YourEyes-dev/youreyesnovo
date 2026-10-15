@@ -90,6 +90,7 @@ import { AdmissaoList } from "@/components/admissao/AdmissaoList";
 import { AdmissaoForm } from "@/components/admissao/AdmissaoForm";
 import { AdmissaoDetail } from "@/components/admissao/AdmissaoDetail";
 import { useAdmissoes } from "@/hooks/useAdmissoes";
+import { usePodeVerSalario } from "@/hooks/usePodeVerSalario";
 import { AdmissaoFormData } from "@/types/database";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { useAfastamentosAtivos } from "@/hooks/useAfastamentosAtivos";
@@ -968,6 +969,7 @@ function AdmissoesTab() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { hasMinimumRole, loading: authLoading } = useAuthContext();
+  const podeVerSalarioAdm = usePodeVerSalario();
 
   const {
     admissoes, isLoading, error, criarAdmissao, atualizarAdmissao, atualizarStatus,
@@ -1375,7 +1377,7 @@ function AdmissoesTab() {
       cargo: a.cargo, departamento: a.departamento || "", filial: a.filial || "",
       dataAdmissao: a.data_admissao || "", tipoContrato: a.tipo_contrato || "",
       jornadaTrabalho: a.jornada_trabalho || "",
-      salario: a.salario ? `R$ ${a.salario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "",
+      salario: !podeVerSalarioAdm ? "Sem permissão" : (a.salario ? `R$ ${a.salario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""),
       gestorImediato: a.gestor_imediato || "", centroCusto: a.centro_custo || "",
       cbo: (a as any).cbo || "",
     },

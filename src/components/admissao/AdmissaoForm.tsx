@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { usePodeVerSalario } from '@/hooks/usePodeVerSalario';
 import { toast } from 'sonner';
 import { useDepartamentos, useFiliais } from '@/hooks/useCadastros';
 import { useEmpresaAtiva } from '@/contexts/EmpresaAtivaContext';
@@ -106,6 +107,7 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
   const { filiais } = useFiliais();
   const { empresaAtivaId } = useEmpresaAtiva();
   const { tenantId } = useAuth();
+  const podeVerSalario = usePodeVerSalario();
   const [buscandoCpf, setBuscandoCpf] = useState(false);
   const [usuarioEncontrado, setUsuarioEncontrado] = useState<UsuarioEncontrado | null>(null);
   const [dadosReaproveitados, setDadosReaproveitados] = useState(false);
@@ -966,7 +968,17 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
 
               <div>
                 <Label htmlFor="salario">Salário *</Label>
-                <Input 
+                {!podeVerSalario ? (
+                  <Input
+                    id="salario"
+                    value="Sem permissão para ver salário"
+                    disabled
+                    readOnly
+                    className="italic text-muted-foreground"
+                  />
+                ) : (
+                <>
+                <Input
                   id="salario"
                   {...formProfissionais.register('salario')}
                   placeholder="R$ 0.000,00"
@@ -986,6 +998,8 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
                 />
                 {formProfissionais.formState.errors.salario && (
                   <p className="text-xs text-destructive mt-1">{formProfissionais.formState.errors.salario.message}</p>
+                )}
+                </>
                 )}
               </div>
 

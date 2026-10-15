@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { fromTable } from '@/integrations/supabase/untypedClient';
 import {
   AdmissaoRow,
   AdmissaoInsert,
@@ -45,8 +46,10 @@ export function useAdmissoes() {
       const admissoesData: any[] = [];
       let from = 0;
       for (let i = 0; i < 100; i++) {
-        let q = supabase
-          .from('admissoes')
+        // Leitura pela VIEW mascarada: o salário vem nulo para perfis sem
+        // "pode ver salário" (mascaramento no servidor). Escritas seguem na
+        // tabela admissoes (mutations abaixo).
+        let q = fromTable('admissoes_segura')
           .select('*')
           .eq('tenant_id', tenantId);
         if (empresaAtivaId) q = q.eq('empresa_id', empresaAtivaId);

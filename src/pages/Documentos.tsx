@@ -53,6 +53,7 @@ import { fromTable } from "@/integrations/supabase/untypedClient";
 
 import { useDocumentoPastas } from "@/hooks/useDocumentoPastas";
 import { useAuth } from "@/hooks/useAuth";
+import { usePerfilPermissions } from "@/hooks/usePerfilPermissions";
 import { useDocumentos } from "@/hooks/useDocumentos";
 import { PastaTreeView } from "@/components/documentos/PastaTreeView";
 import { PastaDocumentosList } from "@/components/documentos/PastaDocumentosList";
@@ -85,9 +86,19 @@ function filterTree(nodes: DocumentoPastaNode[], term: string): DocumentoPastaNo
 const Documentos = () => {
   const [searchParams] = useSearchParams();
   const colaboradorIdFromUrl = searchParams.get("colaborador");
-  const { tenantId } = useAuth();
+  const { tenantId, hasMinimumRole } = useAuth();
   const { empresaAtivaId } = useEmpresaAtiva();
-  
+  const { temAcessoModuloAdmin, isOwner } = usePerfilPermissions();
+
+  // Acesso AMPLO ao módulo (espelha perfil_permite_modulo no servidor):
+  // superadmin/owner, manager+ ou um perfil com escopo <> proprio_usuario.
+  // Quem NÃO é amplo tem o módulo só como "próprio usuário" — vê apenas a
+  // própria pasta (a RLS já limita os dados) e nenhuma visão de empresa.
+  const podeGerirDocumentos =
+    isOwner ||
+    hasMinimumRole("manager") ||
+    temAcessoModuloAdmin(["documentos", "configuracoes", "colaboradores"]);
+
   const [activeTab, setActiveTab] = useState("arvore");
   const [searchTerm, setSearchTerm] = useState("");
   const [auditSearchTerm, setAuditSearchTerm] = useState("");
@@ -182,21 +193,30 @@ const Documentos = () => {
     }
   }, [colaboradorIdFromUrl, tree]);
 
-  // Auto-sync: criar pastas para colaboradores novos
+  // Força a aba "Estrutura" para quem só tem acesso próprio (as demais abas
+  // trazem visão de empresa e ficam ocultas abaixo).
   useEffect(() => {
+    if (!podeGerirDocumentos) setActiveTab("arvore");
+  }, [podeGerirDocumentos]);
+
+  // Auto-sync: criar pastas para colaboradores novos (só para quem gere os
+  // documentos — o usuário "próprio" não cria pastas; a escrita nem passaria).
+  useEffect(() => {
+    if (!podeGerirDocumentos) return;
     if (needsSync && !syncing) {
       syncColaboradores();
     }
-  }, [needsSync, syncing, syncColaboradores]);
+  }, [podeGerirDocumentos, needsSync, syncing, syncColaboradores]);
 
   // Auto-gerar estrutura padrão silenciosamente (idempotente — cria apenas pastas faltantes)
   useEffect(() => {
+    if (!podeGerirDocumentos) return;
     if (!tenantId || loading || initializing) return;
     const initKey = `${tenantId}_${empresaAtivaId || 'default'}`;
     if (autoInitDone === initKey) return;
     setAutoInitDone(initKey);
     initializeDefaultStructure(undefined).catch(() => {});
-  }, [tenantId, loading, initializing, empresaAtivaId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [podeGerirDocumentos, tenantId, loading, initializing, empresaAtivaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleOpenUpload = useCallback((pastaId?: string) => {
     setUploadForPastaId(pastaId);
@@ -460,10 +480,12 @@ ${pop.referencias ? `<h2>12. Referências</h2><p>${pop.referencias}</p>` : ""}
           <p className="text-muted-foreground">Gestão hierárquica de arquivos e prontuários</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setShowCreatePasta(true)}>
-            <FolderPlus className="w-4 h-4 mr-2" />
-            Nova Pasta
-          </Button>
+          {podeGerirDocumentos && (
+            <Button variant="outline" onClick={() => setShowCreatePasta(true)}>
+              <FolderPlus className="w-4 h-4 mr-2" />
+              Nova Pasta
+            </Button>
+          )}
           <Button onClick={() => handleOpenUpload(selectedPasta?.id)}>
             <Upload className="w-4 h-4 mr-2" />
             Upload
@@ -528,31 +550,35 @@ ${pop.referencias ? `<h2>12. Referências</h2><p>${pop.referencias}</p>` : ""}
               <FolderTree className="w-4 h-4" />
               Estrutura
             </TabsTrigger>
-            <TabsTrigger value="conformidade" className="gap-2">
-              <ShieldCheck className="w-4 h-4" />
-              Conformidade
-            </TabsTrigger>
-            <TabsTrigger value="radar" className="gap-2">
-              <Radar className="w-4 h-4" />
-              Governança
-            </TabsTrigger>
-            <TabsTrigger value="pdca" className="gap-2">
-              <RefreshCw className="w-4 h-4" />
-              PDCA
-            </TabsTrigger>
-            <TabsTrigger value="notificacoes" className="gap-2 relative">
-              <Bell className="w-4 h-4" />
-              Notificações
-              {(stats.vencidos > 0 || stats.vencendo > 0) && (
-                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
-                  {stats.vencidos + stats.vencendo}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="historico" className="gap-2">
-              <History className="w-4 h-4" />
-              Auditoria
-            </TabsTrigger>
+            {podeGerirDocumentos && (
+              <>
+                <TabsTrigger value="conformidade" className="gap-2">
+                  <ShieldCheck className="w-4 h-4" />
+                  Conformidade
+                </TabsTrigger>
+                <TabsTrigger value="radar" className="gap-2">
+                  <Radar className="w-4 h-4" />
+                  Governança
+                </TabsTrigger>
+                <TabsTrigger value="pdca" className="gap-2">
+                  <RefreshCw className="w-4 h-4" />
+                  PDCA
+                </TabsTrigger>
+                <TabsTrigger value="notificacoes" className="gap-2 relative">
+                  <Bell className="w-4 h-4" />
+                  Notificações
+                  {(stats.vencidos > 0 || stats.vencendo > 0) && (
+                    <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                      {stats.vencidos + stats.vencendo}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="historico" className="gap-2">
+                  <History className="w-4 h-4" />
+                  Auditoria
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
         </motion.div>
 
@@ -564,11 +590,24 @@ ${pop.referencias ? `<h2>12. Referências</h2><p>${pop.referencias}</p>` : ""}
               animate={{ opacity: 1, scale: 1 }}
               className="flex flex-col items-center justify-center h-full bg-card rounded-xl border border-border border-dashed p-12"
             >
-              <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Gerando estrutura de pastas…</h3>
-              <p className="text-muted-foreground text-center max-w-md">
-                A estrutura padrão está sendo criada automaticamente para esta empresa.
-              </p>
+              {podeGerirDocumentos ? (
+                <>
+                  <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Gerando estrutura de pastas…</h3>
+                  <p className="text-muted-foreground text-center max-w-md">
+                    A estrutura padrão está sendo criada automaticamente para esta empresa.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <FolderTree className="w-10 h-10 text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Nenhuma pasta disponível</h3>
+                  <p className="text-muted-foreground text-center max-w-md">
+                    Seu acesso aos documentos está limitado à sua própria pasta. Se ela
+                    ainda não aparece, peça ao RH para criá-la.
+                  </p>
+                </>
+              )}
             </motion.div>
           ) : (
             <motion.div

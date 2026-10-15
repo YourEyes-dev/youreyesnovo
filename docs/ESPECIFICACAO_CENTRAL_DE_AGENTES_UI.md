@@ -509,6 +509,95 @@ Consultas ao conteúdo geram linha na trilha de **Acesso**.
 
 ---
 
+## 13. Quando o agente erra — tranquilidade do cliente
+
+> Pergunta do dono do produto: "e se o agente executar algo errado?". A resposta precisa existir **antes** da compra (na Ficha), **durante** o uso (limites e botões) e **depois** do erro (conter, corrigir, comunicar, compensar). Promessa só é feita se o sistema consegue cumprir; o que depende de decisão da casa está marcado **[REGRA]**.
+
+### 13.1 Defesa em cinco camadas (o erro tem que passar por todas)
+| # | Camada | Mecanismo | Já especificado? |
+|---|---|---|---|
+| 1 | **Antes de existir** | Paradas duras fixas (nunca fecha, paga, transmite, desliga, decide) | Sim (§2.4) |
+| 2 | **Antes de agir** | Período de experiência com "teria feito"; níveis Sugere → Faz e pede OK → Cuida sozinho | Sim (§1.3) |
+| 3 | **Ao agir** | **Envelope de limites**: máx. de ações por hora/dia, máx. de destinatários por dia, janela de horário, canal permitido; **lote em duas etapas** (os 3 primeiros itens de cada novo tipo vão para aprovação, o resto só segue se aprovados); mensagem com **modelo aprovado** (agente não escreve texto livre para colaborador no nível C) | **Novo** |
+| 4 | **Depois de agir** | Detecção: alertas de anomalia (§12.5), botão **"Reportar erro"**, taxa de recusa/reversão | Parcial → completo aqui |
+| 5 | **Quando falha** | Conter, reverter, corrigir, comunicar, compensar (§13.3 a §13.6) | **Novo** |
+
+### 13.2 Classificar toda ação por reversibilidade (no catálogo, por tipo de ação)
+| Classe | Exemplo | O que o sistema oferece |
+|---|---|---|
+| **Reversível** | Marcar pendência, abrir ação no Plano de Ação, preparar minuta (rascunho) | **Desfazer** com 1 clique (grava reversão na trilha) |
+| **Compensável** | Lembrete enviado ao colaborador/gestor errado | Não se "des-envia": **mensagem corretiva** pré-aprovada ("Desconsidere o aviso de dd/mm") + registro |
+| **Irreversível** | Qualquer coisa que feche, pague, transmita ou decida | **Não existe para agente** (parada dura); só humano |
+Regra: ação da classe *compensável* só pode ser executada no nível "Cuida sozinho" se o catálogo trouxer mensagem corretiva; ação *irreversível* nunca é cadastrada para agente.
+
+### 13.3 Conter: parar em segundos
+- **Afastar** (já previsto) passa a existir em três escopos: **uma ação** (suspender só "cobrar assinatura"), **um agente**, **toda a equipe digital** ("Pausar tudo", destaque no topo da Central, com confirmação).
+- **Quarentena automática (disjuntor)**: se N ações do mesmo tipo forem reportadas como erro ou revertidas em X horas, o tipo de ação é suspenso e o administrador é avisado **[REGRA: N e X]**. O agente volta a "Faz e pede seu OK" até alguém liberar.
+- A casa também pode **suspender um agente globalmente** (kill switch no SuperAdmin → Agentes) quando o erro é do agente, não do cliente. Todos os clientes afetados veem a faixa "Agente em manutenção" e nada é executado.
+
+### 13.4 Reportar e entender o impacto
+- Botão **"Algo errado?"** em cada linha do Diário, em cada aprovação e no dossiê. Abre formulário curto (o que aconteceu, gravidade sugerida) e **cria um incidente** (reaproveita `evento_incidente`) ligado à ação.
+- **"Quem foi afetado?"**: a partir de uma ação, o dossiê lista as ações da mesma causa (mesma regra/versão/lote) e os destinatários, mascarados. O administrador vê o tamanho do estrago antes de agir.
+- Gravidade: **Baixa** (sem efeito fora da empresa), **Média** (colaborador ou gestor recebeu algo indevido), **Alta** (dado pessoal/saúde envolvido, ou repetição em massa). Alta aciona a casa e o fluxo de incidente de LGPD **[REGRA: prazo e comunicação à ANPD/titulares]**.
+
+### 13.5 Corrigir
+1. **Desfazer** o que é reversível (individual ou **em lote** pelo mesmo incidente).
+2. **Mensagem corretiva** aos destinatários afetados, a partir de modelo, **sempre com aprovação humana**, registrada na trilha.
+3. Registrar a **causa** (regra errada, dado errado no cadastro, falha do agente) para saber se o conserto é do cliente (corrigir cadastro) ou da casa (corrigir agente).
+4. Após correção, o agente permanece em quarentena até o administrador clicar **"Liberar"**.
+5. **Relatório do incidente** (linha do tempo, impacto, causa, correção, o que muda) gerado em PDF, arquivado em Documentos e anexado à trilha, útil para DPO e cliente final.
+
+### 13.6 Responsabilidade e compensação **[REGRA]**
+Não decido isto. O que a interface precisa suportar quando o dono do produto definir: (a) **crédito automático** ou estorno proporcional do agente nos dias de incidente (a conciliação de cobrança §12.6 já registra o motivo); (b) **cobrança suspensa** enquanto o agente está em quarentena por falha da casa; (c) **prazo de resposta** da casa por gravidade, exibido no incidente; (d) cláusula no termo de uso (limite de responsabilidade, o que é erro do agente × erro de cadastro). O texto da Ficha só promete o que (a) a (d) cumprirem.
+
+### 13.7 O que o cliente vê antes de comprar: bloco "E se ele errar?" na Ficha
+Seção em acordeão, aberta por padrão, linguagem de RH:
+1. **Ele começa só observando** por 14 dias.
+2. **Há coisas que ele nunca faz** (lista fixa).
+3. **Você vê tudo o que ele fez** e por quê.
+4. **Você para tudo em um clique** (Afastar / Pausar tudo).
+5. **Dá para desfazer** o que for desfazível e **avisar** quem recebeu algo errado.
+6. **Se o erro for nosso**, abrimos um incidente, corrigimos e tratamos o valor cobrado nesse período **[REGRA]**.
+Link "Ver política de erros e responsabilidades" (termo de uso).
+
+### 13.8 Telas e estados novos
+- **Central → Visão geral**: botão **Pausar tudo**; faixa de incidente aberto ("1 incidente em análise") quando houver.
+- **Cartão e Perfil do agente**: novos estados **Em quarentena** (⚠, explica o motivo e quem pode liberar) e **Em manutenção pela YourEyes**.
+- **Incidentes** (nova subseção em Auditoria): lista, gravidade, status (aberto, em correção, resolvido), causa, ações de desfazer e mensagem corretiva.
+- **SuperAdmin → Agentes**: painel de incidentes por agente/tenant, kill switch global, histórico de quarentenas.
+
+| Estado | Mostra | Usuário pode | Mensagem |
+|---|---|---|---|
+| quarentena | selo ⚠, esmaecido | Ver incidente, Liberar (admin) | "Pausado por segurança: 4 ações foram reportadas como erro." |
+| manutenção (casa) | faixa informativa | Acompanhar | "Estamos corrigindo o agente. Nada será executado até a liberação." |
+| incidente aberto | faixa na Central | Abrir incidente | "1 incidente em análise." |
+| desfazendo em lote | progresso `aria-live` | Cancelar restante | "Desfazendo 12 de 40 ações." |
+
+### 13.9 Back **[BACK]**
+`agente_incidentes` (vinculado a `agente_acoes`), `agente_acoes.revertida_por`, `agentes_catalogo.acoes[]` com `reversibilidade` e `mensagem_corretiva`, `agentes_tenant.envelope_json` e `quarentena_ate`/`quarentena_motivo`, RPCs `agente_acao_desfazer`, `agente_incidente_abrir`, `agente_pausar_todos`, `agente_quarentena_liberar`, `agente_mensagem_corretiva_enviar`. O **disjuntor** e os limites do envelope precisam ser aplicados **no banco/RPC da ação** (não só na tela), senão o agente os ultrapassa. Depende da Onda 0 (identidade do agente, kill switch, shadow).
+
+### 13.10 Critérios de aceite
+- **CA-UX-045** A Ficha traz "E se ele errar?" com as 6 garantias e só promete o que a casa definiu.
+- **CA-UX-046** "Pausar tudo" interrompe todos os agentes da empresa em até 1 minuto e registra quem e quando.
+- **CA-UX-047** É possível afastar uma ação específica sem afastar o agente.
+- **CA-UX-048** Toda ação reversível tem "Desfazer" que cria linha de reversão sem apagar a original.
+- **CA-UX-049** Ação compensável só roda em "Cuida sozinho" se houver mensagem corretiva cadastrada.
+- **CA-UX-050** "Algo errado?" abre incidente ligado à ação em até 2 cliques.
+- **CA-UX-051** O incidente mostra quem foi afetado (mascarado) e o tamanho do lote.
+- **CA-UX-052** Atingido o limite de erros, o tipo de ação entra em quarentena sozinho e o administrador é avisado.
+- **CA-UX-053** Limites do envelope (ações/h, destinatários/dia, janela) são recusados **pelo banco**, mesmo se a tela for burlada.
+- **CA-UX-054** Em tipo novo de ação, só os 3 primeiros itens vão antes para aprovação.
+- **CA-UX-055** Mensagem corretiva exige aprovação humana e fica na trilha.
+- **CA-UX-056** Relatório do incidente é gerado em PDF e arquivado em Documentos.
+- **CA-UX-057** Em quarentena ou manutenção da casa, nenhuma ação é executada e a cobrança do período fica registrada com o motivo.
+- **CA-UX-058** Incidente de gravidade Alta notifica a casa e abre o fluxo de LGPD.
+
+**QA adicional:** `AGENTES-012` desfazer cria reversão e preserva a original; `-013` disjuntor suspende o tipo após N erros; `-014` limite de envelope barrado no banco; `-015` ação classe irreversível não pode ser cadastrada para agente; `-016` quarentena bloqueia execução e suspende cobrança conforme regra; `-017` incidente respeita isolamento entre tenants.
+
+**Dúvidas novas [REGRA]:** política de compensação (crédito, estorno, prazo); valores de N e X do disjuntor; limite de responsabilidade no termo; prazo e fluxo de incidente de LGPD (ANPD e titulares); SLA de resposta da casa por gravidade; se mensagem corretiva a colaborador pode sair no nível C ou sempre exige OK.
+
+---
+
 ## Avaliação crítica do agente (10 perguntas)
 1. **Especifiquei todos os estados?** Cartão e as 8 telas têm carregando/vazio/erro/sucesso/sem permissão; falta detalhar offline por tela e o estado "plano sem o módulo `agentes`" na navegação — deixei como regra única, não por tela.
 2. **Acessibilidade nos tokens e nos critérios?** Sim (§4, §5, CA-UX-019/020/021/026), mas não calculei os pares de contraste reais dos tokens novos — isso é tarefa de implementação com validador.

@@ -56,7 +56,8 @@ Menu lateral ▸ "Equipe Digital" (/agentes)                  ← NOVO
  │         └─ Confirmar contratação (Dialog)   impacto no valor mensal antes → depois
  ├─ Aba 3  Aprovações    (/agentes/aprovacoes) caixa de entrada "aguardando seu OK" (nível B)
  ├─ Aba 4  Diário        (/agentes/diario)     trilha de ações, filtro por agente/empresa/resultado
- ├─ Aba 5  Resultados    (/agentes/resultados) entregas, horas economizadas, custo × benefício
+ ├─ Aba 5  Resultados    (/agentes/resultados) entregas medidas, horas estimadas, antes × depois (§11)
+ ├─ Aba 6  Auditoria     (/agentes/auditoria)  trilha imutável, dossiê, integridade, exportação (§12; só Admin/Auditor)
  └─ Perfil do agente     (/agentes/:codigo)    cabeçalho + Regras (envelope) + Diário + Resultados daquele agente
 
 Meu Plano (/meu-plano)        ← ALTERADO: card "Equipe digital" (contratados + valor) → link p/ Central; contratar via MESMA Ficha
@@ -160,10 +161,10 @@ Cabeçalho (avatar, status, ações `Afastar` / `Efetivar` / `Encerrar contrato`
 ### 2.7 Aba "Aprovações"
 Lista priorizada por prazo. Cada item: agente, ação proposta em uma frase, **por quê?** (expansível), entidade alvo (link), prazo. Ações: `Aprovar`, `Recusar` (com motivo opcional), `Abrir detalhe`. Aprovação em lote só para itens do mesmo tipo e **risco baixo**. Itens que exigem parada dura nunca aparecem como "aprovar", só como "Abrir no módulo" (humano executa).
 
-### 2.8 Aba "Diário"
+### 2.8 Aba "Diário" (base da auditoria, ver §12)
 Linha do tempo: hora · agente · ação em português · resultado (✔ enviado, ⏸ aguardando, ✖ falhou, ◌ simulado) · **Por quê?**. Filtros: agente, período, resultado, módulo. Exportar CSV (Documentos). Linhas simuladas (experiência) com selo "simulado".
 
-### 2.9 Aba "Resultados"
+### 2.9 Aba "Resultados" (detalhada em §11) e aba "Auditoria" (§12)
 KPIs por agente com a **unidade de valor** do Discovery §3 (ex.: "Contratos decididos no prazo"), comparativo mês a mês, horas economizadas (estimativa rotulada), custo × benefício. Sem ranking entre pessoas; nada que identifique colaborador.
 
 ### 2.10 Meu Plano (`/meu-plano`) — alteração
@@ -354,6 +355,160 @@ Tenant sempre derivado de `get_user_tenant_id()`, nunca do parâmetro. Ver a Cen
 
 ---
 
+## 11. Resultados — como são medidos e apresentados
+
+> Complementa §2.9. A aba "Resultados" deixa de ser só uma tela de números e vira um **contrato de medição**: cada número tem definição, fonte e rótulo de confiança.
+
+### 11.1 Princípio: três camadas de resultado, rotuladas de formas diferentes
+| Camada | O que é | Como se prova | Rótulo na tela |
+|---|---|---|---|
+| **Atividade** | O que o agente fez (lembretes enviados, minutas preparadas) | Linhas de `agente_acoes` (reais, nunca as simuladas) | "Feito" |
+| **Entrega** | O **evento de sucesso** do agente, verificado no banco dentro de uma janela de atribuição após a ação dele | Evento no módulo de origem (ex.: assinatura registrada, contrato com decisão antes do D-0) | "Medido" |
+| **Impacto** | Horas e R$ economizados | Cálculo: entregas × minutos por unidade × custo/hora (premissas visíveis e ajustáveis) | "Estimativa" |
+
+Regras: só **Entrega** com evento verificável conta como resultado; Atividade sozinha nunca vira "sucesso" (evita inflar com lembretes que não mudam nada — risco de *gaming* do Discovery §7). Ação **simulada** (período de experiência) não entra em nenhuma camada; aparece à parte como "teria feito".
+
+### 11.2 Definição por agente (ficha de medição, preenchida no catálogo `agentes_catalogo`)
+| Agente | Unidade de valor | Evento de sucesso | Janela de atribuição |
+|---|---|---|---|
+| Bruno · Experiência | Contrato decidido no prazo | Decisão registrada antes do D-0 | Do 1º aviso até o D-0 |
+| Clara · Assinaturas | Documento assinado | Assinatura registrada após lembrete | 7 dias após o lembrete **[VALIDAR]** |
+| Aline · Admissão | Admissão concluída | Admissão `concluido` com checklist 100% | Da 1ª cobrança até a conclusão |
+| Marta · Pessoas | Item concluído no prazo | Trilha/PDI/avaliação concluídos antes do vencimento | Do lembrete até o vencimento |
+| Rui · Pendências | Pendência resolvida | Tarefa encerrada após o resumo diário | 3 dias após o resumo **[VALIDAR]** |
+Os demais (Ponto, Folha, SST, Contábil) seguem o Discovery §3 e só ganham ficha quando passarem de "Em breve".
+
+### 11.3 Indicadores da tela "Resultados"
+| Indicador | Fórmula | Rótulo |
+|---|---|---|
+| Entregas no período | nº de eventos de sucesso atribuídos | Medido |
+| Taxa de aceitação humana | aprovadas ÷ (aprovadas + recusadas), por tipo de ação | Medido |
+| Tempo até a decisão | mediana entre aviso do agente e decisão humana | Medido |
+| Vencimentos evitados | itens resolvidos antes do prazo após ação do agente | Medido |
+| Falhas e reversões | ações com erro ou revertidas ÷ total | Medido |
+| Horas economizadas | entregas × minutos/unidade ÷ 60 | **Estimativa** |
+| Custo × benefício | preço do agente (+ excedente) ÷ economia estimada | **Estimativa** |
+| **Antes × depois** | mesma entrega nos 30 dias **antes** da contratação (linha de base) | Medido (base) / comparação |
+A **linha de base** é gravada no dia da contratação (`agentes_tenant.baseline_json`), porque só ela torna o "antes × depois" honesto.
+
+### 11.4 Apresentação
+1. **Visão geral**: 3 KPIs (entregas, aceitação humana, horas estimadas) com sparkline e comparação com o mês anterior.
+2. **Resultados** (por agente e consolidado): seletor de período (mês atual, 3 meses, personalizado), barras de entregas por semana, tabela de detalhe, bloco "Antes × depois". Todo número é **clicável** e abre o Diário já filtrado nas linhas que o compõem (rastreabilidade número → evidência).
+3. **Relatório mensal do agente**: gerado automaticamente no fechamento do mês (PDF em português para leitor de RH, sem dado pessoal), arquivado no módulo **Documentos** e enviado por e-mail ao decisor. Mesmo conteúdo da tela.
+4. **Meu Plano**: linha "Equipe digital" ganha o resumo "X entregas este mês" ao lado do valor (liga custo a benefício no mesmo lugar).
+5. **SuperAdmin**: adoção, taxa de aceitação média, custo de servir × preço, agentes com resultado fraco (insumo para promoção de nível, Discovery §6).
+
+### 11.5 Honestidade dos números
+- Período corrente rotulado "parcial"; sem dado = "—", nunca 0 enganoso; menos de 7 dias = estado vazio explicativo.
+- Estimativas sempre com premissas expansíveis e botão "ajustar".
+- Nenhuma correlação apresentada como causa; o texto diz "após ação do agente", não "por causa do agente".
+- Sem dado individual: agregados; célula com menos de N pessoas é suprimida **[REGRA: N]** (psicossocial/ouvidoria só agregado, mínimo por GHE).
+- Gráficos com tabela equivalente e cor nunca como única codificação (§4).
+
+---
+
+## 12. Auditoria
+
+> A pergunta central: **"Posso provar, depois, o que o agente fez, por quê, com qual regra, quem autorizou e quanto custou?"** Sem isso o cliente não confia, o DPO não aprova e a cobrança não se sustenta. O Discovery já apontava a falta de "trilha única de ação de agente" (§1.6, §5.1); esta seção fecha a especificação.
+
+### 12.1 Quem audita e o que cada um precisa
+| Audiência | Pergunta | Acesso |
+|---|---|---|
+| Dono/RH-gestor | "O que o agente fez e por quê?" | Diário e Auditoria da própria empresa |
+| **Auditor / DPO do cliente** (perfil novo, somente leitura) | "Há evidência, integridade e conformidade LGPD?" | Aba Auditoria + exportação assinada |
+| Titular (colaborador), via RH | Informação sobre tratamento (LGPD art. 18) e **revisão de decisão automatizada** (art. 20) | RH consulta por colaborador; resposta registrada |
+| SuperAdmin da casa | Suporte, incidente, cobrança contestada | Metadados cross-tenant; **conteúdo só com justificativa registrada** |
+
+### 12.2 Três trilhas (todas append-only)
+1. **Execução** — `agente_acoes`, uma linha por ação (inclusive **bloqueadas** e **simuladas**). Campos mínimos: `id`, `tenant_id` (derivado do registro do agente, nunca do input), `agente`, `agente_versao`, `regra_versao`, `nivel_vigente`, `gatilho` + `evento_origem_id`, `entidade_tipo/id`, `acao`, `resumo` (sem dado sensível; referência à entidade), `status` (feita, aguardando, recusada, falhou, **bloqueada_parada_dura**), `simulada`, `aprovador_id/aprovado_em/motivo_recusa`, `canal` + destinatário **mascarado**, `custo_tokens/custo_canal`, `sucesso_em` (evento de sucesso), `revertida_por`, `chave_idempotencia`, `criado_em` (relógio do servidor).
+2. **Governança** — quem **contratou, efetivou, mudou nível, mudou regra (antes/depois), afastou, retomou, encerrou, aceitou o termo**; e, no SuperAdmin, quem **alterou preço** ou despublicou agente. Reaproveita o padrão de `entitlement_audit_log`.
+3. **Acesso** — quem **consultou** o Diário/dossiê de uma entidade sensível e quem **exportou** (padrão do `log_acesso_clinico`). Consulta ao conteúdo por SuperAdmin entra aqui com a justificativa.
+Cobrança tem um quarto vínculo: **conciliação diária** entre agentes ativos e o valor faturado (§12.6).
+
+### 12.3 Integridade e imutabilidade
+- Sem `UPDATE` nem `DELETE`: trigger bloqueia (como `ponto_audit_log`); correção = **nova linha** apontando a original; reversão idem (`revertida_por`).
+- **Encadeamento por hash**: cada linha guarda `hash_anterior` e `hash` (SHA-256 sobre o conteúdo + hash anterior, por tenant), permitindo provar que nada foi apagado ou alterado. `digest` já tem atalho em `public` (CLAUDE.md). Função `agente_auditoria_verificar(tenant, de, ate)` devolve "cadeia íntegra" ou a primeira linha quebrada.
+- Exportação **assinada** (CSV + arquivo de hashes + data/hora do servidor) guardada em Documentos. Carimbo de tempo com validade jurídica (ICP-Brasil) **[REGRA]**.
+- Dados pessoais fora do `resumo`: guarda referência, não cópia; assim o expurgo de LGPD não destrói a cadeia.
+
+### 12.4 Tela de Auditoria (nova aba "Auditoria", só perfis Administrador e Auditor)
+```
+┌ Auditoria ───────────────────────────────────────────────────────────────┐
+│ Cadeia de registros:  ✔ Íntegra até 15/10 09:02   [Verificar agora]      │
+│ Período [01/10–15/10]  Agente [Todos]  Tipo [Todos]  Status [Todos]      │
+│ Buscar por colaborador/entidade: [ ................ ]  (acesso é registrado)│
+├──────────┬────────┬──────────────────────────┬──────────┬───────────────┤
+│ Quando   │ Agente │ Ação                     │ Status   │ Quem autorizou│
+│ 15/10 08:00 │ Bruno │ Avisou gestora (7 dias)│ ✔ Feita  │ Regra v3 · auto│
+│ 14/10 17:12 │ Bruno │ Minuta de prorrogação  │ ✔ Aprov. │ Ana (RH)      │
+│ 14/10 09:30 │ Clara │ Reabrir link vencido   │ ⛔ Bloqueada (parada dura)│
+└──────────┴────────┴──────────────────────────┴──────────┴───────────────┘
+ [Exportar período (assinado)]   [Gerar relatório de auditoria]
+```
+**Dossiê da ação** (painel lateral ao clicar numa linha): linha do tempo *gatilho → regra aplicada (versão) → dados lidos (categorias) → decisão → quem aprovou/recusou → efeito → reversão*, mais custo e hash da linha. Botão "Ver no módulo" e "Criar ação no Plano de Ação" (regra global do YE).
+**Visão por entidade**: "tudo que agentes fizeram sobre esta admissão/contrato" (resposta direta a pedido do titular).
+**Reconstrução no tempo**: seletor "como estava em dd/mm" mostra o nível e a versão das regras vigentes naquela data.
+
+### 12.5 Alertas de anomalia e "auditoria contínua"
+Notificação ao administrador (e abertura no Plano de Ação) quando: pico de ações por hora acima do envelope; ação fora da janela de horário; **tentativa de parada dura bloqueada** (sempre registrada); custo acima do limite; taxa de recusa acima de meta; cadeia de hash quebrada (crítico, avisa também a casa). Esses mesmos indicadores alimentam os critérios de promoção de nível (Discovery §6).
+
+### 12.6 Auditoria de cobrança
+Tabela de conciliação diária (`agente_cobranca_dia`: tenant, agente, estado, preço vigente, motivo). Regras verificáveis: (a) nada é cobrado de agente "Em breve" ou em experiência sem decisão **[REGRA]**; (b) valor em `entitlement_my_plan` = soma dos agentes cobráveis do dia; (c) toda mudança de preço do SuperAdmin está no log e **não altera contratos vigentes**. Telas: Meu Plano mostra "histórico de cobrança dos agentes" por mês; SuperAdmin tem relatório de divergências.
+
+### 12.7 Permissões (matriz)
+| Ação | Admin | RH | Gestor | Auditor | SuperAdmin |
+|---|---|---|---|---|---|
+| Ver Diário da empresa | ✔ | ✔ (escopo do módulo) | só do seu time | ✔ | metadados |
+| Ver aba Auditoria / dossiê | ✔ | — | — | ✔ | metadados (conteúdo com justificativa) |
+| Exportar trilha assinada | ✔ | — | — | ✔ | ✔ (registrado) |
+| Verificar cadeia | ✔ | — | — | ✔ | ✔ |
+| Alterar/apagar registro | **ninguém** | | | | |
+Consultas ao conteúdo geram linha na trilha de **Acesso**.
+
+### 12.8 Estados da tela de Auditoria
+| Estado | Mostra | Ação |
+|---|---|---|
+| carregando | skeleton da tabela e do selo de cadeia | — |
+| vazio | "Nenhuma ação registrada neste período. Agentes em experiência aparecem como simulados." | alterar período |
+| erro | "Não foi possível carregar a trilha." | tentar de novo |
+| **cadeia quebrada** | faixa crítica "Inconsistência detectada na linha X" | contatar suporte, exportar evidência |
+| exportando | progresso e `aria-live` | cancelar |
+| sem permissão | "Você não tem acesso à auditoria" + a quem pedir | — |
+| parcial | resultados paginados com aviso "mostrando 50 de N" | carregar mais |
+
+### 12.9 Viabilidade e back **[BACK]**
+- Tabelas: `agente_acoes`, `agente_governanca_log`, `agente_acesso_log`, `agente_cobranca_dia`, `agente_resultados_dia` (pré-agregado). Criar por `EXECUTE 'CREATE ' || 'TABLE'` no script de entrega (auto-RLS do SQL Editor, CLAUDE.md); RLS por `get_user_tenant_id()` + política `RESTRICTIVE perfil_restringe_leitura_*` (rotina PERFIL-003 cobra).
+- RPCs: `agente_auditoria_listar`, `agente_dossie`, `agente_auditoria_verificar`, `agente_auditoria_exportar`, `agentes_resultados`, `agente_baseline_gravar`.
+- Performance: índice `(tenant_id, criado_em desc)`; paginação por cursor; verificação de cadeia em lote por período (não ao vivo na tela inteira); `agente_resultados_dia` alimentada por job diário (padrão pg_cron + `app_config`).
+- Retenção/expurgo: o job `central-expurgo-eventos` é precedente; política de prazo é **[REGRA]**. Expurgo nunca quebra a cadeia (guarda hash, remove referência pessoal).
+- Depende da **Onda 0** do Discovery: sem `agente_acoes` não há Diário, Resultados nem Auditoria; a Vitrine pode sair antes, a cobrança de agente real não.
+
+### 12.10 Critérios de aceite adicionais
+- **CA-UX-027** Todo número da aba Resultados abre o Diário filtrado nas linhas que o compõem.
+- **CA-UX-028** Cada indicador exibe o rótulo "Feito", "Medido" ou "Estimativa"; estimativa mostra premissas e permite ajustar.
+- **CA-UX-029** Ação simulada nunca soma em Entregas nem em Horas economizadas.
+- **CA-UX-030** A linha de base é gravada na contratação e o "antes × depois" a usa.
+- **CA-UX-031** O relatório mensal é arquivado em Documentos, sem dado pessoal identificável.
+- **CA-UX-032** Não existe edição nem exclusão de registro de auditoria em nenhuma tela ou RPC; correção cria nova linha.
+- **CA-UX-033** O selo "Cadeia íntegra" reflete `agente_auditoria_verificar`; adulterar uma linha em teste muda o selo para "quebrada" e destaca a linha.
+- **CA-UX-034** Ação bloqueada por parada dura aparece na Auditoria com status próprio.
+- **CA-UX-035** O dossiê da ação mostra gatilho, versão da regra, categorias de dado, decisão, aprovador, efeito e custo.
+- **CA-UX-036** A busca por colaborador gera registro na trilha de Acesso.
+- **CA-UX-037** A exportação é assinada (arquivo + hashes) e fica em Documentos.
+- **CA-UX-038** O perfil Auditor vê a trilha, mas não contrata, aprova nem altera regras.
+- **CA-UX-039** SuperAdmin só vê metadados de outro tenant; abrir conteúdo exige justificativa registrada.
+- **CA-UX-040** Anomalias (pico, fora do horário, bloqueio, custo, cadeia quebrada) notificam o administrador e oferecem "Criar ação no Plano de Ação".
+- **CA-UX-041** O valor cobrado no mês = soma dos agentes cobráveis conciliados por dia; divergência aparece no relatório do SuperAdmin.
+- **CA-UX-042** Alterar preço no SuperAdmin deixa linha na governança e não muda contratos vigentes.
+- **CA-UX-043** Tenant A nunca enxerga trilha, resultados ou cobrança do tenant B (família `ISOL-*`).
+- **CA-UX-044** Toda tabela e gráfico das abas Resultados e Auditoria tem equivalente textual e navegação por teclado.
+
+**QA adicional (3 conferências):** casos `api` propostos `AGENTES-006` imutabilidade (UPDATE/DELETE falham), `-007` cadeia de hash detecta adulteração, `-008` simulada não conta como entrega, `-009` bloqueio de parada dura é registrado, `-010` conciliação de cobrança bate com `entitlement_my_plan`, `-011` isolamento da trilha entre tenants; `e2e` para Resultados → Diário → Dossiê e exportação. Rotinas `qa_caso_agentes_*()` e `it()` só depois dos casos documentados.
+
+**Dúvidas novas [REGRA]:** prazo de retenção da trilha; se agentes de nível B/C configuram **decisão automatizada** (LGPD art. 20) e como o titular pede revisão; valor jurídico exigido da assinatura/carimbo; se existe hoje um perfil "Auditor" (o `perfis_acesso` é configurável, **[VERIFICAR]**); se o cliente pode pedir exportação completa ao encerrar o contrato; limite mínimo N de supressão de células.
+
+---
+
 ## Avaliação crítica do agente (10 perguntas)
 1. **Especifiquei todos os estados?** Cartão e as 8 telas têm carregando/vazio/erro/sucesso/sem permissão; falta detalhar offline por tela e o estado "plano sem o módulo `agentes`" na navegação — deixei como regra única, não por tela.
 2. **Acessibilidade nos tokens e nos critérios?** Sim (§4, §5, CA-UX-019/020/021/026), mas não calculei os pares de contraste reais dos tokens novos — isso é tarefa de implementação com validador.
@@ -364,4 +519,4 @@ Tenant sempre derivado de `get_user_tenant_id()`, nunca do parâmetro. Ver a Cen
 7. **O que assumi sem validar?** Nomes das personas, posição no menu, minutos economizados por tarefa, 14 dias, que `Bot` do lucide combina com a identidade, que a identidade Íris/tokens permite os acentos por agente.
 8. **A inovação é real ou enfeite?** Os diferenciais com valor comprovável são: experiência com "teria feito", "por quê?" e simulador com dado real. "Pergunte à Íris" e organograma são desejáveis, mas não essenciais à 1ª entrega.
 9. **Reaproveitei antes de criar?** Sim (add-on, `PrecosAddonsPanel`, `Meu Plano`, `Command`, `Sheet`), mas li só os trechos citados; pode haver componentes de card/KPI já existentes que não vi.
-10. **Falta algo?** Não especifiquei o **onboarding da primeira visita** (tour da Íris), o **e-mail da Reunião diária** nem a **versão do SuperAdmin para ver a Central "como cliente"** (suporte). Também não há protótipo navegável — apenas wireframes.
+10. **Falta algo?** Não especifiquei o **onboarding da primeira visita** (tour da Íris), o **e-mail da Reunião diária** nem a **versão do SuperAdmin para ver a Central "como cliente"** (suporte). O protótipo navegável cobre só Vitrine, Times e Ficha; Resultados e Auditoria estão apenas em texto e wireframe. Pergunta adicionada pelo dono: os resultados e a auditoria **não estavam** tratados como requisito próprio na primeira versão; as §11 e §12 corrigem isso, mas dependem de `agente_acoes`, que não existe.

@@ -36,10 +36,12 @@ describe("ESCOPO_APLICADO — só o que o filtro de dados honra hoje", () => {
   it("subordinados_diretos é aplicado SÓ nos módulos liberados", () => {
     // sem módulo ou módulo não liberado → não aplicado
     expect(ESCOPO_APLICADO("subordinados_diretos")).toBe(false);
-    expect(ESCOPO_APLICADO("subordinados_diretos", "ponto")).toBe(false);
-    // módulo liberado (ferias) → aplicado
+    expect(ESCOPO_APLICADO("subordinados_diretos", "financeiro")).toBe(false);
+    // módulos liberados (ferias e ponto) → aplicado
     expect(MODULOS_COM_SUBORDINADOS.has("ferias")).toBe(true);
+    expect(MODULOS_COM_SUBORDINADOS.has("ponto")).toBe(true);
     expect(ESCOPO_APLICADO("subordinados_diretos", "ferias")).toBe(true);
+    expect(ESCOPO_APLICADO("subordinados_diretos", "ponto")).toBe(true);
     // todo módulo listado como liberado realmente retorna true
     for (const m of MODULOS_COM_SUBORDINADOS) {
       expect(ESCOPO_APLICADO("subordinados_diretos", m)).toBe(true);

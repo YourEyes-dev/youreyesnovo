@@ -268,6 +268,19 @@ Pré-requisitos: Etapas 1, 3, 4, 5, 6 (as rotinas auditam essas peças).
 
 ---
 
+## Etapa 7b — Administrador Master: acrescentar Excluir e Aprovar (antes das etapas de escrita)
+
+Arquivo: `script_perfil_administrador_master_verbos_escrita.sql`. Rode **depois** das
+pré-checagens (0.3 C e a consulta do Aprovar) e **antes** da Etapa 8.
+
+- **Muda:** só acrescenta linhas em `perfil_permissoes` do perfil "Administrador Master" (não
+  abre módulo novo, não mexe em outros perfis). Cópia de segurança em
+  `backup_perfil_verbos_20261016`.
+- **Conferência:** `faltando_excluir_esperado_0 = 0`, `faltando_aprovar_esperado_0 = 0`, `ok`.
+- **Desfazer:** dois comandos comentados no fim do script.
+
+---
+
 ## Etapa 8 — Acesso Fase 2b: o perfil manda na **escrita** (férias, ponto, psicossocial)
 
 Arquivo: `script_acesso_fase2b_escrita_pelo_perfil.sql`

@@ -344,6 +344,30 @@ async function semearGhe(admin: Admin, _userId: string) {
   if (error) console.error("psicossocial_ghe (fixtures):", error.message);
 }
 
+// Humor do dia da conta-robô. O HumorCheckInPopup (montado no MainLayout) abre
+// em TODA tela logada quando o usuário ainda não registrou humor hoje; seu
+// overlay (bg-black/80, pointer-events:auto) cobre filtros e modais e derruba
+// os specs que interagem com a tela (ex.: usuarios.cy.ts — USR-TELA-03/04/06/07).
+// Com um registro de HOJE, precisaRegistrarHumor fica falso e o popup não abre.
+// Idempotente por (user_id, data). NÃO-FATAL.
+async function semearHumorRobo(admin: Admin, userId: string) {
+  const hoje = new Date().toISOString().split("T")[0];
+  const { data: existe } = await admin
+    .from("humor_diario").select("id")
+    .eq("user_id", userId).eq("data", hoje).limit(1);
+  if (existe && existe.length > 0) return; // humor de hoje já registrado
+
+  const { error } = await admin.from("humor_diario").insert({
+    tenant_id: TENANT_ID,
+    user_id: userId,
+    user_nome: "Robô de Testes (Cypress)",
+    data: hoje,
+    humor: "Bem",
+    emoji: "😊",
+  });
+  if (error) console.error("humor_diario (fixtures):", error.message);
+}
+
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -677,6 +701,15 @@ serve(async (req) => {
       await semearGhe(admin, userId);
     } catch (e) {
       console.error("GHE (fixtures, nao-fatal):", (e as Error).message);
+    }
+
+    // 7e) Humor do dia da conta-robô — sem ele, o popup diário de humor abre em
+    //     toda tela logada e seu overlay cobre filtros/modais (derruba
+    //     usuarios.cy.ts). Ver nota na função. NÃO-FATAL.
+    try {
+      await semearHumorRobo(admin, userId);
+    } catch (e) {
+      console.error("Humor do robô (nao-fatal):", (e as Error).message);
     }
 
     // 6) Robô-PARCEIRO: conta sem perfil de tenant, vinculada ao parceiro

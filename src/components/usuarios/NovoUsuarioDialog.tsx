@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { cleanCpf, formatCpf, validateCpf } from "@/lib/cpf";
 import { CpfInput } from "@/components/ui/cpf-input";
 import { mapTipoUsuarioToAppRole } from "@/lib/userRoleMap";
+import { mensagemDaFuncao } from "@/lib/supabaseFunctions";
 import { useGruposEconomicos } from "@/hooks/useGruposEconomicos";
 
 const schemaEtapa1 = z.object({
@@ -251,8 +252,14 @@ export function NovoUsuarioDialog({ open, onOpenChange }: Props) {
         },
       });
 
-      if (authError) throw new Error(authError.message);
-      if ((authData as any)?.error) throw new Error((authData as any).error);
+      // Em falha non-2xx o supabase-js embrulha tudo em "Edge Function returned
+      // a non-2xx status code" e guarda o motivo real em error.context. Sem
+      // extrair esse corpo, o usuário vê sempre a mesma mensagem genérica — e o
+      // motivo verdadeiro (e-mail já em outra organização, sem permissão, falha
+      // no link de convite) nunca aparece na tela.
+      if (authError || (authData as any)?.error) {
+        throw new Error(await mensagemDaFuncao(authError, authData));
+      }
 
       const authUserId = (authData as any)?.userId as string | undefined;
       if (!authUserId) throw new Error("Não foi possível provisionar o acesso no sistema.");
@@ -579,11 +586,12 @@ export function NovoUsuarioDialog({ open, onOpenChange }: Props) {
                     </Select>
                     <p className="text-xs text-muted-foreground">
                       Define o nível de acesso e permissões deste usuário no sistema.
-                      Se nenhum perfil for selecionado, o perfil{" "}
-                      <strong>Colaborador (padrão)</strong> é aplicado
-                      automaticamente — auto-serviço apenas: a pessoa vê o
-                      próprio ponto, atestados e holerites, sem acesso a dados
-                      de outros colaboradores.
+                      Se nenhum perfil for selecionado, é aplicado automaticamente o
+                      <strong> modelo do tipo escolhido</strong>: Administrador e Gestor
+                      entram com acesso amplo (empresa inteira); os demais entram com o
+                      <strong> Colaborador (padrão)</strong> — auto-serviço apenas
+                      (próprio ponto, atestados e holerites). O modelo pode ser ajustado
+                      depois em Perfis de acesso.
                     </p>
                   </div>
 
@@ -610,13 +618,28 @@ export function NovoUsuarioDialog({ open, onOpenChange }: Props) {
                 {!watchedValues.perfil_acesso_id && (
                   <div className="flex gap-2 items-start p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm">
                     <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
-                    <span>
-                      <strong>Sem perfil de acesso selecionado.</strong> A pessoa
-                      entrará com o perfil <strong>Colaborador (padrão)</strong>:
-                      auto-serviço apenas (próprio ponto, atestados e holerites),
-                      sem acesso a dados de outros colaboradores. Volte à etapa
-                      anterior se ela precisar de mais acesso.
-                    </span>
+                    {["administrador", "gestor"].includes(watchedValues.tipo_usuario) ? (
+                      <span>
+                        <strong>Sem perfil de acesso selecionado.</strong> A pessoa
+                        entrará com o modelo{" "}
+                        <strong>
+                          {watchedValues.tipo_usuario === "administrador"
+                            ? "Administrador (padrão)"
+                            : "Gestor (padrão)"}
+                        </strong>
+                        : acesso amplo (empresa inteira) a todos os módulos. Você pode
+                        ajustar esse modelo depois em Perfis de acesso, ou voltar e
+                        escolher um perfil específico.
+                      </span>
+                    ) : (
+                      <span>
+                        <strong>Sem perfil de acesso selecionado.</strong> A pessoa
+                        entrará com o perfil <strong>Colaborador (padrão)</strong>:
+                        auto-serviço apenas (próprio ponto, atestados e holerites),
+                        sem acesso a dados de outros colaboradores. Volte à etapa
+                        anterior se ela precisar de mais acesso.
+                      </span>
+                    )}
                   </div>
                 )}
 

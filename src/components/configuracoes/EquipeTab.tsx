@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { mensagemDaFuncao } from "@/lib/supabaseFunctions";
 import { useTenant } from "@/hooks/useTenant";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -103,8 +104,9 @@ export function EquipeTab() {
       const { data, error } = await supabase.functions.invoke("invite-tenant-user", {
         body: { email, nomeCompleto: nome, role, method, password: method === "password" ? password : undefined },
       });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
+      // non-2xx guarda o motivo real em error.context; sem extrair, toda falha
+      // vira a mesma "Edge Function returned a non-2xx status code".
+      if (error || data?.error) throw new Error(await mensagemDaFuncao(error, data));
       return data;
     },
     onSuccess: (data) => {

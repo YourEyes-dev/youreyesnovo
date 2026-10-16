@@ -768,6 +768,7 @@ export type Database = {
           funcao_periculosa: boolean
           genero: string | null
           gestor_imediato: string | null
+          gestor_cpf: string | null
           id: string
           inativado_em: string | null
           inativado_por: string | null
@@ -863,6 +864,7 @@ export type Database = {
           funcao_periculosa?: boolean
           genero?: string | null
           gestor_imediato?: string | null
+          gestor_cpf?: string | null
           id?: string
           inativado_em?: string | null
           inativado_por?: string | null
@@ -958,6 +960,7 @@ export type Database = {
           funcao_periculosa?: boolean
           genero?: string | null
           gestor_imediato?: string | null
+          gestor_cpf?: string | null
           id?: string
           inativado_em?: string | null
           inativado_por?: string | null
@@ -20182,6 +20185,7 @@ export type Database = {
           icone: string | null
           id: string
           is_perfil_assistido: boolean | null
+          pode_ver_salario: boolean | null
           nivel_risco: string | null
           nome: string
           permite_acumulo: boolean
@@ -20203,6 +20207,7 @@ export type Database = {
           icone?: string | null
           id?: string
           is_perfil_assistido?: boolean | null
+          pode_ver_salario?: boolean | null
           nivel_risco?: string | null
           nome: string
           permite_acumulo?: boolean
@@ -20224,6 +20229,7 @@ export type Database = {
           icone?: string | null
           id?: string
           is_perfil_assistido?: boolean | null
+          pode_ver_salario?: boolean | null
           nivel_risco?: string | null
           nome?: string
           permite_acumulo?: boolean

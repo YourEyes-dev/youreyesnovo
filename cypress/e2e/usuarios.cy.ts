@@ -120,7 +120,11 @@ describe("Módulo Usuários", () => {
   // USR-TELA-06
   it("o filtro de tipo de usuário abre com as opções", () => {
     abrirFiltro("Todos os tipos de usuário", '[role="listbox"]');
-    cy.get('[role="listbox"]').contains('[role="option"]', "Todos os tipos de usuário").should("be.visible");
+    // A abertura do listbox já é afirmada (visível) pela abrirFiltro. A opção
+    // em si pode ficar fora da área visível do popover (position:fixed com
+    // overflow), então basta afirmar que ela EXISTE na lista aberta — exigir
+    // be.visible aqui dava flake ("overflowed by other elements").
+    cy.get('[role="listbox"]').contains('[role="option"]', "Todos os tipos de usuário").should("exist");
     cy.get("body").type("{esc}", { force: true });
   });
 

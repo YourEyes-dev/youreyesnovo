@@ -1,0 +1,67 @@
+# =====================================================================
+# Rede de Segurança Diferencial — trava de QA ANTES do merge.
+#
+# A cada Pull Request para a main:
+#   1) sobe um Postgres EFÊMERO no runner (nada de staging/produção);
+#   2) aplica o preflight (papéis/schemas/stubs) + extensões-falsas
+#      pg_cron/pg_net e TODAS as migrations — provando, de quebra, que
+#      elas atravessam um banco vazio;
+#   3) roda o Motor (qa_rodar_bateria) em todos os módulos;
+#   4) compara o resultado com qa-harness/baseline.tsv e REPROVA só o que
+#      REGREDIU (um caso que passava e parou de passar).
+#
+# Contrato: "tudo verde" é inatingível (há lacunas de estrutura conhecidas);
+# o alvo é "nada que estava verde ficou vermelho". Detalhes e limitações
+# de fidelidade em docs/REDE_SEGURANCA_QA.md.
+#
+# Não usa Docker, não toca em rede externa, não alcança Supabase nenhum.
+# =====================================================================
+name: rede-seguranca
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: rede-seguranca-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rede:
+    name: Motor em banco efêmero + diff diferencial
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Garantir PostgreSQL 16 no PATH
+        run: |
+          if [ -x /usr/lib/postgresql/16/bin/initdb ]; then
+            echo "PG 16 já presente no runner."
+          else
+            sudo apt-get update
+            sudo apt-get install -y postgresql-16 postgresql-contrib
+          fi
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+
+      - name: Rodar a Rede (banco efêmero + Motor)
+        # O runner executa como usuário comum (não-root), então initdb roda
+        # direto. As extensões-falsas são copiadas para o sharedir pelo
+        # próprio script (com sudo quando preciso).
+        run: bash qa-harness/rodar-local.sh
+
+      - name: Diff diferencial contra a baseline
+        run: node scripts/qa-diff-baseline.mjs
+
+      - name: Guardar o snapshot desta corrida
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rede-seguranca-snapshot
+          path: qa-harness/resultado-atual.tsv
+          if-no-files-found: ignore
+          retention-days: 14

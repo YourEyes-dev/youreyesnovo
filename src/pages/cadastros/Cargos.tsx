@@ -32,6 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronsUpDown, X } from "lucide-react";
 import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useTenant } from "@/hooks/useTenant";
+import { usePodeVerSalario } from "@/hooks/usePodeVerSalario";
 import { cn } from "@/lib/utils";
 
 const NIVEIS = [
@@ -108,6 +109,7 @@ export default function Cargos() {
   const { departamentos } = useDepartamentos();
   const { sincronizar } = useSyncCadastros();
   const { tenantId } = useTenant();
+  const podeVerSalario = usePodeVerSalario();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -347,9 +349,11 @@ export default function Cargos() {
                   </TableCell>
                   <TableCell>{getNivelLabel(cargo.nivel)}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {cargo.faixa_salarial_min || cargo.faixa_salarial_max
-                      ? `${formatCurrency(cargo.faixa_salarial_min)} - ${formatCurrency(cargo.faixa_salarial_max)}`
-                      : "-"}
+                    {!podeVerSalario
+                      ? <span className="italic">Sem permissão</span>
+                      : cargo.faixa_salarial_min || cargo.faixa_salarial_max
+                        ? `${formatCurrency(cargo.faixa_salarial_min)} - ${formatCurrency(cargo.faixa_salarial_max)}`
+                        : "-"}
                   </TableCell>
                   <TableCell>
                     {hasCondicoesEspeciais(cargo) ? (
@@ -552,19 +556,23 @@ export default function Cargos() {
                   <div className="space-y-2">
                     <Label>Salário Mínimo</Label>
                     <Input
-                      type="number"
-                      value={formData.faixa_salarial_min || ""}
+                      type={podeVerSalario ? "number" : "text"}
+                      value={podeVerSalario ? (formData.faixa_salarial_min || "") : "Sem permissão"}
+                      disabled={!podeVerSalario}
                       onChange={(e) => setFormData({ ...formData, faixa_salarial_min: e.target.value ? Number(e.target.value) : null })}
                       placeholder="R$ 0,00"
+                      className={!podeVerSalario ? "italic text-muted-foreground" : undefined}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Salário Máximo</Label>
                     <Input
-                      type="number"
-                      value={formData.faixa_salarial_max || ""}
+                      type={podeVerSalario ? "number" : "text"}
+                      value={podeVerSalario ? (formData.faixa_salarial_max || "") : "Sem permissão"}
+                      disabled={!podeVerSalario}
                       onChange={(e) => setFormData({ ...formData, faixa_salarial_max: e.target.value ? Number(e.target.value) : null })}
                       placeholder="R$ 0,00"
+                      className={!podeVerSalario ? "italic text-muted-foreground" : undefined}
                     />
                   </div>
                 </div>

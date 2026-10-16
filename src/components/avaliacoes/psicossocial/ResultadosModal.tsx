@@ -47,6 +47,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePsicossocial } from "@/hooks/usePsicossocial";
 import { RadarPsicossocial } from "./RadarPsicossocial";
+import { radarParaIPS } from "@/lib/psicossocial-direcao";
 import { IPSGauge } from "./IPSGauge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,7 +62,6 @@ import {
   getIRPSBgColor,
   getIRPSLabel,
   calcularIPSClassificacao,
-  calcularIRPSClassificacao,
   type IPSClassificacao,
   type IRPSClassificacao,
 } from "@/types/psicossocial";
@@ -170,25 +170,20 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
 
   const isLoading = loadingStats || loadingRespostas;
 
-  const isSipro = campanhaRef.instrumento === 'sipro';
   // Quando a campanha está vinculada a GHE, a base da taxa é o GHE (não o setor).
   const temGHE = (campanhaRef.ghe_ids?.length ?? 0) > 0;
   const baseLabel = temGHE ? "GHE" : "Setor";
   const baseLabelInline = temGHE ? "GHE" : "setor";
 
-  // IPS e classificação a partir das estatísticas reais
+  // Régua única de SAÚDE (IPS, alto=melhor) para TODOS os instrumentos.
+  // stats.ips já é saúde (agregado de indicadores.IPS); o radar bruto é
+  // normalizado por radarParaIPS (SIPRO/entrevista vêm orientados a risco).
   const ips = stats?.ips;
-  const ipsClass = ips !== undefined
-    ? isSipro
-      ? calcularIRPSClassificacao(ips) as unknown as IPSClassificacao
-      : calcularIPSClassificacao(ips)
-    : null;
+  const ipsClass = ips !== undefined ? calcularIPSClassificacao(ips) : null;
+  const radarSaude = radarParaIPS(stats?.radar, campanhaRef.instrumento, campanhaRef.tipo_instrumento);
 
-  // Label e cor do score principal conforme instrumento
-  const scoreLabel = isSipro ? 'IRP-S — Índice de Risco Psicossocial' : 'IPS — Índice Psicossocial';
-  const scoreDescricao = isSipro
-    ? 'Score 0–100: quanto maior, maior o risco organizacional'
-    : 'Score 0–100: quanto maior, mais saudável o ambiente';
+  const scoreLabel = 'IPS — Índice Psicossocial';
+  const scoreDescricao = 'Score 0–100: quanto maior, mais saudável o ambiente';
 
   // ── GAP A+B+C: Proteção de privacidade por grupo (ISO 45003) ───────────────
   // Verifica se há situações de trabalho segmentadas e aplica regras de mínimo.
@@ -197,41 +192,29 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
     const totalRespondentes = stats?.concluidos ?? 0;
     if (situacoes.length === 0) return null; // sem segmentação — usa proteção global
     const contagem = estimarContagemPorGrupo(totalRespondentes, situacoes);
-    return aplicarRegrasPrivacidade(situacoes, contagem, totalRespondentes);
+    // Fase 0.4: contagem por grupo é estimada (respostas anônimas) → sinaliza.
+    return aplicarRegrasPrivacidade(situacoes, contagem, totalRespondentes, { estimado: true });
   }, [campanhaRef.situacoes_trabalho, stats?.concluidos]);
 
-  // Dimensões por resposta → agregar média por dimensão
-  // Para SIPRO (IRP-S): maior score = maior risco → críticas têm score ALTO, pontos fortes têm score BAIXO
-  // Para demais: menor score = pior → críticas têm score BAIXO, pontos fortes têm score ALTO
+  // Dimensões agregadas na régua de SAÚDE (radar já normalizado em radarSaude).
+  // Menor score = mais crítico, para todos os instrumentos.
   const dimensoesAgregadas = (() => {
-    if (!stats?.anonimato_garantido || !stats?.radar || stats.radar.length === 0) return [];
-    
-    // Usamos os dados do radar que já estão agregados nas estatísticas
-    const arr = stats.radar.map(d => ({
+    if (!stats?.anonimato_garantido || radarSaude.length === 0) return [];
+    const arr = radarSaude.map(d => ({
       bloco: d.subject,
       media: d.value,
     }));
-
-    // SIPRO: ordenar do mais crítico (maior score) para o menos
-    // Outros: ordenar do mais crítico (menor score) para o melhor
-    return isSipro
-      ? arr.sort((a, b) => b.media - a.media)
-      : arr.sort((a, b) => a.media - b.media);
+    return arr.sort((a, b) => a.media - b.media);
   })();
 
-  // Para SIPRO: crítico = score alto (≥50); ponto forte = score baixo (≤24)
-  // Para demais: crítico = score baixo (<65); ponto forte = score alto (≥65)
-  const limiarCritico = isSipro ? 50 : 65;
-  const limiarForte = isSipro ? 25 : 65;
-  const isCritico = (media: number) => isSipro ? media >= limiarCritico : media < limiarCritico;
-  const isForte = (media: number) => isSipro ? media <= limiarForte : media >= limiarForte;
+  // Régua de saúde (alto=melhor): crítico = score baixo (<65); ponto forte = alto (≥65)
+  const limiarCritico = 65;
+  const limiarForte = 65;
+  const isCritico = (media: number) => media < limiarCritico;
+  const isForte = (media: number) => media >= limiarForte;
 
   const getNivelScore = (score: number): { label: string; cls: IPSClassificacao } => {
-    // Para SIPRO usa lógica invertida (IRP-S): alto = ruim
-    // Faixas espelhadas do IPS: 0-20 saudável, 21-35 estável, 36-50 atenção, 51-65 risco, 66-100 crítico
-    const cls = isSipro
-      ? (score >= 66 ? 'critico' : score >= 51 ? 'risco' : score >= 36 ? 'atencao' : score >= 21 ? 'estavel' : 'saudavel') as IPSClassificacao
-      : calcularIPSClassificacao(score);
+    const cls = calcularIPSClassificacao(score);
     const labels: Record<IPSClassificacao, string> = {
       saudavel: 'Saudável',
       estavel: 'Estável',
@@ -254,9 +237,9 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
         classificacao: ipsClass,
         total_respostas: stats.concluidos,
         taxa_participacao: stats.taxa_participacao,
-        dimensoes_criticas: dimensoesAgregadas.filter(d => isSipro ? d.media >= 50 : d.media < 50).map(d => d.bloco),
-        dimensoes_atencao: dimensoesAgregadas.filter(d => isSipro ? (d.media >= 36 && d.media < 50) : (d.media >= 50 && d.media < 65)).map(d => d.bloco),
-        dimensoes_saudaveis: dimensoesAgregadas.filter(d => isSipro ? d.media <= 20 : d.media >= 80).map(d => d.bloco),
+        dimensoes_criticas: dimensoesAgregadas.filter(d => d.media < 50).map(d => d.bloco),
+        dimensoes_atencao: dimensoesAgregadas.filter(d => d.media >= 50 && d.media < 65).map(d => d.bloco),
+        dimensoes_saudaveis: dimensoesAgregadas.filter(d => d.media >= 80).map(d => d.bloco),
       };
 
       const { data, error } = await supabase.functions.invoke('ai-psicossocial-analise', {
@@ -286,7 +269,7 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
             instrumento: campanhaRef.instrumento || 'copsoq',
             ips,
             classificacao: ipsClass,
-            dimensoes_criticas: dimensoesAgregadas.filter(d => isSipro ? d.media >= 50 : d.media < 50).map(d => d.bloco),
+            dimensoes_criticas: dimensoesAgregadas.filter(d => d.media < 50).map(d => d.bloco),
           },
           modo: 'plano_acao',
         },
@@ -423,11 +406,7 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {(stats?.por_campanha ?? []).map(c => {
-                      const cls = c.ips !== undefined
-                        ? (isSipro
-                            ? (calcularIRPSClassificacao(c.ips) as unknown as IPSClassificacao)
-                            : calcularIPSClassificacao(c.ips))
-                        : null;
+                      const cls = c.ips !== undefined ? calcularIPSClassificacao(c.ips) : null;
                       return (
                         <div
                           key={c.campanha_id}
@@ -448,7 +427,7 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
                                 {c.ips}
                               </p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">
-                                {isSipro ? "IRP-S" : "IPS"}
+                                IPS
                               </p>
                             </div>
                           ) : (
@@ -529,8 +508,8 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
                         <CardDescription className="text-xs">Score por dimensão (0-100)</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        {stats?.radar && stats.radar.length > 0 ? (
-                          <RadarPsicossocial dados={stats.radar} />
+                        {radarSaude.length > 0 ? (
+                          <RadarPsicossocial dados={radarSaude} />
                         ) : (
                           <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
                             Dados insuficientes para o radar
@@ -547,7 +526,7 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm flex items-center gap-2 text-red-600">
                             <AlertTriangle className="h-4 w-4" />
-                            {isSipro ? 'Maiores Riscos (IRP-S)' : 'Dimensões Críticas'}
+                            Dimensões Críticas
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
@@ -565,7 +544,7 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
                           })}
                           {dimensoesAgregadas.filter(d => isCritico(d.media)).length === 0 && (
                             <p className="text-sm text-muted-foreground">
-                              {isSipro ? 'Nenhuma dimensão em risco 🎉' : 'Nenhuma dimensão crítica 🎉'}
+                              Nenhuma dimensão crítica 🎉
                             </p>
                           )}
                         </CardContent>
@@ -575,7 +554,7 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm flex items-center gap-2 text-emerald-600">
                             <CheckCircle2 className="h-4 w-4" />
-                            {isSipro ? 'Condições Favoráveis (IRP-S)' : 'Pontos Fortes'}
+                            Pontos Fortes
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
@@ -593,7 +572,7 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
                           })}
                           {[...dimensoesAgregadas].reverse().filter(d => isForte(d.media)).length === 0 && (
                             <p className="text-sm text-muted-foreground">
-                              {isSipro ? 'Sem dimensões favoráveis ainda' : 'Sem dimensões saudáveis ainda'}
+                              Sem dimensões saudáveis ainda
                             </p>
                           )}
                         </CardContent>
@@ -745,9 +724,9 @@ export function ResultadosModal({ open, onOpenChange, campanha, campanhas }: Res
               {stats?.anonimato_garantido && ips !== undefined && (
                 (() => {
                   const criticos = dimensoesAgregadas.filter(d => isCritico(d.media));
-                  const isRiscoRelevante = isSipro ? ips >= 50 : ips < 65;
+                  const isRiscoRelevante = ips < 65;
                   const multiplosRiscos = criticos.length >= 2;
-                  const riscoUrgente = isSipro ? ips >= 75 : ips < 35;
+                  const riscoUrgente = ips < 35;
 
                   if (!isRiscoRelevante && !multiplosRiscos) return null;
 

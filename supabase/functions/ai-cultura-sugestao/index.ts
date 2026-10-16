@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { getCompanyContext } from '../_shared/ai-helper.ts'
+import { autenticar, respostaDeErro } from '../_shared/auth.ts'
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +14,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { campo, contexto, tenantId } = await req.json();
+    // A empresa vem do cadastro do usuário logado, nunca do corpo da requisição.
+    const { tenantId } = await autenticar(req);
+    const { campo, contexto } = await req.json();
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -117,10 +120,6 @@ ${companyContext}` },
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return respostaDeErro(error, corsHeaders);
   }
 });

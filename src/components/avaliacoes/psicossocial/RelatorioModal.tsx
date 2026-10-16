@@ -690,10 +690,10 @@ export function RelatorioModal({ open, onClose, campanhas, empresaNome, campanha
                 "Abaixo do mínimo",
               ];
             }
-            // SIPRO armazena score de risco (alto = pior); IPS = 100 - risco
-            const ipsGhe = g.ipsMedio != null
-              ? (isSipro ? 100 - g.ipsMedio : g.ipsMedio)
-              : 0;
+            // g.ipsMedio já está em escala de SAÚDE (IPS, alto=melhor): vem de
+            // indicadores.IPS, uniforme para todos os instrumentos. NÃO inverter
+            // por isSipro (fazia duplo-flip e devolvia risco para o SIPRO).
+            const ipsGhe = g.ipsMedio != null ? g.ipsMedio : 0;
             return [
               sanitize(g.ghe_nome),
               `${g.count} de ${elegiveisGhe}`,

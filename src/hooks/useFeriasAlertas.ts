@@ -38,7 +38,9 @@ export function useFeriasAlertas() {
     queryKey: ["ferias-alertas", tenantId],
     enabled: !!tenantId,
     queryFn: async (): Promise<FeriasAlerta[]> => {
-      const { data, error } = await fromTable("ferias_alertas")
+      // View mascarada: custo_estimado vem nulo para quem não pode ver salário
+      // (server-side). Varredura/escritas seguem na tabela base (RPC abaixo).
+      const { data, error } = await fromTable("ferias_alertas_segura")
         .select("*")
         .eq("tenant_id", tenantId)
         .eq("resolvido", false)

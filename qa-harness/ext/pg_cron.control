@@ -1,0 +1,9 @@
+# Extensão-FALSA de pg_cron, só para o banco efêmero da Rede de Segurança.
+# NÃO é o pg_cron de verdade: dá corpo a cron.schedule/unschedule/cron.job
+# para que as migrations que agendam rotinas atravessem um Postgres puro
+# (que não tem pg_cron). Em produção/staging o pg_cron REAL é usado — isto
+# nunca sai do runner de CI / da réplica local.
+default_version = '1.6'
+comment = 'stub de pg_cron para a Rede de Segurança (CI/réplica local)'
+relocatable = false
+schema = pg_catalog

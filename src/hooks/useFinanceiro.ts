@@ -168,7 +168,9 @@ export function useFinanceiro() {
     queryFn: async (): Promise<BeneficioColaborador[]> => {
       if (!tenantId) return [];
       
-      let query = fromTable("beneficios_colaboradores")
+      // View mascarada: valor/valor_desconto vêm nulos para quem não pode ver
+      // salário (server-side). Escritas seguem na tabela base (mutations abaixo).
+      let query = fromTable("beneficios_colaboradores_segura")
         .select("*, beneficios_tipos(*)")
         .eq("tenant_id", tenantId);
 

@@ -37,6 +37,8 @@ export interface PerfilAcesso {
   expira_em?: string;
   nivel_risco?: "normal" | "elevado" | "critico";
   is_perfil_assistido?: boolean;
+  /** Quando false, o salário/valores de remuneração são mascarados para quem tem este perfil. */
+  pode_ver_salario?: boolean;
   total_usuarios: number;
   criado_por?: string;
   criado_por_nome?: string;
@@ -196,19 +198,50 @@ export const ACOES_DISPONIVEIS = [
   { id: "ver_individual", label: "Dados Individualizados", sensivel: true },
 ];
 
+/**
+ * `aplicado` diz se o escopo é de fato HONRADO hoje pelo filtro de dados.
+ *
+ * A trava real (função `perfil_permite_modulo`, nas políticas RESTRICTIVE das
+ * tabelas sensíveis) só distingue "próprio usuário" de "mais que isso": tudo
+ * que não é `proprio_usuario` libera a leitura da empresa ativa inteira. Os
+ * recortes intermediários (subordinados diretos, setor, unidade,
+ * estabelecimento, equipe, grupo, carteira, customizado) NÃO viram filtro — se
+ * comportam como "empresa inteira". Enquanto esse filtro não existir, o editor
+ * marca esses escopos como `aplicado: false` ("em breve") para não prometer um
+ * recorte que não acontece (risco de LGPD: expor mais do que o admin acredita).
+ */
 export const ESCOPOS_DISPONIVEIS = [
-  { id: "proprio_usuario", label: "Próprio usuário" },
-  { id: "subordinados_diretos", label: "Subordinados diretos" },
-  { id: "equipe_direta_indireta", label: "Equipe direta e indireta" },
-  { id: "setor", label: "Setor" },
-  { id: "unidade", label: "Unidade" },
-  { id: "estabelecimento", label: "Estabelecimento/Obra" },
-  { id: "empresa_inteira", label: "Empresa inteira" },
-  { id: "grupo_economico", label: "Grupo econômico" },
-  { id: "multiplas_empresas", label: "Múltiplas empresas" },
-  { id: "carteira_clientes", label: "Carteira de clientes" },
-  { id: "customizado", label: "Customizado" },
+  { id: "proprio_usuario", label: "Próprio usuário", aplicado: true },
+  { id: "subordinados_diretos", label: "Subordinados diretos", aplicado: false },
+  { id: "equipe_direta_indireta", label: "Equipe direta e indireta", aplicado: false },
+  { id: "setor", label: "Setor", aplicado: false },
+  { id: "unidade", label: "Unidade", aplicado: false },
+  { id: "estabelecimento", label: "Estabelecimento/Obra", aplicado: false },
+  { id: "empresa_inteira", label: "Empresa inteira", aplicado: true },
+  { id: "grupo_economico", label: "Grupo econômico", aplicado: false },
+  { id: "multiplas_empresas", label: "Múltiplas empresas", aplicado: false },
+  { id: "carteira_clientes", label: "Carteira de clientes", aplicado: false },
+  { id: "customizado", label: "Customizado", aplicado: false },
 ];
+
+/**
+ * Módulos em que o filtro "subordinados diretos" JÁ está implementado no banco
+ * (RLS por linha). Cresce a cada entrega de módulo. Fora desta lista, o escopo
+ * subordinados ainda se comporta como "empresa inteira" e segue marcado como
+ * "em breve" no editor.
+ */
+export const MODULOS_COM_SUBORDINADOS = new Set<string>(["ferias", "ponto"]);
+
+/**
+ * O escopo já filtra os dados hoje? Depende do módulo para 'subordinados_diretos'
+ * (implementado por módulo). 'proprio_usuario' e 'empresa_inteira' valem sempre;
+ * os demais recortes seguem não aplicados. Sem módulo informado, usa o default
+ * global (flag `aplicado`), em que subordinados conta como não aplicado.
+ */
+export const ESCOPO_APLICADO = (id?: string | null, modulo?: string | null): boolean => {
+  if (id === "subordinados_diretos") return !!modulo && MODULOS_COM_SUBORDINADOS.has(modulo);
+  return ESCOPOS_DISPONIVEIS.find((e) => e.id === id)?.aplicado ?? false;
+};
 
 // Combos que geram alerta de risco
 export const COMBOS_RISCO = [

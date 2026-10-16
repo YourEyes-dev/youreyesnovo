@@ -4,7 +4,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { PerfilAcesso } from "@/hooks/usePerfisAcesso";
-import { MODULOS_SISTEMA, ACOES_DISPONIVEIS, ESCOPOS_DISPONIVEIS } from "@/hooks/usePerfisAcesso";
+import { MODULOS_SISTEMA, ACOES_DISPONIVEIS, ESCOPOS_DISPONIVEIS, ESCOPO_APLICADO } from "@/hooks/usePerfisAcesso";
 import { CheckCircle2, XCircle, Lock, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -71,8 +71,20 @@ export function SimularAcessoDialog({ open, onClose, perfil }: SimularAcessoDial
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={cn("font-medium", !ativo && "text-muted-foreground")}>{modulo.label}</span>
                               {ativo && escopo && (
-                                <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[10px] h-4 px-1.5",
+                                    !ESCOPO_APLICADO(escopo, modulo.id) && "border-amber-300 text-amber-600"
+                                  )}
+                                  title={
+                                    ESCOPO_APLICADO(escopo, modulo.id)
+                                      ? undefined
+                                      : "Este recorte ainda não filtra os dados neste módulo — comporta-se como Empresa inteira."
+                                  }
+                                >
                                   {getEscopoLabel(escopo)}
+                                  {!ESCOPO_APLICADO(escopo, modulo.id) && " · como empresa inteira"}
                                 </Badge>
                               )}
                             </div>

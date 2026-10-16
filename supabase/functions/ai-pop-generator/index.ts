@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getCompanyContext } from '../_shared/ai-helper.ts';
+import { autenticar, respostaDeErro } from '../_shared/auth.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +11,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // A empresa vem do cadastro do usuário logado, nunca do corpo da requisição.
+    const { tenantId, admin } = await autenticar(req);
+
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurada");
 
@@ -25,20 +28,13 @@ serve(async (req) => {
       criterios_qualidade, responsaveis,
       responsavel_direto, consequencia_erro, conteudos_relacionados,
       action, trecho, instrucao,
-      tenantId,
     } = body;
 
-    // Fetch company context if tenantId provided
+    // Contexto da empresa do próprio usuário (não bloqueia se falhar)
     let companyContext = "";
-    if (tenantId) {
-      try {
-        const supabase = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        );
-        companyContext = await getCompanyContext(supabase, tenantId);
-      } catch { /* ignore */ }
-    }
+    try {
+      companyContext = await getCompanyContext(admin, tenantId);
+    } catch { /* ignore */ }
 
     // IA assistida: reescrever/detalhar/simplificar trechos
     if (action === "rewrite") {
@@ -197,10 +193,6 @@ REGRAS:
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("Error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return respostaDeErro(e, corsHeaders);
   }
 });

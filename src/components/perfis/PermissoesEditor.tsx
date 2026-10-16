@@ -9,6 +9,7 @@ import {
   MODULOS_SISTEMA,
   ACOES_DISPONIVEIS,
   ESCOPOS_DISPONIVEIS,
+  ESCOPO_APLICADO,
   type PerfilPermissao,
 } from "@/hooks/usePerfisAcesso";
 import { AlertTriangle, ChevronDown, ChevronRight, Lock } from "lucide-react";
@@ -114,18 +115,45 @@ export function PermissoesEditor({ permissoes, onChange }: PermissoesEditorProps
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] text-muted-foreground">{count} ação{count !== 1 ? "ões" : ""}</span>
                             <Select value={escopo} onValueChange={(v) => updateEscopo(modulo.id, v)}>
-                              <SelectTrigger className="h-6 text-[11px] w-40 border-dashed">
+                              <SelectTrigger className="h-6 text-[11px] w-44 border-dashed">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {ESCOPOS_DISPONIVEIS.map((e) => (
-                                  <SelectItem key={e.id} value={e.id} className="text-[12px]">{e.label}</SelectItem>
-                                ))}
+                                {ESCOPOS_DISPONIVEIS.map((e) => {
+                                  // "aplicado" é por módulo (subordinados diretos já vale em
+                                  // alguns módulos, em outros ainda não). Não deixa escolher o
+                                  // que não filtra, mas mantém selecionável o que o perfil já tem.
+                                  const aplicadoAqui = ESCOPO_APLICADO(e.id, modulo.id);
+                                  return (
+                                    <SelectItem
+                                      key={e.id}
+                                      value={e.id}
+                                      disabled={!aplicadoAqui && e.id !== escopo}
+                                      className="text-[12px]"
+                                    >
+                                      {e.label}
+                                      {!aplicadoAqui && (
+                                        <span className="ml-1 text-muted-foreground">(em breve)</span>
+                                      )}
+                                    </SelectItem>
+                                  );
+                                })}
                               </SelectContent>
                             </Select>
                           </div>
                         )}
                       </div>
+                      {ativo && !ESCOPO_APLICADO(escopo, modulo.id) && (
+                        <div className="ml-6 flex items-start gap-1.5 text-[10px] text-amber-600">
+                          <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                          <span>
+                            O recorte "{ESCOPOS_DISPONIVEIS.find((e) => e.id === escopo)?.label || escopo}"
+                            ainda não filtra os dados — hoje este módulo se comporta como
+                            <strong> Empresa inteira</strong>. Troque para "Próprio usuário"
+                            se a intenção é limitar o acesso.
+                          </span>
+                        </div>
+                      )}
                       {ativo && (
                         <div className="ml-6 flex flex-wrap gap-1.5">
                           {ACOES_DISPONIVEIS.map((acao) => {
@@ -171,6 +199,17 @@ export function PermissoesEditor({ permissoes, onChange }: PermissoesEditorProps
           Este perfil possui permissões sensíveis. Atribua com critério.
         </div>
       )}
+      <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/40 border border-border rounded-lg p-2">
+        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+        <span>
+          <strong>Próprio usuário</strong> e <strong>Empresa inteira</strong> filtram
+          os dados em todos os módulos. <strong>Subordinados diretos</strong> já
+          filtra nos módulos onde foi liberado (ex.: Férias) e aparece como
+          "(em breve)" nos demais. Os outros recortes (setor, unidade,
+          estabelecimento…) ainda estão em desenvolvimento e, se escolhidos, o
+          módulo se comporta como <strong>Empresa inteira</strong>.
+        </span>
+      </div>
     </div>
   );
 }

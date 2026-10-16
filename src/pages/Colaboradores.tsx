@@ -90,6 +90,7 @@ import { AdmissaoList } from "@/components/admissao/AdmissaoList";
 import { AdmissaoForm } from "@/components/admissao/AdmissaoForm";
 import { AdmissaoDetail } from "@/components/admissao/AdmissaoDetail";
 import { useAdmissoes } from "@/hooks/useAdmissoes";
+import { usePodeVerSalario } from "@/hooks/usePodeVerSalario";
 import { AdmissaoFormData } from "@/types/database";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { useAfastamentosAtivos } from "@/hooks/useAfastamentosAtivos";
@@ -315,7 +316,7 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
     // (centro_custo, gestor_imediato, matricula_esocial, cbo, etc.)
     const { data: full, error: fullErr } = await supabase
       .from("admissoes")
-      .select("id, nome_completo, cpf, email, celular, tipo_contrato, cargo, cargo_id, departamento, filial, centro_custo, gestor_imediato, data_admissao, matricula_esocial, cbo, foto_url, bate_ponto, art62_inciso, art62_documento, teletrabalho_modalidade")
+      .select("id, nome_completo, cpf, email, celular, tipo_contrato, cargo, cargo_id, departamento, filial, centro_custo, gestor_imediato, gestor_cpf, data_admissao, matricula_esocial, cbo, foto_url, bate_ponto, art62_inciso, art62_documento, teletrabalho_modalidade")
       .eq("id", colab.id)
       .maybeSingle();
 
@@ -338,6 +339,7 @@ function AtivosTab({ showImport, setShowImport }: { showImport: boolean; setShow
       filial: src.filial ?? colab.filial,
       centro_custo: src.centro_custo ?? null,
       gestor_imediato: src.gestor_imediato ?? null,
+      gestor_cpf: src.gestor_cpf ?? null,
       data_admissao: src.data_admissao ?? colab.data_admissao,
       matricula_esocial: src.matricula_esocial ?? null,
       cbo: src.cbo ?? null,
@@ -967,6 +969,7 @@ function AdmissoesTab() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { hasMinimumRole, loading: authLoading } = useAuthContext();
+  const podeVerSalarioAdm = usePodeVerSalario();
 
   const {
     admissoes, isLoading, error, criarAdmissao, atualizarAdmissao, atualizarStatus,
@@ -1374,7 +1377,7 @@ function AdmissoesTab() {
       cargo: a.cargo, departamento: a.departamento || "", filial: a.filial || "",
       dataAdmissao: a.data_admissao || "", tipoContrato: a.tipo_contrato || "",
       jornadaTrabalho: a.jornada_trabalho || "",
-      salario: a.salario ? `R$ ${a.salario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "",
+      salario: !podeVerSalarioAdm ? "Sem permissão" : (a.salario ? `R$ ${a.salario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""),
       gestorImediato: a.gestor_imediato || "", centroCusto: a.centro_custo || "",
       cbo: (a as any).cbo || "",
     },

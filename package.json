@@ -19,7 +19,9 @@
     "test:e2e": "cypress run",
     "test:e2e:abrir": "cypress open",
     "qa:cobertura-e2e": "node scripts/verificar-cobertura-e2e.mjs",
-    "qa:carimbos": "node scripts/verificar-carimbos.mjs"
+    "qa:carimbos": "node scripts/verificar-carimbos.mjs",
+    "qa:rede": "bash qa-harness/rodar-local.sh && node scripts/qa-diff-baseline.mjs",
+    "qa:baseline": "bash qa-harness/rodar-local.sh && cp qa-harness/resultado-atual.tsv qa-harness/baseline.tsv && echo 'baseline da Rede de Seguranca atualizada'"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

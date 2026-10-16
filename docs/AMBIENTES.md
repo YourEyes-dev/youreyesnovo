@@ -1014,6 +1014,53 @@ O seed cria:
 - [ ] Uma chamada de IA (Gerar Função com IA) — valida secret + Edge Function.
 - [ ] Upload de um documento — valida bucket + policies.
 
+## Empresa de demonstração (só no ambiente de TESTE)
+
+Para prints de marketing e demos de venda sem expor cliente, o ambiente de
+teste tem uma empresa fictícia: **Metalúrgica Exemplo Ltda** (CNPJ fictício
+98.765.432/0001-98).
+
+**O que ela tem**
+- 4 setores/GHE (Produção, Manutenção, Logística, Administrativo) e 16 cargos.
+- 77 colaboradores fictícios (CPFs da faixa 900.000.021–097, com DV válido).
+- 2 campanhas psicossociais SIPRO encerradas, março/2026 (31 respostas) e
+  setembro/2026 (41 respostas). As respostas são anônimas, sem nome nem CPF,
+  e os indicadores são calculados pelo mesmo código da tela.
+- Índice de Confiabilidade e 5 ações no Plano de Ação PGR.
+
+**Login**
+- Usuária **Ana Demonstração** (`ana.demonstracao@youreyes.demo`).
+- Papel: gestora do próprio cliente (owner do tenant demo). **Não** é Super Admin.
+- Senha padrão `DemoYourEyes2026`. Se o secret `DEMO_SENHA` (8 caracteres ou
+  mais) existir no GitHub, ele substitui a padrão na próxima corrida da esteira.
+
+**Como é criada**
+- A função `seed-demo-empresa` é chamada pela esteira do staging, no passo
+  "Semear a empresa de demonstração", a cada mudança na `main`.
+- Ela é fechada pelo `QA_E2E_TOKEN` e recusa qualquer projeto que não seja o
+  de TESTE: a homologação (tem cópia de cliente real) e a produção ficam de fora.
+- Idempotente e não-fatal: se falhar, a esteira só avisa.
+
+**Isolamento**
+- Tudo vive num tenant próprio (`d3e00000-0000-4000-8000-000000000001`).
+- A conta-robô do Cypress pertence ao tenant da Empresa Staging e não enxerga
+  a demo.
+
+**Respostas fictícias**
+- Ficam em `supabase/functions/seed-demo-empresa/psicossocial-demo.ts`,
+  gerado pelo teste `src/test/demoPsicossocialFixture.test.ts`.
+- Se o cálculo do IPS mudar, esse teste falha até a fixture ser regenerada:
+  `GERAR_DEMO=1 npx vitest run src/test/demoPsicossocialFixture.test.ts`.
+
+**Remover a demo (SQL Editor do projeto de TESTE)**
+- Apague as linhas com `tenant_id = 'd3e00000-0000-4000-8000-000000000001'`
+  nas tabelas psicossociais (respostas, plano_acao, indice_confiabilidade,
+  campanhas, ghe_cargos, ghe), em `admissoes`, `cargos`, `departamentos`,
+  `usuarios_base`, `profiles`, `humor_diario`, `empresa_cadastro` e `tenants`.
+- Depois apague a usuária em Authentication → Users.
+- A próxima corrida da esteira a recria: para não recriar, tire o passo do
+  `staging.yml`.
+
 ## Automação (GitHub Actions)
 
 O workflow `.github/workflows/staging.yml` mantém o staging atualizado sozinho: a cada mudança mesclada na `main`, ele aplica as migrations novas no projeto de staging, reimplanta as Edge Functions e — se os secrets do Netlify estiverem configurados — publica o site de teste. Ninguém precisa de CLI local para manter o ambiente.

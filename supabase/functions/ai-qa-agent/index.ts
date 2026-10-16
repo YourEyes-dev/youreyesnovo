@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { exigirSuperadmin, respostaDeErro } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,9 +25,17 @@ interface FlowResult {
   total_duration_ms: number;
 }
 
-// Test credentials
-const TEST_EMAIL = "wallasmonteirobarros@gmail.com";
-const TEST_PASSWORD = "12345678";
+// Conta de teste do agente de QA: vem dos segredos da função (Supabase > Edge Functions >
+// Secrets), nunca do código. Sem os dois segredos a função recusa rodar.
+const TEST_EMAIL = Deno.env.get("QA_AGENT_EMAIL") ?? "";
+const TEST_PASSWORD = Deno.env.get("QA_AGENT_PASSWORD") ?? "";
+
+// Trava de empresa: este agente escreve com a chave de serviço (ignora o RLS). Por isso só
+// pode atuar na ILHA DE QA (a "Empresa Staging", plantada pela seed-e2e-user no teste e na
+// homologação). A empresa NUNCA vem do corpo da chamada: vem do login da conta de teste, e se
+// não for a ilha de QA o agente recusa. Antes, falha no login fazia cair na empresa de quem
+// chamou, e as escritas iam parar numa empresa real.
+const TENANT_ILHA_QA = Deno.env.get("QA_ILHA_TENANT_ID") ?? "11111111-1111-1111-1111-111111111111";
 
 async function runStep(stepName: string, action: string, fn: () => Promise<string>): Promise<StepResult> {
   const start = Date.now();
@@ -42,7 +51,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { flow, tenantId, stream } = await req.json();
+    // Roda com chave de serviço e escreve dados: só superadmin.
+    await exigirSuperadmin(req);
+    const { flow, stream } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -54,6 +65,9 @@ serve(async (req) => {
 
     // ═══ Authenticate as test user ═══
     async function getAuthenticatedClient() {
+      if (!TEST_EMAIL || !TEST_PASSWORD) {
+        throw new Error("Conta de teste do agente de QA não configurada (QA_AGENT_EMAIL / QA_AGENT_PASSWORD).");
+      }
       const client = createClient(SUPABASE_URL, ANON_KEY);
       const { data, error } = await client.auth.signInWithPassword({
         email: TEST_EMAIL,
@@ -119,7 +133,7 @@ serve(async (req) => {
         // ═══════════════════════════════════════════════════
         let authClient: any = null;
         let authUser: any = null;
-        let authTenantId: string | null = tenantId || null;
+        let authTenantId: string | null = null; // só o login da conta de teste define a empresa
 
         if (flow === "login_auth" || flow === "todos") {
           send("flow_start", { flow: "login_auth", label: "Autenticação & Perfil" });
@@ -178,14 +192,17 @@ serve(async (req) => {
             authUser = user;
             if (!authTenantId) {
               const { data } = await authClient.from("profiles").select("tenant_id").eq("user_id", user.id).single();
-              authTenantId = data?.tenant_id || tenantId;
+              authTenantId = data?.tenant_id ?? null;
             }
           } catch (e) {
             send("step_done", { flow: "auth", step: "Auto-login", action: "signIn", status: "fail", details: (e as Error).message, duration_ms: 0 });
           }
         }
 
-        const effectiveTenant = authTenantId || tenantId;
+        const effectiveTenant = authTenantId === TENANT_ILHA_QA ? authTenantId : null;
+        if (authTenantId && !effectiveTenant) {
+          send("step_done", { flow: "auth", step: "Trava de empresa", action: "guard", status: "fail", details: "Recusado: a conta de teste do agente não pertence à ilha de QA (Empresa Staging). Nenhuma escrita foi feita.", duration_ms: 0 });
+        }
 
         // ═══════════════════════════════════════════════════
         // FLOW: EMPRESA (Cadastro)
@@ -1349,9 +1366,6 @@ Seja direto e técnico. Português do Brasil.`,
       },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message || "Erro interno" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return respostaDeErro(e, corsHeaders);
   }
 });

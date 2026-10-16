@@ -78,6 +78,9 @@ BEGIN
        estava_ativo          boolean,
        tinha_papel_superadmin boolean
      )', v_tabela_bkp);
+  -- O backup nasce FECHADO para a API (tem e-mail e id de usuario).
+  EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', v_tabela_bkp);
+  EXECUTE format('REVOKE ALL ON TABLE public.%I FROM anon, authenticated', v_tabela_bkp);
 
   SELECT s.ativo INTO v_ja_ativo
   FROM public.superadmins s WHERE s.user_id = v_uid;

@@ -408,4 +408,27 @@ Banco novo com tela antiga funciona; **tela nova com banco antigo, não.**
 - Casos de QA de tela DOC-052/053 ficam só documentados (precisam de uma segunda
   conta-robô restrita e do site de teste liberado na rede do ambiente).
 
-**A produção segue intacta até o seu "aprovado".**
+
+---
+
+## Situação final (16/10/2026)
+
+**Aplicado na produção:** Etapas 1 a 12 (com a 7b), `consulta de status` conferida, QA (`21` a `28` na
+homologação e produção, exceto `qa_cercas`), PR de telas #791 mesclado, 9 Edge Functions publicadas
+(`ai-chat`, `ai-cultura-manual`, `ai-cultura-sugestao`, `ai-pgr-riscos`, `ai-pop-generator`,
+`ai-sst-analise`, `ai-qa-scan`, `ai-qa-agent`, `invite-tenant-user`), `seed-test-user` apagada.
+
+**Pendências para a próxima leva:**
+- **Convite por e-mail nunca funcionou** (cadastro de usuário): ver logs de `invite-tenant-user` e o
+  segredo `RESEND_API_KEY`/domínio no Resend.
+- **Importação de documento de SST** não extrai (0 riscos, 0 ações) num documento que já funcionou:
+  conferir no painel se `sst-pdf-extract` e `ai-sst-importacao` existem na produção e em que data
+  foram publicadas (o repositório as traz desde 29/09); comparar com a homologação.
+- **Conta `teste@seguramente.com`** (teste interno): trocar a senha (era `123456`; ficou pública
+  enquanto `seed-test-user` esteve no ar) e encerrar as sessões; log de acessos não disponível.
+- **`script_qa_cercas_compensacao_falta`** não aplicado na produção: rodar antes a consulta de
+  tabelas sem gatilho `qa_guarda_cercado`.
+- **Backfill dos colaboradores** (perfil "Colaborador (padrão)" para quem não tem perfil): decisão
+  pendente; até lá, quem não tem perfil grava como antes.
+- RH, Gerente de Operações e Gestor/Líder ficaram sem Excluir (decisão aceita em 16/10/2026).
+- Opcional: `20_backups_fechar_todos_sem_rls` (varre o catálogo; o de lista fixa já foi aplicado).

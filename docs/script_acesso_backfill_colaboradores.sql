@@ -3,7 +3,7 @@
 --
 -- Cole ESTE arquivo inteiro no SQL Editor do projeto de HOMOLOGACAO primeiro e,
 -- so depois de conferido, no de PRODUCAO. Espelha a migration
-
+-- 20261016195132_acesso_backfill_colaboradores_perfil_padrao.sql
 -- PRE-REQUISITOS: Fases 1a, 1b, 2a e a de escrita (2b) aplicadas.
 -- Recomendado ANTES: as consultas PRE-CHECAGEM no fim (so leitura).
 --

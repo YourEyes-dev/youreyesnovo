@@ -79,6 +79,30 @@ A regra da casa — "produção só muda por gesto manual" — é preservada ass
   (avanço/fast-forward, via PR `main → producao` ou empurrando a branch). A Vercel
   então publica em `youreyes.com.br` automaticamente.
 
+### Edge Functions de produção (gesto manual)
+Nenhum robô publica Edge Function na produção (a esteira recusa o projeto `diayjpsrcerycycyaxst`).
+A publicação é um gesto do dono, pela Supabase CLI, com as funções nomeadas uma a uma. Receita
+usada em 16/10/2026 (sem instalar nada no computador):
+
+1. GitHub → branch `producao` → **Code → Codespaces → Create codespace on producao**; no terminal,
+   `git log -1 --oneline` deve mostrar o merge da publicação.
+2. Autenticar: `npx supabase login --no-browser` (link e código valem poucos minutos e uma vez só;
+   abra o link inteiro, na hora). Se falhar, plano B: token pessoal (Account → Access Tokens, validade
+   curta) passado só no comando, `SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy …`.
+   **O token é senha da conta**: não aparecer em print, chat ou arquivo; revogar ao terminar.
+3. Conferir o projeto: `npx supabase projects list` deve listar `diayjpsrcerycycyaxst`.
+4. Anotar o estado: `npx supabase functions list --project-ref diayjpsrcerycycyaxst`.
+5. Publicar **sempre com `--use-api`** (monta no servidor; o Docker do Codespace falha com erro de DNS
+   em `deno.land`) e **sempre com os nomes das funções**:
+   `npx supabase functions deploy <f1> <f2> … --project-ref diayjpsrcerycycyaxst --use-api`.
+   Sem nomes, o comando publica todas, inclusive as `seed-*` de teste.
+6. Ordem: telas primeiro (as funções de IA passam a exigir login; o front antigo não manda o token),
+   depois as funções. Uma função de teste antes, as demais em seguida.
+7. Não publicar as `seed-*` na produção. Funções removidas do repositório **continuam no ar** até
+   serem apagadas no painel (Edge Functions → função → Delete); caso real: `seed-test-user`
+   (criava um owner com senha fixa, sem login) ficou exposta na produção até 16/10/2026.
+8. Ao terminar: revogar o token e apagar o Codespace.
+
 ### Configuração no repositório e na Vercel
 - `vercel.json` (raiz do repo): rewrite de SPA (`/(.*) → /index.html`) para deep links
   não darem 404 ao recarregar.

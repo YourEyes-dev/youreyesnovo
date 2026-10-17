@@ -587,8 +587,11 @@ export function NovoUsuarioDialog({ open, onOpenChange }: Props) {
                     <p className="text-xs text-muted-foreground">
                       Define o nível de acesso e permissões deste usuário no sistema.
                       Se nenhum perfil for selecionado, é aplicado automaticamente o
-                      <strong> modelo do tipo escolhido</strong>: Administrador e Gestor
-                      entram com acesso amplo (empresa inteira); os demais entram com o
+                      <strong> modelo do tipo escolhido</strong>: Administrador, Gestor e RH
+                      entram com acesso amplo (empresa inteira); o Técnico de Segurança
+                      entra com o <strong>modelo de SST</strong> (empresa inteira em SST,
+                      Ergonomia, EPIs, Incidentes e Documentos; no resto, só os próprios
+                      dados); os demais entram com o
                       <strong> Colaborador (padrão)</strong> — auto-serviço apenas
                       (próprio ponto, atestados e holerites). O modelo pode ser ajustado
                       depois em Perfis de acesso.

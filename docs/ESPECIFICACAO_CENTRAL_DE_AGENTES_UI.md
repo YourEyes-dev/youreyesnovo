@@ -800,6 +800,43 @@ Regra de ouro: **sem I1 a I10 verdes em staging, o agente não sai de "Em breve"
 
 ---
 
+## 15. Agente de Descritivos e POPs (com espaço para fluxogramas)
+
+> Acréscimo ao catálogo inicial (Discovery §3). Não havia agente para descritivos de função e POPs. O sistema já gera esses documentos **por botão**, em Aprendizado e Papéis (`GerarFuncaoIAModal`, `PopSection`, `CentralPopsSection`; funções `ai-gerar-funcao-completa`, `ai-manual-funcao`, `ai-pop-generator`, `ai-responsabilidade-funcao`, `ai-texto-atividades`, `ai-audio-atividades`), mas só quando alguém lembra de clicar. O agente cuida da **cobertura e da atualização**, sem substituir os botões. POPs ficam em `documentos` (pastas e versões) e o manual da função tem fluxo de assinatura (`manual-funcao-assinatura-finalizar`). **Fluxograma não existe no sistema hoje** (a palavra só aparece como referência em `MapaConformidade.tsx` e `planoAcaoReferencia.ts`).
+
+### 15.1 Ficha do agente
+| Campo | Definição |
+|---|---|
+| Persona (sugestão) | Lúcia **[VALIDAR]** |
+| Resultado que possui | Todo cargo tem descritivo de função e toda atividade crítica tem POP, vigentes e aprovados |
+| Evento de sucesso | Documento aprovado e publicado como versão vigente (e assinado, quando o fluxo de assinatura for usado) |
+| O que faz | Aponta cargos sem descritivo e atividades sem POP; prepara rascunho com base no cadastro da empresa; sugere atualização quando algo que afeta o documento muda (atividade, risco, EPI, versão antiga); trabalha em lote; envia ao responsável para revisão; cobra revisão parada |
+| O que nunca faz | Publicar, aprovar ou assinar sozinho; alterar versão aprovada (sempre cria **nova versão**, a anterior é preservada); inventar exigência legal; enviar dado pessoal de colaborador à IA (usa só cargo, atividade, risco e EPI) |
+| Nível máximo | "Faz e pede seu OK". **Não existe "Cuida sozinho" para publicar** |
+| Classe da ação | Reversível: rascunho e nova versão, com a anterior preservada (§13.2) |
+| Gatilhos | Cargo ou atividade novos sem documento; documento com revisão vencida; mudança relacionada no cadastro |
+| Unidade de valor | Documento aprovado e vigente |
+| Situação na Vitrine | Em breve. **Candidato a primeiro agente com IA**: o conteúdo é corporativo e não carrega dado pessoal. Depende do gateway de IA e do contrato com o provedor (§14) |
+| Preço | **[REGRA]** em aberto. O custo de IA é relevante (gera texto): mensalidade com franquia de documentos ou valor por documento aprovado |
+
+### 15.2 Espaço aberto para fluxogramas
+- O agente é desenhado por **tipo de entregável**, numa lista extensível: descritivo de função, POP e, no futuro, fluxograma, instrução de trabalho e mapa de processo. Cada tipo é um registro no catálogo (`agentes_catalogo`): formato do resultado, modelo, regras de validação e a ação que gera o rascunho. Habilitar um tipo novo **não exige novo agente nem mudança no código do agente**.
+- **Fluxograma (futuro):** o modelo propõe a estrutura (etapas, decisões, responsáveis e ligações) em formato estruturado validado por esquema; o código desenha o diagrama; a pessoa edita. O fluxograma entra no POP como anexo, com a mesma versão e a mesma aprovação. O modelo nunca produz o desenho final: só propõe dados, como em todo agente (§14.4, princípio 1).
+- É **capacidade nova**: precisa de componente de visualização e edição e de saída em PDF **[VALIDAR a biblioteca na hora]**. Dependência técnica: nenhuma outra além das da fase de IA.
+- **Vitrine:** o cartão lista os tipos de entregável com estado "Disponível" ou "Em breve" (por exemplo, "Fluxogramas: em breve"). Se fluxograma terá preço próprio é decisão comercial futura **[REGRA]**.
+
+### 15.3 Critérios de aceite e testes adicionais
+- **CA-UX-065** O cartão do agente mostra os tipos de entregável e o estado de cada um (Disponível ou Em breve).
+- **CA-UX-066** Todo rascunho gerado vira nova versão e nunca altera a versão vigente.
+- **CA-UX-067** O documento só vira vigente com aprovação humana registrada na trilha.
+- **QA `api`:** `AGENTES-035` rascunho não altera a versão vigente; `AGENTES-036` o texto enviado à IA não traz dado pessoal de colaborador; `AGENTES-037` habilitar um tipo novo de entregável não exige mudar o código do agente.
+- **Entrega:** a ficha entra em `agentes_catalogo` na Fase 1 (como "Em breve"); o agente só é liberado depois do gateway de IA (Fase 4 do documento de requisitos).
+
+### 15.4 Em aberto
+Preço do agente e se fluxograma terá preço próprio; escolha do componente de edição de fluxograma; regra de revisão periódica (a cada quantos meses um POP ou descritivo "vence"); quem aprova cada tipo de documento (RH, gestor da área ou SST, conforme o tema).
+
+---
+
 ## Avaliação crítica do agente (10 perguntas)
 1. **Especifiquei todos os estados?** Cartão e as 8 telas têm carregando/vazio/erro/sucesso/sem permissão; falta detalhar offline por tela e o estado "plano sem o módulo `agentes`" na navegação — deixei como regra única, não por tela.
 2. **Acessibilidade nos tokens e nos critérios?** Sim (§4, §5, CA-UX-019/020/021/026), mas não calculei os pares de contraste reais dos tokens novos — isso é tarefa de implementação com validador.

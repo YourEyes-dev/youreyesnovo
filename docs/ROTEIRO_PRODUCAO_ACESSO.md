@@ -428,7 +428,11 @@ homologação e produção, exceto `qa_cercas`), PR de telas #791 mesclado, 9 Ed
   enquanto `seed-test-user` esteve no ar) e encerrar as sessões; log de acessos não disponível.
 - **`script_qa_cercas_compensacao_falta`** não aplicado na produção: rodar antes a consulta de
   tabelas sem gatilho `qa_guarda_cercado`.
-- **Backfill dos colaboradores** (perfil "Colaborador (padrão)" para quem não tem perfil): decisão
-  pendente; até lá, quem não tem perfil grava como antes.
+- **Backfill dos colaboradores: APLICADO em 17/10/2026** (homologação e produção; 1 colaborador
+  recebeu o "Colaborador (padrão)"; `candidatos_restantes = 0`, PERFIL-013 e PERFIL-014 `passou`).
+  Ficam de fora, por decisão, os outros tipos sem perfil (ex.: 1 `tecnico_seguranca`), que operam
+  por papel e pedem decisão caso a caso. Achado aberto: o cadastro de usuário novo dá o
+  "Colaborador (padrão)" a qualquer tipo fora da gestão (`rh`, `proprietario`, `tecnico_seguranca`…),
+  o que pode restringir um RH ou técnico recém-criado; revisar `perfil_modelo_para_tipo`.
 - RH, Gerente de Operações e Gestor/Líder ficaram sem Excluir (decisão aceita em 16/10/2026).
 - Opcional: `20_backups_fechar_todos_sem_rls` (varre o catálogo; o de lista fixa já foi aplicado).

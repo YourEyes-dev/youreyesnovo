@@ -430,9 +430,17 @@ homologação e produção, exceto `qa_cercas`), PR de telas #791 mesclado, 9 Ed
   tabelas sem gatilho `qa_guarda_cercado`.
 - **Backfill dos colaboradores: APLICADO em 17/10/2026** (homologação e produção; 1 colaborador
   recebeu o "Colaborador (padrão)"; `candidatos_restantes = 0`, PERFIL-013 e PERFIL-014 `passou`).
-  Ficam de fora, por decisão, os outros tipos sem perfil (ex.: 1 `tecnico_seguranca`), que operam
-  por papel e pedem decisão caso a caso. Achado aberto: o cadastro de usuário novo dá o
-  "Colaborador (padrão)" a qualquer tipo fora da gestão (`rh`, `proprietario`, `tecnico_seguranca`…),
-  o que pode restringir um RH ou técnico recém-criado; revisar `perfil_modelo_para_tipo`.
+  Ficam de fora, por decisão, os outros tipos sem perfil, que operam por papel e pedem decisão
+  caso a caso.
+- **Cadastro novo de RH e Técnico de Segurança: APLICADO em 17/10/2026** (homologação e produção):
+  `perfil_modelo_para_tipo` passa `rh` ao modelo de gestão e `tecnico_seguranca` ao novo modelo
+  "Técnico de Segurança (padrão)" (SST, Ergonomia, EPIs, Incidentes e Documentos em empresa inteira;
+  resto só os próprios dados; sem salário). PERFIL-015 `passou`.
+- **Backfill dos técnicos existentes: APLICADO em 17/10/2026** (2 técnicos na produção, 2 na
+  homologação); PERFIL-016 `passou`. Aprendizado: o índice `usuario_perfil_vinculos_ativo_uidx` permite
+  UM vínculo ativo por usuário e empresa; o backfill desativa os vínculos ativos sem empresa antes de
+  ligar o modelo (e o script engole o erro por usuário: sempre conferir `candidatos_restantes = 0`).
+- Tipos ainda no Colaborador (padrão) no cadastro novo: `saude_ocupacional`, `auditor`,
+  `consultor_externo`, `prestador_terceiro`, `clinica_parceira`, `proprietario`; revisar com o produto.
 - RH, Gerente de Operações e Gestor/Líder ficaram sem Excluir (decisão aceita em 16/10/2026).
 - Opcional: `20_backups_fechar_todos_sem_rls` (varre o catálogo; o de lista fixa já foi aplicado).

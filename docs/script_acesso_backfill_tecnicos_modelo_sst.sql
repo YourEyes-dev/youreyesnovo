@@ -80,6 +80,10 @@ BEGIN
        || quote_literal(v_ids::text) || '::uuid[])';
   EXECUTE 'ALTER ' || 'TABLE public.backup_vinculos_tecnicos_20261017 ENABLE ROW LEVEL SECURITY';
   EXECUTE 'REVOKE ALL ON public.backup_vinculos_tecnicos_20261017 FROM PUBLIC, anon, authenticated';
+  -- reexecucao: acrescenta a copia dos alvos novos (a tabela ja existe e o CREATE acima nao refaz)
+  EXECUTE 'INSERT INTO public.backup_vinculos_tecnicos_20261017 SELECT x.* FROM public.usuario_perfil_vinculos x '
+       || 'WHERE x.usuario_id = ANY (' || quote_literal(v_ids::text) || '::uuid[]) '
+       || 'AND NOT EXISTS (SELECT 1 FROM public.backup_vinculos_tecnicos_20261017 b WHERE b.id = x.id)';
 
   FOR r IN
     SELECT ub.id AS usuario_id, ub.tenant_id
@@ -92,7 +96,11 @@ BEGIN
         CONTINUE;
       END IF;
 
-      -- desativa o automatico "Colaborador (padrao)" (a tela resolve 1 principal)
+      -- Desativa os vinculos ativos "sem empresa" do usuario (o automatico "Colaborador
+      -- (padrao)", mesmo que o nome do perfil seja outro, e vinculos a perfil expirado ou
+      -- desativado): o indice usuario_perfil_vinculos_ativo_uidx permite UM vinculo ativo por
+      -- usuario e empresa, e o modelo entra sem empresa. Ninguem aqui tem perfil escolhido
+      -- vigente (os alvos foram filtrados), entao nada que valia e desligado.
       UPDATE public.usuario_perfil_vinculos v
          SET ativo = false,
              is_perfil_principal = false,
@@ -101,9 +109,8 @@ BEGIN
                || to_char(now(), 'DD/MM/YYYY') || ']'
        WHERE v.usuario_id = r.usuario_id
          AND COALESCE(v.ativo, true) = true
-         AND v.perfil_id IN (SELECT pa.id FROM public.perfis_acesso pa
-                              WHERE pa.tenant_id = r.tenant_id
-                                AND pa.nome = 'Colaborador (padrão)');
+         AND v.empresa_id IS NULL
+         AND v.perfil_id <> v_modelo;
 
       INSERT INTO public.usuario_perfil_vinculos
         (tenant_id, usuario_id, perfil_id, ativo, is_perfil_principal,

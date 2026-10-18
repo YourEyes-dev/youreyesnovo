@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { fromTable } from "@/integrations/supabase/untypedClient";
+import { datasAoRegistrarRitual } from "@/lib/celebracoes";
 import type { CulturaData, CulturaAcao, CulturaRitual, CulturaConfig, CulturaMarco, CulturaPreferencia } from "@/types/cultura";
 
 export function useCultura() {
@@ -77,6 +80,41 @@ export function useCultura() {
     qc.invalidateQueries({ queryKey: ["cultura-acoes"] });
   };
 
+  /**
+   * Celebrar em 1 toque: cria a ação já concluída (ou conclui a existente).
+   * Devolve a função que desfaz — o chamador oferece o "Desfazer" por alguns segundos.
+   */
+  const parabenizar = async (payload: Partial<CulturaAcao>, existente?: CulturaAcao): Promise<() => Promise<void>> => {
+    if (!tenantId) return async () => {};
+    const hoje = format(new Date(), "yyyy-MM-dd");
+    const refrescar = () => qc.invalidateQueries({ queryKey: ["cultura-acoes"] });
+    if (existente) {
+      const { error } = await supabase
+        .from("cultura_acoes")
+        .update({ status: "concluida", data_execucao: hoje })
+        .eq("id", existente.id);
+      if (error) { toast.error("Erro ao celebrar"); throw error; }
+      refrescar();
+      return async () => {
+        await supabase
+          .from("cultura_acoes")
+          .update({ status: existente.status, data_execucao: existente.data_execucao })
+          .eq("id", existente.id);
+        refrescar();
+      };
+    }
+    const { data, error } = await fromTable("cultura_acoes")
+      .insert({ ...payload, status: "concluida", data_execucao: hoje, tenant_id: tenantId, empresa_id: empresaAtivaId || null })
+      .select("id")
+      .single();
+    if (error) { toast.error("Erro ao celebrar"); throw error; }
+    refrescar();
+    return async () => {
+      await supabase.from("cultura_acoes").delete().eq("id", data.id);
+      refrescar();
+    };
+  };
+
   const deleteAcao = async (id: string) => {
     const { error } = await supabase.from("cultura_acoes").delete().eq("id", id);
     if (error) { toast.error("Erro ao excluir"); throw error; }
@@ -120,6 +158,16 @@ export function useCultura() {
     const { error } = await supabase.from("cultura_rituais").delete().eq("id", id);
     if (error) { toast.error("Erro ao excluir"); throw error; }
     toast.success("Ritual removido");
+    qc.invalidateQueries({ queryKey: ["cultura-rituais"] });
+  };
+
+  const registrarRealizacaoRitual = async (r: CulturaRitual) => {
+    const { error } = await supabase
+      .from("cultura_rituais")
+      .update(datasAoRegistrarRitual(r.frequencia))
+      .eq("id", r.id);
+    if (error) { toast.error("Erro ao registrar realização"); throw error; }
+    toast.success("Realização registrada");
     qc.invalidateQueries({ queryKey: ["cultura-rituais"] });
   };
 
@@ -215,8 +263,8 @@ export function useCultura() {
 
   return {
     datas, isLoadingDatas, createData, deleteData,
-    acoes, isLoadingAcoes, createAcao, updateAcaoStatus, deleteAcao,
-    rituais, isLoadingRituais, createRitual, toggleRitual, deleteRitual,
+    acoes, isLoadingAcoes, createAcao, updateAcaoStatus, deleteAcao, parabenizar,
+    rituais, isLoadingRituais, createRitual, toggleRitual, deleteRitual, registrarRealizacaoRitual,
     config, saveConfig,
     marcos, createMarco,
     preferencias, createPreferencia, deletePreferencia,

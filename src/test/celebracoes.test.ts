@@ -116,3 +116,109 @@ describe("pessoaReservada (RN-006)", () => {
   it("público/tanto faz não restringe", () =>
     expect(pessoaReservada([{ ...prefs[0], tipo_reconhecimento: "publico" }], "p1", "Ana Souza")).toBe(false));
 });
+
+import {
+  calcularCobertura,
+  celebracoesNoIntervalo,
+  datasAoRegistrarRitual,
+  montarEventosCalendario,
+  proximaExecucaoRitual,
+} from "@/lib/celebracoes";
+import type { CulturaRitual } from "@/types/cultura";
+
+describe("celebracoesNoIntervalo", () => {
+  it("cobre um mês inteiro, inclusive datas já passadas", () => {
+    const r = celebracoesNoIntervalo(
+      [pessoa({ data_nascimento: "1990-10-05" })],
+      null,
+      new Date(2026, 9, 1),
+      new Date(2026, 9, 31),
+      new Date(2026, 9, 18),
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0].diasRestantes).toBe(-13);
+  });
+
+  it("intervalo que atravessa o ano usa o ano de cada data", () => {
+    const r = celebracoesNoIntervalo(
+      [pessoa({ data_admissao: "2021-01-10" })],
+      null,
+      new Date(2025, 11, 20),
+      new Date(2026, 0, 20),
+    );
+    expect(r.map((c) => c.anos)).toEqual([5]);
+  });
+});
+
+describe("CA-006: calendário e lista mostram os mesmos itens", () => {
+  it("mesmo intervalo, mesmas celebrações detectadas", () => {
+    const pessoas = [
+      pessoa({ id: "a", data_nascimento: "1990-10-20", data_admissao: "2020-10-25" }),
+      pessoa({ id: "b", nome_completo: "Bruno", data_nascimento: "1985-11-02" }),
+    ];
+    const hoje = new Date(2026, 9, 18);
+    const lista = calcularCelebracoes(pessoas, { dias_antecedencia_acao: 20 }, hoje).map((c) => c.chave);
+    const cal = montarEventosCalendario({
+      pessoas, config: { dias_antecedencia_acao: 20 }, acoes: [], rituais: [], datas: [],
+      de: hoje, ate: new Date(2026, 10, 7),
+    }).map((e) => e.id);
+    expect(cal.sort()).toEqual(lista.sort());
+  });
+
+  it("ação manual, data configurada e ritual entram nos grupos certos", () => {
+    const ev = montarEventosCalendario({
+      pessoas: [],
+      acoes: [{ id: "x", tipo: "data_configurada", titulo: "Almoço", colaborador_nome: null, data_referencia: "2026-10-10", status: "pendente" } as CulturaAcao],
+      rituais: [{ id: "r", nome: "Roda", frequencia: "mensal", ativo: true, ultima_execucao: null, proxima_execucao: "2026-10-12" } as CulturaRitual],
+      datas: [{ id: "d", titulo: "Dia do Cliente", ativo: true, mes: 10, dia: 15, data_especifica: null }],
+      de: new Date(2026, 9, 1), ate: new Date(2026, 9, 31),
+    });
+    expect(ev.map((e) => e.grupo)).toEqual(["datas", "rituais", "datas"]);
+  });
+
+  it("ação cancelada não aparece", () => {
+    const ev = montarEventosCalendario({
+      pessoas: [],
+      acoes: [{ id: "x", tipo: "data_configurada", titulo: "Almoço", colaborador_nome: null, data_referencia: "2026-10-10", status: "cancelada" } as CulturaAcao],
+      rituais: [], datas: [], de: new Date(2026, 9, 1), ate: new Date(2026, 9, 31),
+    });
+    expect(ev).toHaveLength(0);
+  });
+});
+
+describe("rituais", () => {
+  it("usa a próxima agendada; senão soma a frequência à última", () => {
+    expect(proximaExecucaoRitual({ frequencia: "mensal", ultima_execucao: "2026-10-01", proxima_execucao: "2026-10-20" })!.getDate()).toBe(20);
+    const d = proximaExecucaoRitual({ frequencia: "semanal", ultima_execucao: "2026-10-01", proxima_execucao: null })!;
+    expect([d.getMonth(), d.getDate()]).toEqual([9, 8]);
+    expect(proximaExecucaoRitual({ frequencia: "mensal", ultima_execucao: null, proxima_execucao: null })).toBeNull();
+  });
+  it("registrar realização grava última e próxima", () => {
+    expect(datasAoRegistrarRitual("quinzenal", new Date(2026, 9, 18, 14))).toEqual({
+      ultima_execucao: "2026-10-18",
+      proxima_execucao: "2026-11-01",
+    });
+  });
+});
+
+describe("calcularCobertura", () => {
+  const acao = (nome: string, status: string, data: string) =>
+    ({ status, colaborador_nome: nome, data_execucao: null, data_referencia: data }) as CulturaAcao;
+
+  it("conta só concluídas dos últimos 12 meses", () => {
+    const pessoas = [pessoa({ nome_completo: "Ana" }), pessoa({ id: "b", nome_completo: "Bia" }), pessoa({ id: "c", nome_completo: "Caio" })];
+    const c = calcularCobertura(
+      pessoas,
+      [acao("Ana", "concluida", "2026-03-01"), acao("Bia", "pendente", "2026-03-01"), acao("Caio", "concluida", "2024-01-01")],
+      new Date(2026, 9, 18),
+    );
+    expect(c.cobertas).toBe(1);
+    expect(c.percentual).toBe(33);
+    expect(c.semCelebracao.map((p) => p.nome_completo)).toEqual(["Bia", "Caio"]);
+  });
+
+  it("CA-008: sem colaboradores ou sem ações dá 0% sem erro", () => {
+    expect(calcularCobertura([], [], new Date()).percentual).toBe(0);
+    expect(calcularCobertura([pessoa({})], [], new Date()).percentual).toBe(0);
+  });
+});

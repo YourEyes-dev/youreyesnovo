@@ -1,32 +1,30 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { format, addDays, differenceInDays } from "date-fns";
+import { format, differenceInCalendarDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Cake, Award, CalendarHeart, Sparkles, Loader2, Bell, Briefcase } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
-import { toast } from "sonner";
 import type { CulturaAcao } from "@/types/cultura";
-import { buscarDiaProfissao } from "@/lib/diasProfissao";
 import { TIPO_ACAO_LABELS, STATUS_ACAO_COLORS, STATUS_ACAO_LABELS } from "@/types/cultura";
+import { useCelebracoes } from "@/hooks/useCelebracoes";
+import { toDateLocal } from "@/lib/dataLocal";
+import { chaveDaAcao, indexarAcoes, payloadAcaoDaCelebracao, type Celebracao } from "@/lib/celebracoes";
 
 interface CelebracaoItem {
+  chave: string;
   nome: string;
   tipo: "aniversario" | "tempo_casa" | "dia_profissao" | "acao";
   data: Date;
   diasRestantes: number;
-  avatar?: string;
   cargo?: string;
   anos?: number;
+  /** ação já registrada para esta celebração (RN-004: no máximo uma por pessoa+tipo+ano) */
   acao?: CulturaAcao;
+  celebracao?: Celebracao;
 }
-
 
 interface Props {
   acoes: CulturaAcao[];
@@ -35,135 +33,63 @@ interface Props {
 }
 
 export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Props) => {
-  const { tenantId } = useAuth();
-  const { empresaAtivaId } = useEmpresaAtiva();
   const [criandoAcao, setCriandoAcao] = useState<string | null>(null);
+  // trava síncrona: o refetch das ações é assíncrono e um segundo clique rápido duplicaria a ação
+  const emCriacao = useRef(new Set<string>());
 
-  // Fetch upcoming birthdays and work anniversaries from admissoes
-  const { data: celebracoesReais = [] } = useQuery({
-    queryKey: ["proximas-celebracoes", tenantId, empresaAtivaId],
-    queryFn: async (): Promise<CelebracaoItem[]> => {
-      if (!tenantId || !empresaAtivaId) return [];
+  // A Configuração do módulo governa o que é detectado e a janela de dias
+  const { celebracoes: detectadas, janelaDias } = useCelebracoes({ exigirEmpresa: true });
 
-      const { data, error } = await supabase
-        .from("admissoes")
-        .select("nome_completo, data_nascimento, data_admissao, cargo, empresa_id")
-        .eq("tenant_id", tenantId)
-        .eq("empresa_id", empresaAtivaId)
-        .eq("status", "concluido");
+  const acoesPorChave = indexarAcoes(acoes);
+  const chavesDetectadas = new Set(detectadas.map((c) => c.chave));
+  const hoje = startOfDay(new Date());
 
-      if (error) throw error;
-      if (!data || data.length === 0) return [];
+  const itensDetectados: CelebracaoItem[] = detectadas.map((c) => ({
+    chave: c.chave,
+    nome: c.nome,
+    tipo: c.tipo,
+    data: c.data,
+    diasRestantes: c.diasRestantes,
+    cargo: c.cargo,
+    anos: c.anos,
+    acao: acoesPorChave.get(c.chave),
+    celebracao: c,
+  }));
 
-      const today = new Date();
-      const limite = addDays(today, 30);
-      const items: CelebracaoItem[] = [];
-
-      // Parser seguro: trata 'YYYY-MM-DD' como data local (evita shift de timezone)
-      const parseLocalDate = (val: string): Date => {
-        const m = String(val).match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-        return new Date(val);
-      };
-
-      data.forEach((pessoa) => {
-        // Check birthday
-        if (pessoa.data_nascimento) {
-          const birth = parseLocalDate(pessoa.data_nascimento);
-          const thisYearBday = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
-          if (thisYearBday < today) thisYearBday.setFullYear(today.getFullYear() + 1);
-          const dias = differenceInDays(thisYearBday, today);
-          if (dias >= 0 && dias <= 30) {
-            items.push({
-              nome: pessoa.nome_completo,
-              tipo: "aniversario",
-              data: thisYearBday,
-              diasRestantes: dias,
-              cargo: pessoa.cargo || undefined,
-            });
-          }
-        }
-
-        // Check work anniversary
-        if (pessoa.data_admissao) {
-          const adm = parseLocalDate(pessoa.data_admissao);
-          const thisYearAdm = new Date(today.getFullYear(), adm.getMonth(), adm.getDate());
-          if (thisYearAdm < today) thisYearAdm.setFullYear(today.getFullYear() + 1);
-          const dias = differenceInDays(thisYearAdm, today);
-          const anos = today.getFullYear() - adm.getFullYear();
-          if (dias >= 0 && dias <= 30 && anos > 0) {
-            items.push({
-              nome: pessoa.nome_completo,
-              tipo: "tempo_casa",
-              data: thisYearAdm,
-              diasRestantes: dias,
-              anos,
-              cargo: pessoa.cargo || undefined,
-            });
-          }
-        }
-        // Check dia da profissão
-        if (pessoa.cargo) {
-          const diaProfissao = buscarDiaProfissao(pessoa.cargo);
-          if (diaProfissao) {
-            const dataProfissao = new Date(today.getFullYear(), diaProfissao.mes - 1, diaProfissao.dia);
-            if (dataProfissao < today) dataProfissao.setFullYear(today.getFullYear() + 1);
-            const dias = differenceInDays(dataProfissao, today);
-            if (dias >= 0 && dias <= 30) {
-              // Avoid duplicates for same profession date
-              const key = `profissao-${diaProfissao.mes}-${diaProfissao.dia}`;
-              if (!items.find(i => i.tipo === "dia_profissao" && i.data.getTime() === dataProfissao.getTime() && i.cargo === pessoa.cargo)) {
-                items.push({
-                  nome: diaProfissao.nome,
-                  tipo: "dia_profissao",
-                  data: dataProfissao,
-                  diasRestantes: dias,
-                  cargo: pessoa.cargo || undefined,
-                });
-              }
-            }
-          }
-        }
-      });
-
-      return items.sort((a, b) => a.diasRestantes - b.diasRestantes);
-    },
-    enabled: !!tenantId && !!empresaAtivaId,
-  });
-
-  // Merge ações pendentes as items
-  const acoesProximas: CelebracaoItem[] = acoes
+  // Ações sem celebração detectada correspondente (manuais, datas configuradas, rituais)
+  const itensAcoes: CelebracaoItem[] = acoes
     .filter((a) => {
       if (a.status === "concluida" || a.status === "cancelada") return false;
-      const dias = differenceInDays(new Date(a.data_referencia), new Date());
-      return dias >= 0 && dias <= 30;
+      const k = chaveDaAcao(a);
+      if (k && chavesDetectadas.has(k)) return false; // já aparece junto da celebração
+      const ref = toDateLocal(a.data_referencia);
+      if (!ref) return false;
+      const dias = differenceInCalendarDays(ref, hoje);
+      return dias >= 0 && dias <= janelaDias;
     })
-    .map((a) => ({
-      nome: a.colaborador_nome || a.titulo,
-      tipo: "acao" as const,
-      data: new Date(a.data_referencia),
-      diasRestantes: differenceInDays(new Date(a.data_referencia), new Date()),
-      acao: a,
-    }));
+    .map((a) => {
+      const ref = toDateLocal(a.data_referencia)!;
+      return {
+        chave: `acao-${a.id}`,
+        nome: a.colaborador_nome || a.titulo,
+        tipo: "acao" as const,
+        data: ref,
+        diasRestantes: differenceInCalendarDays(ref, hoje),
+        acao: a,
+      };
+    });
 
-  const celebracoes = [...celebracoesReais, ...acoesProximas].sort((a, b) => a.diasRestantes - b.diasRestantes);
+  const celebracoes = [...itensDetectados, ...itensAcoes].sort((a, b) => a.diasRestantes - b.diasRestantes);
 
   const handleCriarAcao = async (item: CelebracaoItem) => {
-    if (!onCreateAcao) return;
-    setCriandoAcao(item.nome);
+    if (!onCreateAcao || !item.celebracao) return;
+    if (item.acao || emCriacao.current.has(item.chave)) return;
+    emCriacao.current.add(item.chave);
+    setCriandoAcao(item.chave);
     try {
-      await onCreateAcao({
-        tipo: item.tipo === "aniversario" ? "aniversario" : "tempo_casa",
-        titulo: item.tipo === "aniversario"
-          ? `Aniversário de ${item.nome}`
-          : `${item.anos} anos de empresa - ${item.nome}`,
-        colaborador_nome: item.nome,
-        data_referencia: format(item.data, "yyyy-MM-dd"),
-        status: "pendente",
-      });
-      toast.success("Ação criada! Ela também aparecerá no Mural Interno.");
+      await onCreateAcao(payloadAcaoDaCelebracao(item.celebracao));
     } catch {
-      toast.error("Erro ao criar ação");
+      emCriacao.current.delete(item.chave);
     } finally {
       setCriandoAcao(null);
     }
@@ -198,7 +124,7 @@ export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Pro
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Bell className="h-4 w-4 text-primary" strokeWidth={1.75} />
-            Próximas Celebrações (30 dias)
+            Próximas Celebrações ({janelaDias} dias)
           </CardTitle>
         </div>
       </CardHeader>
@@ -206,7 +132,7 @@ export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Pro
         <div className="space-y-3">
           {celebracoes.slice(0, 8).map((item, i) => (
             <motion.div
-              key={`${item.nome}-${item.tipo}-${i}`}
+              key={item.chave}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.05 }}
@@ -219,7 +145,6 @@ export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Pro
               }`}
             >
               <Avatar className="h-10 w-10">
-                {item.avatar && <AvatarImage src={item.avatar} />}
                 <AvatarFallback className={
                   item.tipo === "aniversario"
                     ? "bg-pink-500/10 text-pink-600"
@@ -257,15 +182,15 @@ export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Pro
                 </div>
               </div>
 
-              {item.tipo !== "acao" && onCreateAcao && (
+              {item.celebracao && !item.acao && onCreateAcao && (
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-7 px-2 text-xs shrink-0"
-                  disabled={criandoAcao === item.nome}
+                  disabled={criandoAcao === item.chave}
                   onClick={() => handleCriarAcao(item)}
                 >
-                  {criandoAcao === item.nome ? (
+                  {criandoAcao === item.chave ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
                     <>
@@ -276,7 +201,7 @@ export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Pro
                 </Button>
               )}
 
-              {item.tipo === "acao" && item.acao && item.acao.status !== "concluida" && onUpdateStatus && (
+              {item.acao && item.acao.status !== "concluida" && onUpdateStatus && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -286,9 +211,14 @@ export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Pro
                   Concluir
                 </Button>
               )}
-              {item.tipo === "acao" && item.acao && item.acao.status === "concluida" && (
+              {item.acao && item.acao.status === "concluida" && (
                 <Badge className={`text-[10px] shrink-0 ${STATUS_ACAO_COLORS["concluida"]}`}>
                   Concluída
+                </Badge>
+              )}
+              {item.celebracao && item.acao && item.acao.status !== "concluida" && (
+                <Badge className={`text-[10px] shrink-0 ${STATUS_ACAO_COLORS[item.acao.status] || ""}`}>
+                  {STATUS_ACAO_LABELS[item.acao.status] || item.acao.status}
                 </Badge>
               )}
             </motion.div>
@@ -296,7 +226,7 @@ export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Pro
 
           {celebracoes.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">
-              Nenhuma celebração nos próximos 30 dias
+              Nenhuma celebração nos próximos {janelaDias} dias
             </p>
           )}
         </div>

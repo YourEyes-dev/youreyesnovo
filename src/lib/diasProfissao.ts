@@ -100,3 +100,46 @@ export function buscarDiaProfissao(cargo: string): { mes: number; dia: number; n
 
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Catálogo da empresa: dias de profissão que a IA sugeriu e uma pessoa aprovou
+// (ou rejeitou), ou que foram informados à mão. Vale por cima do catálogo acima.
+// ---------------------------------------------------------------------------
+
+export interface DiaProfissaoEmpresa {
+  /** cargo normalizado por `normalizarCargo` */
+  cargo_chave: string;
+  status: "aprovado" | "rejeitado";
+  nome_data: string | null;
+  mes: number | null;
+  dia: number | null;
+}
+
+/** Chave estável do cargo: minúsculas, sem acento e sem espaços repetidos. */
+export function normalizarCargo(cargo: string): string {
+  return cargo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Dia da profissão do cargo, na ordem: decisão da empresa (aprovado vale; rejeitado
+ * desliga, mesmo que o catálogo padrão casasse por engano) e, sem decisão, o catálogo padrão.
+ */
+export function buscarDiaProfissaoDaEmpresa(
+  cargo: string,
+  catalogo: readonly DiaProfissaoEmpresa[] = [],
+): { mes: number; dia: number; nome: string } | null {
+  const chave = normalizarCargo(cargo);
+  const decisao = catalogo.find((c) => c.cargo_chave === chave);
+  if (decisao) {
+    if (decisao.status === "aprovado" && decisao.mes && decisao.dia && decisao.nome_data) {
+      return { mes: decisao.mes, dia: decisao.dia, nome: decisao.nome_data };
+    }
+    return null;
+  }
+  return buscarDiaProfissao(cargo);
+}

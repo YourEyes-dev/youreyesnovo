@@ -1,6 +1,6 @@
 import { addDays, addMonths, differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { toDateLocal } from "@/lib/dataLocal";
-import { buscarDiaProfissao } from "@/lib/diasProfissao";
+import { buscarDiaProfissaoDaEmpresa, type DiaProfissaoEmpresa } from "@/lib/diasProfissao";
 import type { CulturaAcao, CulturaConfig, CulturaData, CulturaPreferencia, CulturaRitual, TomMensagem } from "@/types/cultura";
 
 // Fonte única do cálculo de "próximas celebrações". Usada pela tela de Cultura
@@ -74,6 +74,7 @@ export function celebracoesNoIntervalo(
   de: Date,
   ate: Date,
   referencia: Date = new Date(),
+  diasProfissao: readonly DiaProfissaoEmpresa[] = [],
 ): Celebracao[] {
   const cfg = { ...CONFIG_CELEBRACAO_PADRAO, ...(config ?? {}) };
   const ini = startOfDay(de);
@@ -127,7 +128,7 @@ export function celebracoesNoIntervalo(
       }
 
       if (cfg.dia_profissao_ativo && p.cargo) {
-        const prof = buscarDiaProfissao(p.cargo);
+        const prof = buscarDiaProfissaoDaEmpresa(p.cargo, diasProfissao);
         if (prof) {
           const data = dataNoAno(prof.mes, prof.dia, ano);
           const chave = chaveCelebracao(prof.nome, "dia_profissao", ano);
@@ -155,11 +156,12 @@ export function calcularCelebracoes(
   pessoas: PessoaCelebravel[],
   config?: Partial<ConfigCelebracao> | null,
   agora: Date = new Date(),
+  diasProfissao: readonly DiaProfissaoEmpresa[] = [],
 ): Celebracao[] {
   const cfg = { ...CONFIG_CELEBRACAO_PADRAO, ...(config ?? {}) };
   const hoje = startOfDay(agora);
   const janela = Math.max(0, cfg.dias_antecedencia_acao ?? CONFIG_CELEBRACAO_PADRAO.dias_antecedencia_acao);
-  return celebracoesNoIntervalo(pessoas, cfg, hoje, addDays(hoje, janela), hoje);
+  return celebracoesNoIntervalo(pessoas, cfg, hoje, addDays(hoje, janela), hoje, diasProfissao);
 }
 
 /** Chave da ação já existente (qualquer status exceto cancelada) para uma celebração. */
@@ -314,15 +316,16 @@ export function montarEventosCalendario(args: {
   acoes: CulturaAcao[];
   rituais: CulturaRitual[];
   datas: Pick<CulturaData, "id" | "titulo" | "ativo" | "mes" | "dia" | "data_especifica">[];
+  diasProfissao?: readonly DiaProfissaoEmpresa[];
   de: Date;
   ate: Date;
 }): EventoCalendario[] {
-  const { pessoas, config, acoes, rituais, datas } = args;
+  const { pessoas, config, acoes, rituais, datas, diasProfissao = [] } = args;
   const ini = startOfDay(args.de);
   const fim = startOfDay(args.ate);
   const eventos: EventoCalendario[] = [];
 
-  const detectadas = celebracoesNoIntervalo(pessoas, config, ini, fim);
+  const detectadas = celebracoesNoIntervalo(pessoas, config, ini, fim, new Date(), diasProfissao);
   const tratadas = indexarAcoes(acoes);
   const chavesDetectadas = new Set(detectadas.map((c) => c.chave));
 

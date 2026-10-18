@@ -4,6 +4,7 @@ import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { calcularCelebracoes, type Celebracao, type PessoaCelebravel } from "@/lib/celebracoes";
+import { useDiasProfissao } from "@/hooks/useDiasProfissao";
 import type { CulturaConfig } from "@/types/cultura";
 
 interface Opcoes {
@@ -49,15 +50,19 @@ export function useCelebracoes({ exigirEmpresa = false }: Opcoes = {}) {
     enabled: !!tenantId,
   });
 
+  // decisões da empresa sobre o dia da profissão (IA aprovada, rejeitada ou manual)
+  const { registros: diasProfissao } = useDiasProfissao();
+
   const celebracoes: Celebracao[] = useMemo(
-    () => (habilitado ? calcularCelebracoes(pessoas, config) : []),
-    [habilitado, pessoas, config],
+    () => (habilitado ? calcularCelebracoes(pessoas, config, new Date(), diasProfissao) : []),
+    [habilitado, pessoas, config, diasProfissao],
   );
 
   return {
     celebracoes,
     pessoas,
     config,
+    diasProfissao,
     janelaDias: config?.dias_antecedencia_acao ?? 30,
     isLoading: carregandoPessoas || carregandoConfig,
   };

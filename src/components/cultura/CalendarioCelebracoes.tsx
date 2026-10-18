@@ -39,7 +39,7 @@ const COR_PONTO: Record<string, string> = {
 const DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
 
 export const CalendarioCelebracoes = ({ acoes, rituais, datas, preferencias }: Props) => {
-  const { pessoas, config } = useCelebracoes({ exigirEmpresa: true });
+  const { pessoas, config, diasProfissao } = useCelebracoes({ exigirEmpresa: true });
   const { empresaAtiva } = useEmpresaAtiva();
   const [visao, setVisao] = useState<"mes" | "ano">("mes");
   const [ref, setRef] = useState(() => startOfMonth(new Date()));
@@ -52,8 +52,8 @@ export const CalendarioCelebracoes = ({ acoes, rituais, datas, preferencias }: P
   );
 
   const eventos = useMemo(
-    () => montarEventosCalendario({ pessoas, config, acoes, rituais, datas, de: inicio, ate: fim }),
-    [pessoas, config, acoes, rituais, datas, inicio, fim],
+    () => montarEventosCalendario({ pessoas, config, acoes, rituais, datas, diasProfissao, de: inicio, ate: fim }),
+    [pessoas, config, acoes, rituais, datas, diasProfissao, inicio, fim],
   );
   const visiveis = grupo === "todos" ? eventos : eventos.filter((e) => e.grupo === grupo);
 

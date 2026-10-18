@@ -222,3 +222,42 @@ describe("calcularCobertura", () => {
     expect(calcularCobertura([pessoa({})], [], new Date()).percentual).toBe(0);
   });
 });
+
+import { montarAlertas, quantidadeDeVariantes, sugerirMensagem } from "@/lib/celebracoes";
+
+describe("sugerirMensagem", () => {
+  it("usa o nome e os anos, e nunca a idade", () => {
+    const m = sugerirMensagem({ tipo: "tempo_casa", nome: "Ana", anos: 5 }, "leve");
+    expect(m).toContain("Ana");
+    expect(m).toContain("5 anos");
+    const a = sugerirMensagem({ tipo: "aniversario", nome: "Bruno" }, "formal");
+    expect(a).toContain("Bruno");
+    expect(a).not.toMatch(/\d+ anos/);
+  });
+  it("singular em 1 ano e variantes rotacionam", () => {
+    expect(sugerirMensagem({ tipo: "tempo_casa", nome: "Ana", anos: 1 }, "leve")).toContain("1 ano ");
+    const n = quantidadeDeVariantes("aniversario", "leve");
+    expect(sugerirMensagem({ tipo: "aniversario", nome: "X" }, "leve", 0)).toBe(sugerirMensagem({ tipo: "aniversario", nome: "X" }, "leve", n));
+  });
+});
+
+describe("montarAlertas", () => {
+  const hoje = new Date(2026, 9, 18);
+  it("alerta de atrasadas só conta pendentes com data vencida (hoje não é atraso)", () => {
+    const a = montarAlertas({
+      acoes: [
+        { status: "pendente", data_referencia: "2026-10-10" },
+        { status: "pendente", data_referencia: "2026-10-18" },
+        { status: "concluida", data_referencia: "2026-10-01" },
+      ],
+      cobertura: { total: 10, percentual: 100 },
+      metaCobertura: 95,
+      hoje,
+    });
+    expect(a.map((x) => x.id)).toEqual(["atrasadas"]);
+  });
+  it("alerta de cobertura abaixo da meta, mas não sem colaboradores", () => {
+    expect(montarAlertas({ acoes: [], cobertura: { total: 10, percentual: 40 }, metaCobertura: 95, hoje }).map((x) => x.id)).toEqual(["cobertura"]);
+    expect(montarAlertas({ acoes: [], cobertura: { total: 0, percentual: 0 }, metaCobertura: 95, hoje })).toEqual([]);
+  });
+});

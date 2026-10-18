@@ -139,6 +139,9 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
                     <Badge className={`text-[10px] shrink-0 ${STATUS_ACAO_COLORS[acao.status]}`}>
                       {STATUS_ACAO_LABELS[acao.status]}
                     </Badge>
+                    {acao.origem === "automatica" && (
+                      <Badge variant="secondary" className="text-[10px] shrink-0">Automática</Badge>
+                    )}
                   </div>
                   {acao.colaborador_nome && (
                     <p className="text-xs text-muted-foreground">Colaborador: {acao.colaborador_nome}</p>

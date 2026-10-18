@@ -9,8 +9,9 @@
 // não cria nada sem título/data. NADA aqui cria ação, ritual ou preferência,
 // então não depende de dado semeado.
 //
-// Obs.: o <h1> da página é "PESSOAS" (o módulo Cultura & Celebrações vive sob
-// essa área) — é o que o beforeEach confere.
+// Obs.: o <h1> da página é "Cultura & Celebrações" — é o que o beforeEach confere.
+// Painel Hoje, Calendário, Cobertura e a checagem de celular só olham a montagem
+// (data-testid), sem depender de colaborador ou ação semeados.
 // =====================================================================
 
 import { credenciaisDeTeste } from "../support/credenciais";
@@ -33,7 +34,7 @@ describe("Cultura & Celebrações (/cultura-celebracoes)", () => {
   beforeEach(() => {
     login();
     cy.visit(`${baseUrl}/cultura-celebracoes`);
-    cy.contains("h1", "PESSOAS", { timeout: 20000 }).should("be.visible");
+    cy.contains("h1", "Cultura & Celebrações", { timeout: 20000 }).should("be.visible");
   });
 
   // CULT-001
@@ -43,6 +44,44 @@ describe("Cultura & Celebrações (/cultura-celebracoes)", () => {
     );
     ["Experiência do Colaborador", "Preferências", "Rituais e Reconhecimento"].forEach((t) =>
       cy.contains('[role="tab"]', t).should("exist")
+    );
+  });
+
+  // CULT-003
+  it("mostra a janela de dias da configuração no card de celebrações", () => {
+    cy.contains(/Próximas Celebrações \(\d+ dias\)/, { timeout: 20000 }).should("be.visible");
+  });
+
+  // CULT-080
+  it("mostra o painel Hoje", () => {
+    cy.get('[data-testid="painel-hoje"]', { timeout: 20000 }).should("be.visible").and("contain.text", "Hoje");
+  });
+
+  // CULT-081
+  it("mostra o calendário e alterna para a visão anual", () => {
+    cy.get('[data-testid="calendario-celebracoes"]', { timeout: 20000 }).should("be.visible");
+    cy.get('[data-testid="calendario-celebracoes"]').contains("button", "Ano").click();
+    cy.get('[data-testid="calendario-ano"]').should("be.visible");
+    cy.get('[data-testid="calendario-celebracoes"]').contains("button", "Mês").click();
+    cy.get('[data-testid="calendario-ano"]').should("not.exist");
+  });
+
+  // CULT-082
+  it("mostra a cobertura de celebração nos indicadores", () => {
+    cy.get('[data-testid="cobertura-celebracao"]', { timeout: 20000 })
+      .should("be.visible")
+      .and("contain.text", "Cobertura de celebração");
+  });
+
+  // CULT-086
+  it("não estoura a largura no celular", () => {
+    cy.viewport(375, 812);
+    cy.reload();
+    cy.contains("h1", "Cultura & Celebrações", { timeout: 20000 }).should("be.visible");
+    ["painel-hoje", "calendario-celebracoes", "cobertura-celebracao"].forEach((id) =>
+      cy.get(`[data-testid="${id}"]`, { timeout: 20000 }).then(($el) => {
+        expect($el[0].scrollWidth, id).to.be.at.most($el[0].clientWidth + 1);
+      })
     );
   });
 

@@ -66,6 +66,9 @@ serve(async (req) => {
   }
 
   const userName = linkData?.user?.user_metadata?.nome_completo || "";
+  // Diagnóstico: a resposta ao usuário é sempre "ok" (não revela se o e-mail
+  // existe), então o único rastro do que aconteceu são estas linhas nos logs.
+  console.log("send-recovery-email: link gerado, enviando pelo Resend");
 
   try {
     const resendRes = await fetch("https://api.resend.com/emails", {
@@ -109,8 +112,11 @@ serve(async (req) => {
     });
 
     if (!resendRes.ok) {
-      const err = await resendRes.json();
-      console.error("Resend error:", err);
+      const err = await resendRes.json().catch(() => ({}));
+      console.error("Resend error:", resendRes.status, err);
+    } else {
+      const ok = await resendRes.json().catch(() => ({}));
+      console.log("send-recovery-email: Resend aceitou o envio, id:", ok?.id ?? "?");
     }
   } catch (e) {
     console.error("Email send error:", e);

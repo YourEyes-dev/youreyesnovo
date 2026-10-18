@@ -471,3 +471,26 @@ export function montarAlertas(args: {
   }
   return alertas;
 }
+
+// ---------------------------------------------------------------- Time do gestor
+
+export function somenteDigitos(valor: string | null | undefined): string {
+  return (valor ?? "").replace(/\D/g, "");
+}
+
+/** CPF como costuma estar gravado (com e sem máscara), para buscar sem depender do formato. */
+export function variantesDeCpf(cpf: string | null | undefined): string[] {
+  const d = somenteDigitos(cpf);
+  if (d.length !== 11) return [];
+  return [d, `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`];
+}
+
+/** Escapa % e _ para usar o nome num ILIKE sem curinga (comparação exata sem diferenciar maiúsculas). */
+export function escaparParaIlike(nome: string): string {
+  return nome.trim().replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/** Celebrações de pessoas do time do gestor (o dia da profissão não é de ninguém em particular). */
+export function celebracoesDoTime(celebracoes: Celebracao[], idsDoTime: ReadonlySet<string>): Celebracao[] {
+  return celebracoes.filter((c) => c.tipo !== "dia_profissao" && !!c.pessoaId && idsDoTime.has(c.pessoaId));
+}

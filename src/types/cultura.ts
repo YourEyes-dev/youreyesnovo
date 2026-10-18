@@ -58,6 +58,8 @@ export interface CulturaConfig {
   tom_mensagem: TomMensagem;
   /** meta de cobertura de celebração (%), abaixo dela a tela alerta */
   meta_cobertura: number;
+  /** o Mural avisa cada gestor das celebrações do próprio time */
+  lembrar_gestor: boolean;
   created_at: string;
   updated_at: string;
 }

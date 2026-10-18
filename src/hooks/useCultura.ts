@@ -7,12 +7,13 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fromTable, rpcUntyped } from "@/integrations/supabase/untypedClient";
 import { datasAoRegistrarRitual } from "@/lib/celebracoes";
+import { usePublicarNoMural } from "@/hooks/usePublicarNoMural";
 import type { CulturaData, CulturaAcao, CulturaRitual, CulturaConfig, CulturaMarco, CulturaPreferencia } from "@/types/cultura";
 
 const JA_EXISTE = "23505"; // unique_violation: índice cultura_acoes_chave_unica_uidx
 
 export function useCultura() {
-  const { tenantId, user, profile } = useAuth();
+  const { tenantId } = useAuth();
   const { empresaAtivaId } = useEmpresaAtiva();
   const qc = useQueryClient();
 
@@ -192,25 +193,7 @@ export function useCultura() {
     return Number(data ?? 0);
   };
 
-  /** Publica a mensagem (já revisada por um humano) no Mural e registra na ação. */
-  const publicarNoMural = async (args: { conteudo: string; tipo: "aniversario" | "tempo_casa" | "anuncio"; acaoId?: string }) => {
-    if (!tenantId || !user || !profile) throw new Error("Usuário não autenticado");
-    const { error } = await fromTable("feed_posts").insert({
-      tenant_id: tenantId,
-      autor_id: user.id,
-      autor_nome: profile.nome_completo,
-      autor_avatar: profile.avatar_url,
-      tipo: args.tipo,
-      conteudo: args.conteudo,
-    });
-    if (error) { toast.error("Erro ao publicar no Mural"); throw error; }
-    if (args.acaoId) {
-      await fromTable("cultura_acoes").update({ publicado_em: new Date().toISOString() }).eq("id", args.acaoId);
-      qc.invalidateQueries({ queryKey: ["cultura-acoes"] });
-    }
-    qc.invalidateQueries({ queryKey: ["feed-posts"] });
-    toast.success("Publicado no Mural!");
-  };
+  const publicarNoMural = usePublicarNoMural();
 
   // --- Config ---
   const { data: config } = useQuery({

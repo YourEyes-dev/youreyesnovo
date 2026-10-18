@@ -4,12 +4,15 @@ import {
   startOfMonth, startOfWeek, endOfWeek, startOfYear,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarDays, ChevronLeft, ChevronRight, Lock } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Download, Lock } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useCelebracoes } from "@/hooks/useCelebracoes";
+import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
+import { gerarCalendarioPdf, nomeDoArquivo } from "@/lib/calendarioPdf";
 import {
   GRUPO_LABELS, montarEventosCalendario, pessoaReservada,
   type EventoCalendario, type GrupoEvento,
@@ -37,6 +40,7 @@ const DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
 
 export const CalendarioCelebracoes = ({ acoes, rituais, datas, preferencias }: Props) => {
   const { pessoas, config } = useCelebracoes({ exigirEmpresa: true });
+  const { empresaAtiva } = useEmpresaAtiva();
   const [visao, setVisao] = useState<"mes" | "ano">("mes");
   const [ref, setRef] = useState(() => startOfMonth(new Date()));
   const [grupo, setGrupo] = useState<"todos" | GrupoEvento>("todos");
@@ -63,6 +67,23 @@ export const CalendarioCelebracoes = ({ acoes, rituais, datas, preferencias }: P
   const naoPublico = (e: EventoCalendario) =>
     e.grupo === "pessoas" && pessoaReservada(preferencias, e.celebracao?.pessoaId, e.acao?.colaborador_nome || e.titulo);
 
+  // O papel circula: quem pediu reconhecimento reservado não sai impresso
+  const baixarPdf = () => {
+    try {
+      const permitidos = visiveis.filter((e) => !naoPublico(e));
+      const doc = gerarCalendarioPdf({
+        mes: ref,
+        eventos: permitidos,
+        empresaNome: empresaAtiva?.razao_social || empresaAtiva?.nome_fantasia || undefined,
+        filtro: GRUPO_LABELS[grupo],
+        ocultos: visiveis.length - permitidos.length,
+      });
+      doc.save(nomeDoArquivo(ref));
+    } catch {
+      toast.error("Não foi possível gerar o PDF");
+    }
+  };
+
   const porMes = useMemo(() => {
     const m = Array.from({ length: 12 }, () => 0);
     visiveis.forEach((e) => { m[e.data.getMonth()]++; });
@@ -81,6 +102,11 @@ export const CalendarioCelebracoes = ({ acoes, rituais, datas, preferencias }: P
             <CalendarDays className="h-4 w-4 text-primary" strokeWidth={1.75} /> Calendário
           </CardTitle>
           <div className="flex items-center gap-1 flex-wrap">
+            {visao === "mes" && (
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={baixarPdf}>
+                <Download className="h-3.5 w-3.5" /> Baixar PDF
+              </Button>
+            )}
             {(["mes", "ano"] as const).map((v) => (
               <Button key={v} size="sm" variant={visao === v ? "default" : "outline"} className="h-7 text-xs" onClick={() => setVisao(v)}>
                 {v === "mes" ? "Mês" : "Ano"}

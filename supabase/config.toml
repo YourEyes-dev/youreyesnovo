@@ -26,6 +26,8 @@ project_id = "diayjpsrcerycycyaxst"
     verify_jwt = false
   [functions.ai-cultura-sugestao]
     verify_jwt = false
+  [functions.ai-cultura-dia-profissao]
+    verify_jwt = false
   [functions.ai-epi-fiscal]
     verify_jwt = false
   [functions.ai-experiencia-doc]

@@ -46,6 +46,11 @@ describe("Cultura & Celebrações (/cultura-celebracoes)", () => {
     );
   });
 
+  // CULT-003
+  it("mostra a janela de dias da configuração no card de celebrações", () => {
+    cy.contains(/Próximas Celebrações \(\d+ dias\)/, { timeout: 20000 }).should("be.visible");
+  });
+
   // CULT-011
   it("não cria ação sem título ou data", () => {
     cy.contains("button", "Nova Ação").click({ force: true });

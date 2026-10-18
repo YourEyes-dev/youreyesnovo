@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useColaboradores } from "@/hooks/useColaboradores";
 import type { CulturaAcao } from "@/types/cultura";
 import { TIPO_ACAO_LABELS, STATUS_ACAO_LABELS, STATUS_ACAO_COLORS } from "@/types/cultura";
@@ -39,8 +38,6 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
     data_referencia: "",
     data_execucao: "",
     responsavel_nome: "",
-    criar_antecipada: false,
-    dias_antecedencia: "7",
   });
 
   const filtered = acoes.filter(a => {
@@ -73,7 +70,7 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
       responsavel_nome: form.responsavel_nome || null,
     });
     setShowForm(false);
-    setForm({ tipo: "aniversario", titulo: "", descricao: "", colaborador_nome: "", data_referencia: "", data_execucao: "", responsavel_nome: "", criar_antecipada: false, dias_antecedencia: "7" });
+    setForm({ tipo: "aniversario", titulo: "", descricao: "", colaborador_nome: "", data_referencia: "", data_execucao: "", responsavel_nome: "" });
   };
 
   return (
@@ -219,28 +216,6 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
                 <Label>Data de Execução</Label>
                 <Input type="date" value={form.data_execucao} onChange={e => setForm(f => ({ ...f, data_execucao: e.target.value }))} />
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={form.criar_antecipada}
-                  onCheckedChange={v => setForm(f => ({ ...f, criar_antecipada: v }))}
-                />
-                <Label className="text-sm">Criar ação com antecedência</Label>
-              </div>
-              {form.criar_antecipada && (
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={90}
-                    className="w-16 h-8 text-xs"
-                    value={form.dias_antecedencia}
-                    onChange={e => setForm(f => ({ ...f, dias_antecedencia: e.target.value }))}
-                  />
-                  <span className="text-xs text-muted-foreground">dias antes</span>
-                </div>
-              )}
             </div>
             <div>
               <Label>Responsável</Label>

@@ -13,8 +13,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
+import { useCelebracoes } from "@/hooks/useCelebracoes";
+import { chaveDaAcao, pessoaReservada } from "@/lib/celebracoes";
 import { TIPO_ACAO_LABELS, STATUS_ACAO_COLORS, STATUS_ACAO_LABELS } from "@/types/cultura";
-import { format, parseISO, differenceInDays, setYear, addYears, startOfDay } from "date-fns";
+import { format, parseISO, differenceInCalendarDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface LembreteMural {
@@ -122,16 +124,17 @@ function AvisosCulturaWidget({ onFelicitar }: { onFelicitar: (msg: string) => vo
     enabled: !!tenantId,
   });
 
-  const { data: admissoes = [] } = useQuery({
-    queryKey: ["mural-admissoes-auto", tenantId, empresaAtivaId],
+  // Mesma fonte da tela de Cultura: respeita a Configuração (tipos ligados e janela de dias)
+  const { celebracoes } = useCelebracoes();
+
+  // Quem pediu reconhecimento "reservado" não é exposto no Mural (RN-006)
+  const { data: preferencias = [] } = useQuery({
+    queryKey: ["cultura-preferencias", tenantId],
     queryFn: async () => {
       if (!tenantId) return [];
-      let query = fromTable("admissoes")
-        .select("id, nome_completo, data_nascimento, data_admissao, cargo, empresa_id")
-        .eq("tenant_id", tenantId)
-        .eq("status", "concluido");
-      if (empresaAtivaId) query = query.eq("empresa_id", empresaAtivaId);
-      const { data, error } = await query;
+      const { data, error } = await fromTable("cultura_preferencias")
+        .select("colaborador_id, colaborador_nome, tipo_reconhecimento")
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       return data || [];
     },
@@ -140,59 +143,51 @@ function AvisosCulturaWidget({ onFelicitar }: { onFelicitar: (msg: string) => vo
 
   const lembretes = useMemo(() => {
     const hoje = startOfDay(new Date());
-    const ano = hoje.getFullYear();
     const items: LembreteMural[] = [];
     const dispensadoSet = new Set(dispensados);
 
-    for (const adm of admissoes) {
-      if (adm.data_nascimento) {
-        const nasc = parseISO(adm.data_nascimento);
-        let proxAniv = startOfDay(setYear(nasc, ano));
-        if (proxAniv < hoje) proxAniv = addYears(proxAniv, 1);
-        const dias = differenceInDays(proxAniv, hoje);
-        const chave = `aniv-${adm.id}-${proxAniv.getFullYear()}`;
-        if (dias <= 30 && !dispensadoSet.has(chave)) {
-          items.push({
-            id: `aniv-${adm.id}`,
-            titulo: `🎂 Aniversário de ${adm.nome_completo}`,
-            tipo: "aniversario",
-            tipoLabel: "Aniversário",
-            nome: adm.nome_completo,
-            dataStr: format(proxAniv, "dd/MM"),
-            diasFaltam: dias,
-            source: "auto",
-            chaveDispensa: chave,
-          });
-        }
-      }
-      if (adm.data_admissao) {
-        const admDate = parseISO(adm.data_admissao);
-        let proxAniv = startOfDay(setYear(admDate, ano));
-        if (proxAniv < hoje) proxAniv = addYears(proxAniv, 1);
-        const dias = differenceInDays(proxAniv, hoje);
-        const anos = proxAniv.getFullYear() - admDate.getFullYear();
-        const chave = `tempo-${adm.id}-${proxAniv.getFullYear()}`;
-        if (dias <= 30 && anos >= 1 && !dispensadoSet.has(chave)) {
-          items.push({
-            id: `tempo-${adm.id}`,
-            titulo: `🏆 ${anos} ano${anos > 1 ? "s" : ""} de empresa — ${adm.nome_completo}`,
-            tipo: "tempo_casa",
-            tipoLabel: "Tempo de Casa",
-            nome: adm.nome_completo,
-            dataStr: format(proxAniv, "dd/MM"),
-            diasFaltam: dias,
-            source: "auto",
-            chaveDispensa: chave,
-          });
-        }
+    for (const c of celebracoes) {
+      if (c.tipo === "dia_profissao") continue; // o Mural só traz celebrações de pessoas
+      if (pessoaReservada(preferencias, c.pessoaId, c.nome)) continue;
+      const ano = c.data.getFullYear();
+      if (c.tipo === "aniversario") {
+        const chave = `aniv-${c.pessoaId}-${ano}`;
+        if (dispensadoSet.has(chave)) continue;
+        items.push({
+          id: `aniv-${c.pessoaId}`,
+          titulo: `🎂 Aniversário de ${c.nome}`,
+          tipo: "aniversario",
+          tipoLabel: "Aniversário",
+          nome: c.nome,
+          dataStr: format(c.data, "dd/MM"),
+          diasFaltam: c.diasRestantes,
+          source: "auto",
+          chaveDispensa: chave,
+        });
+      } else {
+        const anos = c.anos ?? 0;
+        const chave = `tempo-${c.pessoaId}-${ano}`;
+        if (dispensadoSet.has(chave)) continue;
+        items.push({
+          id: `tempo-${c.pessoaId}`,
+          titulo: `🏆 ${anos} ano${anos > 1 ? "s" : ""} de empresa — ${c.nome}`,
+          tipo: "tempo_casa",
+          tipoLabel: "Tempo de Casa",
+          nome: c.nome,
+          dataStr: format(c.data, "dd/MM"),
+          diasFaltam: c.diasRestantes,
+          source: "auto",
+          chaveDispensa: chave,
+        });
       }
     }
 
     // Ações manuais — deduplicar por nome+tipo
-    const autoKeys = new Set(items.map(i => `${i.nome}-${i.tipo}`));
+    const autoKeys = new Set(celebracoes.map(c => c.chave));
     for (const acao of acoesPendentes) {
-      const key = `${acao.colaborador_nome}-${acao.tipo}`;
-      if (autoKeys.has(key)) continue;
+      const key = chaveDaAcao(acao);
+      if (key && autoKeys.has(key)) continue;
+      if (acao.colaborador_nome && pessoaReservada(preferencias, undefined, acao.colaborador_nome)) continue;
       const chave = `acao-${acao.id}`;
       if (dispensadoSet.has(chave)) continue;
       items.push({
@@ -202,7 +197,7 @@ function AvisosCulturaWidget({ onFelicitar }: { onFelicitar: (msg: string) => vo
         tipoLabel: TIPO_ACAO_LABELS[acao.tipo] || acao.tipo,
         nome: acao.colaborador_nome || "Colaborador",
         dataStr: acao.data_referencia ? format(parseISO(acao.data_referencia), "dd/MM", { locale: ptBR }) : "",
-        diasFaltam: acao.data_referencia ? differenceInDays(parseISO(acao.data_referencia), hoje) : 99,
+        diasFaltam: acao.data_referencia ? differenceInCalendarDays(parseISO(acao.data_referencia), hoje) : 99,
         source: "acao",
         status: acao.status,
         chaveDispensa: chave,
@@ -211,7 +206,7 @@ function AvisosCulturaWidget({ onFelicitar }: { onFelicitar: (msg: string) => vo
 
     items.sort((a, b) => a.diasFaltam - b.diasFaltam);
     return items.slice(0, 8);
-  }, [admissoes, acoesPendentes, dispensados]);
+  }, [celebracoes, preferencias, acoesPendentes, dispensados]);
 
   if (lembretes.length === 0) return null;
 

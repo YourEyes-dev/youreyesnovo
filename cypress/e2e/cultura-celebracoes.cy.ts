@@ -66,6 +66,13 @@ describe("Cultura & Celebrações (/cultura-celebracoes)", () => {
     cy.get('[data-testid="calendario-ano"]').should("not.exist");
   });
 
+  // CULT-096
+  it("mostra o botão de baixar o PDF do calendário", () => {
+    cy.get('[data-testid="calendario-celebracoes"]', { timeout: 20000 })
+      .contains("button", "Baixar PDF")
+      .should("be.visible");
+  });
+
   // CULT-082
   it("mostra a cobertura de celebração nos indicadores", () => {
     cy.get('[data-testid="cobertura-celebracao"]', { timeout: 20000 })

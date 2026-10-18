@@ -333,6 +333,16 @@ export const RituaisReconhecimento = ({
               </SelectContent>
             </Select>
           </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Lembrar os gestores</p>
+              <p className="text-xs text-muted-foreground">
+                No Mural, cada gestor vê as celebrações do próprio time, com mensagem sugerida. O time vem do cadastro:
+                o gestor imediato do colaborador (nome igual ao do gestor) ou o departamento em que a pessoa é gestora.
+              </p>
+            </div>
+            <Switch checked={config?.lembrar_gestor ?? false} onCheckedChange={v => onSaveConfig({ lembrar_gestor: v })} />
+          </div>
           <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t">
             <p className="text-xs text-muted-foreground">A rotina roda todo dia às 6h. Para ver o efeito agora:</p>
             <Button

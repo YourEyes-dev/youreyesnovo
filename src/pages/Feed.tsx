@@ -14,6 +14,7 @@ import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { useCelebracoes } from "@/hooks/useCelebracoes";
+import { LembreteGestor } from "@/components/cultura/LembreteGestor";
 import { chaveDaAcao, pessoaReservada } from "@/lib/celebracoes";
 import { TIPO_ACAO_LABELS, STATUS_ACAO_COLORS, STATUS_ACAO_LABELS } from "@/types/cultura";
 import { format, parseISO, differenceInCalendarDays, startOfDay } from "date-fns";
@@ -327,6 +328,7 @@ export default function Feed() {
         </div>
 
         <div className="space-y-4">
+          <LembreteGestor />
           <AvisosCulturaWidget onFelicitar={handleFelicitacao} />
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { proximaExecucaoRitual } from "@/lib/celebracoes";
+import { DiasProfissaoIA } from "@/components/cultura/DiasProfissaoIA";
 import { PartyPopper, CheckCheck, Wand2, Plus, Trash2, ToggleLeft, ToggleRight, Settings2, CalendarDays } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,7 @@ export const RituaisReconhecimento = ({
         <TabsTrigger value="rituais">Rituais Culturais</TabsTrigger>
         <TabsTrigger value="datas">Datas Configuráveis</TabsTrigger>
         <TabsTrigger value="marcos">Marcos de Tempo</TabsTrigger>
+        <TabsTrigger value="profissoes">Dias da Profissão</TabsTrigger>
         <TabsTrigger value="config">Configuração</TabsTrigger>
       </TabsList>
 
@@ -203,6 +205,11 @@ export const RituaisReconhecimento = ({
             ))}
           </div>
         )}
+      </TabsContent>
+
+      {/* Dias da profissão (IA sugere, pessoa aprova) */}
+      <TabsContent value="profissoes">
+        <DiasProfissaoIA />
       </TabsContent>
 
       {/* Config */}

@@ -102,6 +102,16 @@ describe("Cultura & Celebrações (/cultura-celebracoes)", () => {
       .and("contain.text", "Gerar ações agora");
   });
 
+  // CULT-098
+  it("mostra a aba Dias da Profissão com a análise de cargos por IA", () => {
+    cy.contains('[role="tab"]', "Rituais e Reconhecimento", { timeout: 20000 }).click({ force: true });
+    cy.contains('[role="tab"]', "Dias da Profissão").click({ force: true });
+    cy.get('[data-testid="dias-profissao"]', { timeout: 20000 })
+      .should("be.visible")
+      .and("contain.text", "Analisar cargos com IA")
+      .and("contain.text", "Definidos pela empresa");
+  });
+
   // CULT-094
   it("mostra o painel de alertas", () => {
     cy.get('[data-testid="alertas-cultura"]', { timeout: 20000 }).should("be.visible").and("contain.text", "Alertas");

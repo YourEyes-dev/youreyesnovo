@@ -19,7 +19,7 @@ import { resolve } from "node:path";
 const FUNCOES = resolve(__dirname, "../../supabase/functions");
 const ler = (f: string) => readFileSync(resolve(FUNCOES, f, "index.ts"), "utf8");
 
-const COM_EMPRESA = ["ai-cultura-manual", "ai-cultura-sugestao", "ai-pop-generator", "ai-sst-analise"];
+const COM_EMPRESA = ["ai-cultura-manual", "ai-cultura-sugestao", "ai-cultura-dia-profissao", "ai-pop-generator", "ai-sst-analise"];
 const SO_USUARIO = ["ai-chat"];
 const SO_SUPERADMIN = ["ai-qa-scan", "ai-qa-agent"];
 

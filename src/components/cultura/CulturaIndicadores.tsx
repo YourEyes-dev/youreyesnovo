@@ -2,7 +2,10 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, TrendingUp, Clock, Target } from "lucide-react";
 import type { CulturaAcao, CulturaRitual } from "@/types/cultura";
-import { differenceInDays, parseISO, isBefore } from "date-fns";
+import { differenceInDays, parseISO, isBefore, startOfDay } from "date-fns";
+import { ShieldCheck } from "lucide-react";
+import { useCelebracoes } from "@/hooks/useCelebracoes";
+import { calcularCobertura } from "@/lib/celebracoes";
 
 interface Props {
   acoes: CulturaAcao[];
@@ -10,6 +13,9 @@ interface Props {
 }
 
 export const CulturaIndicadores = ({ acoes, rituais }: Props) => {
+  const { pessoas } = useCelebracoes({ exigirEmpresa: true });
+  const cobertura = useMemo(() => calcularCobertura(pessoas, acoes), [pessoas, acoes]);
+
   const indicadores = useMemo(() => {
     const total = acoes.length;
     const concluidas = acoes.filter(a => a.status === "concluida").length;
@@ -29,7 +35,7 @@ export const CulturaIndicadores = ({ acoes, rituais }: Props) => {
     const taxaNoPrazo = concluidas > 0 ? Math.round((concluidasNoPrazo / concluidas) * 100) : 0;
 
     // Ações atrasadas (pendentes com data_referencia no passado)
-    const hoje = new Date();
+    const hoje = startOfDay(new Date());
     const atrasadas = acoes.filter(a =>
       (a.status === "pendente" || a.status === "em_andamento") &&
       isBefore(parseISO(a.data_referencia), hoje)
@@ -95,6 +101,33 @@ export const CulturaIndicadores = ({ acoes, rituais }: Props) => {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 pb-4 border-b" data-testid="cobertura-celebracao">
+          <div className="flex items-center gap-3">
+            <ShieldCheck className="h-8 w-8 text-primary shrink-0" strokeWidth={1.5} />
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-2">
+                <span className={`text-3xl font-bold ${cobertura.percentual >= 95 ? "text-emerald-600" : cobertura.percentual >= 70 ? "text-amber-600" : "text-red-600"}`}>
+                  {cobertura.percentual}%
+                </span>
+                <span className="text-sm font-medium">Cobertura de celebração</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {cobertura.cobertas} de {cobertura.total} colaboradores celebrados nos últimos 12 meses (só o registrado aqui)
+              </p>
+            </div>
+          </div>
+          {cobertura.semCelebracao.length > 0 && cobertura.total > 0 && (
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer text-muted-foreground">
+                Sem celebração há mais de 12 meses: {cobertura.semCelebracao.length} pessoa{cobertura.semCelebracao.length > 1 ? "s" : ""}
+              </summary>
+              <p className="mt-1 text-muted-foreground">
+                {cobertura.semCelebracao.slice(0, 10).map((p) => p.nome_completo).join(", ")}
+                {cobertura.semCelebracao.length > 10 && ` e mais ${cobertura.semCelebracao.length - 10}`}
+              </p>
+            </details>
+          )}
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {cards.map((c) => (
             <div key={c.label} className="text-center">

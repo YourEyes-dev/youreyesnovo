@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { PartyPopper, Plus, Trash2, ToggleLeft, ToggleRight, Settings2, CalendarDays } from "lucide-react";
+import { format } from "date-fns";
+import { proximaExecucaoRitual } from "@/lib/celebracoes";
+import { PartyPopper, CheckCheck, Plus, Trash2, ToggleLeft, ToggleRight, Settings2, CalendarDays } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +25,7 @@ interface Props {
   onCreateRitual: (data: Partial<CulturaRitual>) => Promise<void>;
   onToggleRitual: (id: string, ativo: boolean) => Promise<void>;
   onDeleteRitual: (id: string) => Promise<void>;
+  onRegistrarRitual: (r: CulturaRitual) => Promise<void>;
   onCreateData: (data: Partial<CulturaData>) => Promise<void>;
   onDeleteData: (id: string) => Promise<void>;
   onSaveConfig: (data: Partial<CulturaConfig>) => Promise<void>;
@@ -32,7 +35,7 @@ interface Props {
 export const RituaisReconhecimento = ({
   rituais, datas, config, marcos,
   isLoadingRituais, isLoadingDatas,
-  onCreateRitual, onToggleRitual, onDeleteRitual,
+  onCreateRitual, onToggleRitual, onDeleteRitual, onRegistrarRitual,
   onCreateData, onDeleteData,
   onSaveConfig, onCreateMarco,
 }: Props) => {
@@ -108,8 +111,21 @@ export const RituaisReconhecimento = ({
                   </div>
                   {r.descricao && <p className="text-xs text-muted-foreground">{r.descricao}</p>}
                   {r.responsavel_nome && <p className="text-xs text-muted-foreground">Responsável: {r.responsavel_nome}</p>}
+                  {r.ativo && (
+                    <p className="text-xs text-muted-foreground">
+                      {(() => {
+                        const prox = proximaExecucaoRitual(r);
+                        return prox ? `Próximo: ${format(prox, "dd/MM/yyyy")}` : "Ainda não realizado: registre a primeira realização";
+                      })()}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  {r.ativo && (
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1" onClick={() => onRegistrarRitual(r)}>
+                      <CheckCheck className="w-3.5 h-3.5" /> Registrar realização
+                    </Button>
+                  )}
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onToggleRitual(r.id, !r.ativo)}>
                     {r.ativo ? <ToggleRight className="w-4 h-4 text-emerald-600" /> : <ToggleLeft className="w-4 h-4 text-muted-foreground" />}
                   </Button>

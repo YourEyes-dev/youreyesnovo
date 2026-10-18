@@ -76,10 +76,10 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-            <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[160px] h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os tipos</SelectItem>
               {Object.entries(TIPO_ACAO_LABELS).map(([k, v]) => (
@@ -88,7 +88,7 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
             </SelectContent>
           </Select>
           <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-            <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[150px] h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
               {Object.entries(STATUS_ACAO_LABELS).map(([k, v]) => (
@@ -97,7 +97,7 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
             </SelectContent>
           </Select>
           <Select value={filtroPeriodo} onValueChange={setFiltroPeriodo}>
-            <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todo período</SelectItem>
               <SelectItem value="mes">Este mês</SelectItem>
@@ -109,7 +109,7 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
             placeholder="Buscar colaborador..."
             value={filtroColaborador}
             onChange={e => setFiltroColaborador(e.target.value)}
-            className="w-[180px] h-8 text-xs"
+            className="w-full sm:w-[180px] h-8 text-xs"
           />
         </div>
         <Button size="sm" onClick={() => setShowForm(true)} className="gap-1">

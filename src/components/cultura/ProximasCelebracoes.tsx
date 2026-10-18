@@ -2,16 +2,16 @@ import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { format, differenceInCalendarDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Cake, Award, CalendarHeart, Sparkles, Loader2, Bell, Briefcase } from "lucide-react";
+import { Cake, Award, CalendarHeart, Sparkles, Loader2, Bell, Briefcase, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { CulturaAcao } from "@/types/cultura";
+import type { CulturaAcao, CulturaPreferencia } from "@/types/cultura";
 import { TIPO_ACAO_LABELS, STATUS_ACAO_COLORS, STATUS_ACAO_LABELS } from "@/types/cultura";
 import { useCelebracoes } from "@/hooks/useCelebracoes";
 import { toDateLocal } from "@/lib/dataLocal";
-import { chaveDaAcao, indexarAcoes, payloadAcaoDaCelebracao, type Celebracao } from "@/lib/celebracoes";
+import { chaveDaAcao, indexarAcoes, payloadAcaoDaCelebracao, pessoaReservada, type Celebracao } from "@/lib/celebracoes";
 
 interface CelebracaoItem {
   chave: string;
@@ -24,15 +24,17 @@ interface CelebracaoItem {
   /** ação já registrada para esta celebração (RN-004: no máximo uma por pessoa+tipo+ano) */
   acao?: CulturaAcao;
   celebracao?: Celebracao;
+  pessoaId?: string;
 }
 
 interface Props {
   acoes: CulturaAcao[];
+  preferencias?: CulturaPreferencia[];
   onCreateAcao?: (data: Partial<CulturaAcao>) => Promise<void>;
   onUpdateStatus?: (id: string, status: string) => Promise<void>;
 }
 
-export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Props) => {
+export const ProximasCelebracoes = ({ acoes, preferencias = [], onCreateAcao, onUpdateStatus }: Props) => {
   const [criandoAcao, setCriandoAcao] = useState<string | null>(null);
   // trava síncrona: o refetch das ações é assíncrono e um segundo clique rápido duplicaria a ação
   const emCriacao = useRef(new Set<string>());
@@ -54,6 +56,7 @@ export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Pro
     anos: c.anos,
     acao: acoesPorChave.get(c.chave),
     celebracao: c,
+    pessoaId: c.pessoaId,
   }));
 
   // Ações sem celebração detectada correspondente (manuais, datas configuradas, rituais)
@@ -165,6 +168,11 @@ export const ProximasCelebracoes = ({ acoes, onCreateAcao, onUpdateStatus }: Pro
                     {getIcon(item.tipo)}
                     {getBadgeLabel(item)}
                   </Badge>
+                  {item.tipo !== "dia_profissao" && pessoaReservada(preferencias, item.pessoaId, item.nome) && (
+                    <Badge variant="outline" className="text-[10px] shrink-0 gap-1" title="Preferiu reconhecimento reservado: celebre com discrição">
+                      <Lock className="h-2.5 w-2.5" /> Reservado
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {item.cargo && <span>{item.cargo}</span>}

@@ -56,6 +56,8 @@ export function useCelebracoes({ exigirEmpresa = false }: Opcoes = {}) {
 
   return {
     celebracoes,
+    pessoas,
+    config,
     janelaDias: config?.dias_antecedencia_acao ?? 30,
     isLoading: carregandoPessoas || carregandoConfig,
   };

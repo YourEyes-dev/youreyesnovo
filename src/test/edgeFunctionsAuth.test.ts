@@ -69,6 +69,15 @@ describe("Edge Functions de IA: autenticação", () => {
     expect(src).not.toMatch(/atob\(/);
   });
 
+  it("invite-tenant-user confere o login no Auth e não decodifica o token na mão", () => {
+    // Já foi possível forjar um token (verify_jwt desligado + atob) e convidar usuário
+    // no cliente de um dono. A identidade de quem chama vem do auxiliar, que usa auth.getUser().
+    const src = ler("invite-tenant-user");
+    expect(src).toMatch(/_shared\/auth\.ts/);
+    expect(src).toMatch(/await exigirUsuario\(req\)/);
+    expect(src).not.toMatch(/atob\(/);
+  });
+
   it("função de semeadura sem trava (seed-test-user) não existe mais", () => {
     expect(existsSync(resolve(FUNCOES, "seed-test-user"))).toBe(false);
     const toml = readFileSync(resolve(__dirname, "../../supabase/config.toml"), "utf8");

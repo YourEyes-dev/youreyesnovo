@@ -1,8 +1,6 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import { exigirUsuario, HttpError } from "../_shared/auth.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SITE_URL = Deno.env.get("SITE_URL") || "https://youreyes.com.br";
 
 type Payload = {
@@ -93,22 +91,17 @@ serve(async (req) => {
 
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
 
-  const authHeader = req.headers.get("authorization") ?? "";
-  const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (!jwt) return json({ error: "Missing Authorization" }, 401);
-
-  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
-  // Validate caller
+  // Quem chama: o login e CONFERIDO no Auth (assinatura e validade do token). Antes o token
+  // era decodificado na mao (atob) com verify_jwt desligado, e qualquer pessoa podia forjar um
+  // token com o id de um dono e convidar usuarios (ate com senha) no cliente dele.
   let callerId: string;
+  let admin: Awaited<ReturnType<typeof exigirUsuario>>["admin"];
   try {
-    const sub = JSON.parse(atob(jwt.split('.')[1])).sub;
-    const { data: callerUser, error: callerError } = await admin.auth.admin.getUserById(sub);
-    if (callerError || !callerUser?.user) return json({ error: "Invalid token" }, 401);
-    callerId = callerUser.user.id;
-  } catch {
+    const usuario = await exigirUsuario(req);
+    callerId = usuario.userId;
+    admin = usuario.admin;
+  } catch (e) {
+    if (e instanceof HttpError) return json({ error: e.message }, e.status);
     return json({ error: "Invalid token" }, 401);
   }
 

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import { proximaExecucaoRitual } from "@/lib/celebracoes";
-import { PartyPopper, CheckCheck, Plus, Trash2, ToggleLeft, ToggleRight, Settings2, CalendarDays } from "lucide-react";
+import { PartyPopper, CheckCheck, Wand2, Plus, Trash2, ToggleLeft, ToggleRight, Settings2, CalendarDays } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ interface Props {
   onToggleRitual: (id: string, ativo: boolean) => Promise<void>;
   onDeleteRitual: (id: string) => Promise<void>;
   onRegistrarRitual: (r: CulturaRitual) => Promise<void>;
+  onGerarAcoes: () => Promise<number>;
   onCreateData: (data: Partial<CulturaData>) => Promise<void>;
   onDeleteData: (id: string) => Promise<void>;
   onSaveConfig: (data: Partial<CulturaConfig>) => Promise<void>;
@@ -35,10 +37,11 @@ interface Props {
 export const RituaisReconhecimento = ({
   rituais, datas, config, marcos,
   isLoadingRituais, isLoadingDatas,
-  onCreateRitual, onToggleRitual, onDeleteRitual, onRegistrarRitual,
+  onCreateRitual, onToggleRitual, onDeleteRitual, onRegistrarRitual, onGerarAcoes,
   onCreateData, onDeleteData,
   onSaveConfig, onCreateMarco,
 }: Props) => {
+  const [gerando, setGerando] = useState(false);
   const [showRitualForm, setShowRitualForm] = useState(false);
   const [showDataForm, setShowDataForm] = useState(false);
   const [showMarcoForm, setShowMarcoForm] = useState(false);
@@ -265,6 +268,21 @@ export const RituaisReconhecimento = ({
               />
             </div>
             <div>
+              <Label>Meta de cobertura de celebração (%)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                className="w-24 mt-1"
+                value={config?.meta_cobertura ?? 95}
+                onChange={e => {
+                  const v = parseInt(e.target.value);
+                  if (v >= 1 && v <= 100) onSaveConfig({ meta_cobertura: v });
+                }}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Abaixo da meta, a tela alerta e sugere uma ação no Plano de Ação</p>
+            </div>
+            <div>
               <Label>Responsável padrão</Label>
               <Select value={config?.responsavel_padrao ?? "rh"} onValueChange={v => onSaveConfig({ responsavel_padrao: v })}>
                 <SelectTrigger className="w-48 mt-1"><SelectValue /></SelectTrigger>
@@ -275,6 +293,76 @@ export const RituaisReconhecimento = ({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 space-y-4" data-testid="config-automacao">
+          <h3 className="font-medium flex items-center gap-2">
+            <Wand2 className="w-4 h-4" /> Automação
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Todo dia a rotina cria, sozinha, a ação <strong>pendente</strong> de cada celebração que cai dentro dos dias de
+            antecedência acima. Ela nunca conclui, nunca publica no Mural e nunca concede presente ou folga: parabenizar e
+            publicar continuam sendo um clique seu, e quem pediu reconhecimento reservado nunca é publicado.
+          </p>
+          {([
+            ["automacao_aniversario", "Aniversário"],
+            ["automacao_tempo_casa", "Tempo de casa"],
+          ] as const).map(([campo, rotulo]) => (
+            <div key={campo} className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-sm font-medium">{rotulo}</p>
+              <Select value={config?.[campo] ?? "desligado"} onValueChange={v => onSaveConfig({ [campo]: v } as Partial<CulturaConfig>)}>
+                <SelectTrigger className="w-full sm:w-64"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desligado">Desligada: eu crio as ações</SelectItem>
+                  <SelectItem value="aprovar">Criar ação pendente sozinha</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm font-medium">Tom das mensagens sugeridas</p>
+              <p className="text-xs text-muted-foreground">Usado pela Íris ao sugerir o texto de parabéns</p>
+            </div>
+            <Select value={config?.tom_mensagem ?? "leve"} onValueChange={v => onSaveConfig({ tom_mensagem: v } as Partial<CulturaConfig>)}>
+              <SelectTrigger className="w-full sm:w-64"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="leve">Leve e acolhedor</SelectItem>
+                <SelectItem value="formal">Formal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Lembrar os gestores</p>
+              <p className="text-xs text-muted-foreground">
+                No Mural, cada gestor vê as celebrações do próprio time, com mensagem sugerida. O time vem do cadastro:
+                o gestor imediato do colaborador (nome igual ao do gestor) ou o departamento em que a pessoa é gestora.
+              </p>
+            </div>
+            <Switch checked={config?.lembrar_gestor ?? false} onCheckedChange={v => onSaveConfig({ lembrar_gestor: v })} />
+          </div>
+          <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t">
+            <p className="text-xs text-muted-foreground">A rotina roda todo dia às 6h. Para ver o efeito agora:</p>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={gerando}
+              onClick={async () => {
+                setGerando(true);
+                try {
+                  const n = await onGerarAcoes();
+                  toast.success(n > 0 ? `${n} ação${n > 1 ? "ões criadas" : " criada"}` : "Nada novo para criar agora");
+                } catch {
+                  /* o hook já avisou o erro */
+                } finally {
+                  setGerando(false);
+                }
+              }}
+            >
+              Gerar ações agora
+            </Button>
           </div>
         </Card>
       </TabsContent>

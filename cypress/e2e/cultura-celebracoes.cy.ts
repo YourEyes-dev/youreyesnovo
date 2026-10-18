@@ -66,6 +66,13 @@ describe("Cultura & Celebrações (/cultura-celebracoes)", () => {
     cy.get('[data-testid="calendario-ano"]').should("not.exist");
   });
 
+  // CULT-096
+  it("mostra o botão de baixar o PDF do calendário", () => {
+    cy.get('[data-testid="calendario-celebracoes"]', { timeout: 20000 })
+      .contains("button", "Baixar PDF")
+      .should("be.visible");
+  });
+
   // CULT-082
   it("mostra a cobertura de celebração nos indicadores", () => {
     cy.get('[data-testid="cobertura-celebracao"]', { timeout: 20000 })
@@ -83,6 +90,21 @@ describe("Cultura & Celebrações (/cultura-celebracoes)", () => {
         expect($el[0].scrollWidth, id).to.be.at.most($el[0].clientWidth + 1);
       })
     );
+  });
+
+  // CULT-091
+  it("mostra as opções de automação na Configuração", () => {
+    cy.contains('[role="tab"]', "Rituais e Reconhecimento", { timeout: 20000 }).click({ force: true });
+    cy.contains('[role="tab"]', "Configuração").click({ force: true });
+    cy.get('[data-testid="config-automacao"]', { timeout: 20000 })
+      .should("be.visible")
+      .and("contain.text", "Criar ação pendente sozinha")
+      .and("contain.text", "Gerar ações agora");
+  });
+
+  // CULT-094
+  it("mostra o painel de alertas", () => {
+    cy.get('[data-testid="alertas-cultura"]', { timeout: 20000 }).should("be.visible").and("contain.text", "Alertas");
   });
 
   // CULT-011

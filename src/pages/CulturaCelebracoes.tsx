@@ -9,6 +9,7 @@ import { ProximasCelebracoes } from "@/components/cultura/ProximasCelebracoes";
 import { PreferenciasColaborador } from "@/components/cultura/PreferenciasColaborador";
 import { HojeCelebracoes } from "@/components/cultura/HojeCelebracoes";
 import { CalendarioCelebracoes } from "@/components/cultura/CalendarioCelebracoes";
+import { AlertasCultura } from "@/components/cultura/AlertasCultura";
 import { CulturaIndicadores } from "@/components/cultura/CulturaIndicadores";
 
 const CulturaCelebracoes = () => {
@@ -34,6 +35,8 @@ const CulturaCelebracoes = () => {
         preferencias={cultura.preferencias}
         onParabenizar={cultura.parabenizar}
         onRegistrarRitual={cultura.registrarRealizacaoRitual}
+        tom={cultura.config?.tom_mensagem ?? "leve"}
+        onPublicar={cultura.publicarNoMural}
       />
 
       <CulturaStats
@@ -56,6 +59,8 @@ const CulturaCelebracoes = () => {
         onCreateAcao={cultura.createAcao}
         onUpdateStatus={cultura.updateAcaoStatus}
       />
+
+      <AlertasCultura acoes={cultura.acoes} />
 
       <CulturaIndicadores
         acoes={cultura.acoes}
@@ -99,6 +104,7 @@ const CulturaCelebracoes = () => {
             onToggleRitual={cultura.toggleRitual}
             onDeleteRitual={cultura.deleteRitual}
             onRegistrarRitual={cultura.registrarRealizacaoRitual}
+            onGerarAcoes={cultura.gerarAcoesAgora}
             onCreateData={cultura.createData}
             onDeleteData={cultura.deleteData}
             onSaveConfig={cultura.saveConfig}

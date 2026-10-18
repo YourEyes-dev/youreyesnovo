@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { startOfDay, differenceInCalendarDays } from "date-fns";
-import { Cake, Award, Briefcase, CalendarHeart, PartyPopper, Lock, Loader2 } from "lucide-react";
+import { Cake, Award, Briefcase, CalendarHeart, PartyPopper, Lock, Loader2, MessageSquareText } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,8 @@ import {
   indexarAcoes, payloadAcaoDaCelebracao, pessoaReservada, proximaExecucaoRitual, chaveDaAcao,
   type Celebracao,
 } from "@/lib/celebracoes";
-import type { CulturaAcao, CulturaPreferencia, CulturaRitual } from "@/types/cultura";
+import type { CulturaAcao, CulturaPreferencia, CulturaRitual, TomMensagem } from "@/types/cultura";
+import { MensagemSugerida } from "@/components/cultura/MensagemSugerida";
 
 interface Props {
   acoes: CulturaAcao[];
@@ -19,6 +20,8 @@ interface Props {
   preferencias: CulturaPreferencia[];
   onParabenizar: (payload: Partial<CulturaAcao>, existente?: CulturaAcao) => Promise<() => Promise<void>>;
   onRegistrarRitual: (r: CulturaRitual) => Promise<void>;
+  tom: TomMensagem;
+  onPublicar: (args: { conteudo: string; tipo: "aniversario" | "tempo_casa" | "anuncio"; acaoId?: string }) => Promise<void>;
 }
 
 interface ItemHoje {
@@ -44,9 +47,10 @@ const ICONE: Record<string, JSX.Element> = {
 
 const DESFAZER_MS = 10_000;
 
-export const HojeCelebracoes = ({ acoes, rituais, preferencias, onParabenizar, onRegistrarRitual }: Props) => {
+export const HojeCelebracoes = ({ acoes, rituais, preferencias, onParabenizar, onRegistrarRitual, tom, onPublicar }: Props) => {
   const { celebracoes, pessoas } = useCelebracoes({ exigirEmpresa: true });
   const [ocupado, setOcupado] = useState<string | null>(null);
+  const [redigindo, setRedigindo] = useState<ItemHoje | null>(null);
   const emCurso = useRef(new Set<string>());
   const hoje = startOfDay(new Date());
   const tratadas = indexarAcoes(acoes);
@@ -180,6 +184,12 @@ export const HojeCelebracoes = ({ acoes, rituais, preferencias, onParabenizar, o
                           {item.atraso} dia{item.atraso > 1 ? "s" : ""} de atraso
                         </Badge>
                       )}
+                      {item.acao?.origem === "automatica" && (
+                        <Badge variant="secondary" className="text-[10px] h-4" title="Criada pela rotina diária da automação">Automática</Badge>
+                      )}
+                      {item.acao?.publicado_em && (
+                        <Badge variant="secondary" className="text-[10px] h-4">Publicada no Mural</Badge>
+                      )}
                       {reservado && (
                         <Badge variant="outline" className="text-[10px] h-4 gap-1" title="Preferiu reconhecimento reservado: celebre com discrição">
                           <Lock className="h-2.5 w-2.5" /> Reservado
@@ -187,6 +197,18 @@ export const HojeCelebracoes = ({ acoes, rituais, preferencias, onParabenizar, o
                       )}
                     </div>
                   </div>
+                  {item.celebracao && item.celebracao.tipo !== "dia_profissao" && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 shrink-0"
+                      aria-label={`Sugerir mensagem para ${item.titulo}`}
+                      title="Sugerir mensagem"
+                      onClick={() => setRedigindo(item)}
+                    >
+                      <MessageSquareText className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     className="h-8 shrink-0"
@@ -207,6 +229,19 @@ export const HojeCelebracoes = ({ acoes, rituais, preferencias, onParabenizar, o
           </div>
         )}
       </CardContent>
+      <MensagemSugerida
+        celebracao={redigindo?.celebracao ?? null}
+        tom={tom}
+        reservado={!!redigindo?.nomePessoa && pessoaReservada(preferencias, redigindo.pessoaId, redigindo.nomePessoa)}
+        onFechar={() => setRedigindo(null)}
+        onPublicar={(conteudo) =>
+          onPublicar({
+            conteudo,
+            tipo: redigindo?.celebracao?.tipo === "tempo_casa" ? "tempo_casa" : "aniversario",
+            acaoId: redigindo?.acao?.id,
+          })
+        }
+      />
     </Card>
   );
 };

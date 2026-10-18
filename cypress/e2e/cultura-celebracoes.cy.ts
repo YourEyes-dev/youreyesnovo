@@ -85,6 +85,21 @@ describe("Cultura & Celebrações (/cultura-celebracoes)", () => {
     );
   });
 
+  // CULT-091
+  it("mostra as opções de automação na Configuração", () => {
+    cy.contains('[role="tab"]', "Rituais e Reconhecimento", { timeout: 20000 }).click({ force: true });
+    cy.contains('[role="tab"]', "Configuração").click({ force: true });
+    cy.get('[data-testid="config-automacao"]', { timeout: 20000 })
+      .should("be.visible")
+      .and("contain.text", "Criar ação pendente sozinha")
+      .and("contain.text", "Gerar ações agora");
+  });
+
+  // CULT-094
+  it("mostra o painel de alertas", () => {
+    cy.get('[data-testid="alertas-cultura"]', { timeout: 20000 }).should("be.visible").and("contain.text", "Alertas");
+  });
+
   // CULT-011
   it("não cria ação sem título ou data", () => {
     cy.contains("button", "Nova Ação").click({ force: true });

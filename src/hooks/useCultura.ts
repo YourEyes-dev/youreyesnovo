@@ -5,12 +5,14 @@ import { useAuth } from "./useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { fromTable } from "@/integrations/supabase/untypedClient";
+import { fromTable, rpcUntyped } from "@/integrations/supabase/untypedClient";
 import { datasAoRegistrarRitual } from "@/lib/celebracoes";
 import type { CulturaData, CulturaAcao, CulturaRitual, CulturaConfig, CulturaMarco, CulturaPreferencia } from "@/types/cultura";
 
+const JA_EXISTE = "23505"; // unique_violation: índice cultura_acoes_chave_unica_uidx
+
 export function useCultura() {
-  const { tenantId } = useAuth();
+  const { tenantId, user, profile } = useAuth();
   const { empresaAtivaId } = useEmpresaAtiva();
   const qc = useQueryClient();
 
@@ -68,6 +70,11 @@ export function useCultura() {
   const createAcao = async (payload: Partial<CulturaAcao>) => {
     if (!tenantId) return;
     const { error } = await supabase.from("cultura_acoes").insert({ ...payload, tenant_id: tenantId, empresa_id: empresaAtivaId || null } as any);
+    if (error?.code === JA_EXISTE) {
+      toast.info("Esta celebração já tem uma ação.");
+      qc.invalidateQueries({ queryKey: ["cultura-acoes"] });
+      return;
+    }
     if (error) { toast.error("Erro ao criar ação"); throw error; }
     toast.success("Ação criada!");
     qc.invalidateQueries({ queryKey: ["cultura-acoes"] });
@@ -107,6 +114,12 @@ export function useCultura() {
       .insert({ ...payload, status: "concluida", data_execucao: hoje, tenant_id: tenantId, empresa_id: empresaAtivaId || null })
       .select("id")
       .single();
+    if (error?.code === JA_EXISTE) {
+      // outra aba ou a rotina diária criou antes: só atualiza a lista, nada a desfazer
+      toast.info("Esta celebração já tem uma ação. Atualizamos a lista.");
+      refrescar();
+      return async () => {};
+    }
     if (error) { toast.error("Erro ao celebrar"); throw error; }
     refrescar();
     return async () => {
@@ -171,13 +184,40 @@ export function useCultura() {
     qc.invalidateQueries({ queryKey: ["cultura-rituais"] });
   };
 
+  /** Gera agora, para esta empresa, as ações pendentes que a rotina diária geraria. */
+  const gerarAcoesAgora = async (): Promise<number> => {
+    const { data, error } = await rpcUntyped("cultura_automacao_minha_empresa");
+    if (error) { toast.error("Não foi possível gerar as ações"); throw error; }
+    qc.invalidateQueries({ queryKey: ["cultura-acoes"] });
+    return Number(data ?? 0);
+  };
+
+  /** Publica a mensagem (já revisada por um humano) no Mural e registra na ação. */
+  const publicarNoMural = async (args: { conteudo: string; tipo: "aniversario" | "tempo_casa" | "anuncio"; acaoId?: string }) => {
+    if (!tenantId || !user || !profile) throw new Error("Usuário não autenticado");
+    const { error } = await fromTable("feed_posts").insert({
+      tenant_id: tenantId,
+      autor_id: user.id,
+      autor_nome: profile.nome_completo,
+      autor_avatar: profile.avatar_url,
+      tipo: args.tipo,
+      conteudo: args.conteudo,
+    });
+    if (error) { toast.error("Erro ao publicar no Mural"); throw error; }
+    if (args.acaoId) {
+      await fromTable("cultura_acoes").update({ publicado_em: new Date().toISOString() }).eq("id", args.acaoId);
+      qc.invalidateQueries({ queryKey: ["cultura-acoes"] });
+    }
+    qc.invalidateQueries({ queryKey: ["feed-posts"] });
+    toast.success("Publicado no Mural!");
+  };
+
   // --- Config ---
   const { data: config } = useQuery({
     queryKey: ["cultura-config", tenantId],
     queryFn: async () => {
       if (!tenantId) return null;
-      const { data, error } = await supabase
-        .from("cultura_config")
+      const { data, error } = await fromTable("cultura_config")
         .select("*")
         .eq("tenant_id", tenantId)
         .maybeSingle();
@@ -263,7 +303,7 @@ export function useCultura() {
 
   return {
     datas, isLoadingDatas, createData, deleteData,
-    acoes, isLoadingAcoes, createAcao, updateAcaoStatus, deleteAcao, parabenizar,
+    acoes, isLoadingAcoes, createAcao, updateAcaoStatus, deleteAcao, parabenizar, gerarAcoesAgora, publicarNoMural,
     rituais, isLoadingRituais, createRitual, toggleRitual, deleteRitual, registrarRealizacaoRitual,
     config, saveConfig,
     marcos, createMarco,

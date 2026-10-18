@@ -1,7 +1,7 @@
 import { addDays, addMonths, differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { toDateLocal } from "@/lib/dataLocal";
 import { buscarDiaProfissao } from "@/lib/diasProfissao";
-import type { CulturaAcao, CulturaConfig, CulturaData, CulturaPreferencia, CulturaRitual } from "@/types/cultura";
+import type { CulturaAcao, CulturaConfig, CulturaData, CulturaPreferencia, CulturaRitual, TomMensagem } from "@/types/cultura";
 
 // Fonte única do cálculo de "próximas celebrações". Usada pela tela de Cultura
 // e pelo widget de lembretes do Mural, para os dois nunca divergirem.
@@ -196,6 +196,9 @@ export function payloadAcaoDaCelebracao(c: Celebracao): Partial<CulturaAcao> {
     colaborador_nome: c.tipo === "dia_profissao" ? null : c.nome,
     data_referencia: format(c.data, "yyyy-MM-dd"),
     status: "pendente",
+    origem: "manual",
+    // mesma chave da rotina diária no banco: o índice único impede a segunda ação
+    chave_unica: c.chave,
   };
 }
 
@@ -379,4 +382,92 @@ export function montarEventosCalendario(args: {
   }
 
   return eventos.sort((a, b) => a.data.getTime() - b.data.getTime());
+}
+
+// ---------------------------------------------------------------- Mensagem sugerida
+
+const FRASES: Record<TomMensagem, { aniversario: string[]; tempo_casa: string[]; dia_profissao: string[] }> = {
+  leve: {
+    aniversario: [
+      "🎂 Hoje é dia de festa! Parabéns, {nome}! Que seu novo ciclo venha com muita saúde, alegria e conquistas. A equipe toda manda um abraço!",
+      "🎉 Feliz aniversário, {nome}! Obrigado por fazer parte do nosso time. Que o seu dia seja tão especial quanto você é para nós!",
+    ],
+    tempo_casa: [
+      "🏆 {anos} de casa! Parabéns, {nome}! Obrigado por cada dia de dedicação e por construir esta história com a gente.",
+      "🎊 {nome} completa {anos} de empresa hoje! Sua trajetória inspira o time. Parabéns e muito obrigado!",
+    ],
+    dia_profissao: [
+      "🌟 Hoje é o {nome}! Nosso reconhecimento a todos os profissionais que fazem a diferença no dia a dia da empresa. Parabéns!",
+    ],
+  },
+  formal: {
+    aniversario: [
+      "Hoje celebramos o aniversário de {nome}. Em nome de toda a empresa, desejamos saúde, realizações e um excelente novo ciclo.",
+    ],
+    tempo_casa: [
+      "{nome} completa hoje {anos} de empresa. Registramos nosso agradecimento pela dedicação e pelo compromisso ao longo dessa trajetória.",
+    ],
+    dia_profissao: [
+      "Hoje é o {nome}. Registramos nosso reconhecimento aos profissionais que contribuem diariamente para os resultados da empresa.",
+    ],
+  },
+};
+
+/**
+ * Texto-base para o gestor/RH editar antes de publicar. É sugestão: nunca
+ * traz idade nem ano de nascimento (RN-007) e a pessoa que decide publicar é humana.
+ * `variante` escolhe entre as frases do tom, para não repetir sempre a mesma.
+ */
+export function sugerirMensagem(
+  c: Pick<Celebracao, "tipo" | "nome" | "anos">,
+  tom: TomMensagem = "leve",
+  variante = 0,
+): string {
+  const opcoes = FRASES[tom][c.tipo];
+  const frase = opcoes[variante % opcoes.length];
+  const anos = c.anos ? `${c.anos} ano${c.anos > 1 ? "s" : ""}` : "";
+  return frase.replace("{nome}", c.nome).replace("{anos}", anos);
+}
+
+export function quantidadeDeVariantes(tipo: TipoCelebracao, tom: TomMensagem): number {
+  return FRASES[tom][tipo].length;
+}
+
+// ---------------------------------------------------------------- Alertas
+
+export interface AlertaCultura {
+  id: "atrasadas" | "cobertura";
+  titulo: string;
+  descricao: string;
+}
+
+/** Alertas que merecem virar ação no Plano de Ação (fecha o ciclo: medir → agir). */
+export function montarAlertas(args: {
+  acoes: Pick<CulturaAcao, "status" | "data_referencia">[];
+  cobertura: Pick<CoberturaCelebracao, "total" | "percentual">;
+  metaCobertura: number;
+  hoje?: Date;
+}): AlertaCultura[] {
+  const hoje = startOfDay(args.hoje ?? new Date());
+  const alertas: AlertaCultura[] = [];
+  const atrasadas = args.acoes.filter((a) => {
+    if (a.status !== "pendente" && a.status !== "em_andamento") return false;
+    const ref = toDateLocal(a.data_referencia);
+    return !!ref && ref < hoje;
+  }).length;
+  if (atrasadas > 0) {
+    alertas.push({
+      id: "atrasadas",
+      titulo: `${atrasadas} celebraç${atrasadas > 1 ? "ões" : "ão"} atrasada${atrasadas > 1 ? "s" : ""}`,
+      descricao: `Há ${atrasadas} ação${atrasadas > 1 ? "ões" : ""} cultural${atrasadas > 1 ? "is" : ""} pendente${atrasadas > 1 ? "s" : ""} com a data já vencida. Pessoas deixaram de ser lembradas no dia certo.`,
+    });
+  }
+  if (args.cobertura.total > 0 && args.cobertura.percentual < args.metaCobertura) {
+    alertas.push({
+      id: "cobertura",
+      titulo: `Cobertura de celebração em ${args.cobertura.percentual}% (meta ${args.metaCobertura}%)`,
+      descricao: `Só ${args.cobertura.percentual}% dos colaboradores foram celebrados nos últimos 12 meses; a meta da empresa é ${args.metaCobertura}%.`,
+    });
+  }
+  return alertas;
 }

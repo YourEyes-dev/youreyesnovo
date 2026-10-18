@@ -168,6 +168,9 @@ export const ProximasCelebracoes = ({ acoes, preferencias = [], onCreateAcao, on
                     {getIcon(item.tipo)}
                     {getBadgeLabel(item)}
                   </Badge>
+                  {item.acao?.origem === "automatica" && (
+                    <Badge variant="secondary" className="text-[10px] shrink-0" title="Criada pela rotina diária da automação">Automática</Badge>
+                  )}
                   {item.tipo !== "dia_profissao" && pessoaReservada(preferencias, item.pessoaId, item.nome) && (
                     <Badge variant="outline" className="text-[10px] shrink-0 gap-1" title="Preferiu reconhecimento reservado: celebre com discrição">
                       <Lock className="h-2.5 w-2.5" /> Reservado

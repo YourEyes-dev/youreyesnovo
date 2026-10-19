@@ -41,6 +41,19 @@ describe("Edge Functions de IA: autenticação", () => {
     expect(ler(f)).toMatch(/await exigirSuperadmin\(req\)/);
   });
 
+  it("ai-cultura-dia-profissao valida a empresa logada e só analisa cargos dela", () => {
+    const src = ler("ai-cultura-dia-profissao");
+    // a empresa do corpo só vale se pertencer ao tenant do login
+    expect(src).toMatch(/from\("empresa_cadastro"\)[\s\S]*\.eq\("tenant_id", tenantId\)/);
+    // todo acesso a dados é filtrado pelo tenant E pela empresa
+    expect(src).toMatch(/from\("cargos"\)\.select\("nome"\)\.eq\("tenant_id", tenantId\)\.eq\("empresa_id", empresaId\)/);
+    expect(src).toMatch(/from\("admissoes"\)\.select\("cargo"\)\.eq\("tenant_id", tenantId\)\.eq\("empresa_id", empresaId\)/);
+    // a IA só recebe cargos que passaram pelo filtro da empresa
+    expect(src).toMatch(/filtrarCargosDaEmpresa\(solicitados/);
+    expect(src).toMatch(/montarPrompt\(cargos\)/);
+    expect(src).not.toMatch(/montarPrompt\(solicitados\)/);
+  });
+
   it("ai-sst-analise só baixa arquivo da própria empresa", () => {
     const src = ler("ai-sst-analise");
     expect(src).toMatch(/startsWith\(`\$\{tenantId\}\//);

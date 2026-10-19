@@ -102,6 +102,12 @@ project_id = "diayjpsrcerycycyaxst"
   # Empresa de demonstração (só TESTE): fechada pelo x-qa-token, como a acima.
   [functions.seed-demo-empresa]
     verify_jwt = false
+  # Fixture de folha (13º/FGTS) da suíte Cypress: fechada pelo x-qa-token +
+  # trava de ambiente, como as duas acima. Sem este bloco, o verify_jwt assume
+  # true e o gateway devolve 401 antes do código (a esteira chama só com
+  # x-qa-token, sem Authorization) — foi o que derrubava o seed no staging.
+  [functions.seed-folha-fixture]
+    verify_jwt = false
   [functions.sst-pdf-extract]
     verify_jwt = false
   [functions.trilha-notificacoes]

@@ -103,3 +103,30 @@ export function sanitizarResultados(cargos: string[], bruto: unknown): SugestaoD
     };
   });
 }
+
+/** Chave de comparação do cargo: sem acento, minúsculas, espaços únicos. */
+export function chaveCargo(nome: string): string {
+  return nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Mantém só os cargos que existem na EMPRESA do usuário logado. O que vier do
+ * navegador nunca é confiável: a lista de cargos permitidos é montada no servidor,
+ * filtrada pela empresa, e tudo que não estiver nela é descartado (e contado).
+ */
+export function filtrarCargosDaEmpresa(
+  solicitados: string[],
+  permitidos: Iterable<string>,
+): { aceitos: string[]; ignorados: number } {
+  const conjunto = new Set<string>();
+  for (const nome of permitidos) if (typeof nome === "string" && nome.trim()) conjunto.add(chaveCargo(nome));
+  const aceitos = solicitados.filter((c) => conjunto.has(chaveCargo(c)));
+  return { aceitos, ignorados: solicitados.length - aceitos.length };
+}
+
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

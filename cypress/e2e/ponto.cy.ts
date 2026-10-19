@@ -20,7 +20,7 @@
 // Casos cobertos: PONTO-HOM-A1 (nova declaração de intervalo),
 //   PONTO-HOM-E1 (novo certificado digital), PONTO-HOM-B1 (fechamento),
 //   PONTO-HOM-E2 (dossiê fiscal), PONTO-HOM-I1 (alertas CLT),
-//   PONTO-HOM-H1 (escalas).
+//   PONTO-HOM-H1 (escalas), PONTO-HOM-F1 (feriados unificados).
 // =====================================================================
 
 import { credenciaisDeTeste } from "../support/credenciais";
@@ -112,5 +112,20 @@ describe("Módulo Ponto", () => {
   it("abre Escalas com a ação de criar escala", () => {
     abrirArea("tab-ponto-escalas");
     cy.contains("button", "Criar Escala", { timeout: 20000 }).should("be.visible");
+  });
+
+  // PONTO-HOM-F1 — Configurações › Feriados: a unificação dos dois cadastros.
+  // Confere as duas seções (Calendário da unidade / Feriados por localização) e
+  // que o cadastro por localização não oferece mais a abrangência 'Filial'.
+  it("abre Configurações › Feriados com as duas seções e sem a abrangência Filial", () => {
+    abrirArea("tab-ponto-configuracoes");
+    abrirSub("Feriados");
+    cy.contains("Calendário da unidade", { timeout: 20000 }).should("be.visible");
+    cy.contains("Feriados por localização").should("be.visible");
+    cy.contains("button", "Adicionar feriado", { timeout: 20000 }).should("be.visible").click({ force: true });
+    cy.get('[role="dialog"]', { timeout: 15000 }).should("exist");
+    // a abrangência 'Filial / unidade' saiu do cadastro por localização
+    cy.get('[role="dialog"]').contains("Filial / unidade").should("not.exist");
+    cy.get("body").type("{esc}", { force: true });
   });
 });

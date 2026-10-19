@@ -15,14 +15,14 @@ export interface FeriadoFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing: Feriado | null;
-  unidades: { id: string; nome: string }[];
   salvando: boolean;
   onSubmit: (form: FeriadoForm) => void;
 }
 
-/** Formulário de feriado: abrangência (estadual/municipal/filial) + recorrência anual. */
+/** Formulário de feriado por localização: estadual ou municipal + recorrência anual.
+ *  Feriado específico de uma unidade mora no Calendário da unidade, não aqui. */
 export function FeriadoFormDialog({
-  open, onOpenChange, editing, unidades, salvando, onSubmit,
+  open, onOpenChange, editing, salvando, onSubmit,
 }: FeriadoFormDialogProps) {
   const [form, setForm] = useState<FeriadoForm>(formVazioFeriado());
 
@@ -32,7 +32,7 @@ export function FeriadoFormDialog({
       ? {
           data: editing.data || "",
           nome: editing.nome,
-          abrangencia: editing.abrangencia === "nacional" ? "estadual" : editing.abrangencia,
+          abrangencia: editing.abrangencia === "municipal" ? "municipal" : "estadual",
           uf: editing.uf || "",
           municipio: editing.municipio || "",
           codigo_ibge: editing.codigo_ibge || "",
@@ -54,7 +54,7 @@ export function FeriadoFormDialog({
         <DialogHeader>
           <DialogTitle>{editing ? "Editar feriado" : "Adicionar feriado"}</DialogTitle>
           <DialogDescription>
-            Feriados estaduais, municipais ou específicos de uma filial. Após salvar, o espelho de ponto é reconsolidado.
+            Feriados estaduais e municipais (por localização). Para um feriado só de uma unidade, use o Calendário da unidade. Após salvar, o espelho de ponto é reconsolidado.
           </DialogDescription>
         </DialogHeader>
 
@@ -129,39 +129,19 @@ export function FeriadoFormDialog({
                 <SelectContent>
                   <SelectItem value="estadual">Estadual</SelectItem>
                   <SelectItem value="municipal">Municipal</SelectItem>
-                  <SelectItem value="filial">Filial / unidade</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {form.abrangencia !== "filial" && (
-              <div className="space-y-1">
-                <Label>UF</Label>
-                <Select value={form.uf} onValueChange={(v) => set({ uf: v })}>
-                  <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
-                  <SelectContent>
-                    {UFS.map((u) => (<SelectItem key={u} value={u}>{u}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
-          {form.abrangencia === "filial" && (
             <div className="space-y-1">
-              <Label>Unidade / filial</Label>
-              <Select value={form.empresa_id} onValueChange={(v) => set({ empresa_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+              <Label>UF</Label>
+              <Select value={form.uf} onValueChange={(v) => set({ uf: v })}>
+                <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
                 <SelectContent>
-                  {unidades.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
-                  ))}
+                  {UFS.map((u) => (<SelectItem key={u} value={u}>{u}</SelectItem>))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Vale apenas para colaboradores lotados nesta unidade.
-              </p>
             </div>
-          )}
+          </div>
 
           {form.abrangencia === "municipal" && (
             <div className="grid grid-cols-2 gap-3">

@@ -50,11 +50,12 @@ export function FeriadoTabelasPanel() {
         <div>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Layers className="h-5 w-5 text-primary" />
-            Tabelas de feriados
+            Calendário da unidade (tabelas de feriados)
           </CardTitle>
           <CardDescription>
-            Monte tabelas numeradas (Tabela 1, Tabela 2…) por município e reaproveite a mesma
-            tabela em várias filiais/empresas. Prevalecem sobre feriados estaduais e nacionais.
+            É aqui que mora o feriado específico de uma unidade. Monte tabelas numeradas
+            (Tabela 1, Tabela 2…) por município e reaproveite a mesma tabela em várias
+            unidades. Prevalecem sobre os feriados por localização (estaduais e nacionais).
           </CardDescription>
         </div>
         <Button size="sm" onClick={() => { setEditing(null); setShowForm(true); }}>

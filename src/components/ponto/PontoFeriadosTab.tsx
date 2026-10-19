@@ -159,10 +159,10 @@ export function PontoFeriadosTab() {
           <div>
             <CardTitle className="flex items-center gap-2 text-lg">
               <CalendarDays className="h-5 w-5 text-primary" />
-              Feriados
+              Feriados por localização
             </CardTitle>
             <CardDescription>
-              Feriados estaduais, municipais e por filial, com recorrência anual. Os nacionais são fornecidos pelo sistema.
+              Estaduais e municipais (com recorrência anual); os nacionais são fornecidos pelo sistema. Feriado específico de uma unidade fica no Calendário da unidade, acima.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -222,7 +222,9 @@ export function PontoFeriadosTab() {
                   </TableRow>
                 ) : (
                   feriados.map((f) => {
-                    const somenteLeitura = !f.tenant_id || f.abrangencia === "nacional";
+                    // 'filial' legada é somente-leitura: a abrangência foi unificada
+                    // no Calendário da unidade; novas não são criadas por aqui.
+                    const somenteLeitura = !f.tenant_id || f.abrangencia === "nacional" || f.abrangencia === "filial";
                     const efetiva = dataEfetiva(f, ano);
                     const local = f.abrangencia === "filial"
                       ? nomeUnidade(f.empresa_id)
@@ -293,7 +295,6 @@ export function PontoFeriadosTab() {
         open={showForm}
         onOpenChange={(v) => { setShowForm(v); if (!v) setEditing(null); }}
         editing={editing}
-        unidades={unidades}
         salvando={salvarMutation.isPending}
         onSubmit={(form) => salvarMutation.mutate(form)}
       />

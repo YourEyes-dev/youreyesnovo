@@ -1,4 +1,9 @@
-/** RN20-22 — tipos e regras compartilhadas do cadastro de feriados por filial. */
+/** RN20-22 — tipos e regras do cadastro de feriados por localização.
+ *
+ * A abrangência 'filial' foi unificada no Calendário da unidade (feriado_tabela_*)
+ * na unificação de feriados (Fases 1-2): o cadastro NÃO cria mais feriado 'filial'
+ * aqui — feriado de uma unidade mora no calendário. O valor 'filial' permanece no
+ * tipo apenas para LER/EXIBIR eventuais linhas legadas; o formulário não o oferece. */
 
 export type FeriadoAbrangencia = "nacional" | "estadual" | "municipal" | "filial";
 export type FeriadoTipo = "feriado" | "facultativo";
@@ -23,7 +28,7 @@ export interface Feriado {
 export interface FeriadoForm {
   data: string;
   nome: string;
-  abrangencia: Exclude<FeriadoAbrangencia, "nacional">;
+  abrangencia: "estadual" | "municipal";
   uf: string;
   municipio: string;
   codigo_ibge: string;
@@ -85,8 +90,7 @@ export function validarFeriado(form: FeriadoForm): string | null {
   } else if (!form.data) {
     return "Informe a data.";
   }
-  if (form.abrangencia === "filial" && !form.empresa_id) return "Selecione a unidade/filial.";
-  if (form.abrangencia !== "filial" && !form.uf) return "Selecione a UF.";
+  if (!form.uf) return "Selecione a UF.";
   if (form.abrangencia === "municipal" && !form.municipio.trim()) {
     return "Informe o município para feriado municipal.";
   }
@@ -101,10 +105,10 @@ export function payloadFeriado(form: FeriadoForm, tenantId: string) {
     data: recorrente ? null : form.data,
     nome: form.nome.trim(),
     abrangencia: form.abrangencia,
-    uf: form.abrangencia === "filial" ? null : form.uf,
+    uf: form.uf,
     municipio: form.abrangencia === "municipal" ? form.municipio.trim() : null,
     codigo_ibge: form.abrangencia === "municipal" ? form.codigo_ibge.trim() || null : null,
-    empresa_id: form.abrangencia === "filial" ? form.empresa_id : null,
+    empresa_id: null,
     tipo: form.tipo,
     recorrente,
     dia: recorrente ? Number(form.dia) : null,

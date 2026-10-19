@@ -85,10 +85,14 @@ describe("Cultura & Celebrações (/cultura-celebracoes)", () => {
     cy.viewport(375, 812);
     cy.reload();
     cy.contains("h1", "Cultura & Celebrações", { timeout: 20000 }).should("be.visible");
+    // `.should` repete até passar (ou estourar o tempo): as animações de entrada dos cards
+    // podem deixar a largura instável nos primeiros instantes, e `.then` mediria uma vez só
     ["painel-hoje", "calendario-celebracoes", "cobertura-celebracao"].forEach((id) =>
-      cy.get(`[data-testid="${id}"]`, { timeout: 20000 }).then(($el) => {
-        expect($el[0].scrollWidth, id).to.be.at.most($el[0].clientWidth + 1);
-      })
+      cy.get(`[data-testid="${id}"]`, { timeout: 20000 })
+        .should("be.visible")
+        .should(($el) => {
+          expect($el[0].scrollWidth, id).to.be.at.most($el[0].clientWidth + 1);
+        })
     );
   });
 
@@ -96,9 +100,13 @@ describe("Cultura & Celebrações (/cultura-celebracoes)", () => {
   it("mostra as opções de automação na Configuração", () => {
     cy.contains('[role="tab"]', "Rituais e Reconhecimento", { timeout: 20000 }).click({ force: true });
     cy.contains('[role="tab"]', "Configuração").click({ force: true });
+    // Só texto que fica na tela: as opções do seletor ("Criar ação pendente sozinha") só existem
+    // no DOM depois de abrir o seletor, então não servem de âncora aqui.
     cy.get('[data-testid="config-automacao"]', { timeout: 20000 })
       .should("be.visible")
-      .and("contain.text", "Criar ação pendente sozinha")
+      .and("contain.text", "Automação")
+      .and("contain.text", "Tom das mensagens sugeridas")
+      .and("contain.text", "Lembrar os gestores")
       .and("contain.text", "Gerar ações agora");
   });
 

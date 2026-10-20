@@ -37,7 +37,7 @@ const searchItems: SearchItem[] = [
   { title: "Mural Interno", path: "/feed", section: "Pessoas", keywords: ["mural", "feed", "comunicação", "notícia"] },
   { title: "Ponto", path: "/ponto", section: "Pessoas", keywords: ["ponto", "marcação", "relógio", "jornada"] },
   { title: "Análise de Jornada", path: "/analise-jornada", section: "Pessoas", keywords: ["jornada", "análise", "horas extras", "banco"] },
-  { title: "Empresa", path: "/empresa", section: "Estrutura", keywords: ["empresa", "cnpj", "dados"] },
+  { title: "Empresa", path: "/empresa", section: "Estrutura", keywords: ["empresa", "cnpj", "dados", "logo", "marca", "identidade visual"] },
   { title: "Departamentos", path: "/cadastros/departamentos", section: "Cadastros", keywords: ["departamento", "setor", "área"] },
   { title: "Cargos", path: "/cadastros/cargos", section: "Cadastros", keywords: ["cargo", "cargo", "cbo"] },
   { title: "Estabelecimento ou Obra", path: "/cadastros/filiais", section: "Cadastros", keywords: ["filial", "obra", "estabelecimento", "unidade"] },
@@ -47,7 +47,7 @@ const searchItems: SearchItem[] = [
   { title: "Financeiro", path: "/financeiro", section: "Financeiro", keywords: ["financeiro", "guia", "pagamento", "certidão"] },
   { title: "Benefícios", path: "/financeiro/beneficios", section: "Financeiro", keywords: ["benefício", "vale", "plano saúde"] },
   { title: "Hub Contábil", path: "/hub-contabil", section: "Financeiro", keywords: ["contábil", "hub", "competência", "folha"] },
-  { title: "Configurações", path: "/configuracoes", section: "Sistema", keywords: ["configuração", "usuário", "perfil", "acesso", "auditoria"] },
+  { title: "Usuários", path: "/configuracoes", section: "Sistema", keywords: ["configuração", "usuário", "perfil", "acesso", "auditoria"] },
   { title: "Suporte", path: "/suporte", section: "Sistema", keywords: ["suporte", "ticket", "ajuda", "bug"] },
   { title: "Meu Perfil", path: "/meu-perfil", section: "Sistema", keywords: ["meu perfil", "conta", "avatar", "senha"] },
 ];

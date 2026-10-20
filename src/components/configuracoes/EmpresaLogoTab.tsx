@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -12,13 +11,21 @@ const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 const BUCKET = "empresas-logos";
 
-export function EmpresaLogoTab() {
-  const { empresaAtiva, empresaAtivaId } = useEmpresaAtiva();
+interface EmpresaLogoTabProps {
+  /** Empresa cuja logo é gerida (a que está em edição na tela Empresa). */
+  empresaId: string | null;
+  /** Logo atual dessa empresa. */
+  logoUrl: string | null | undefined;
+  /** Avisa a tela-mãe da nova logo (ou null ao remover), sem marcar o formulário como alterado. */
+  onChange?: (url: string | null) => void;
+}
+
+export function EmpresaLogoTab({ empresaId: empresaAtivaId, logoUrl: logoUrlAtual, onChange }: EmpresaLogoTabProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
-  const logoUrl = (empresaAtiva as any)?.logo_url as string | null;
+  const logoUrl = logoUrlAtual ?? null;
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -59,9 +66,12 @@ export function EmpresaLogoTab() {
 
       return publicUrl;
     },
-    onSuccess: () => {
+    onSuccess: (publicUrl) => {
       toast.success("Logo atualizada com sucesso!");
+      onChange?.(publicUrl);
       queryClient.invalidateQueries({ queryKey: ["empresa_cadastro_list_ativa"] });
+      queryClient.invalidateQueries({ queryKey: ["empresa_cadastro_list"] });
+      queryClient.invalidateQueries({ queryKey: ["empresa_cadastro", empresaAtivaId] });
     },
     onError: (err: any) => {
       toast.error(err.message || "Erro ao enviar logo");
@@ -93,7 +103,10 @@ export function EmpresaLogoTab() {
     },
     onSuccess: () => {
       toast.success("Logo removida");
+      onChange?.(null);
       queryClient.invalidateQueries({ queryKey: ["empresa_cadastro_list_ativa"] });
+      queryClient.invalidateQueries({ queryKey: ["empresa_cadastro_list"] });
+      queryClient.invalidateQueries({ queryKey: ["empresa_cadastro", empresaAtivaId] });
     },
     onError: () => {
       toast.error("Erro ao remover logo");
@@ -116,7 +129,7 @@ export function EmpresaLogoTab() {
     return (
       <Card>
         <CardContent className="py-10 text-center text-muted-foreground">
-          Selecione uma empresa no seletor acima para gerenciar a logo.
+          Salve o cadastro da empresa para poder enviar a logo.
         </CardContent>
       </Card>
     );

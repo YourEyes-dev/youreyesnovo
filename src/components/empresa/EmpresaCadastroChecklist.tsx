@@ -99,6 +99,12 @@ export function EmpresaCadastroChecklist({ data, onGoToTab }: Props) {
         title: 'Contexto I.A.',
         fields: [
           { label: 'Contexto para I.A.', required: false, filled: notEmpty(data.ai_context) },
+        ],
+      },
+      {
+        id: 'logo',
+        title: 'Logo',
+        fields: [
           { label: 'Logo da empresa', required: false, filled: notEmpty(data.logo_url) },
         ],
       },

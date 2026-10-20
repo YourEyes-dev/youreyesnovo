@@ -419,8 +419,19 @@ homologação e produção, exceto `qa_cercas`), PR de telas #791 mesclado, 9 Ed
 `ai-sst-analise`, `ai-qa-scan`, `ai-qa-agent`, `invite-tenant-user`), `seed-test-user` apagada.
 
 **Pendências para a próxima leva:**
-- **Convite por e-mail nunca funcionou** (cadastro de usuário): ver logs de `invite-tenant-user` e o
-  segredo `RESEND_API_KEY`/domínio no Resend.
+- **E-mail (convite e recuperação de senha): RESOLVIDO em 18/10/2026.** Causa: o domínio
+  `youreyes.com.br` estava no Resend do desenvolvedor antigo e o segredo `RESEND_API_KEY` da
+  produção guardava uma chave que o Resend recusava (`API key is invalid`, 401; a chave nova aparecia
+  como "No activity"). Correção: domínio recriado e verificado em `your.eyesye.app`, nova chave com
+  Sending access para o domínio e segredo substituído (um valor com espaço/aspas sobrando ou chave
+  de outra conta dá o mesmo erro). Recuperação de senha chegou. Aprendizados: a função
+  `send-recovery-email` responde "ok" sempre (não revela se o e-mail existe), então o diagnóstico é
+  só pelos logs da função e pelo Resend; `send-recovery-email` e `invite-tenant-user` republicadas
+  em 18/10 (logs de diagnóstico + conferência de login no Auth). Falta testar o convite de usuário
+  com um e-mail novo.
+- **Vínculo de perfil "duplicate key": CORRIGIDO em 18/10/2026** (homologação e produção): gatilho
+  BEFORE `trigger_vinculo_libera_modelo_antes`; conferência `1, 1, passou` (PERFIL-017). Na produção só
+  a Maike (criada em 18/10) ficou com o perfil-modelo e precisa ser revinculada pela tela de Perfis.
 - **Importação de documento de SST** não extrai (0 riscos, 0 ações) num documento que já funcionou:
   conferir no painel se `sst-pdf-extract` e `ai-sst-importacao` existem na produção e em que data
   foram publicadas (o repositório as traz desde 29/09); comparar com a homologação.

@@ -10,6 +10,7 @@
 // Casos cobertos:
 //   EMP-014 — Documento exigido acompanha o tipo de pessoa (CNPJ x CPF)
 //   ENQ-018 — Mandato e membros viram obrigatórios com CIPA ativa
+//   CFG-040 — Aba Logo da Empresa (a logo saiu de Configurações/Usuários)
 //
 // ZERO mutação: só abrimos "Nova Empresa" e lemos o checklist de pendências.
 // Nada é salvo (o rascunho vive só no localStorage do navegador). Por isso
@@ -69,7 +70,7 @@ describe("Módulo Empresa — checklist de cadastro", () => {
   }
 
   // Navega para uma aba do formulário pelo id estável do TabsTrigger.
-  function irAba(nome: "dados" | "enquadramento" | "checklist") {
+  function irAba(nome: "dados" | "logo" | "enquadramento" | "checklist") {
     cy.get(`[data-testid="tab-${nome}"]`).click({ force: true });
     cy.wait(500);
   }
@@ -87,6 +88,15 @@ describe("Módulo Empresa — checklist de cadastro", () => {
     // entre os testes, então cada teste começa sem rascunho nem navegação
     // restaurada — a lista de empresas abre limpa.
     login();
+  });
+
+  // CFG-040: a logo é gerida na aba Logo da tela Empresa. Em empresa ainda não
+  // salva (zero mutação), a aba monta e orienta salvar o cadastro antes do envio.
+  it("CFG-040: aba Logo da Empresa monta e orienta salvar o cadastro antes", () => {
+    abrirNovaEmpresa();
+    irAba("logo");
+    cy.contains("Salve o cadastro da empresa para poder enviar a logo", { timeout: 15000 }).should("be.visible");
+    cy.contains("Algo deu errado").should("not.exist");
   });
 
   // EMP-014: o documento obrigatório no checklist acompanha o tipo de pessoa.

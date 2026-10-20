@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Users, ClipboardList, ShieldCheck, Rocket, ArrowRight, Shield, ImageIcon } from "lucide-react";
+import { Users, ClipboardList, ShieldCheck, Rocket, ArrowRight, Shield } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AuditoriaTab } from "@/components/configuracoes/AuditoriaTab";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import UsuariosContent from "@/components/configuracoes/UsuariosContent";
 import PerfisContent from "@/components/configuracoes/PerfisContent";
 import { EsocialConfig } from "@/components/esocial/EsocialConfig";
-import { EmpresaLogoTab } from "@/components/configuracoes/EmpresaLogoTab";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Configuracoes() {
@@ -49,8 +48,8 @@ export default function Configuracoes() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
-        <p className="text-muted-foreground">Gerencie sua empresa, equipe e níveis de acesso</p>
+        <h1 className="text-2xl font-bold text-foreground">Usuários</h1>
+        <p className="text-muted-foreground">Gerencie sua equipe, níveis de acesso e auditoria</p>
       </div>
 
       {needsOnboarding && (
@@ -110,12 +109,6 @@ export default function Configuracoes() {
               <span className="hidden sm:inline">Auditoria</span>
             </TabsTrigger>
           )}
-          {isAdmin && (
-            <TabsTrigger value="logo" className="flex items-center gap-1.5">
-              <ImageIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Logo</span>
-            </TabsTrigger>
-          )}
         </TabsList>
 
         {isAdmin && (
@@ -146,13 +139,6 @@ export default function Configuracoes() {
           <TabsContent value="auditoria" className="mt-6">
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               <AuditoriaTab />
-            </motion.div>
-          </TabsContent>
-        )}
-        {isAdmin && (
-          <TabsContent value="logo" className="mt-6">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <EmpresaLogoTab />
             </motion.div>
           </TabsContent>
         )}

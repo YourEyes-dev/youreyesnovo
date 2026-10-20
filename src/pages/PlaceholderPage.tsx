@@ -14,7 +14,7 @@ const pageTitles: Record<string, string> = {
   "/pdi": "PDI - Plano de Desenvolvimento Individual",
   "/epis": "EPIs - Equipamentos de Proteção",
   "/felicidade": "Gestão da Felicidade",
-  "/configuracoes": "Configurações",
+  "/configuracoes": "Usuários",
 };
 
 const PlaceholderPage = () => {

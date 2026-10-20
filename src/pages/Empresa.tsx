@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Building2, Save, Shield, Users, TrendingUp, Clock, Target, Upload, ArrowLeft, Layers, Brain, ClipboardCheck } from 'lucide-react';
+import { Loader2, Building2, Save, Shield, Users, TrendingUp, Clock, Target, Upload, ArrowLeft, Layers, Brain, ClipboardCheck, ImageIcon } from 'lucide-react';
 import { useEmpresaCadastro } from '@/hooks/useEmpresaCadastro';
 import { EmpresaDadosBasicos } from '@/components/empresa/EmpresaDadosBasicos';
 import { EmpresaEnquadramentoLegal } from '@/components/empresa/EmpresaEnquadramentoLegal';
@@ -16,6 +16,7 @@ import { EmpresaImportExport } from '@/components/empresa/EmpresaImportExport';
 import { EmpresaList } from '@/components/empresa/EmpresaList';
 import { EmpresaAIContext } from '@/components/empresa/EmpresaAIContext';
 import { EmpresaCadastroChecklist } from '@/components/empresa/EmpresaCadastroChecklist';
+import { EmpresaLogoTab } from '@/components/configuracoes/EmpresaLogoTab';
 import { GruposEconomicosManager } from '@/components/empresa/GruposEconomicosManager';
 import { useGruposEconomicos } from '@/hooks/useGruposEconomicos';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,7 +50,7 @@ export default function Empresa() {
     } catch { /* ignore */ }
   }, [viewMode, selectedEmpresaId, activeTab]);
 
-  const TABS = ['dados', 'enquadramento', 'inclusao', 'indicadores', 'jornada', 'obrigacoes', 'ai', 'checklist'];
+  const TABS = ['dados', 'logo', 'enquadramento', 'inclusao', 'indicadores', 'jornada', 'obrigacoes', 'ai', 'checklist'];
   const currentTabIndex = TABS.indexOf(activeTab);
   const isFirstTab = currentTabIndex === 0;
   const isLastTab = currentTabIndex === TABS.length - 1;
@@ -232,9 +233,12 @@ export default function Empresa() {
     }
 
     // Se já criamos nessa sessão (createdIdRef), força update em vez de novo insert
+    // A logo é gravada na hora pela aba Logo; o formulário nunca a regrava, senão
+    // um valor velho (cadastro carregado ou rascunho) desfaria um envio recente.
+    const { logo_url: _logoFora, ...formSemLogo } = formData;
     const payload: Partial<EmpresaCadastro> = createdIdRef.current && !selectedEmpresaId
-      ? { ...formData, id: createdIdRef.current as any }
-      : formData;
+      ? { ...formSemLogo, id: createdIdRef.current as any }
+      : formSemLogo;
 
     savingRef.current = true;
     try {
@@ -458,10 +462,14 @@ export default function Empresa() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 md:grid-cols-8">
+        <TabsList className="grid w-full grid-cols-4 md:grid-cols-9">
           <TabsTrigger value="dados" className="text-xs" data-testid="tab-dados">
             <Building2 className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
             Dados
+          </TabsTrigger>
+          <TabsTrigger value="logo" className="text-xs" data-testid="tab-logo">
+            <ImageIcon className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
+            Logo
           </TabsTrigger>
           <TabsTrigger value="enquadramento" className="text-xs" data-testid="tab-enquadramento">
             <Shield className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
@@ -505,6 +513,20 @@ export default function Empresa() {
                 onChange={handleChange}
                 matrizes={matrizes}
                 currentEmpresaId={viewMode === 'edit' ? selectedEmpresaId : undefined}
+              />
+            </CardContent>
+          </TabsContent>
+
+          <TabsContent value="logo" className="mt-0" data-testid="conteudo-logo">
+            <CardHeader>
+              <CardTitle className="text-lg">Logo da Empresa</CardTitle>
+              <CardDescription>Identidade visual usada nos documentos gerados (PDF, relatórios, laudos)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmpresaLogoTab
+                empresaId={viewMode === 'edit' ? (cadastro?.id ?? selectedEmpresaId) : null}
+                logoUrl={formData.logo_url ?? cadastro?.logo_url}
+                onChange={(url) => setFormData((prev) => ({ ...prev, logo_url: url }))}
               />
             </CardContent>
           </TabsContent>

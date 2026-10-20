@@ -194,6 +194,19 @@ Regras das migrations:
   modulos)` + políticas RESTRICTIVE `perfil_restringe_leitura_*` em 11 tabelas
   sensíveis. Tabela sensível nova PRECISA da política (a rotina de QA
   PERFIL-003 acusa) ou de exceção documentada dentro da própria rotina.
+- **`consolidar_ponto_diario_manual` (e afins) recebe blocos INJETADOS em runtime
+  por migrations posteriores** — feriado neutro (`20260901180000`) e folga
+  compensatória (`20260901200000`), via `pg_get_functiondef` + `replace` +
+  `EXECUTE`, ancorados em `c := public._ponto_calc_dia(`. Um `CREATE OR REPLACE`
+  integral a partir de uma base antiga APAGA esses blocos em silêncio — aconteceu
+  10/2026: a Fatia 2a da declaração reverteu a proteção de feriado e um feriado
+  sem marcação voltou a virar falta (descontando folha + DSR, Lei 605/49). Antes
+  de redefinir essa função (ou qualquer uma com injeção em runtime), **rode a
+  bateria do Ponto** — `SELECT public.qa_rodar_bateria('manual','jornada-rotina/ponto')`
+  — que o PONTO-402 (teste comportamental) pega na hora; e confira os blocos com
+  `position('ponto_grava_feriado_neutro' IN pg_get_functiondef('public.consolidar_ponto_diario_manual(uuid,text,date)'::regprocedure)) > 0`.
+  Ao restaurar, prefira REINJETAR (o mesmo `DO` idempotente das migrations originais),
+  não reescrever a função inteira.
 
 ## QA
 

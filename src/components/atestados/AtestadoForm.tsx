@@ -94,7 +94,7 @@ const formSchema = z.object({
   colaborador_cargo: z.string().optional(),
   colaborador_departamento: z.string().optional(),
   
-  lancamento_tipo: z.enum(["atestado_medico", "acidente_trabalho", "afastamento_inss", "licenca_legal", "licenca_nr"]).optional(),
+  lancamento_tipo: z.enum(["atestado_medico", "acidente_trabalho", "afastamento_inss", "licenca_legal", "licenca_nr", "declaracao_comparecimento"]).optional(),
   tipo_principal_new: z.string().optional(),
   numero_cat: z.string().optional(),
   data_acidente: z.string().optional(),
@@ -131,6 +131,7 @@ const formSchema = z.object({
   
   contem_cid: z.boolean().optional(),
   cid_codigo: z.string().optional(),
+  abona: z.boolean().optional(),
   cid_autorizado: z.boolean().optional(),
   grupo_clinico: z.string().optional(),
   nexo_trabalho: z.string().optional(),
@@ -141,7 +142,9 @@ const formSchema = z.object({
   
   observacoes: z.string().optional(),
 }).refine((data) => {
-  if (data.tipo !== "licencas") {
+  // Declaração de comparecimento muitas vezes não traz médico/CRM (é um
+  // comprovante de presença, não um atestado de incapacidade) — isenta.
+  if (data.tipo !== "licencas" && data.lancamento_tipo !== "declaracao_comparecimento") {
     return !!data.profissional_registro && data.profissional_registro.length > 0;
   }
   return true;
@@ -199,6 +202,7 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
       cid_autorizado: true, // Agora sempre true por padrão, pois o envio ao RH implica autorização
       nexo_trabalho: "nao",
       unidade_afastamento: "dias",
+      abona: false,
     },
   });
 
@@ -242,6 +246,7 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
         contem_cid: a.contem_cid ?? false,
         cid_codigo: a.cid_codigo ?? undefined,
         cid_autorizado: a.cid_autorizado ?? true,
+        abona: (a as { abona?: boolean | null }).abona ?? false,
         grupo_clinico: a.grupo_clinico ?? undefined,
         nexo_trabalho: a.nexo_trabalho ?? "nao",
         aptidao: a.aptidao ?? undefined,
@@ -598,6 +603,9 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
       contem_cid: values.contem_cid,
       cid_codigo: values.cid_codigo,
       cid_autorizado: values.cid_autorizado,
+      // Declaração: decisão de abonar (vale quando a regra da empresa é
+      // configurável; sim/não do catálogo prevalecem na consolidação).
+      abona: values.lancamento_tipo === 'declaracao_comparecimento' ? !!values.abona : null,
       grupo_clinico: values.grupo_clinico as AtestadoFormData['grupo_clinico'],
       nexo_trabalho: values.nexo_trabalho as AtestadoFormData['nexo_trabalho'],
       aptidao: values.aptidao as AtestadoFormData['aptidao'],
@@ -704,6 +712,34 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
                     )}
                   />
                 )}
+              </div>
+            )}
+
+            {/* Declaração de comparecimento: sem CRM/CID; abono pela regra da empresa. */}
+            {watchLancamentoTipo === 'declaracao_comparecimento' && (
+              <div className="space-y-3 rounded-lg border border-sky-300/60 bg-sky-50/50 dark:bg-sky-950/20 p-4">
+                <p className="text-xs text-muted-foreground">
+                  Comprovante de presença em consulta/exame. Não exige CRM nem CID. O abono segue
+                  a regra definida em <strong>Configurações › Justificativas de Ponto</strong>.
+                </p>
+                <FormField
+                  control={form.control}
+                  name="abona"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between rounded-md border p-3 bg-background">
+                      <div className="pr-3">
+                        <FormLabel className="text-sm">Abonar o dia</FormLabel>
+                        <p className="text-xs text-muted-foreground">
+                          Vale quando a regra da empresa é “Configurável”. Se a empresa definiu
+                          Abona/Não abona fixo, a configuração prevalece.
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
               </div>
             )}
 

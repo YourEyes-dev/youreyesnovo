@@ -39,3 +39,11 @@ comparado por hash (na 2ª rodada, sem comentários e espaços).
 | 5 | `admissao_normalizar_cpf`, `admissoes_cpf_duplicado` e gatilho `admissao_normaliza_cpf` | CPF único na admissão (QA ADM-002); já listado em `divergencia_producao_resultado.md` | `docs/script_divergencia_producao_parte2.sql` (conferir pré-check) |
 | 6 | Funções Lovable-era sem script em `docs`: `finalizar_admissao_by_token`, `feriado_do_dia`, `reconciliar_donos_documentos`, `superadmin_delete_tenant` | Versões antigas na produção | Avaliar caso a caso (a de `superadmin_delete_tenant` protege só o tenant de QA) |
 | 7 | Funções com corpo diferente sem explicação de `SELECT INTO`: `ferias_*`, `desligamento_*`/`admissao_guardar_desligamento`, `apurar_banco_horas_colaborador`, `ponto_espelho_resumo_empresa`, Mapa Comportamental (por_cpf, ficha/time, campanhas) | Podem ser versão anterior | Rodar a bateria de QA do módulo na produção |
+
+## Bateria de QA na produção (20/10/2026)
+Nenhum caso de negócio ficou pior que a `main`, exceto 6 por **rotina de teste em versão antiga** (gatilhos,
+restrições e `cpf_valido` da produção são idênticos aos da `main`, conferido na `LEV_8`):
+COLAB-011, 021, 023, 033 e DOC-030 (corrigidos por `docs/script_qa_colab_doc_rotinas_atualizar.sql`) e
+PONTO-486 (rotina ainda não entregue). A bancada de testes na produção é parcial (Férias 1/57 casos,
+Ponto 89/194, EPI com 48 sem rotina, RLS 1/8, módulos sem caso: Afastamentos, Folha, Benefícios,
+Compliance SST, Central, Edge Functions); ver `docs/ROTEIRO_PRODUCAO_BANCADA_QA.md`.

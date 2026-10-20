@@ -489,6 +489,49 @@ export function SolicitarAjusteFolhaInterno({
             ))}
           </SelectContent>
         </Select>
+        {/* Diretriz lida da configuração: a própria justificativa diz se abona. */}
+        {just && (
+          <div
+            className={`flex items-start gap-1 rounded px-1.5 py-1 text-[10px] leading-snug ${
+              just.tipo_abono === "sim"
+                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                : just.tipo_abono === "nao"
+                  ? "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300"
+                  : "bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300"
+            }`}
+          >
+            {just.tipo_abono === "sim" ? (
+              <>
+                <CheckCircle2 className="w-3 h-3 mt-px shrink-0" />
+                <span>
+                  <strong>Abona o dia.</strong>{" "}
+                  {just.base_legal
+                    ? `Abono obrigatório por lei (${just.base_legal}).`
+                    : "Na aprovação, o dia fica justificado e não conta como falta."}
+                </span>
+              </>
+            ) : just.tipo_abono === "nao" ? (
+              <>
+                <AlertCircle className="w-3 h-3 mt-px shrink-0" />
+                <span>
+                  <strong>Não abona.</strong> O dia fica registrado com a justificativa, mas segue contando como falta — mesmo após a aprovação.
+                </span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-3 h-3 mt-px shrink-0" />
+                <span>
+                  <strong>Abono configurável.</strong> Marque “Abonar o dia” abaixo para abonar; sem marcar, o dia não é abonado.
+                </span>
+              </>
+            )}
+          </div>
+        )}
+        {just?.requer_anexo && (
+          <div className="flex items-center gap-1 text-[9px] text-amber-600 dark:text-amber-400">
+            <Paperclip className="w-2.5 h-2.5 shrink-0" /> Exige anexo (comprovante).
+          </div>
+        )}
         <Input
           value={pj.observacao}
           onChange={(e) => setPJ(data, key, { observacao: e.target.value })}
@@ -502,7 +545,7 @@ export function SolicitarAjusteFolhaInterno({
               checked={pj.abonarSeAprovado}
               onCheckedChange={(c) => setPJ(data, key, { abonarSeAprovado: c === true })}
             />
-            <span>Abonar se aprovado</span>
+            <span>Abonar o dia (quando aprovado)</span>
           </label>
         )}
       </div>
@@ -530,7 +573,7 @@ export function SolicitarAjusteFolhaInterno({
                 <div className="flex-1">
                   <DialogTitle>Folha de Ponto · Ajustes</DialogTitle>
                   <DialogDescription>
-                    A folha mostra o mês todo. Edite horários e informe a justificativa de cada período (o abono é aplicado automaticamente pela justificativa na aprovação). Use "Dia Inteiro" para lançar o dia pela escala.
+                    A folha mostra o mês todo. Edite horários e informe a justificativa de cada período, ou use "Dia inteiro" para lançar uma folga/justificativa no dia todo (folga, licença, abono…). Cada justificativa mostra se abona ou não — o abono é aplicado automaticamente na aprovação, conforme a configuração.
                   </DialogDescription>
                 </div>
               </div>
@@ -687,10 +730,11 @@ export function SolicitarAjusteFolhaInterno({
                               </div>
                             ) : ed.diaInteiro ? (
                               <div className="grid grid-cols-[240fr_280fr] gap-2 items-start">
-                                <div className="text-[10px] text-muted-foreground italic py-1">
-                                  Dia inteiro pela escala do colaborador (horários não editáveis).
+                                <div className="text-[10px] text-muted-foreground py-1 space-y-0.5">
+                                  <p className="font-medium text-foreground">Lançamento de dia inteiro</p>
+                                  <p className="italic">Folga, licença ou abono no dia todo, pela escala do colaborador (horários não editáveis). A justificativa ao lado define se o dia é abonado.</p>
                                 </div>
-                                <div>{renderJustBlock(data, DIA_KEY, "Dia inteiro")}</div>
+                                <div>{renderJustBlock(data, DIA_KEY, "Justificativa do dia (folga, licença, abono…)")}</div>
                               </div>
                             ) : preAssinalado ? (
                               /* Escala pré-assinalada: só 1 par (Entrada/Saída). O intervalo

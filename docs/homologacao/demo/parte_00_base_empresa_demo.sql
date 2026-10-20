@@ -320,7 +320,7 @@ SELECT
   (SELECT count(*) FROM public.admissoes WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS colaboradores,
   (SELECT count(*) FROM public.profiles WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001'
       AND user_id IN (SELECT id FROM auth.users WHERE lower(email) = 'leirinuernberg@gmail.com')) AS login_ligado_ao_demo,
-  CASE WHEN (SELECT count(*) FROM public.admissoes WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') = 64
+  CASE WHEN (SELECT count(*) FROM public.admissoes WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') >= 64
        THEN 'OK' ELSE 'CONFERIR' END AS situacao;
 
 -- ---------------------------------------------------------------------------

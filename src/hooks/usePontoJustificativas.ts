@@ -23,6 +23,9 @@ export interface PontoJustificativa {
   codigo: string | null;
   /** true = justificativa padrão do sistema (não pode ser excluída). */
   sistema: boolean;
+  /** Citação legal quando o abono é obrigatório por lei (art. 473 CLT).
+   *  Preenchido => abono travado em "sim", linha não editável/excluível. */
+  base_legal: string | null;
   created_at: string;
   updated_at: string;
 }

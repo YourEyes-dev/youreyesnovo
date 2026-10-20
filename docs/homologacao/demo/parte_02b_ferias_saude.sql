@@ -443,7 +443,7 @@ BEGIN
                round(r.salario / 30.0 * v_dir * 4.0 / 3.0, 2),
                'Pedido recusado pelo gestor da área.', now() - interval '9 days', now() - interval '6 days'
          WHERE NOT EXISTS (SELECT 1 FROM public.ferias_solicitacoes x WHERE x.id = public.demo_id('feriassol:' || r.id::text || ':b'));
-      ELSIF v_sc = 'sugerido' AND v_rn % 2 = 0 THEN
+      ELSIF v_sc = 'sugerido' THEN
         INSERT INTO public.ferias_solicitacoes (
           id, tenant_id, empresa_id, colaborador_id, colaborador_nome, colaborador_cpf, departamento, cargo,
           data_inicio, data_fim, dias_solicitados, saldo_dias, status, abono_pecuniario, dias_abono, salario_base,
@@ -908,6 +908,56 @@ WHERE t.tenant_id = 'd3e00000-0000-4000-8000-000000000001' AND t.tipo = 'ocupaci
   AND t.data_emissao + 365 < CURRENT_DATE
   AND NOT EXISTS (SELECT 1 FROM public.alertas_saude x WHERE x.id = public.demo_id('alertasaude:aso:' || t.id::text));
 
+-- Um afastamento que cai em cima de ferias ja aprovadas: o proprio sistema suspende as ferias
+-- (gatilho de afastamento), e a solicitacao passa a aparecer como "suspensa".
+DO $suspenso$
+DECLARE
+  v_sol record;
+  v_af  uuid := public.demo_id('afast:19');
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.afastamentos WHERE id = v_af) THEN
+    RETURN;
+  END IF;
+  FOR v_sol IN
+    SELECT s.colaborador_nome, s.colaborador_cpf, s.data_inicio, s.departamento, s.cargo
+      FROM public.ferias_solicitacoes s
+     WHERE s.tenant_id = 'd3e00000-0000-4000-8000-000000000001'
+       AND s.status = 'aprovado'
+       AND s.data_inicio - CURRENT_DATE BETWEEN 3 AND 14
+     ORDER BY s.data_inicio, s.id
+     LIMIT 1
+  LOOP
+    INSERT INTO public.afastamentos (
+      id, tenant_id, empresa_id, colaborador_id, colaborador_nome, colaborador_cpf, data_inicio, data_fim, status,
+      motivo_principal, nexo_trabalho, observacoes, cargo_id, setor_id, tipo_principal_new, status_geral_new, data_atestado
+    ) VALUES (
+      v_af, 'd3e00000-0000-4000-8000-000000000001', 'd3e00000-0000-4000-8000-000000000002', NULL,
+      v_sol.colaborador_nome, v_sol.colaborador_cpf, CURRENT_DATE - 1, v_sol.data_inicio + 2, 'ativo',
+      'respiratorio', 'nao', 'Pneumonia leve; o afastamento coincide com as férias já aprovadas, que foram suspensas pelo sistema.',
+      public.demo_id('cargo:' || v_sol.cargo), public.demo_id('depto:' || v_sol.departamento),
+      'doenca_comum', 'registrado', CURRENT_DATE - 1
+    );
+    INSERT INTO public.afastamentos_saude (id, afastamento_id, tenant_id, cid_principal, cid_descricao, cid_grupo, cid_capitulo,
+                                           profissional_nome, profissional_conselho, profissional_numero, profissional_uf, especialidade)
+    VALUES (public.demo_id('afastsaude:19'), v_af, 'd3e00000-0000-4000-8000-000000000001', 'J18.9', 'Pneumonia não especificada',
+            'J09-J18', 'X - Doenças do aparelho respiratório', 'Dr. Paulo Ricardo Menezes', 'CRM', 'DEMO-10101', 'SC', 'Clínica geral');
+    INSERT INTO public.atestados (
+      id, tenant_id, empresa_id, colaborador_nome, colaborador_cpf, colaborador_cargo, colaborador_departamento, tipo, subtipo_assistencial,
+      data_emissao, profissional_nome, profissional_registro, profissional_tipo, profissional_uf, data_inicio_afastamento,
+      data_fim_afastamento, dias_afastamento, unidade_afastamento, contem_cid, cid_codigo, cid_autorizado, grupo_clinico, nexo_trabalho,
+      afastamento_id, criado_por_nome
+    ) VALUES (
+      public.demo_id('atestado:af19'), 'd3e00000-0000-4000-8000-000000000001', 'd3e00000-0000-4000-8000-000000000002',
+      v_sol.colaborador_nome, v_sol.colaborador_cpf, v_sol.cargo, v_sol.departamento, 'atestados', 'doenca_nao_trabalho',
+      CURRENT_DATE - 1, 'Dr. Paulo Ricardo Menezes', 'DEMO-10101', 'medico', 'SC', CURRENT_DATE - 1,
+      v_sol.data_inicio + 2, (v_sol.data_inicio + 2) - (CURRENT_DATE - 1) + 1, 'dias', true, 'J18.9', true, 'respiratorio', 'nao',
+      v_af, 'Camila Duarte (RH)'
+    );
+  END LOOP;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Afastamento sobre ferias aprovadas nao semeado: % (%)', SQLERRM, SQLSTATE;
+END $suspenso$;
+
 -- Reprocessa a inteligencia do GAF (marcadores, pendencias, NTEP) dos afastamentos que tem CID,
 -- agora que o CID foi gravado. Feito uma unica vez por afastamento.
 UPDATE public.afastamentos a
@@ -915,3 +965,50 @@ UPDATE public.afastamentos a
  WHERE a.tenant_id = 'd3e00000-0000-4000-8000-000000000001'
    AND EXISTS (SELECT 1 FROM public.afastamentos_saude s WHERE s.afastamento_id = a.id AND s.cid_principal IS NOT NULL)
    AND NOT EXISTS (SELECT 1 FROM public.gaf_auditoria g WHERE g.entidade_id = a.id AND g.acao = 'alteracao');
+
+-- Efeito colateral do sistema: ao gravar uma solicitacao de ferias que ainda nao esta aprovada
+-- (pendente, recusada, cancelada ou suspensa), a consolidacao do ponto marca "falta" nos dias
+-- FUTUROS do pedido. Falta futura nao existe de verdade: trocamos para "pendente" (dia ainda por
+-- acontecer) e retiramos os alertas de falta desses dias. So o tenant demo, so depois de hoje, so
+-- nos dias cobertos por esses pedidos.
+UPDATE public.ponto_diario pd
+   SET status = 'pendente'
+ WHERE pd.tenant_id = 'd3e00000-0000-4000-8000-000000000001'
+   AND pd.status = 'falta'
+   AND pd.data > CURRENT_DATE
+   AND pd.entrada IS NULL
+   AND EXISTS (SELECT 1 FROM public.ferias_solicitacoes f
+                WHERE f.tenant_id = pd.tenant_id AND f.colaborador_cpf = pd.colaborador_cpf
+                  AND f.status IN ('pendente', 'recusado', 'cancelado', 'suspenso')
+                  AND pd.data BETWEEN f.data_inicio AND f.data_fim);
+
+DELETE FROM public.ponto_alertas pa
+ WHERE pa.tenant_id = 'd3e00000-0000-4000-8000-000000000001'
+   AND pa.tipo = 'falta'
+   AND pa.data_referencia > CURRENT_DATE
+   AND EXISTS (SELECT 1 FROM public.ferias_solicitacoes f
+                WHERE f.tenant_id = pa.tenant_id AND f.colaborador_cpf = pa.colaborador_cpf
+                  AND f.status IN ('pendente', 'recusado', 'cancelado', 'suspenso')
+                  AND pa.data_referencia BETWEEN f.data_inicio AND f.data_fim);
+
+-- ---------------------------------------------------------------------------
+-- Conferencia final (parte 02b)
+-- ---------------------------------------------------------------------------
+SELECT
+  (SELECT count(*) FROM public.ferias_periodos_aquisitivos WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS periodos_aquisitivos,
+  (SELECT count(*) FROM public.ferias_programacao WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS programacoes,
+  (SELECT count(*) FROM public.ferias_solicitacoes WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS solicitacoes_ferias,
+  (SELECT count(DISTINCT status) FROM public.ferias_solicitacoes WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS situacoes_ferias,
+  (SELECT count(*) FROM public.ferias_coletivas WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS ferias_coletivas,
+  (SELECT count(*) FROM public.ferias_alertas WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS alertas_ferias,
+  (SELECT count(*) FROM public.afastamentos WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS afastamentos,
+  (SELECT count(*) FROM public.atestados WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001' AND tipo <> 'ocupacional') AS atestados_e_licencas,
+  (SELECT count(*) FROM public.atestados WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001' AND tipo = 'ocupacional') AS asos,
+  (SELECT count(*) FROM public.eventos_saude WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS eventos_saude,
+  (SELECT count(*) FROM public.beneficios_inss WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS beneficios_inss,
+  (SELECT count(*) FROM public.afastamentos_pendencias WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS pendencias_gaf,
+  CASE WHEN (SELECT count(*) FROM public.ferias_solicitacoes WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') >= 15
+        AND (SELECT count(*) FROM public.ferias_periodos_aquisitivos WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') >= 40
+        AND (SELECT count(*) FROM public.afastamentos WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') >= 18
+        AND (SELECT count(*) FROM public.atestados WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001' AND tipo = 'ocupacional') >= 30
+       THEN 'OK' ELSE 'CONFERIR' END AS situacao;

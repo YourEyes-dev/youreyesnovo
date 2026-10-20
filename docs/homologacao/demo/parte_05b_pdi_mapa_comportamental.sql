@@ -412,6 +412,8 @@ WHERE EXISTS (SELECT 1 FROM public.mapa_comportamental_politicas WHERE id = publ
 
 -- (M3) Mapas concluidos dos colaboradores (resultado calculado com o algoritmo do app;
 --      as respostas item a item nao sao gravadas para os colaboradores)
+DO $mapa1$
+BEGIN
 INSERT INTO public.mapa_comportamental_respostas (
   id, tenant_id, empresa_id, colaborador_nome, colaborador_cpf, campanha_id, instrumento_versao, algoritmo_versao, status,
   respostas, resultado, arquetipo, indice_consistencia, confiabilidade, aviso_versao, aviso_aceite_em,
@@ -474,8 +476,13 @@ FROM (VALUES
 JOIN public.admissoes a ON a.id = public.demo_id('admissao:' || v.n)
 WHERE EXISTS (SELECT 1 FROM public.mapa_comportamental_campanhas WHERE id = public.demo_id('mapacamp:' || v.camp))
   AND NOT EXISTS (SELECT 1 FROM public.mapa_comportamental_respostas r WHERE r.id = public.demo_id('mapa:' || v.n));
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Mapas dos colaboradores nao semeados (cota do plano ou estrutura diferente): % (%)', SQLERRM, SQLSTATE;
+END $mapa1$;
 
 -- (M4) Mapas do proprio login da demo: o atual (campanha de lideranca) e a aplicacao anterior
+DO $mapa2$
+BEGIN
 INSERT INTO public.mapa_comportamental_respostas (
   id, tenant_id, empresa_id, auth_user_id, usuario_id, colaborador_nome, colaborador_cpf, campanha_id, instrumento_versao,
   algoritmo_versao, status, respostas, resultado, arquetipo, indice_consistencia, confiabilidade, aviso_versao, aviso_aceite_em,
@@ -497,6 +504,9 @@ FROM (VALUES
 JOIN public.usuarios_base ub ON ub.auth_user_id = (SELECT u.id FROM auth.users u WHERE lower(u.email) = 'leirinuernberg@gmail.com' LIMIT 1)
 WHERE ub.tenant_id = 'd3e00000-0000-4000-8000-000000000001'
   AND NOT EXISTS (SELECT 1 FROM public.mapa_comportamental_respostas r WHERE r.id = public.demo_id('mapa:demo:' || v.qual));
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Mapas do login da demo nao semeados (cota do plano ou estrutura diferente): % (%)', SQLERRM, SQLSTATE;
+END $mapa2$;
 
 -- (M5) Participacoes nas campanhas (convidados x respondidos = cobertura)
 INSERT INTO public.mapa_comportamental_participacoes (

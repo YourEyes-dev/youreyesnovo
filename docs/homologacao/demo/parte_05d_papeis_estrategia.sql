@@ -17,7 +17,8 @@
 --      (atividades, competencias, POPs, EPIs, treinamentos, manual gerado), 6 parciais,
 --      4 minimas e 1 vazia; indicadores, evidencias de treinamento (aprovados,
 --      reprovados e em andamento) e 8 envios de manual para assinatura;
---   2. EPIs do catalogo usados nas funcoes (so cria o que ainda nao existir pelo nome);
+--   2. EPIs: vincula as funcoes ao catalogo da parte 03a (se o tenant nao tiver catalogo,
+--      cria um minimo de 9 tipos);
 --   3. Estrategia: cultura (missao, visao, valores, manual), 3 analises SWOT com
 --      itens, 2 matrizes Oceano Azul e organograma com ~35 posicoes.
 --
@@ -322,7 +323,9 @@ WHERE p.tenant_id = 'd3e00000-0000-4000-8000-000000000001' AND p.status IN ('pub
   AND NOT EXISTS (SELECT 1 FROM public.funcao_pop_versoes v WHERE v.id = public.demo_id('fpopv:' || p.id::text || ':' || s.versao));
 
 -- ---------------------------------------------------------------------------
--- (5) EPIs: catalogo (so o que nao existe pelo nome) e vinculacao as funcoes
+-- (5) EPIs: usa o catalogo ja semeado pela parte 03a (reconhece pelo nome); so cria um
+--     catalogo minimo se o tenant ainda nao tiver NENHUM tipo de EPI
+--     (aplique a 03a antes desta parte para nao misturar catalogos)
 -- ---------------------------------------------------------------------------
 INSERT INTO public.epi_tipos (id, tenant_id, nome, descricao, validade_meses, categoria, ca_numero, estoque_minimo, quantidade_estoque, is_active, created_at, updated_at)
 SELECT public.demo_id('epitipo:' || v.nome), 'd3e00000-0000-4000-8000-000000000001', v.nome, v.descr, v.validade, v.cat, v.ca, 10, 40, true,
@@ -338,7 +341,7 @@ FROM (VALUES
   ('Respirador PFF2', 'Proteção respiratória contra fumos metálicos.', 3, 'Proteção respiratória', 'CA 00008 (demo)'),
   ('Luva isolante', 'Proteção contra choque elétrico (classe 0).', 12, 'Proteção das mãos', 'CA 00009 (demo)')
 ) AS v(nome, descr, validade, cat, ca)
-WHERE NOT EXISTS (SELECT 1 FROM public.epi_tipos e WHERE e.tenant_id = 'd3e00000-0000-4000-8000-000000000001' AND lower(e.nome) = lower(v.nome));
+WHERE NOT EXISTS (SELECT 1 FROM public.epi_tipos e WHERE e.tenant_id = 'd3e00000-0000-4000-8000-000000000001');
 
 INSERT INTO public.funcao_epi_vinculacoes (id, tenant_id, cargo_id, epi_tipo_id, obrigatoriedade, created_at)
 SELECT public.demo_id('fepivin:' || v.cargo || ':' || v.epi), 'd3e00000-0000-4000-8000-000000000001', public.demo_id('cargo:' || v.cargo),
@@ -366,7 +369,25 @@ FROM (VALUES
   ('Analista da Qualidade', 'Capacete de segurança', 'condicional'), ('Analista da Qualidade', 'Calçado de segurança', 'condicional'),
   ('Analista da Qualidade', 'Óculos de proteção', 'condicional')
 ) AS v(cargo, epi, obr)
-JOIN public.epi_tipos e ON e.tenant_id = 'd3e00000-0000-4000-8000-000000000001' AND lower(e.nome) = lower(v.epi)
+JOIN (VALUES
+  ('Capacete de segurança', ARRAY['%capacete%'], '%zzz%'),
+  ('Óculos de proteção', ARRAY['%óculos%'], '%zzz%'),
+  ('Protetor auricular', ARRAY['%protetor auricular%'], '%zzz%'),
+  ('Luvas de proteção', ARRAY['%luva%'], '%isolante%'),
+  ('Calçado de segurança', ARRAY['%botina%', '%calçado%'], '%zzz%'),
+  ('Máscara de solda', ARRAY['%máscara de solda%'], '%zzz%'),
+  ('Avental de raspa', ARRAY['%avental%'], '%zzz%'),
+  ('Respirador PFF2', ARRAY['%respirador%pff2%'], '%zzz%'),
+  ('Luva isolante', ARRAY['%luva isolante%'], '%zzz%')
+) AS mp(label, inc, exc) ON mp.label = v.epi
+JOIN LATERAL (
+  SELECT x.id
+    FROM public.epi_tipos x
+   WHERE x.tenant_id = 'd3e00000-0000-4000-8000-000000000001'
+     AND x.nome ILIKE ANY (mp.inc) AND x.nome NOT ILIKE mp.exc
+   ORDER BY x.created_at, x.id
+   LIMIT 1
+) e ON true
 WHERE EXISTS (SELECT 1 FROM public.cargos c WHERE c.id = public.demo_id('cargo:' || v.cargo))
   AND NOT EXISTS (SELECT 1 FROM public.funcao_epi_vinculacoes x WHERE x.id = public.demo_id('fepivin:' || v.cargo || ':' || v.epi));
 

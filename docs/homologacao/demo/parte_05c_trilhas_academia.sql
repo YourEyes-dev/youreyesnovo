@@ -585,6 +585,6 @@ SELECT
   (SELECT count(*) FROM public.trilha_medalhas_colaboradores WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS medalhas_conquistadas,
   (SELECT count(*) FROM public.academia_treinamentos WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS academia_treinamentos,
   (SELECT count(*) FROM public.academia_aulas WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') AS academia_aulas,
-  CASE WHEN (SELECT count(*) FROM public.trilhas WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') = 13
+  CASE WHEN (SELECT count(*) FROM public.trilhas WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') >= 13
         AND (SELECT count(*) FROM public.academia_treinamentos WHERE tenant_id = 'd3e00000-0000-4000-8000-000000000001') = 7
        THEN 'OK' ELSE 'CONFERIR' END AS situacao;

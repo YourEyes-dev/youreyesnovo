@@ -19,7 +19,7 @@ import { resolve } from "node:path";
 const FUNCOES = resolve(__dirname, "../../supabase/functions");
 const ler = (f: string) => readFileSync(resolve(FUNCOES, f, "index.ts"), "utf8");
 
-const COM_EMPRESA = ["ai-cultura-manual", "ai-cultura-sugestao", "ai-pop-generator", "ai-sst-analise"];
+const COM_EMPRESA = ["ai-cultura-manual", "ai-cultura-sugestao", "ai-cultura-dia-profissao", "ai-pop-generator", "ai-sst-analise"];
 const SO_USUARIO = ["ai-chat"];
 const SO_SUPERADMIN = ["ai-qa-scan", "ai-qa-agent"];
 
@@ -39,6 +39,19 @@ describe("Edge Functions de IA: autenticação", () => {
 
   it.each(SO_SUPERADMIN)("%s exige superadmin", (f) => {
     expect(ler(f)).toMatch(/await exigirSuperadmin\(req\)/);
+  });
+
+  it("ai-cultura-dia-profissao valida a empresa logada e só analisa cargos dela", () => {
+    const src = ler("ai-cultura-dia-profissao");
+    // a empresa do corpo só vale se pertencer ao tenant do login
+    expect(src).toMatch(/from\("empresa_cadastro"\)[\s\S]*\.eq\("tenant_id", tenantId\)/);
+    // todo acesso a dados é filtrado pelo tenant E pela empresa
+    expect(src).toMatch(/from\("cargos"\)\.select\("nome"\)\.eq\("tenant_id", tenantId\)\.eq\("empresa_id", empresaId\)/);
+    expect(src).toMatch(/from\("admissoes"\)\.select\("cargo"\)\.eq\("tenant_id", tenantId\)\.eq\("empresa_id", empresaId\)/);
+    // a IA só recebe cargos que passaram pelo filtro da empresa
+    expect(src).toMatch(/filtrarCargosDaEmpresa\(solicitados/);
+    expect(src).toMatch(/montarPrompt\(cargos\)/);
+    expect(src).not.toMatch(/montarPrompt\(solicitados\)/);
   });
 
   it("ai-sst-analise só baixa arquivo da própria empresa", () => {

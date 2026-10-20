@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, X, Pencil, Clock, Paperclip, ShieldAlert } from "lucide-react";
+import { Plus, Trash2, Save, X, Pencil, Clock, Paperclip, ShieldAlert, Scale } from "lucide-react";
 import { usePontoJustificativas, type PontoJustificativa, type TipoAbono } from "@/hooks/usePontoJustificativas";
 import { confirm } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ interface Props {
 
 type FormState = Partial<PontoJustificativa> & { nome: string; horas_abono: number };
 
-const EMPTY: FormState = { nome: "", descricao: "", horas_abono: 0, requer_anexo: false, ativo: true, ordem: 0, tipo_abono: "nao" };
+const EMPTY: FormState = { nome: "", descricao: "", horas_abono: 0, requer_anexo: false, ativo: true, ordem: 0, tipo_abono: "nao", base_legal: null };
 
 const ABONO_LABEL: Record<TipoAbono, string> = { sim: "Abona", nao: "Não abona", configuravel: "Configurável" };
 const ABONO_BADGE: Record<TipoAbono, string> = {
@@ -47,6 +47,7 @@ export function ConfigJustificativasModal({ open, onOpenChange }: Props) {
       tipo_abono: j.tipo_abono || "nao",
       codigo: j.codigo,
       sistema: j.sistema,
+      base_legal: j.base_legal,
     });
   };
 
@@ -109,7 +110,7 @@ export function ConfigJustificativasModal({ open, onOpenChange }: Props) {
               <div className="flex items-center gap-4 text-sm flex-wrap">
                 <div className="flex items-center gap-2">
                   <Label className="text-xs">Abono automático</Label>
-                  <Select value={(form.tipo_abono as TipoAbono) || "nao"} onValueChange={(v) => setForm({ ...form, tipo_abono: v as TipoAbono })}>
+                  <Select value={(form.tipo_abono as TipoAbono) || "nao"} disabled={!!form.base_legal} onValueChange={(v) => setForm({ ...form, tipo_abono: v as TipoAbono })}>
                     <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="sim">Sim (abona)</SelectItem>
@@ -117,6 +118,11 @@ export function ConfigJustificativasModal({ open, onOpenChange }: Props) {
                       <SelectItem value="configuravel">Configurável</SelectItem>
                     </SelectContent>
                   </Select>
+                  {form.base_legal && (
+                    <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                      <Scale className="w-3 h-3" /> Abono obrigatório por lei ({form.base_legal})
+                    </span>
+                  )}
                 </div>
                 <label className="flex items-center gap-2">
                   <Switch checked={!!form.requer_anexo} onCheckedChange={(v) => setForm({ ...form, requer_anexo: v })} />
@@ -163,9 +169,17 @@ export function ConfigJustificativasModal({ open, onOpenChange }: Props) {
                     <td className="px-3 py-2">
                       <div className="font-medium flex items-center gap-1.5">
                         {j.nome}
-                        {j.sistema && <Badge variant="secondary" className="text-[9px] px-1 py-0">padrão</Badge>}
+                        {j.base_legal ? (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 border-indigo-500 text-indigo-700 dark:text-indigo-400">por lei</Badge>
+                        ) : j.sistema ? (
+                          <Badge variant="secondary" className="text-[9px] px-1 py-0">padrão</Badge>
+                        ) : null}
                       </div>
-                      {j.descricao && <div className="text-xs text-muted-foreground">{j.descricao}</div>}
+                      {j.base_legal ? (
+                        <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1"><Scale className="w-3 h-3" /> {j.base_legal}</div>
+                      ) : j.descricao ? (
+                        <div className="text-xs text-muted-foreground">{j.descricao}</div>
+                      ) : null}
                     </td>
                     <td className="px-3 py-2">
                       <Badge variant="outline" className={`text-[10px] ${ABONO_BADGE[j.tipo_abono || "nao"]}`}>

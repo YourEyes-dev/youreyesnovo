@@ -15,6 +15,9 @@ export interface CulturaData {
   updated_at: string;
 }
 
+export type AutomacaoModo = "desligado" | "aprovar";
+export type TomMensagem = "formal" | "leve";
+
 export interface CulturaPreferencia {
   id: string;
   tenant_id: string;
@@ -49,6 +52,14 @@ export interface CulturaConfig {
   limite_valor_presente: number | null;
   folga_permitida: boolean;
   responsavel_padrao: string;
+  /** desligado | aprovar — a rotina diária só cria ações pendentes; publicar e concluir seguem humanos */
+  automacao_aniversario: AutomacaoModo;
+  automacao_tempo_casa: AutomacaoModo;
+  tom_mensagem: TomMensagem;
+  /** meta de cobertura de celebração (%), abaixo dela a tela alerta */
+  meta_cobertura: number;
+  /** o Mural avisa cada gestor das celebrações do próprio time */
+  lembrar_gestor: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +79,10 @@ export interface CulturaAcao {
   status: string;
   observacoes: string | null;
   cultura_data_id: string | null;
+  /** manual | automatica */
+  origem?: string;
+  chave_unica?: string | null;
+  publicado_em?: string | null;
   created_at: string;
   updated_at: string;
 }

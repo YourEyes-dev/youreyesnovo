@@ -94,7 +94,7 @@ const formSchema = z.object({
   colaborador_cargo: z.string().optional(),
   colaborador_departamento: z.string().optional(),
   
-  lancamento_tipo: z.enum(["atestado_medico", "acidente_trabalho", "afastamento_inss", "licenca_legal", "licenca_nr"]).optional(),
+  lancamento_tipo: z.enum(["atestado_medico", "acidente_trabalho", "afastamento_inss", "licenca_legal", "licenca_nr", "declaracao_comparecimento"]).optional(),
   tipo_principal_new: z.string().optional(),
   numero_cat: z.string().optional(),
   data_acidente: z.string().optional(),
@@ -113,7 +113,7 @@ const formSchema = z.object({
   subtipo_atestados: z.string().optional(),
   
   data_emissao: z.date({ required_error: "Data de emissão é obrigatória" }),
-  profissional_nome: z.string().min(1, "Nome do emissor é obrigatório"),
+  profissional_nome: z.string().optional(),
   profissional_registro: z.string().optional(),
   profissional_uf: z.string().optional(),
   profissional_rqe: z.string().optional(),
@@ -131,6 +131,7 @@ const formSchema = z.object({
   
   contem_cid: z.boolean().optional(),
   cid_codigo: z.string().optional(),
+  abona: z.boolean().optional(),
   cid_autorizado: z.boolean().optional(),
   grupo_clinico: z.string().optional(),
   nexo_trabalho: z.string().optional(),
@@ -141,13 +142,24 @@ const formSchema = z.object({
   
   observacoes: z.string().optional(),
 }).refine((data) => {
-  if (data.tipo !== "licencas") {
+  // Declaração de comparecimento muitas vezes não traz médico/CRM (é um
+  // comprovante de presença, não um atestado de incapacidade) — isenta.
+  if (data.tipo !== "licencas" && data.lancamento_tipo !== "declaracao_comparecimento") {
     return !!data.profissional_registro && data.profissional_registro.length > 0;
   }
   return true;
 }, {
   message: "Registro profissional (CRM/RMS) é obrigatório",
   path: ["profissional_registro"],
+}).refine((data) => {
+  // Nome do emissor é obrigatório, EXCETO na declaração de comparecimento —
+  // comprovante que muitas vezes vem de clínica/secretaria sem profissional
+  // nomeado. (A coluna é NOT NULL: no submit gravamos '' quando em branco.)
+  if (data.lancamento_tipo === "declaracao_comparecimento") return true;
+  return !!data.profissional_nome && data.profissional_nome.length > 0;
+}, {
+  message: "Nome do emissor é obrigatório",
+  path: ["profissional_nome"],
 }).refine((data) => {
   // Período informado exige data de início. Sem ela não há período, e o
   // atestado era salvo anunciando "3 dias de afastamento" sem registrar
@@ -199,6 +211,7 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
       cid_autorizado: true, // Agora sempre true por padrão, pois o envio ao RH implica autorização
       nexo_trabalho: "nao",
       unidade_afastamento: "dias",
+      abona: false,
     },
   });
 
@@ -242,6 +255,7 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
         contem_cid: a.contem_cid ?? false,
         cid_codigo: a.cid_codigo ?? undefined,
         cid_autorizado: a.cid_autorizado ?? true,
+        abona: (a as { abona?: boolean | null }).abona ?? false,
         grupo_clinico: a.grupo_clinico ?? undefined,
         nexo_trabalho: a.nexo_trabalho ?? "nao",
         aptidao: a.aptidao ?? undefined,
@@ -577,7 +591,8 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
         ? (TIPO_PRINCIPAL_TO_SUBTIPO_ASSISTENCIAL[values.tipo_principal_new as keyof typeof TIPO_PRINCIPAL_TO_SUBTIPO_ASSISTENCIAL] as AtestadoFormData['subtipo_assistencial'])
         : (values.tipo === 'licencas' ? values.subtipo_licencas : values.subtipo_atestados),
       data_emissao: format(values.data_emissao, "yyyy-MM-dd"),
-      profissional_nome: values.profissional_nome,
+      // Coluna NOT NULL: a declaração pode não ter emissor nomeado -> grava ''.
+      profissional_nome: values.profissional_nome ?? "",
       profissional_registro: values.profissional_registro,
       profissional_uf: values.profissional_uf,
       profissional_rqe: values.profissional_rqe,
@@ -598,6 +613,9 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
       contem_cid: values.contem_cid,
       cid_codigo: values.cid_codigo,
       cid_autorizado: values.cid_autorizado,
+      // Declaração: decisão de abonar (vale quando a regra da empresa é
+      // configurável; sim/não do catálogo prevalecem na consolidação).
+      abona: values.lancamento_tipo === 'declaracao_comparecimento' ? !!values.abona : null,
       grupo_clinico: values.grupo_clinico as AtestadoFormData['grupo_clinico'],
       nexo_trabalho: values.nexo_trabalho as AtestadoFormData['nexo_trabalho'],
       aptidao: values.aptidao as AtestadoFormData['aptidao'],
@@ -622,6 +640,9 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
 
   const watchTipo = form.watch("tipo");
   const watchLancamentoTipo = form.watch("lancamento_tipo");
+  // Declaração de comparecimento: comprovante de presença, não atestado médico.
+  // Não exige CRM/CID nem emissor nomeado; esconde a seção médica.
+  const isDeclaracao = watchLancamentoTipo === "declaracao_comparecimento";
   const watchContemCid = form.watch("contem_cid");
   const watchUnidadeAfastamento = form.watch("unidade_afastamento");
   // Tarefa 2: mostra a seção de Benefício INSS quando o lançamento é Afastamento INSS
@@ -704,6 +725,34 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
                     )}
                   />
                 )}
+              </div>
+            )}
+
+            {/* Declaração de comparecimento: sem CRM/CID; abono pela regra da empresa. */}
+            {watchLancamentoTipo === 'declaracao_comparecimento' && (
+              <div className="space-y-3 rounded-lg border border-sky-300/60 bg-sky-50/50 dark:bg-sky-950/20 p-4">
+                <p className="text-xs text-muted-foreground">
+                  Comprovante de presença em consulta/exame. Não exige CRM nem CID. O abono segue
+                  a regra definida em <strong>Configurações › Justificativas de Ponto</strong>.
+                </p>
+                <FormField
+                  control={form.control}
+                  name="abona"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between rounded-md border p-3 bg-background">
+                      <div className="pr-3">
+                        <FormLabel className="text-sm">Abonar o dia</FormLabel>
+                        <p className="text-xs text-muted-foreground">
+                          Vale quando a regra da empresa é “Configurável”. Se a empresa definiu
+                          Abona/Não abona fixo, a configuração prevalece.
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
               </div>
             )}
 
@@ -1307,7 +1356,7 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
             <div className="space-y-4">
               <h3 className="text-sm font-medium flex items-center gap-2">
                 <Stethoscope className="h-4 w-4" />
-                Profissional Emissor
+                {isDeclaracao ? "Emissor do documento (opcional)" : "Profissional Emissor"}
               </h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1316,7 +1365,7 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
                   name="profissional_nome"
                   render={({ field }) => (
                     <FormItem className="sm:col-span-2">
-                      <FormLabel>{watchTipo === "licencas" ? "Nome do Emissor *" : "Nome do Médico *"}</FormLabel>
+                      <FormLabel>{isDeclaracao ? "Emissor (clínica/secretaria)" : (watchTipo === "licencas" ? "Nome do Emissor *" : "Nome do Médico *")}</FormLabel>
                       <FormControl>
                         <Input placeholder="Dr. Nome Completo" {...field} />
                       </FormControl>
@@ -1365,6 +1414,9 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
                 />
               </div>
 
+              {/* Dados médicos (CRM/UF/RQE, contato, endereço) — ocultos na
+                  declaração de comparecimento, que não exige profissional com registro. */}
+              {!isDeclaracao && (<>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <FormField
                   control={form.control}
@@ -1477,6 +1529,7 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
                 )}
               />
             </div>
+            </>)}
 
             {/* Afastamento - for non-occupational or ASO */}
             {watchTipo !== "ocupacional" && (
@@ -1629,7 +1682,8 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
                   </div>
                 )}
 
-                {/* CID */}
+                {/* CID — não se aplica à declaração de comparecimento (sem CID). */}
+                {!isDeclaracao && (
                 <div className="space-y-4 pt-2">
                   <FormField
                     control={form.control}
@@ -1712,6 +1766,7 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
                     </div>
                   )}
                 </div>
+                )}
               </div>
             )}
 

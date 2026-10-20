@@ -7,6 +7,9 @@ import { AgendaCelebracoes } from "@/components/cultura/AgendaCelebracoes";
 import { RituaisReconhecimento } from "@/components/cultura/RituaisReconhecimento";
 import { ProximasCelebracoes } from "@/components/cultura/ProximasCelebracoes";
 import { PreferenciasColaborador } from "@/components/cultura/PreferenciasColaborador";
+import { HojeCelebracoes } from "@/components/cultura/HojeCelebracoes";
+import { CalendarioCelebracoes } from "@/components/cultura/CalendarioCelebracoes";
+import { AlertasCultura } from "@/components/cultura/AlertasCultura";
 import { CulturaIndicadores } from "@/components/cultura/CulturaIndicadores";
 
 const CulturaCelebracoes = () => {
@@ -18,13 +21,23 @@ const CulturaCelebracoes = () => {
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Sparkles className="w-7 h-7 text-primary" />
-            PESSOAS
+            Cultura &amp; Celebrações
           </h1>
           <p className="text-muted-foreground mt-1">
             Cultura não se improvisa. Se planeja, se executa e se acompanha.
           </p>
         </div>
       </motion.div>
+
+      <HojeCelebracoes
+        acoes={cultura.acoes}
+        rituais={cultura.rituais}
+        preferencias={cultura.preferencias}
+        onParabenizar={cultura.parabenizar}
+        onRegistrarRitual={cultura.registrarRealizacaoRitual}
+        tom={cultura.config?.tom_mensagem ?? "leve"}
+        onPublicar={cultura.publicarNoMural}
+      />
 
       <CulturaStats
         datasAtivas={cultura.datasAtivas}
@@ -33,11 +46,21 @@ const CulturaCelebracoes = () => {
         rituaisAtivos={cultura.rituaisAtivos}
       />
 
+      <CalendarioCelebracoes
+        acoes={cultura.acoes}
+        rituais={cultura.rituais}
+        datas={cultura.datas}
+        preferencias={cultura.preferencias}
+      />
+
       <ProximasCelebracoes
         acoes={cultura.acoes}
+        preferencias={cultura.preferencias}
         onCreateAcao={cultura.createAcao}
         onUpdateStatus={cultura.updateAcaoStatus}
       />
+
+      <AlertasCultura acoes={cultura.acoes} />
 
       <CulturaIndicadores
         acoes={cultura.acoes}
@@ -80,6 +103,8 @@ const CulturaCelebracoes = () => {
             onCreateRitual={cultura.createRitual}
             onToggleRitual={cultura.toggleRitual}
             onDeleteRitual={cultura.deleteRitual}
+            onRegistrarRitual={cultura.registrarRealizacaoRitual}
+            onGerarAcoes={cultura.gerarAcoesAgora}
             onCreateData={cultura.createData}
             onDeleteData={cultura.deleteData}
             onSaveConfig={cultura.saveConfig}

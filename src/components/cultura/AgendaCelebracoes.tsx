@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useColaboradores } from "@/hooks/useColaboradores";
 import type { CulturaAcao } from "@/types/cultura";
 import { TIPO_ACAO_LABELS, STATUS_ACAO_LABELS, STATUS_ACAO_COLORS } from "@/types/cultura";
@@ -39,8 +38,6 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
     data_referencia: "",
     data_execucao: "",
     responsavel_nome: "",
-    criar_antecipada: false,
-    dias_antecedencia: "7",
   });
 
   const filtered = acoes.filter(a => {
@@ -73,16 +70,16 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
       responsavel_nome: form.responsavel_nome || null,
     });
     setShowForm(false);
-    setForm({ tipo: "aniversario", titulo: "", descricao: "", colaborador_nome: "", data_referencia: "", data_execucao: "", responsavel_nome: "", criar_antecipada: false, dias_antecedencia: "7" });
+    setForm({ tipo: "aniversario", titulo: "", descricao: "", colaborador_nome: "", data_referencia: "", data_execucao: "", responsavel_nome: "" });
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-            <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[160px] h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os tipos</SelectItem>
               {Object.entries(TIPO_ACAO_LABELS).map(([k, v]) => (
@@ -91,7 +88,7 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
             </SelectContent>
           </Select>
           <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-            <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[150px] h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
               {Object.entries(STATUS_ACAO_LABELS).map(([k, v]) => (
@@ -100,7 +97,7 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
             </SelectContent>
           </Select>
           <Select value={filtroPeriodo} onValueChange={setFiltroPeriodo}>
-            <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todo período</SelectItem>
               <SelectItem value="mes">Este mês</SelectItem>
@@ -112,7 +109,7 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
             placeholder="Buscar colaborador..."
             value={filtroColaborador}
             onChange={e => setFiltroColaborador(e.target.value)}
-            className="w-[180px] h-8 text-xs"
+            className="w-full sm:w-[180px] h-8 text-xs"
           />
         </div>
         <Button size="sm" onClick={() => setShowForm(true)} className="gap-1">
@@ -142,6 +139,9 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
                     <Badge className={`text-[10px] shrink-0 ${STATUS_ACAO_COLORS[acao.status]}`}>
                       {STATUS_ACAO_LABELS[acao.status]}
                     </Badge>
+                    {acao.origem === "automatica" && (
+                      <Badge variant="secondary" className="text-[10px] shrink-0">Automática</Badge>
+                    )}
                   </div>
                   {acao.colaborador_nome && (
                     <p className="text-xs text-muted-foreground">Colaborador: {acao.colaborador_nome}</p>
@@ -219,28 +219,6 @@ export const AgendaCelebracoes = ({ acoes, isLoading, onCreateAcao, onUpdateStat
                 <Label>Data de Execução</Label>
                 <Input type="date" value={form.data_execucao} onChange={e => setForm(f => ({ ...f, data_execucao: e.target.value }))} />
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={form.criar_antecipada}
-                  onCheckedChange={v => setForm(f => ({ ...f, criar_antecipada: v }))}
-                />
-                <Label className="text-sm">Criar ação com antecedência</Label>
-              </div>
-              {form.criar_antecipada && (
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={90}
-                    className="w-16 h-8 text-xs"
-                    value={form.dias_antecedencia}
-                    onChange={e => setForm(f => ({ ...f, dias_antecedencia: e.target.value }))}
-                  />
-                  <span className="text-xs text-muted-foreground">dias antes</span>
-                </div>
-              )}
             </div>
             <div>
               <Label>Responsável</Label>

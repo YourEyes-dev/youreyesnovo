@@ -219,7 +219,7 @@ FROM (
          || ' ' ||
          (ARRAY['Albuquerque Teles','Barreto Nunes','Campos Lacerda','Dantas Moreira','Esteves Prado','Falcão Brito','Gouveia Leme',
                 'Holanda Pires','Imbassahy Costa','Jardim Siqueira','Leal Fontes','Macedo Arruda','Nogueira Paes','Ornelas Vidal',
-                'Peixoto Rangel','Queiroz Bastos','Rezende Matos','Sampaio Valente','Toledo Quintana','Uchôa Ferraz'])[1 + ((s.n * 7) % 20)] AS nome,
+                'Peixoto Rangel','Queiroz Bastos','Rezende Matos','Sampaio Valente','Toledo Quintana','Uchôa Ferraz'])[1 + ((s.n * 7 + s.n / 40) % 20)] AS nome,
          (ARRAY['Albuquerque Teles','Barreto Nunes','Campos Lacerda','Dantas Moreira','Esteves Prado'])[1 + (s.n % 5)] AS sobrenome,
          CASE WHEN (s.n % 2) = 1 THEN 'masculino' ELSE 'feminino' END AS genero,
          c.cargo, c.depto, c.salario, c.cbo, c.gestor,

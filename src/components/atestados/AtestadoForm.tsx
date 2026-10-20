@@ -1528,8 +1528,8 @@ export function AtestadoForm({ open, onOpenChange, onSubmit, loading, atestadoEd
                   </FormItem>
                 )}
               />
-            </div>
             </>)}
+            </div>
 
             {/* Afastamento - for non-occupational or ASO */}
             {watchTipo !== "ocupacional" && (

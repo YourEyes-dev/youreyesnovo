@@ -102,7 +102,7 @@ p4=f"""{HEAD.format(n=4,titulo='funcoes (existencia e corpo)')}
 -- detalhe de CORPO_DIFERENTE: 'ultima migration que define a funcao: AAMMDDHHMM'. A lista vem da mais recente
 -- para a mais antiga. Diferenca de corpo pode ser so formatacao/comentario (script colado a mao) ou versao velha.
 WITH esp_fn AS MATERIALIZED (
-  SELECT substring(l from '^(.*)=[0-9a-f]{{8}}@') AS sig, substring(l from '=([0-9a-f]{{8}})@') AS h, substring(l from '@([0-9]+)$') AS stamp
+  SELECT substring(l from '^(.*)=[0-9a-f]{{8}}@') AS sig, substring(l from '=([0-9a-f]{{8}})@') AS h, substring(l from '@([0-9]*)') AS stamp
   FROM unnest(string_to_array({lit('fn')}, E'\\n')) l WHERE l <> ''
 ), prod_fn AS MATERIALIZED (
   SELECT p.proname::text || '(' || pg_get_function_identity_arguments(p.oid) || ')' AS sig, left(md5(p.prosrc), 8) AS h

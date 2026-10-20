@@ -268,6 +268,7 @@ export function useAtestados() {
           dias_afastamento,
           horas_afastamento: formData.horas_afastamento,
           unidade_afastamento: formData.unidade_afastamento || 'dias',
+          abona: formData.abona ?? null,
           contem_cid: formData.contem_cid,
           cid_codigo: formData.cid_codigo,
           cid_autorizado: formData.cid_autorizado,

@@ -178,7 +178,7 @@ const Ponto = () => {
     queryFn: async () => {
       if (!tenantIdAtivo) return [] as any[];
       const { data, error } = await fromTable("atestados")
-        .select("colaborador_cpf, unidade_afastamento, horas_afastamento, minutos_afastamento, data_inicio_afastamento, data_fim_afastamento")
+        .select("colaborador_cpf, unidade_afastamento, horas_afastamento, minutos_afastamento, data_inicio_afastamento, data_fim_afastamento, subtipo_assistencial")
         .eq("tenant_id", tenantIdAtivo)
         .not("data_inicio_afastamento", "is", null)
         .lte("data_inicio_afastamento", dataSelStr) as { data: any[] | null; error: Error | null };
@@ -944,7 +944,19 @@ const Ponto = () => {
                     // mostra "Atestado" (as horas trabalhadas seguem na coluna
                     // Total). Evita divergência tipo "Regular" x "Justificado"
                     // entre colaboradores com a mesma situação de atestado.
-                    if (atestadosPorCpf.get(onlyDigits(ponto.colaborador_cpf))) {
+                    const docAtest = atestadosPorCpf.get(onlyDigits(ponto.colaborador_cpf));
+                    if (docAtest) {
+                      // Declaração de comparecimento: o selo mostra se abonou,
+                      // conforme a regra da empresa. A consolidação grava
+                      // observação 'Declaração:' só quando abona; não abonada
+                      // fica como rastro (o dia segue como falta).
+                      if (docAtest.subtipo_assistencial === "comparecimento") {
+                        const abonada = ponto.status === "justificado"
+                          && /^\s*declara/i.test(obs.replace(/^\s*abonado\s*(?::|por)?\s*/i, ""));
+                        return abonada
+                          ? { label: "Declaração", color: "bg-teal-100 text-teal-800" }
+                          : { label: "Declaração (não abonada)", color: "bg-amber-100 text-amber-800" };
+                      }
                       return { label: "Atestado", color: "bg-violet-100 text-violet-800" };
                     }
                     if (tipoDia === "feriado") {
@@ -995,7 +1007,7 @@ const Ponto = () => {
                     const di = (atestadoRaw.data_inicio_afastamento || "").split("-").reverse().join("/");
                     const df = atestadoRaw.data_fim_afastamento
                       ? String(atestadoRaw.data_fim_afastamento).split("-").reverse().join("/") : "";
-                    const tooltip = `Atestado${label ? ` (${label})` : ""}: ${di}${df && df !== di ? ` a ${df}` : ""}`;
+                    const tooltip = `${atestadoRaw.subtipo_assistencial === "comparecimento" ? "Declaração" : "Atestado"}${label ? ` (${label})` : ""}: ${di}${df && df !== di ? ` a ${df}` : ""}`;
                     return { label, tooltip };
                   })() : null;
                   // Súmula 338/TST — o intervalo do dia veio de declaração formal

@@ -35,7 +35,8 @@ export type LancamentoTipo =
   | 'acidente_trabalho'
   | 'afastamento_inss'
   | 'licenca_legal'
-  | 'licenca_nr';
+  | 'licenca_nr'
+  | 'declaracao_comparecimento';
 
 // Enum afastamento_tipo_principal (já existe no banco)
 export type AfastamentoTipoPrincipal =
@@ -44,6 +45,7 @@ export type AfastamentoTipoPrincipal =
   | 'acidente_tipico'
   | 'acidente_trajeto'
   | 'atestado_odontologico'
+  | 'comparecimento'
   | 'licenca_maternidade'
   | 'licenca_paternidade'
   | 'aborto_nao_criminoso'
@@ -265,6 +267,9 @@ export interface AtestadoFormData {
   tipo: AtestadoTipo;
   subtipo_assistencial?: AtestadoSubtipoAssistencial;
   subtipo_ocupacional?: AtestadoSubtipoOcupacional;
+  /** Declaração de comparecimento: decisão de abonar (quando a regra da empresa
+   *  é "configurável"). Ignorado quando a regra é sim/não. */
+  abona?: boolean | null;
   
   data_emissao: string;
   profissional_nome: string;
@@ -352,6 +357,7 @@ export const LANCAMENTO_TIPO_LABELS: Record<LancamentoTipo, string> = {
   afastamento_inss: 'Afastamento INSS',
   licenca_legal: 'Licença Legal',
   licenca_nr: 'Licença Não Remunerada',
+  declaracao_comparecimento: 'Declaração de comparecimento',
 };
 
 export const LANCAMENTO_TIPO_PRINCIPAL_OPCOES: Record<
@@ -384,6 +390,9 @@ export const LANCAMENTO_TIPO_PRINCIPAL_OPCOES: Record<
   licenca_nr: [
     { value: 'licenca_nao_remunerada', label: 'Licença não remunerada' },
   ],
+  declaracao_comparecimento: [
+    { value: 'comparecimento', label: 'Comparecimento a consulta/exame' },
+  ],
 };
 
 export const LANCAMENTO_TIPO_TO_ATESTADO_TIPO: Record<LancamentoTipo, AtestadoTipo> = {
@@ -392,6 +401,7 @@ export const LANCAMENTO_TIPO_TO_ATESTADO_TIPO: Record<LancamentoTipo, AtestadoTi
   afastamento_inss: 'atestados',
   licenca_legal: 'licencas',
   licenca_nr: 'licencas',
+  declaracao_comparecimento: 'atestados',
 };
 
 // Mapeia o tipo_principal_new (motor) de volta para um subtipo_assistencial
@@ -403,6 +413,7 @@ export const TIPO_PRINCIPAL_TO_SUBTIPO_ASSISTENCIAL: Record<AfastamentoTipoPrinc
   acidente_tipico: 'acidente_trabalho',
   acidente_trajeto: 'acidente_trabalho',
   atestado_odontologico: 'odontologico',
+  comparecimento: 'comparecimento',
   licenca_maternidade: 'maternidade',
   licenca_paternidade: 'paternidade',
   aborto_nao_criminoso: 'aborto_nao_criminoso',
@@ -436,6 +447,7 @@ export const SUBTIPO_LICENCAS_LABELS: Record<AfastamentoSubtipoLicencas, string>
 };
 
 export const SUBTIPO_ATESTADOS_LABELS: Record<string, string> = {
+  comparecimento: 'Declaração de comparecimento',
   maternidade: 'Licença-Maternidade',
   paternidade: 'Licença-Paternidade',
   adocao: 'Licença-Adoção',

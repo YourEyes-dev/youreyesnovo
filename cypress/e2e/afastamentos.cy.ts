@@ -81,4 +81,23 @@ describe("Módulo Afastamentos (Central GAF)", () => {
     abrirAba("FAP/RAT");
     cy.contains("CAT Pendente", { timeout: 20000 }).should("be.visible");
   });
+
+  // AFAST-TELA-10 — a declaração de comparecimento não exige CRM nem médico.
+  it("abre a Declaração de comparecimento sem exigir CRM", () => {
+    abrirAba("Atestados");
+    cy.contains("button", "Novo Atestado", { timeout: 20000 })
+      .should("be.visible").click({ force: true });
+    cy.get('[role="dialog"]', { timeout: 20000 }).should("be.visible");
+
+    // Escolhe o tipo "Declaração de comparecimento" no seletor de lançamento.
+    cy.get('[role="dialog"]').contains("label", "Tipo de Lançamento")
+      .parent().find('[role="combobox"]').click({ force: true });
+    cy.contains('[role="option"]', "Declaração de comparecimento", { timeout: 10000 })
+      .click({ force: true });
+
+    // Aparece o bloco da declaração (sem CRM/CID) e o campo CRM some.
+    cy.contains("Não exige CRM nem CID", { timeout: 20000 }).should("be.visible");
+    cy.contains("Abonar o dia").should("be.visible");
+    cy.get('[role="dialog"]').contains("CRM / CRO").should("not.exist");
+  });
 });

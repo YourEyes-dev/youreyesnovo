@@ -76,19 +76,6 @@ describe("Acesso crítico", () => {
     cy.contains("Esta área é restrita a Super Administradores.").should("be.visible");
   });
 
-  // AUTH-040
-  it("recuperar senha barra e-mail inválido e oferece voltar ao login", () => {
-    cy.visit(`${baseUrl}/forgot-password`);
-    cy.location("pathname").then((p) => cy.task("diag", `[BANCADA] forgot: pathname logo após visit = ${p}`, { log: false }));
-    cy.document().then((d) => cy.task("diag", `[BANCADA] forgot: corpo logo após visit = ${(d.body?.innerText || "").replace(/\s+/g, " ").slice(0, 160)}`, { log: false }));
-    cy.contains("h1", "Recuperar senha", { timeout: 20000 }).should("be.visible");
-    cy.contains("button", "Enviar link de recuperação").click();
-    cy.contains("E-mail inválido", { timeout: 20000 }).should("be.visible");
-    cy.contains("h1", "Recuperar senha").should("be.visible"); // não avançou
-    cy.contains("a", "Voltar para o login").click();
-    cy.contains("h1", "Login", { timeout: 20000 }).should("be.visible");
-  });
-
   // AUTH-031
   it("redefinir senha sem sessão de recuperação é barrado", () => {
     cy.visit(`${baseUrl}/reset-password`);
@@ -96,6 +83,23 @@ describe("Acesso crítico", () => {
     cy.contains("a", "Solicitar novo link").should("have.attr", "href").and("include", "/forgot-password");
     // O formulário de nova senha não aparece sem o link do e-mail.
     cy.contains("h1", "Criar nova senha").should("not.exist");
+  });
+
+  // AUTH-040
+  it("recuperar senha barra e-mail inválido e oferece voltar ao login", () => {
+    // Caminho do usuário: do login, pelo link "Esqueceu a senha?". (A abertura DIRETA de
+    // /forgot-password num navegador sem cache trava ~20 s em "Iniciando sistema…" na 1ª
+    // vez — achado de produto registrado em docs/PLANO_COBERTURA_CYPRESS.md.)
+    cy.visit(`${baseUrl}/login`);
+    cy.contains("h1", "Login", { timeout: 20000 }).should("be.visible");
+    cy.contains("a", "Esqueceu a senha?").click();
+    cy.location("pathname").should("include", "/forgot-password");
+    cy.contains("h1", "Recuperar senha", { timeout: 20000 }).should("be.visible");
+    cy.contains("button", "Enviar link de recuperação").click();
+    cy.contains("E-mail inválido", { timeout: 20000 }).should("be.visible");
+    cy.contains("h1", "Recuperar senha").should("be.visible"); // não avançou
+    cy.contains("a", "Voltar para o login").click();
+    cy.contains("h1", "Login", { timeout: 20000 }).should("be.visible");
   });
 
   // AUTH-041

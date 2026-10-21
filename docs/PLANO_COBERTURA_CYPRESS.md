@@ -115,6 +115,20 @@ passa por enxugar esses quatro.
 Itens 1 a 8, 10 e 11 da seção 4 (acesso, isolamento, permissão, ponto, admissão, desligamento,
 férias, assinaturas públicas). ≈ 20 testes de ação.
 
+
+**Lote 1 — acesso crítico e links públicos (21/10/2026):** `cypress/e2e/acesso-critico.cy.ts` (7 testes) e
+`cypress/e2e/links-publicos.cy.ts` (10 testes); casos AUTH-040, 041 e 050 a 059 documentados; pontes para
+AUTH-002, 010, 011, 021 e 031. Validado na bancada (6 corridas, 17 de 17 verdes).
+
+> **Achado de produto/ambiente — tela "Recuperar senha" não carrega na 1ª vez.** Em todas as 6
+> corridas da bancada, a 1ª tentativa do teste de recuperar senha ficou em "Iniciando sistema…" (a
+> tela é carregada sob demanda) por mais de 20 s — e por mais de 60 s quando o prazo foi ampliado —
+> enquanto a repetição automática passa em ~2 s. Vale tanto para abertura direta de `/forgot-password`
+> quanto para o clique em "Esqueceu a senha?" no login. As demais telas carregadas sob demanda
+> (login, ativar conta, links públicos) não têm isso. Causa não encontrada; medido só no site de teste
+> (GitHub Pages), não em produção (Vercel). Custo atual: ~21 s a mais por execução da suíte. A
+> investigar com quem conhece o build: chunk da `ForgotPassword`, cache do Pages, Suspense.
+
 ### Onda 2 — regulatório e saúde  ·  ~2 semanas
 Itens 9, 12 a 15, 17: Folha/Financeiro, ASO/EPI/Ergonomia, Psicossocial, Ouvidoria, Experiência.
 Os 28 pendentes da Ergonomia e 40 do Desligamento são maioria `api` — só a jornada fica no tela.

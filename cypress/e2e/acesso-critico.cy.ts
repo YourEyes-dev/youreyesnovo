@@ -88,6 +88,8 @@ describe("Acesso crítico", () => {
   // AUTH-040
   it("recuperar senha barra e-mail inválido e oferece voltar ao login", () => {
     cy.visit(`${baseUrl}/forgot-password`);
+    cy.location("pathname").then((p) => cy.task("diag", `[BANCADA] forgot: pathname logo após visit = ${p}`, { log: false }));
+    cy.document().then((d) => cy.task("diag", `[BANCADA] forgot: corpo logo após visit = ${(d.body?.innerText || "").replace(/\s+/g, " ").slice(0, 160)}`, { log: false }));
     cy.contains("h1", "Recuperar senha", { timeout: 20000 }).should("be.visible");
     cy.contains("button", "Enviar link de recuperação").click();
     cy.contains("E-mail inválido", { timeout: 20000 }).should("be.visible");

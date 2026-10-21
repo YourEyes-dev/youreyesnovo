@@ -34,70 +34,70 @@ describe("Links públicos com token inexistente", () => {
   };
 
   // AUTH-050
-  it("aceite de documento com link inexistente mostra link inválido", () => {
+  it("Aceite de documento com link inexistente mostra link inválido", () => {
     cy.visit(`${baseUrl}/aceite-documento/${TOKEN}`);
     cy.contains("Link inválido", { timeout: 30000 }).should("be.visible");
     semQuebrar();
   });
 
   // AUTH-051
-  it("assinatura de contrato com link inexistente mostra contrato não encontrado", () => {
+  it("Assinatura de contrato com link inexistente mostra contrato não encontrado", () => {
     cy.visit(`${baseUrl}/contrato-assinatura/${TOKEN}`);
     cy.contains("Contrato não encontrado", { timeout: 30000 }).should("be.visible");
     semQuebrar();
   });
 
   // AUTH-052
-  it("assinar contrato de parceiro com link inexistente mostra link inválido", () => {
+  it("Assinar contrato de parceiro com link inexistente mostra link inválido", () => {
     cy.visit(`${baseUrl}/assinar-contrato/${TOKEN}`);
     cy.contains("Link inválido ou expirado.", { timeout: 30000 }).should("be.visible");
     semQuebrar();
   });
 
   // AUTH-053
-  it("assinatura de férias com link inexistente mostra link inválido", () => {
+  it("Assinatura de férias com link inexistente mostra link inválido", () => {
     cy.visit(`${baseUrl}/ferias-assinatura/${TOKEN}`);
     cy.contains("Link inválido", { timeout: 30000 }).should("be.visible");
     semQuebrar();
   });
 
   // AUTH-054
-  it("assinatura de PDI com link inexistente mostra link inválido", () => {
+  it("Assinatura de PDI com link inexistente mostra link inválido", () => {
     cy.visit(`${baseUrl}/pdi-assinatura/${TOKEN}`);
     cy.contains("Link inválido", { timeout: 30000 }).should("be.visible");
     semQuebrar();
   });
 
   // AUTH-055
-  it("assinatura de experiência com link inexistente mostra link inválido", () => {
+  it("Assinatura de experiência com link inexistente mostra link inválido", () => {
     cy.visit(`${baseUrl}/experiencia-assinatura/${TOKEN}`);
     cy.contains("Link inválido ou expirado", { timeout: 30000 }).should("be.visible");
     semQuebrar();
   });
 
   // AUTH-056
-  it("assinatura do manual de função com link inexistente mostra link inválido", () => {
+  it("Assinatura do manual de função com link inexistente mostra link inválido", () => {
     cy.visit(`${baseUrl}/manual-funcao/assinatura/${TOKEN}`);
     cy.contains("Link inválido.", { timeout: 30000 }).should("be.visible");
     semQuebrar();
   });
 
   // AUTH-057
-  it("assinatura de ordem de serviço com link inexistente mostra link inválido", () => {
+  it("Assinatura de ordem de serviço com link inexistente mostra link inválido", () => {
     cy.visit(`${baseUrl}/os/${TOKEN}`);
     cy.contains("Link inválido.", { timeout: 30000 }).should("be.visible");
     semQuebrar();
   });
 
   // AUTH-058
-  it("ouvidoria externa com link inexistente mostra link inválido", () => {
+  it("Ouvidoria externa com link inexistente mostra link inválido", () => {
     cy.visit(`${baseUrl}/ouvidoria-externa/${TOKEN}`);
     cy.contains(/Link inválido/, { timeout: 30000 }).should("be.visible");
     semQuebrar();
   });
 
   // AUTH-059
-  it("entrevista guiada com link inexistente mostra link inválido", () => {
+  it("Entrevista guiada com link inexistente mostra link inválido", () => {
     cy.visit(`${baseUrl}/entrevista/${TOKEN}`);
     cy.contains("Link inválido", { timeout: 30000 }).should("be.visible");
     semQuebrar();

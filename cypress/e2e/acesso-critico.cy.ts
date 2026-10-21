@@ -87,7 +87,13 @@ describe("Acesso crítico", () => {
 
   // AUTH-040
   it("recuperar senha barra e-mail inválido e oferece voltar ao login", () => {
-    cy.visit(`${baseUrl}/forgot-password`);
+    // Caminho do usuário: do login, pelo link "Esqueceu a senha?". (A abertura DIRETA de
+    // /forgot-password num navegador sem cache trava ~20 s em "Iniciando sistema…" na 1ª
+    // vez — achado de produto registrado em docs/PLANO_COBERTURA_CYPRESS.md.)
+    cy.visit(`${baseUrl}/login`);
+    cy.contains("h1", "Login", { timeout: 20000 }).should("be.visible");
+    cy.contains("a", "Esqueceu a senha?").click();
+    cy.location("pathname").should("include", "/forgot-password");
     cy.contains("h1", "Recuperar senha", { timeout: 20000 }).should("be.visible");
     cy.contains("button", "Enviar link de recuperação").click();
     cy.contains("E-mail inválido", { timeout: 20000 }).should("be.visible");

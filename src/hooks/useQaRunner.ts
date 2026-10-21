@@ -13,6 +13,19 @@ import { toast } from "sonner";
 
 export type QaSituacao = "passou" | "falhou" | "nao_implementado" | "erro";
 
+export interface QaModuloE2E {
+  modulo_path: string;
+  label: string;
+  testes: number;
+  specs: string[];
+}
+
+export interface QaStatusAgendamentoE2E {
+  token_configurado: boolean;
+  dias_ligados: number;
+  jobs_cron: number;
+}
+
 export interface QaBateria {
   id: string;
   iniciada_em: string;
@@ -107,6 +120,44 @@ export function useQaRunner() {
     },
   });
 
+  /**
+   * Histórico das corridas do Cypress. Query própria: a lista geral é limitada
+   * às últimas execuções de qualquer tipo e as rodadas do motor SQL empurravam
+   * as do Cypress para fora (a aba parecia parada).
+   */
+  const { data: bateriasE2E = [], isLoading: carregandoBateriasE2E } = useQuery({
+    queryKey: ["qa_baterias_e2e"],
+    queryFn: async (): Promise<QaBateria[]> => {
+      const { data, error } = await rpc("qa_listar_baterias_e2e", { p_limite: 30 });
+      if (error) throw error;
+      return (data || []) as QaBateria[];
+    },
+    refetchInterval: () => {
+      try {
+        const raw =
+          typeof localStorage !== "undefined"
+            ? localStorage.getItem("qa_cypress_run")
+            : null;
+        if (!raw) return false;
+        const at = (JSON.parse(raw) as { at?: string })?.at;
+        if (!at) return false;
+        return Date.now() - new Date(at).getTime() < 50 * 60 * 1000 ? 15000 : false;
+      } catch {
+        return false;
+      }
+    },
+  });
+
+  /** Módulos com teste de tela — alimenta o seletor "rodar só estes". */
+  const { data: modulosE2E = [] } = useQuery({
+    queryKey: ["qa_modulos_e2e"],
+    queryFn: async (): Promise<QaModuloE2E[]> => {
+      const { data, error } = await rpc("qa_modulos_e2e");
+      if (error) throw error;
+      return ((data || []) as QaModuloE2E[]).map((m) => ({ ...m, testes: Number(m.testes) }));
+    },
+  });
+
   /** Dispara uma bateria e espera ela terminar (roda no banco, síncrona). */
   const disparar = useMutation({
     mutationFn: async (moduloPath: string): Promise<string> => {
@@ -153,6 +204,9 @@ export function useQaRunner() {
     carregandoModulos,
     baterias,
     carregandoBaterias,
+    bateriasE2E,
+    carregandoBateriasE2E,
+    modulosE2E,
     disparar,
   };
 }
@@ -287,11 +341,23 @@ export function useQaAgendamentoE2E() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa_agendamento_e2e_dias"] });
       qc.invalidateQueries({ queryKey: ["qa_agendamento_e2e_proxima"] });
+      qc.invalidateQueries({ queryKey: ["qa_agendamento_e2e_status"] });
     },
     onError: (e: unknown) => {
       toast.error(e instanceof Error ? e.message : "Falha ao salvar o dia");
     },
   });
 
-  return { dias, proxima, carregando, salvarDia };
+  /** Tem como disparar? (token do GitHub no banco + jobs de cron criados). */
+  const { data: status } = useQuery({
+    queryKey: ["qa_agendamento_e2e_status"],
+    queryFn: async (): Promise<QaStatusAgendamentoE2E | null> => {
+      const { data, error } = await rpc("qa_agendamento_e2e_status");
+      if (error) throw error;
+      const row = (Array.isArray(data) ? data[0] : data) as QaStatusAgendamentoE2E | undefined;
+      return row ?? null;
+    },
+  });
+
+  return { dias, proxima, carregando, salvarDia, status };
 }

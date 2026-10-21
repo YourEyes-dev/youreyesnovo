@@ -1,0 +1,95 @@
+# =====================================================================
+# Portão de publicação — YourEyes
+#
+# Roda em todo PR para a branch `producao` (o gesto que publica as telas na
+# Vercel). Só passa se a esteira `staging` do MESMO commit terminou com os
+# testes de tela (Cypress) VERDES. Sem isto, nada impedia publicar um commit
+# cujo Cypress estava vermelho (ou ainda rodando).
+#
+# Como funciona:
+#   1) procura a corrida do workflow staging.yml para o commit do PR;
+#   2) espera os jobs "Testes de tela…" terminarem (a corrida leva ~45 min;
+#      este job aguarda até ~90 min, consultando a cada minuto);
+#   3) passa se todos terminaram `success`; reprova se algum falhou/cancelou.
+#
+# VÁLVULA DE EMERGÊNCIA: o rótulo `liberar-sem-cypress` no PR faz o portão
+# passar (com aviso). Uso consciente — hotfix urgente — e fica registrado no
+# histórico do PR (quem pôs o rótulo e quando).
+#
+# PARA VALER: em GitHub > Settings > Branches > regra da `producao`, marcar
+# "Require status checks to pass" e escolher o check
+#   "Cypress verde no commit a publicar".
+# Sem essa regra o portão avisa, mas não impede o merge.
+#
+# Só leitura: não toca em Supabase, Vercel nem em nenhum ambiente.
+# =====================================================================
+name: gate-producao
+
+on:
+  pull_request:
+    branches: [producao]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: gate-producao-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Cypress verde no commit a publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    steps:
+      - name: Conferir os testes de tela do commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          ROTULOS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -u
+          case ",$ROTULOS," in
+            *,liberar-sem-cypress,*)
+              echo "::warning::Rótulo liberar-sem-cypress presente — portão liberado SEM conferir o Cypress."
+              exit 0 ;;
+          esac
+
+          echo "Commit a publicar: $SHA"
+          sem_corrida=0
+          for i in $(seq 1 95); do
+            run=$(gh api "repos/$REPO/actions/workflows/staging.yml/runs?head_sha=$SHA&per_page=10" \
+                    --jq '[.workflow_runs[]] | sort_by(.created_at) | last // empty | .id' || true)
+            if [ -z "$run" ]; then
+              sem_corrida=$((sem_corrida+1))
+              # a corrida do merge pode demorar alguns minutos para existir
+              if [ "$sem_corrida" -ge 6 ]; then
+                echo "::error::Nenhuma corrida da esteira staging para o commit $SHA. Publique só commits que passaram pelo staging (merge na main)."
+                exit 1
+              fi
+              echo "Corrida do staging ainda não apareceu (tentativa $sem_corrida/6)..."; sleep 60; continue
+            fi
+
+            jobs=$(gh api "repos/$REPO/actions/runs/$run/jobs?per_page=100" \
+                     --jq '[.jobs[] | select(.name | startswith("Testes de tela")) | {name, status, conclusion}]')
+            total=$(printf '%s' "$jobs" | jq 'length')
+            ruins=$(printf '%s' "$jobs" | jq '[.[] | select(.status=="completed" and .conclusion!="success")] | length')
+            abertos=$(printf '%s' "$jobs" | jq '[.[] | select(.status!="completed")] | length')
+
+            if [ "$ruins" -gt 0 ]; then
+              printf '%s' "$jobs" | jq -r '.[] | "  - \(.name): \(.status)/\(.conclusion)"'
+              echo "::error::Cypress NÃO está verde para $SHA (corrida $run). Corrija na main antes de publicar, ou use o rótulo liberar-sem-cypress em emergência."
+              exit 1
+            fi
+            if [ "$total" -gt 0 ] && [ "$abertos" -eq 0 ]; then
+              echo "Cypress verde para $SHA (corrida $run, $total job(s) de tela)."
+              exit 0
+            fi
+            echo "Aguardando o Cypress do commit (corrida $run; jobs de tela: $total, em andamento: $abertos)... [$i/95]"
+            sleep 60
+          done
+          echo "::error::Tempo esgotado esperando o Cypress do commit $SHA. Rode este check de novo quando a corrida terminar."
+          exit 1

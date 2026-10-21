@@ -40,6 +40,25 @@ name: cypress-homologacao
 
 on:
   workflow_dispatch:
+    inputs:
+      specs:
+        description: >-
+          Opcional. Specs a rodar, separados por vírgula
+          (ex.: cypress/e2e/ponto.cy.ts,cypress/e2e/ferias.cy.ts).
+          Vazio = a suíte inteira. O painel de QA preenche isto ao escolher módulos.
+        required: false
+        default: ''
+      fumaca:
+        description: 'Só a fumaça crítica (cypress/smoke.txt, ~10 min). Ignorado se "specs" vier preenchido.'
+        type: boolean
+        required: false
+        default: false
+      fatia:
+        description: >-
+          Opcional. Uma fatia equilibrada da suíte, no formato N/M (ex.: 1/3).
+          Para dividir a suíte em corridas paralelas. Ignorado se "specs" ou "fumaca" vierem.
+        required: false
+        default: ''
 
 # A homologação é um recurso compartilhado: duas corridas de tela ao mesmo
 # tempo semeariam/ligariam a mesma conta-robô em paralelo. Serializa.
@@ -136,7 +155,31 @@ jobs:
             exit 1
           fi
       - name: Rodar a suíte
-        run: npm run test:e2e
+        # Seleção da corrida (precedência: specs > fumaça > fatia > tudo). Tudo
+        # entra por env (nunca interpolado no script) e é validado antes de usar.
+        env:
+          SPECS_ESCOLHIDOS: ${{ inputs.specs }}
+          SO_FUMACA: ${{ inputs.fumaca }}
+          FATIA: ${{ inputs.fatia }}
+        run: |
+          ROTULO=""
+          if [ -n "$SPECS_ESCOLHIDOS" ]; then
+            if ! printf '%s' "$SPECS_ESCOLHIDOS" | grep -Eq '^cypress/e2e/[a-z0-9-]+\.cy\.ts(,cypress/e2e/[a-z0-9-]+\.cy\.ts)*$'; then
+              echo "::error::Lista de specs inválida: $SPECS_ESCOLHIDOS"; exit 1
+            fi
+            LISTA="$SPECS_ESCOLHIDOS"; ROTULO="parcial: $(printf '%s' "$LISTA" | grep -o '\.cy\.ts' | wc -l) spec"
+          elif [ "$SO_FUMACA" = "true" ]; then
+            LISTA="$(node scripts/cypress-specs.mjs --fumaca)"; ROTULO="fumaça"
+          elif [ -n "$FATIA" ]; then
+            LISTA="$(node scripts/cypress-specs.mjs --fatia "$FATIA")"; ROTULO="fatia $FATIA"
+          fi
+          if [ -n "${LISTA:-}" ]; then
+            echo "Corrida parcial ($ROTULO) — specs: $LISTA"
+            export QA_E2E_ORIGEM="$QA_E2E_ORIGEM ($ROTULO)"
+            npx cypress run --spec "$LISTA"
+          else
+            npm run test:e2e
+          fi
       - name: Guardar prints e vídeos da corrida
         if: always()
         uses: actions/upload-artifact@v4

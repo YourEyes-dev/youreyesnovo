@@ -84,7 +84,7 @@ import { formatDateBR } from "@/lib/dataLocal";
 // ==========================================
 
 // -- Benefícios Tab --
-const BeneficiosTab = () => {
+export const BeneficiosTab = () => {
   const {
     useBeneficiosTipos,
     useBeneficiosColaboradores,

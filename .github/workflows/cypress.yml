@@ -29,6 +29,11 @@ on:
           Vazio = a suíte inteira. O painel de QA preenche isto ao escolher módulos.
         required: false
         default: ''
+      pular_guarda:
+        description: 'BANCADA: pula a guarda de cobertura (casos ainda não aplicados no banco do teste).'
+        type: boolean
+        required: false
+        default: false
       fumaca:
         description: 'Só a fumaça crítica (cypress/smoke.txt, ~10 min). Ignorado se "specs" vier preenchido.'
         type: boolean
@@ -78,6 +83,7 @@ jobs:
       - name: Instalar dependências
         run: npm ci
       - name: Guarda — teste de tela só existe se documentado (nível e2e)
+        if: ${{ !inputs.pular_guarda }}
         # Reprova a corrida se houver it() no Cypress sem caso documentado.
         # Sem QA_E2E_TOKEN, a guarda se pula sozinha (não bloqueia).
         env:

@@ -108,6 +108,48 @@ serve(async (req) => {
     );
   }
 
+  // ── Seleção de módulos (opcional) ──────────────────────────────────────
+  // Corpo: { modulos?: string[] } com paths de módulo do catálogo de QA
+  // (ex.: "jornada-rotina/ponto"). Vazio/ausente = suíte inteira. Os módulos
+  // viram a lista de specs pela ponte qa_cobertura_e2e (nunca aceitamos caminho
+  // de arquivo vindo do navegador: só o que a ponte documenta chega ao workflow).
+  let modulos: string[] = [];
+  try {
+    const corpo = await req.json();
+    if (Array.isArray(corpo?.modulos)) {
+      modulos = corpo.modulos.filter((m: unknown): m is string => typeof m === "string" && m.length > 0);
+    }
+  } catch {
+    /* sem corpo = suíte inteira */
+  }
+
+  let specsEscolhidos = "";
+  if (modulos.length > 0) {
+    const [casosRes, cobRes, modsRes] = await Promise.all([
+      admin.from("qa_casos_teste").select("codigo, modulo_id").eq("nivel", "e2e"),
+      admin.from("qa_cobertura_e2e").select("codigo, spec").eq("ativo", true),
+      admin.from("qa_modulos").select("id, path"),
+    ]);
+    if (casosRes.error || cobRes.error || modsRes.error) {
+      return json({ error: "Falha ao ler a documentação de QA para montar a seleção." }, 500);
+    }
+    const idsDosModulos = new Set(
+      (modsRes.data ?? []).filter((m) => modulos.includes(m.path as string)).map((m) => m.id as string),
+    );
+    const codigos = new Set(
+      (casosRes.data ?? []).filter((c) => idsDosModulos.has(c.modulo_id as string)).map((c) => c.codigo as string),
+    );
+    const specs = [
+      ...new Set(
+        (cobRes.data ?? []).filter((c) => codigos.has(c.codigo as string)).map((c) => c.spec as string),
+      ),
+    ].filter((sp) => /^cypress\/e2e\/[a-z0-9-]+\.cy\.ts$/.test(sp));
+    if (specs.length === 0) {
+      return json({ error: "Os módulos escolhidos não têm teste de tela documentado." }, 422);
+    }
+    specsEscolhidos = specs.join(",");
+  }
+
   // ── Dispara o workflow (workflow_dispatch) ─────────────────────────────
   const url =
     `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
@@ -123,7 +165,11 @@ serve(async (req) => {
         "User-Agent": "youreyes-qa-runner",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ ref: WORKFLOW_REF }),
+      body: JSON.stringify(
+        specsEscolhidos
+          ? { ref: WORKFLOW_REF, inputs: { specs: specsEscolhidos } }
+          : { ref: WORKFLOW_REF },
+      ),
     });
   } catch (e) {
     return json(
@@ -136,7 +182,10 @@ serve(async (req) => {
   if (resp.status === 204) {
     return json({
       ok: true,
-      mensagem: "Corrida disparada. Ela aparece na esteira em instantes.",
+      mensagem: specsEscolhidos
+        ? `Corrida parcial disparada (${specsEscolhidos.split(",").length} arquivo(s) de teste). Ela aparece na esteira em instantes.`
+        : "Corrida disparada. Ela aparece na esteira em instantes.",
+      specs: specsEscolhidos ? specsEscolhidos.split(",") : null,
       acompanhar: `https://github.com/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}`,
     });
   }

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Play, Loader2, CheckCircle2, XCircle, AlertCircle,
   CircleDashed, Clock, ChevronRight, Bot, CalendarClock,
@@ -17,6 +18,7 @@ import {
 import {
   useQaRunner, useQaResultados, useQaAgendamento, useQaAgendamentoE2E,
   type QaSituacao, type QaBateria, type QaModuloTestavel, type QaDiaAgenda,
+  type QaModuloE2E,
 } from "@/hooks/useQaRunner";
 import { gerarPDF, gerarCSV, abrirImprimivel } from "@/lib/qaRelatorio";
 import { supabase } from "@/integrations/supabase/client";
@@ -336,24 +338,38 @@ function GradeAgendamento({
 function CardAgendamento() {
   const { dias, proxima, carregando, salvarDia } = useQaAgendamento();
   return (
-    <GradeAgendamento
-      dias={dias}
-      proxima={proxima}
-      carregando={carregando}
-      salvarDia={salvarDia}
-      titulo="Rodar automaticamente"
-      legenda={(algumLigado, prox) =>
-        algumLigado && prox
-          ? `Próxima: ${prox} · todos os módulos`
-          : "Nenhum dia agendado — o robô só roda quando você clicar"}
-    />
+      <GradeAgendamento
+        dias={dias}
+        proxima={proxima}
+        carregando={carregando}
+        salvarDia={salvarDia}
+        titulo="Rodar automaticamente"
+        legenda={(algumLigado, prox) =>
+          algumLigado && prox
+            ? `Próxima: ${prox} · todos os módulos`
+            : "Nenhum dia agendado — o robô só roda quando você clicar"}
+      />
   );
 }
 
 // ── card de agendamento do Cypress (dispara a esteira) ──
 function CardAgendamentoE2E() {
-  const { dias, proxima, carregando, salvarDia } = useQaAgendamentoE2E();
+  const { dias, proxima, carregando, salvarDia, status } = useQaAgendamentoE2E();
+  const algumLigado = dias.some((d) => d.ligado);
+  const semToken = !!status && !status.token_configurado;
+  const semJob = !!status && algumLigado && status.jobs_cron === 0;
   return (
+    <div className="space-y-2">
+      {(semToken || semJob) && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <p>
+            {semToken
+              ? "Este ambiente não tem o token do GitHub guardado na configuração: o horário fica salvo, mas NADA é disparado. Cole o token (chave github_dispatch_token em app_config) para o agendamento funcionar."
+              : "Há dias ligados, mas nenhum agendamento foi criado no relógio do banco. Salve o dia de novo (liga/desliga) para recriá-lo."}
+          </p>
+        </div>
+      )}
     <GradeAgendamento
       dias={dias}
       proxima={proxima}
@@ -373,6 +389,7 @@ function CardAgendamentoE2E() {
         </p>
       }
     />
+    </div>
   );
 }
 
@@ -491,13 +508,24 @@ function gravarCorrida(c: CorridaEmAndamento | null) {
 
 // ── painel do Cypress (testes de tela) ──────────────────
 function PainelCypress({
-  baterias, modulos, carregando,
+  baterias, modulos, modulosE2E, carregando,
 }: {
   baterias: QaBateria[];
   modulos: QaModuloTestavel[];
+  modulosE2E: QaModuloE2E[];
   carregando: boolean;
 }) {
   const [disparando, setDisparando] = useState(false);
+  // Módulos marcados para uma corrida parcial. Vazio = a suíte inteira.
+  const [escolhidos, setEscolhidos] = useState<string[]>([]);
+  const alternar = (path: string) =>
+    setEscolhidos((atual) =>
+      atual.includes(path) ? atual.filter((p) => p !== path) : [...atual, path],
+    );
+  const testesEscolhidos = modulosE2E
+    .filter((m) => escolhidos.includes(m.modulo_path))
+    .reduce((n, m) => n + m.testes, 0);
+  const totalTestes = modulosE2E.reduce((n, m) => n + m.testes, 0);
   const [corrida, setCorrida] = useState<CorridaEmAndamento | null>(() => lerCorrida());
 
   // Carimbo da corrida e2e mais recente que a lista já conhece.
@@ -543,7 +571,9 @@ function PainelCypress({
   const rodarCypress = async () => {
     setDisparando(true);
     try {
-      const { data, error } = await supabase.functions.invoke("qa-disparar-cypress");
+      const { data, error } = await supabase.functions.invoke("qa-disparar-cypress", {
+        body: { modulos: escolhidos },
+      });
       if (error) {
         // A função devolve a causa no corpo (401/403/503/502); o error.message
         // do supabase-js é genérico, então tentamos ler o corpo da resposta.
@@ -620,8 +650,17 @@ function PainelCypress({
               ) : (
                 <Play className="h-4 w-4" />
               )}
-              {disparando ? "Disparando..." : "Rodar testes"}
+              {disparando
+                ? "Disparando..."
+                : escolhidos.length > 0
+                  ? `Rodar ${escolhidos.length} módulo(s)`
+                  : "Rodar todos os testes"}
             </Button>
+            {escolhidos.length > 0 && (
+              <Button size="sm" variant="ghost" onClick={() => setEscolhidos([])}>
+                Limpar seleção
+              </Button>
+            )}
             <a
               href="https://github.com/YourEyes-dev/youreyesnovo/actions/workflows/cypress.yml"
               target="_blank"
@@ -632,8 +671,58 @@ function PainelCypress({
               Acompanhar as corridas na esteira (prints e vídeos das falhas)
             </a>
           </div>
+          {modulosE2E.length > 0 && (
+            <div className="space-y-2 rounded-md border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium">
+                  Rodar só alguns módulos{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (nada marcado = suíte inteira, {totalTestes} testes)
+                  </span>
+                </p>
+                <div className="flex gap-2 text-xs">
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => setEscolhidos(modulosE2E.map((m) => m.modulo_path))}
+                  >
+                    Marcar todos
+                  </button>
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => setEscolhidos([])}
+                  >
+                    Desmarcar
+                  </button>
+                </div>
+              </div>
+              <div className="grid max-h-56 gap-1 overflow-y-auto sm:grid-cols-2">
+                {modulosE2E.map((m) => (
+                  <label
+                    key={m.modulo_path}
+                    className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/60"
+                  >
+                    <Checkbox
+                      checked={escolhidos.includes(m.modulo_path)}
+                      onCheckedChange={() => alternar(m.modulo_path)}
+                    />
+                    <span className="flex-1 truncate">{m.label}</span>
+                    <span className="text-muted-foreground">{m.testes}</span>
+                  </label>
+                ))}
+              </div>
+              {escolhidos.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {testesEscolhidos} teste(s) de {escolhidos.length} módulo(s) — bem
+                  mais rápido que a suíte inteira. A corrida parcial aparece em
+                  Corridas com só esses testes.
+                </p>
+              )}
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
-            A corrida leva ~35 min e testa o site de teste como está publicado
+            A corrida completa leva ~35 min e testa o site de teste como está publicado
             agora; para checar mudanças novas, publique antes. O resultado
             aparece aqui em “Corridas” quando terminar.
           </p>
@@ -695,8 +784,10 @@ function PainelCypress({
 
 export default function QARunner() {
   const navigate = useNavigate();
-  const { modulos, carregandoModulos, baterias, carregandoBaterias, disparar } =
-    useQaRunner();
+  const {
+    modulos, carregandoModulos, baterias, carregandoBaterias,
+    bateriasE2E, carregandoBateriasE2E, modulosE2E, disparar,
+  } = useQaRunner();
 
   const [vista, setVista] = useState<"motor" | "cypress">("motor");
   const [moduloSel, setModuloSel] = useState<string>("__todos__");
@@ -705,7 +796,9 @@ export default function QARunner() {
   // Corridas do Cypress (origem 'e2e') ficam na sua própria aba; o motor SQL
   // mostra só as suas (manual/agendado). Assim os dois não se misturam.
   const bateriasSql = baterias.filter((b) => b.disparo !== "e2e");
-  const bateriasCypress = baterias.filter((b) => b.disparo === "e2e");
+  // Cypress tem query própria (qa_listar_baterias_e2e): a lista geral é cortada
+  // nas últimas 20 de qualquer tipo e escondia as corridas de tela.
+  const bateriasCypress = bateriasE2E;
 
   const totalCasos = modulos.reduce((n, m) => n + Number(m.casos_executaveis), 0);
 
@@ -836,7 +929,8 @@ export default function QARunner() {
         <PainelCypress
           baterias={bateriasCypress}
           modulos={modulos}
-          carregando={carregandoBaterias}
+          modulosE2E={modulosE2E}
+          carregando={carregandoBateriasE2E}
         />
       )}
     </div>

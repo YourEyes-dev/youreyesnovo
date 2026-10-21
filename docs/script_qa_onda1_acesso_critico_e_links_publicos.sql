@@ -115,16 +115,16 @@ BEGIN
   ('AUTH-031', 'cypress/e2e/acesso-critico.cy.ts', 'redefinir senha sem sessão de recuperação é barrado'),
   ('AUTH-040', 'cypress/e2e/acesso-critico.cy.ts', 'recuperar senha barra e-mail inválido e oferece voltar ao login'),
   ('AUTH-041', 'cypress/e2e/acesso-critico.cy.ts', 'ativar conta sem o link do convite mostra link inválido'),
-  ('AUTH-050', 'cypress/e2e/links-publicos.cy.ts', 'Aceite de documento com link inexistente mostra link inválido'),
-  ('AUTH-051', 'cypress/e2e/links-publicos.cy.ts', 'Assinatura de contrato com link inexistente mostra contrato não encontrado'),
-  ('AUTH-052', 'cypress/e2e/links-publicos.cy.ts', 'Assinar contrato de parceiro com link inexistente mostra link inválido'),
-  ('AUTH-053', 'cypress/e2e/links-publicos.cy.ts', 'Assinatura de férias com link inexistente mostra link inválido'),
-  ('AUTH-054', 'cypress/e2e/links-publicos.cy.ts', 'Assinatura de PDI com link inexistente mostra link inválido'),
-  ('AUTH-055', 'cypress/e2e/links-publicos.cy.ts', 'Assinatura de experiência com link inexistente mostra link inválido'),
-  ('AUTH-056', 'cypress/e2e/links-publicos.cy.ts', 'Assinatura do manual de função com link inexistente mostra link inválido'),
-  ('AUTH-057', 'cypress/e2e/links-publicos.cy.ts', 'Assinatura de ordem de serviço com link inexistente mostra link inválido'),
-  ('AUTH-058', 'cypress/e2e/links-publicos.cy.ts', 'Ouvidoria externa com link inexistente mostra link inválido'),
-  ('AUTH-059', 'cypress/e2e/links-publicos.cy.ts', 'Entrevista guiada com link inexistente mostra link inválido');
+  ('AUTH-050', 'cypress/e2e/links-publicos.cy.ts', 'aceite de documento com link inexistente mostra link inválido'),
+  ('AUTH-051', 'cypress/e2e/links-publicos.cy.ts', 'assinatura de contrato com link inexistente mostra contrato não encontrado'),
+  ('AUTH-052', 'cypress/e2e/links-publicos.cy.ts', 'assinar contrato de parceiro com link inexistente mostra link inválido'),
+  ('AUTH-053', 'cypress/e2e/links-publicos.cy.ts', 'assinatura de férias com link inexistente mostra link inválido'),
+  ('AUTH-054', 'cypress/e2e/links-publicos.cy.ts', 'assinatura de PDI com link inexistente mostra link inválido'),
+  ('AUTH-055', 'cypress/e2e/links-publicos.cy.ts', 'assinatura de experiência com link inexistente mostra link inválido'),
+  ('AUTH-056', 'cypress/e2e/links-publicos.cy.ts', 'assinatura do manual de função com link inexistente mostra link inválido'),
+  ('AUTH-057', 'cypress/e2e/links-publicos.cy.ts', 'assinatura de ordem de serviço com link inexistente mostra link inválido'),
+  ('AUTH-058', 'cypress/e2e/links-publicos.cy.ts', 'ouvidoria externa com link inexistente mostra link inválido'),
+  ('AUTH-059', 'cypress/e2e/links-publicos.cy.ts', 'entrevista guiada com link inexistente mostra link inválido');
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'Ponte e2e (acesso crítico) não gravada: %', SQLERRM;
 END $ponte$;

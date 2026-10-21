@@ -111,7 +111,7 @@ export const YOUREYES_MODULOS: YourEyesModulo[] = [
     label: "Sistema",
     itens: [
       { id: "suporte", label: "Suporte", path: "/suporte" },
-      { id: "configuracoes", label: "Configurações", path: "/configuracoes" },
+      { id: "configuracoes", label: "Configurações", path: "/usuarios" },
     ],
   },
 ];

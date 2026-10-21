@@ -47,7 +47,7 @@ const searchItems: SearchItem[] = [
   { title: "Financeiro", path: "/financeiro", section: "Financeiro", keywords: ["financeiro", "guia", "pagamento", "certidão"] },
   { title: "Benefícios", path: "/financeiro/beneficios", section: "Financeiro", keywords: ["benefício", "vale", "plano saúde"] },
   { title: "Hub Contábil", path: "/hub-contabil", section: "Financeiro", keywords: ["contábil", "hub", "competência", "folha"] },
-  { title: "Usuários", path: "/configuracoes", section: "Sistema", keywords: ["configuração", "usuário", "perfil", "acesso", "auditoria"] },
+  { title: "Usuários", path: "/usuarios", section: "Sistema", keywords: ["configuração", "usuário", "perfil", "acesso", "auditoria"] },
   { title: "Suporte", path: "/suporte", section: "Sistema", keywords: ["suporte", "ticket", "ajuda", "bug"] },
   { title: "Meu Perfil", path: "/meu-perfil", section: "Sistema", keywords: ["meu perfil", "conta", "avatar", "senha"] },
 ];

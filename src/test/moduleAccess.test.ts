@@ -4,6 +4,7 @@ import {
   getModuloForPath,
   PATH_TO_MODULOS,
   PATH_TO_MODULO,
+  ALWAYS_ALLOWED_PATHS,
 } from "@/lib/moduleAccess";
 import { MODULOS_SISTEMA } from "@/hooks/usePerfisAcesso";
 
@@ -94,5 +95,12 @@ describe("moduleAccess — rota aceita módulo granular e o legado", () => {
       }
     }
     expect([...desconhecidos]).toEqual([]);
+  });
+
+  // A tela de Usuários mudou de /configuracoes para /usuarios. Ela é liberada sem módulo
+  // (a página filtra por papel), como já era; o endereço antigo só redireciona.
+  it("/usuarios e o endereço antigo /configuracoes seguem liberados sem módulo", () => {
+    expect(ALWAYS_ALLOWED_PATHS.has("/usuarios")).toBe(true);
+    expect(ALWAYS_ALLOWED_PATHS.has("/configuracoes")).toBe(true);
   });
 });

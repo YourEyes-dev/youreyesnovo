@@ -405,7 +405,18 @@ jobs:
           fi
           exit 0
 
+      - name: Fumaça crítica (roda primeiro, ~10 min)
+        # Os specs de cypress/smoke.txt (acesso, pessoas, ponto, folha, SST,
+        # canais legais) rodam ANTES da suíte completa: se algo essencial
+        # quebrou, o vermelho aparece em ~10 min em vez de ~45. A suíte
+        # completa roda mesmo assim (abaixo) para o painel de QA receber o
+        # quadro inteiro; o job fica vermelho se qualquer das duas falhar.
+        id: fumaca
+        env:
+          QA_E2E_ORIGEM: esteira staging (fumaça)
+        run: npx cypress run --spec "$(node scripts/cypress-specs.mjs --fumaca)"
       - name: Rodar a suíte
+        if: ${{ !cancelled() && steps.fumaca.conclusion != 'skipped' }}
         run: npm run test:e2e
       - name: Guardar prints e vídeos da corrida
         if: always()

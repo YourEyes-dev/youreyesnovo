@@ -26,6 +26,12 @@ A Vercel serve as telas de produção a partir da branch **`producao`** (NÃO da
 `producao` para o commit desejado da `main`, via PR `main → producao` (a Vercel
 então publica em `youreyes.com.br` sozinha). O Lovable está dormente — não
 republique por ele. Detalhes e rollback (DNS/branch) em `docs/AMBIENTES.md`.
+**Portão de publicação (Cypress):** o PR `main → producao` roda o check
+`Cypress verde no commit a publicar` (`.github/workflows/gate-producao.yml`): só passa se o
+job de testes de tela da esteira `staging` do MESMO commit terminou verde. Vermelho = não
+publique; corrija na `main`. Emergência: rótulo `liberar-sem-cypress` no PR (uso consciente,
+fica registrado). A fumaça crítica (`cypress/smoke.txt`) roda primeiro em toda publicação;
+plano e fila em `docs/PLANO_COBERTURA_CYPRESS.md`.
 
 **Nunca** coloque dados reais (CPFs, nomes, atestados) no staging, em seeds,
 em PDFs de devolutiva ou em documentos que circulam. Dados de saúde são

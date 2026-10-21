@@ -98,17 +98,18 @@ Meta da Camada 0: **~25 testes de ação, rodando em ≤ 10 min**, em toda publi
 
 ## 5. Plano em ondas
 
-### Onda 0 — proteção (estrutura)  ·  ~1 semana
-1. **Fumaça crítica** marcada (tag `@smoke` ou specs `cypress/e2e/_critico/*.cy.ts`) rodando
-   **primeiro** no job `telas`: falha rápida em ≤ 10 min, antes da suíte completa.
-2. **Portão de publicação:** workflow `gate-producao.yml`, exigido como *required check* no PR
-   `main → producao`, que só passa se a **corrida `staging` do mesmo commit** tem o job `telas`
-   verde. Hoje nada impede publicar vermelho. (Requer o dono ligar a regra de proteção da branch
-   `producao` no GitHub.)
-3. **Paralelizar** a completa em 3 fatias por spec (matrix) — de ~45 para ~18 min — e usar
-   `cy.session` no login para cortar o tempo de autenticação repetida.
-4. **Higiene de documentação:** reclassificar os ~60 casos de regra para `api` e criar as rotinas
-   no motor (Rede de Segurança passa a trancá-los antes do merge).
+### Onda 0 — proteção (estrutura)  ·  ~1 semana  ·  **EM ANDAMENTO (21/10/2026)**
+| Item | Estado |
+|---|---|
+| 1. Fumaça crítica rodando primeiro no job `telas` | **Feito** (a validar na 1ª corrida real). `cypress/smoke.txt` (17 specs, ~9,6 min pelas durações medidas); passo "Fumaça crítica" no `staging.yml`; a suíte completa roda em seguida mesmo se a fumaça falhar. Rodar sozinha: `npm run test:e2e:fumaca` ou `cypress.yml` com `fumaca=true`. |
+| 2. Portão de publicação | **Feito, falta ligar.** `.github/workflows/gate-producao.yml` (check "Cypress verde no commit a publicar"). Só impede o merge quando o dono marcá-lo como *required* na regra da branch `producao`. Válvula: rótulo `liberar-sem-cypress`. |
+| 3. Fatiar a suíte em 3 | **Ferramenta pronta, adoção pendente.** `scripts/cypress-specs.mjs --fatia N/M` + `cypress/duracoes.json` dividem os 46 specs em 3 fatias de ~14,5 min; o `cypress.yml` aceita `fatia=1/3`. **Não ativei no merge automático** porque as 3 fatias compartilhariam a mesma conta e o mesmo banco de teste; falta medir colisão de dados antes. |
+| 3b. `cy.session` no login | **Não feito.** Cada um dos 44 specs tem seu próprio `login()`; trocar exige mexer em 44 arquivos e rodar o Cypress para validar. Entra como tarefa própria. |
+| 4. Reclassificar ~60 casos de regra para `api` | **Não feito.** Exige decisão caso a caso (CSV `sugestao_nivel`) e criar a rotina `qa_caso_<x>()` de cada um. |
+
+**Achado das durações (corrida de 20/10, 43 min no total):** 4 specs consomem 23 min —
+`psicossocial` 8:47, `epi` 6:31, `swot` 5:11, `incidentes-acidentes` 2:46. Qualquer ganho de tempo
+passa por enxugar esses quatro.
 
 ### Onda 1 — Camada 0 (jornadas críticas)  ·  ~2–3 semanas
 Itens 1 a 8, 10 e 11 da seção 4 (acesso, isolamento, permissão, ponto, admissão, desligamento,

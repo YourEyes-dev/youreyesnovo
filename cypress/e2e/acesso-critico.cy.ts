@@ -88,14 +88,15 @@ describe("Acesso crítico", () => {
   // AUTH-040
   it("recuperar senha barra e-mail inválido e oferece voltar ao login", () => {
     // Caminho do usuário: do login, pelo link "Esqueceu a senha?".
-    // A 1ª carga da tela de recuperação (carregada sob demanda) leva MAIS de 20 s no
-    // site de teste e depois fica pronta; medido na bancada (5 de 5 corridas). Por isso
-    // o prazo desta espera é maior que o padrão. Achado em docs/PLANO_COBERTURA_CYPRESS.md.
+    // ATENÇÃO (achado, ver docs/PLANO_COBERTURA_CYPRESS.md): na bancada, a 1ª tentativa deste
+    // teste NÃO vê a tela de recuperação nem em 60 s (fica em "Iniciando sistema…") e a
+    // repetição automática (retries do cypress.config.ts) passa em ~2 s — 6 de 6 corridas.
+    // O teste é mantido porque ele acusa o problema; a repetição o deixa verde.
     cy.visit(`${baseUrl}/login`);
     cy.contains("h1", "Login", { timeout: 20000 }).should("be.visible");
     cy.contains("a", "Esqueceu a senha?").click();
     cy.location("pathname").should("include", "/forgot-password");
-    cy.contains("h1", "Recuperar senha", { timeout: 60000 }).should("be.visible");
+    cy.contains("h1", "Recuperar senha", { timeout: 20000 }).should("be.visible");
     cy.contains("button", "Enviar link de recuperação").click();
     cy.contains("E-mail inválido", { timeout: 20000 }).should("be.visible");
     cy.contains("h1", "Recuperar senha").should("be.visible"); // não avançou

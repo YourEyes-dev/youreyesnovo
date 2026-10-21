@@ -202,3 +202,19 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'Documentacao PERFIL-019 nao registrada: %', SQLERRM;
 END $amq3$;
+
+-- Liga os casos a suas rotinas (sem esta linha o motor responde "nenhuma rotina foi escrita").
+-- Inclui o PERFIL-018 (parte 1), que ficou sem registro.
+DO $amr$
+BEGIN
+  IF to_regclass('public.qa_implementacoes') IS NULL THEN
+    RAISE NOTICE 'Motor de QA ausente nesta base; PERFIL-018/019 nao ligados.';
+    RETURN;
+  END IF;
+  INSERT INTO public.qa_implementacoes (codigo, funcao_sql, ativo) VALUES
+    ('PERFIL-018', 'qa_caso_perfil_018', true),
+    ('PERFIL-019', 'qa_caso_perfil_019', true)
+  ON CONFLICT (codigo) DO UPDATE SET funcao_sql = EXCLUDED.funcao_sql, ativo = true;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Ligacao PERFIL-018/019 nao registrada: %', SQLERRM;
+END $amr$;

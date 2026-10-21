@@ -21,6 +21,14 @@ name: cypress
 
 on:
   workflow_dispatch:
+    inputs:
+      specs:
+        description: >-
+          Opcional. Specs a rodar, separados por vírgula
+          (ex.: cypress/e2e/ponto.cy.ts,cypress/e2e/ferias.cy.ts).
+          Vazio = a suíte inteira. O painel de QA preenche isto ao escolher módulos.
+        required: false
+        default: ''
 
 concurrency:
   group: cypress
@@ -102,7 +110,21 @@ jobs:
             exit 1
           fi
       - name: Rodar a suíte
-        run: npm run test:e2e
+        # `specs` vem do painel (seleção de módulos). Passa por env (nunca
+        # interpolado no script) e só aceita caminhos cypress/e2e/<nome>.cy.ts.
+        env:
+          SPECS_ESCOLHIDOS: ${{ inputs.specs }}
+        run: |
+          if [ -n "$SPECS_ESCOLHIDOS" ]; then
+            if ! printf '%s' "$SPECS_ESCOLHIDOS" | grep -Eq '^cypress/e2e/[a-z0-9-]+\.cy\.ts(,cypress/e2e/[a-z0-9-]+\.cy\.ts)*$'; then
+              echo "::error::Lista de specs inválida: $SPECS_ESCOLHIDOS"; exit 1
+            fi
+            echo "Corrida parcial — specs: $SPECS_ESCOLHIDOS"
+            export QA_E2E_ORIGEM="$QA_E2E_ORIGEM (parcial: $(printf '%s' "$SPECS_ESCOLHIDOS" | grep -o '\.cy\.ts' | wc -l) spec)"
+            npx cypress run --spec "$SPECS_ESCOLHIDOS"
+          else
+            npm run test:e2e
+          fi
       - name: Guardar prints e vídeos da corrida
         if: always()
         uses: actions/upload-artifact@v4

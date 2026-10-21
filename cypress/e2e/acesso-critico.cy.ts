@@ -76,15 +76,6 @@ describe("Acesso crítico", () => {
     cy.contains("Esta área é restrita a Super Administradores.").should("be.visible");
   });
 
-  // AUTH-031
-  it("redefinir senha sem sessão de recuperação é barrado", () => {
-    cy.visit(`${baseUrl}/reset-password`);
-    cy.contains("h1", "Link inválido ou expirado", { timeout: 20000 }).should("be.visible");
-    cy.contains("a", "Solicitar novo link").should("have.attr", "href").and("include", "/forgot-password");
-    // O formulário de nova senha não aparece sem o link do e-mail.
-    cy.contains("h1", "Criar nova senha").should("not.exist");
-  });
-
   // AUTH-040
   it("recuperar senha barra e-mail inválido e oferece voltar ao login", () => {
     cy.visit(`${baseUrl}/forgot-password`);
@@ -96,6 +87,15 @@ describe("Acesso crítico", () => {
     cy.contains("h1", "Recuperar senha").should("be.visible"); // não avançou
     cy.contains("a", "Voltar para o login").click();
     cy.contains("h1", "Login", { timeout: 20000 }).should("be.visible");
+  });
+
+  // AUTH-031
+  it("redefinir senha sem sessão de recuperação é barrado", () => {
+    cy.visit(`${baseUrl}/reset-password`);
+    cy.contains("h1", "Link inválido ou expirado", { timeout: 20000 }).should("be.visible");
+    cy.contains("a", "Solicitar novo link").should("have.attr", "href").and("include", "/forgot-password");
+    // O formulário de nova senha não aparece sem o link do e-mail.
+    cy.contains("h1", "Criar nova senha").should("not.exist");
   });
 
   // AUTH-041

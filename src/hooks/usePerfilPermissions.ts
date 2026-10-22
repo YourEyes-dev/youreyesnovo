@@ -156,6 +156,27 @@ export function usePerfilPermissions() {
     };
   }, [permissaoSet, isOwner, vinculo?.perfil_id]);
 
+  /**
+   * A AÇÃO existe no módulo com escopo AMPLO (nem "próprio usuário", nem "subordinados
+   * diretos")? É o espelho em tela da `perfil_escreve` do banco: "editar:proprio_usuario"
+   * NÃO autoriza mexer em registro de outras pessoas. `administrar` vale por todas as ações.
+   * Owner/superadmin sempre. Quem não tem perfil vinculado NÃO é decidido aqui — o chamador
+   * cai no papel (legado), como faz o banco.
+   */
+  const temAcaoAmpla = useMemo(() => {
+    return (modulo: string, acao: string | string[]): boolean => {
+      if (isOwner) return true;
+      const acoes = Array.isArray(acao) ? acao : [acao];
+      return permissoes.some(
+        (p) =>
+          p.modulo === modulo &&
+          (acoes.includes(p.acao) || p.acao === "administrar") &&
+          p.escopo !== "proprio_usuario" &&
+          p.escopo !== "subordinados_diretos"
+      );
+    };
+  }, [permissoes, isOwner]);
+
   const podeExportar = useMemo(
     () => (modulo: string) => podeAcao(modulo, "exportar"),
     [podeAcao]
@@ -173,6 +194,7 @@ export function usePerfilPermissions() {
     temPermissao,
     temAcessoModulo,
     temAcessoModuloAdmin,
+    temAcaoAmpla,
     podeAcao,
     podeExportar,
     podeExcluir,

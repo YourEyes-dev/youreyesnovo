@@ -495,6 +495,143 @@ async function semearUsuarioRestrito(admin: any, senha: string) {
   return { user_id: uid, usuario_base_id: ub.id, perfil_id: perfilId };
 }
 
+// ---------------------------------------------------------------------
+// USUÁRIO DA OUVIDORIA (escopo "Próprio usuário" com papel de gestão)
+//
+// Reproduz de propósito o caso real da Taeco (10/2026): papel técnico `manager` + tipo
+// `gestor` + perfil com Ouvidoria só em "Próprio usuário". É o único cenário que prova que
+// o PERFIL manda sobre o papel. Junto vão três manifestações fictícias: uma dele, uma de
+// outro autor e uma anônima — ele só pode enxergar a primeira.
+// Nada toca a conta-robô nem o usuário restrito (usuário, perfil e vínculo próprios).
+// ---------------------------------------------------------------------
+const EMAIL_OUVIDORIA = "ouvidoria.e2e@youreyes.local";
+const CPF_OUVIDORIA = "90000010804"; // 900.000.108-04 (DV válido, faixa fictícia da casa)
+const NOME_OUVIDORIA = "Usuário Ouvidoria (Cypress)";
+const NOME_PERFIL_OUVIDORIA = "E2E Ouvidoria Próprio (Cypress)";
+const AUTOR_OUTRO_OUV = "00000000-0000-4000-8000-0000000000e2";
+
+// deno-lint-ignore no-explicit-any
+async function semearUsuarioOuvidoria(admin: any, senha: string) {
+  const { data: lista } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  // deno-lint-ignore no-explicit-any
+  const existente = lista?.users?.find((u: any) => (u.email ?? "").toLowerCase() === EMAIL_OUVIDORIA);
+  let uid: string;
+  if (existente) {
+    uid = existente.id;
+    const { error } = await admin.auth.admin.updateUserById(uid, { password: senha, email_confirm: true });
+    if (error) throw new Error("updateUserById: " + error.message);
+  } else {
+    const { data: novo, error } = await admin.auth.admin.createUser({
+      email: EMAIL_OUVIDORIA, password: senha, email_confirm: true,
+      user_metadata: { nome_completo: NOME_OUVIDORIA },
+    });
+    if (error) throw new Error("createUser: " + error.message);
+    uid = novo.user!.id;
+  }
+
+  const { error: pErr } = await admin.from("profiles").upsert(
+    { user_id: uid, tenant_id: TENANT_ID, nome_completo: NOME_OUVIDORIA, onboarding_concluido: true },
+    { onConflict: "user_id" },
+  );
+  if (pErr) throw new Error("profiles: " + pErr.message);
+
+  // Papel de GESTÃO de propósito (é o que o tipo "gestor" gravava na Taeco).
+  await admin.from("user_roles").delete().eq("user_id", uid).neq("role", "manager");
+  const { error: rErr } = await admin.from("user_roles").upsert({ user_id: uid, role: "manager" }, { onConflict: "user_id,role" });
+  if (rErr) throw new Error("user_roles: " + rErr.message);
+
+  const { data: ub0 } = await admin.from("usuarios_base").select("id").eq("auth_user_id", uid).maybeSingle();
+  if (ub0) {
+    const { error } = await admin.from("usuarios_base").update({
+      tenant_id: TENANT_ID, nome_completo: NOME_OUVIDORIA, email_principal: EMAIL_OUVIDORIA,
+      tipo_usuario: "gestor", status: "ativo",
+    }).eq("auth_user_id", uid);
+    if (error) throw new Error("usuarios_base(update): " + error.message);
+  } else {
+    const { error } = await admin.from("usuarios_base").insert({
+      tenant_id: TENANT_ID, auth_user_id: uid, nome_completo: NOME_OUVIDORIA,
+      email_principal: EMAIL_OUVIDORIA, cpf: CPF_OUVIDORIA, tipo_usuario: "gestor", status: "ativo",
+    });
+    if (error) throw new Error("usuarios_base(insert): " + error.message);
+  }
+  const { data: ub } = await admin.from("usuarios_base").select("id").eq("auth_user_id", uid).maybeSingle();
+  if (!ub?.id) throw new Error("usuarios_base: registro não encontrado após o seed");
+
+  // Perfil: Ouvidoria só em "Próprio usuário"; nenhum bloco da tela Início.
+  let perfilId: string | undefined;
+  const { data: pf } = await admin.from("perfis_acesso").select("id")
+    .eq("tenant_id", TENANT_ID).eq("nome", NOME_PERFIL_OUVIDORIA).maybeSingle();
+  if (pf?.id) {
+    perfilId = pf.id;
+    await admin.from("perfis_acesso").update({ ativo: true }).eq("id", perfilId);
+  } else {
+    const { data: novoPf, error } = await admin.from("perfis_acesso").insert({
+      tenant_id: TENANT_ID, nome: NOME_PERFIL_OUVIDORIA,
+      descricao: "Perfil de teste (Cypress): Ouvidoria apenas em Próprio usuário.",
+      tipo: "personalizado", ativo: true, permite_acumulo: false,
+    }).select("id").single();
+    if (error) throw new Error("perfis_acesso: " + error.message);
+    perfilId = novoPf.id;
+  }
+  const { error: ibErr } = await admin.from("perfis_acesso").update({ inicio_blocos: [] }).eq("id", perfilId);
+  if (ibErr) console.error("perfis_acesso.inicio_blocos (ouvidoria):", ibErr.message);
+
+  await admin.from("perfil_permissoes").delete().eq("perfil_id", perfilId);
+  const { error: ppErr } = await admin.from("perfil_permissoes").insert(
+    ["visualizar", "criar", "editar"].map((acao) => ({
+      perfil_id: perfilId, tenant_id: TENANT_ID, modulo: "ouvidoria",
+      acao, escopo: "proprio_usuario", ativo: true,
+    })),
+  );
+  if (ppErr) throw new Error("perfil_permissoes: " + ppErr.message);
+
+  await admin.from("usuario_perfil_vinculos").update({ ativo: false })
+    .eq("usuario_id", ub.id).eq("tenant_id", TENANT_ID).neq("perfil_id", perfilId);
+  const { data: vin } = await admin.from("usuario_perfil_vinculos").select("id")
+    .eq("usuario_id", ub.id).eq("tenant_id", TENANT_ID).eq("perfil_id", perfilId).maybeSingle();
+  if (vin?.id) {
+    const { error } = await admin.from("usuario_perfil_vinculos")
+      .update({ ativo: true, is_perfil_principal: true }).eq("id", vin.id);
+    if (error) throw new Error("usuario_perfil_vinculos(update): " + error.message);
+  } else {
+    const { error } = await admin.from("usuario_perfil_vinculos").insert({
+      tenant_id: TENANT_ID, usuario_id: ub.id, perfil_id: perfilId, ativo: true, is_perfil_principal: true,
+    });
+    if (error) throw new Error("usuario_perfil_vinculos(insert): " + error.message);
+  }
+
+  const hoje = new Date().toISOString().split("T")[0];
+  const { data: humor } = await admin.from("humor_diario").select("id").eq("user_id", uid).eq("data", hoje).limit(1);
+  if (!humor || humor.length === 0) {
+    const { error } = await admin.from("humor_diario").insert({
+      tenant_id: TENANT_ID, user_id: uid, user_nome: NOME_OUVIDORIA, data: hoje, humor: "Bem", emoji: "😊",
+    });
+    if (error) console.error("humor_diario (ouvidoria):", error.message);
+  }
+
+  // Manifestações fictícias (idempotentes pelo assunto): própria, de outro autor e anônima.
+  const manifestacoes = [
+    { assunto: "E2E-OUV-PROPRIA", autor_id: uid, autor_nome: NOME_OUVIDORIA, anonimo: false },
+    { assunto: "E2E-OUV-ALHEIA", autor_id: AUTOR_OUTRO_OUV, autor_nome: "Outro Autor (Cypress)", anonimo: false },
+    { assunto: "E2E-OUV-ANONIMA", autor_id: null, autor_nome: null, anonimo: true },
+  ];
+  for (const m of manifestacoes) {
+    const { data: ja } = await admin.from("ouvidoria").select("id")
+      .eq("tenant_id", TENANT_ID).eq("assunto", m.assunto).limit(1);
+    if (ja && ja.length > 0) {
+      await admin.from("ouvidoria").update({ autor_id: m.autor_id, autor_nome: m.autor_nome, anonimo: m.anonimo }).eq("id", ja[0].id);
+      continue;
+    }
+    const { error } = await admin.from("ouvidoria").insert({
+      tenant_id: TENANT_ID, tipo: "sugestao", assunto: m.assunto,
+      mensagem: "Manifestação fictícia do teste de escopo da Ouvidoria (Cypress). Não é dado real.",
+      anonimo: m.anonimo, autor_id: m.autor_id, autor_nome: m.autor_nome, status: "pendente",
+    });
+    if (error) throw new Error("ouvidoria(" + m.assunto + "): " + error.message);
+  }
+  return { user_id: uid, usuario_base_id: ub.id, perfil_id: perfilId };
+}
+
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -858,6 +995,16 @@ serve(async (req) => {
       console.error("Usuário restrito (nao-fatal):", (e as Error).message);
     }
 
+    // 7g) Usuário da OUVIDORIA (papel de gestão + perfil "Próprio usuário" + 3 manifestações
+    //     fictícias): prova que o perfil manda sobre o papel. NÃO-FATAL.
+    let ouvidoriaEscopo: unknown = null;
+    try {
+      ouvidoriaEscopo = await semearUsuarioOuvidoria(admin, senha);
+    } catch (e) {
+      ouvidoriaEscopo = { ok: false, erro: (e as Error).message };
+      console.error("Usuário da Ouvidoria (nao-fatal):", (e as Error).message);
+    }
+
     // 8) Mobiliário do MarketYE ("Especialista Staging (QA)" com 2 anúncios
     //    publicados): o teste de tela MKY-021 precisa de ao menos um anúncio
     //    em Segurança do Trabalho. A função do banco semeia ou repara e
@@ -880,6 +1027,7 @@ serve(async (req) => {
       tenant_id: TENANT_ID,
       marketye,
       restrito,
+      ouvidoriaEscopo,
       mensagem: "Conta-robô pronta para a suíte Cypress entrar.",
     });
   } catch (erro) {

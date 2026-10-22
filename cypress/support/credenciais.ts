@@ -50,3 +50,17 @@ export function credenciaisRestrito(): CredenciaisDeTeste {
   const { senha } = credenciaisDeTeste();
   return { email: EMAIL_USUARIO_RESTRITO, senha };
 }
+
+// ---------------------------------------------------------------------
+// Usuário da OUVIDORIA (escopo "Próprio usuário" COM papel de gestão).
+//
+// Reproduz o caso real da Taeco: papel `manager`, tipo `gestor` e perfil com Ouvidoria só
+// em "Próprio usuário". Semeado por seed-e2e-user com 3 manifestações fictícias (própria,
+// de outro autor e anônima). Mesma senha da conta-robô.
+// ---------------------------------------------------------------------
+export const EMAIL_USUARIO_OUVIDORIA = "ouvidoria.e2e@youreyes.local";
+
+export function credenciaisOuvidoria(): CredenciaisDeTeste {
+  const { senha } = credenciaisDeTeste();
+  return { email: EMAIL_USUARIO_OUVIDORIA, senha };
+}

@@ -60,9 +60,11 @@ describe("Perfil de acesso × tela Início", () => {
     cy.contains("button", "Novo Perfil", { timeout: 20000 }).click();
 
     cy.get('[role="dialog"]', { timeout: 15000 }).within(() => {
-      cy.contains("Tela inicial (Início)").should("be.visible");
+      // A seção fica abaixo da dobra do formulário (área rolável): rola antes de exigir visibilidade.
+      cy.contains("Tela inicial (Início)").scrollIntoView().should("be.visible");
       BLOCOS.forEach((bloco) => {
         cy.contains("label", bloco)
+          .scrollIntoView()
           .find('[role="checkbox"]')
           .should("have.attr", "aria-checked", "false");
       });
@@ -77,7 +79,9 @@ describe("Perfil de acesso × tela Início", () => {
     abrirInicio();
     cy.contains("h1", /^Olá,/, { timeout: 20000 }).should("be.visible");
     cy.get("main").should("contain.text", "Use o menu ao lado");
-    ["Governança do Trabalho Humano", "KPIs Operacionais", "Colaboradores Ativos", "Pendências", "Alertas Críticos"].forEach(
+    // "Governança do Trabalho Humano" aparece no subtítulo fixo da página; o cabeçalho do bloco de
+    // pilares é identificado pela legenda própria dele.
+    ["Visão integrada dos 4 pilares estratégicos", "KPIs Operacionais", "Colaboradores Ativos", "Pendências", "Alertas Críticos"].forEach(
       (texto) => cy.get("main").should("not.contain.text", texto),
     );
   });

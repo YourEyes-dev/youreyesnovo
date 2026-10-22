@@ -142,3 +142,30 @@ export const MOTIVOS_ENTREGA = [
   "Treinamento",
   "Outro",
 ];
+
+// Payload da edição de um EPI: cada bloco vai para a sua tabela
+export interface EpiEdicaoPayload {
+  epi: {
+    ca: string | null;
+    codigo: string | null;
+    marca: string | null;
+    modelo: string | null;
+    data_fabricacao: string | null;
+    data_validade: string | null;
+    quantidade_minima: number;
+    custo_unitario: number | null;
+    localizacao: string | null;
+    observacoes: string | null;
+  };
+  tipo: {
+    nome: string;
+    categoria: string | null;
+    unidade_medida: string | null;
+    tipo_durabilidade: string | null;
+    periodicidade_troca_dias: number | null;
+    marca: string | null;
+    fabricante: string | null;
+    ca_numero: string | null;
+    ca_validade: string | null;
+  };
+}

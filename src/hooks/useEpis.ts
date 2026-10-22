@@ -14,6 +14,7 @@ import type {
   EpiEntregaUpdate,
   EpiMovimentacao,
   EpiCompleto,
+  EpiEdicaoPayload,
   EpiStatus,
   EntregaStatus,
 } from "@/types/epi";
@@ -401,6 +402,34 @@ export function useEpis() {
     },
   });
 
+  // Edição de um EPI: o que é do item (CA, validade, mínimo, local...) vai para
+  // epis; o que é do cadastro do tipo (nome, categoria, vida útil...) vai para
+  // epi_tipos. O estoque não passa por aqui: muda por Ajustar Estoque.
+  const editarEpiMutation = useMutation({
+    mutationFn: async ({ id, tipoId, epi, tipo }: { id: string; tipoId: string } & EpiEdicaoPayload) => {
+      const { error: tipoError } = await supabase
+        .from("epi_tipos")
+        .update(tipo)
+        .eq("id", tipoId);
+      if (tipoError) throw tipoError;
+
+      const { error: epiError } = await supabase
+        .from("epis")
+        .update(epi)
+        .eq("id", id);
+      if (epiError) throw epiError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["epis"] });
+      queryClient.invalidateQueries({ queryKey: ["epi-tipos"] });
+      queryClient.invalidateQueries({ queryKey: ["epi-entregas"] });
+      toast.success("EPI atualizado com sucesso!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar EPI: " + error.message);
+    },
+  });
+
   const excluirEpiMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("epis").delete().eq("id", id);
@@ -723,6 +752,8 @@ export function useEpis() {
     // Mutations - EPIs
     criarEpi: criarEpiMutation.mutateAsync,
     criandoEpi: criarEpiMutation.isPending,
+    editarEpi: editarEpiMutation.mutateAsync,
+    editandoEpi: editarEpiMutation.isPending,
     atualizarEpi: atualizarEpiMutation.mutateAsync,
     atualizandoEpi: atualizarEpiMutation.isPending,
     excluirEpi: excluirEpiMutation.mutateAsync,

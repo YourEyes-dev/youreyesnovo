@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { EmpresaSelector } from "@/components/layout/EmpresaSelector";
 
 import { useHumorDiario } from "@/hooks/useHumorDiario";
+import { useMeuPerfilInicio } from "@/hooks/useMeuPerfilInicio";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AppRole } from "@/types/database";
 
@@ -48,6 +49,7 @@ export const Header = ({ onMenuToggle, isMobile, isSidebarCollapsed, onSidebarTo
   const { profile, signOut, isSuperAdmin, user, roles, parceiroId, especialistaId } = useAuthContext();
   const { tenant } = useTenant();
   const { humorHoje } = useHumorDiario();
+  const { perfilNome } = useMeuPerfilInicio();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -178,7 +180,7 @@ export const Header = ({ onMenuToggle, isMobile, isSidebarCollapsed, onSidebarTo
                   {profile?.nome_completo?.split(" ")[0] || "Usuário"}
                 </p>
                 <p className="text-xs text-white/70">
-                  {profile?.cargo || (isSuperAdmin ? "Super Admin" : getRoleLabel(roles))}
+                  {profile?.cargo || (isSuperAdmin ? "Super Admin" : perfilNome || getRoleLabel(roles))}
                 </p>
               </div>
               <ChevronDown className="w-4 h-4 text-white/70 hidden md:block" />

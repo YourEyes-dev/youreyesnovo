@@ -5,8 +5,16 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { AlertasCriticos } from "@/components/dashboard/AlertasCriticos";
 import { PendingTasks } from "@/components/dashboard/PendingTasks";
 import { CalendarDays } from "lucide-react";
+import { useMeuPerfilInicio } from "@/hooks/useMeuPerfilInicio";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 const Dashboard = () => {
+  const { profile } = useAuthContext();
+  const { blocos, isLoading } = useMeuPerfilInicio();
+  // blocos === null → painel completo (perfil legado / sem perfil / dono).
+  // Enquanto carrega o perfil, nada sensível é montado (evita piscar números).
+  const mostra = (b: string) => !isLoading && (blocos === null || blocos.includes(b as never));
+  const semBlocos = !isLoading && blocos !== null && blocos.length === 0;
   const today = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "numeric",
@@ -25,7 +33,7 @@ const Dashboard = () => {
       >
         <div>
           <h1 className="text-3xl font-bold text-foreground tracking-tight">
-            Dashboard
+            {blocos === null ? "Dashboard" : `Olá, ${profile?.nome_completo?.split(" ")[0] || "bem-vindo"}`}
           </h1>
           <p className="text-muted-foreground mt-1">
             Plataforma de Governança do Trabalho Humano
@@ -38,16 +46,22 @@ const Dashboard = () => {
       </motion.div>
 
       {/* Pilares Summary - Visão Geral */}
-      <PilaresSummaryLive />
+      {mostra("pilares") && <PilaresSummaryLive />}
 
       {/* KPIs Operacionais */}
-      <DashboardKPIs />
+      {mostra("indicadores") && <DashboardKPIs />}
 
       {/* Pendências */}
-      <PendingTasks />
+      {mostra("pendencias") && <PendingTasks />}
 
       {/* Alertas Críticos */}
-      <AlertasCriticos />
+      {mostra("alertas") && <AlertasCriticos />}
+
+      {semBlocos && (
+        <p className="text-sm text-muted-foreground">
+          Use o menu ao lado para acessar os módulos liberados para o seu perfil.
+        </p>
+      )}
     </div>
   );
 };

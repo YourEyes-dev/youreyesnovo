@@ -202,7 +202,11 @@ export function EpiEntregaWizard({
       .from(BUCKET_EVIDENCIA_EPI)
       .upload(fileName, byteArray, { contentType: "image/png", upsert: false });
 
-    if (error) throw error;
+    if (error) {
+      // Diz o passo que falhou: só "violates row-level security policy" não
+      // permite saber se foi o envio da foto/assinatura ou a gravação da entrega.
+      throw new Error(`envio da foto/assinatura ao armazenamento seguro: ${error.message}`);
+    }
     return data.path;
   };
 
@@ -326,7 +330,7 @@ export function EpiEntregaWizard({
         p_destino_substituicao: substituicaoDetectada && status === "entregue" ? destinoSubstituicao : undefined,
       });
 
-      if (error) throw error;
+      if (error) throw new Error(`gravação da entrega: ${error.message}`);
       const data = entregaGravada as unknown as EpiEntrega;
 
       setEntregaResult({

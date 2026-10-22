@@ -453,6 +453,12 @@ async function semearUsuarioRestrito(admin: any, senha: string) {
     if (error) throw new Error("perfis_acesso: " + error.message);
     perfilId = novoPf.id;
   }
+  // Tela Início: este perfil não enxerga nenhum bloco do painel (só saudação e menu).
+  // Sem isto ele herdaria o painel completo (inicio_blocos NULL) e os testes de
+  // PERFIL-023/024 não provariam nada. Não-fatal: em base sem a coluna só avisa.
+  const { error: ibErr } = await admin.from("perfis_acesso").update({ inicio_blocos: [] }).eq("id", perfilId);
+  if (ibErr) console.error("perfis_acesso.inicio_blocos (restrito):", ibErr.message);
+
   await admin.from("perfil_permissoes").delete().eq("perfil_id", perfilId);
   const { error: ppErr } = await admin.from("perfil_permissoes").insert({
     perfil_id: perfilId, tenant_id: TENANT_ID, modulo: "documentos",

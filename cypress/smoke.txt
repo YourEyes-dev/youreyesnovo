@@ -20,3 +20,4 @@ cypress/e2e/saude-ocupacional.cy.ts
 cypress/e2e/ouvidoria.cy.ts
 cypress/e2e/suporte.cy.ts
 cypress/e2e/pendencias.cy.ts
+cypress/e2e/perfis-tela-inicial.cy.ts

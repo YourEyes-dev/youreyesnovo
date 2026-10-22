@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { INICIO_BLOCOS, TODOS_BLOCOS } from "@/hooks/useMeuPerfilInicio";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PermissoesEditor } from "./PermissoesEditor";
 import type { PerfilAcesso, PerfilPermissao } from "@/hooks/usePerfisAcesso";
@@ -25,6 +27,7 @@ const schema = z.object({
   expira_em: z.string().optional(),
   is_perfil_assistido: z.boolean().optional(),
   pode_ver_salario: z.boolean().optional(),
+  inicio_blocos: z.array(z.string()).optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -62,6 +65,9 @@ export function PerfilFormDialog({ open, onClose, perfilInicial, onSubmit, loadi
       is_perfil_assistido: perfilInicial?.is_perfil_assistido || false,
       // Default TRUE: perfis novos e existentes veem salário até ser desligado.
       pode_ver_salario: perfilInicial?.pode_ver_salario ?? true,
+      // Perfil antigo (null) enxerga o painel completo: o editor mostra tudo marcado.
+      // Perfil NOVO nasce sem nenhum bloco: informação da empresa só aparece se liberada.
+      inicio_blocos: perfilInicial ? (perfilInicial.inicio_blocos ?? [...TODOS_BLOCOS]) : [],
     },
   });
 
@@ -198,6 +204,41 @@ export function PerfilFormDialog({ open, onClose, perfilInicial, onSubmit, loadi
                           holerite da pessoa continua visível).
                         </p>
                       </div>
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="inicio_blocos" render={({ field }) => (
+                    <FormItem className="rounded-lg border border-border p-3 space-y-2">
+                      <div>
+                        <FormLabel className="text-[13px] font-medium">Tela inicial (Início)</FormLabel>
+                        <p className="text-[11px] text-muted-foreground">
+                          Escolha o que as pessoas deste perfil veem ao entrar no sistema. Os blocos
+                          trazem números e alertas da empresa: libere só para quem pode ver essas informações.
+                          Sem nenhum bloco marcado, a pessoa vê apenas a saudação e o menu dos módulos liberados.
+                        </p>
+                      </div>
+                      {INICIO_BLOCOS.map((b) => {
+                        const marcado = (field.value || []).includes(b.id);
+                        return (
+                          <label key={b.id} className="flex items-start gap-2 cursor-pointer">
+                            <Checkbox
+                              className="mt-0.5"
+                              checked={marcado}
+                              onCheckedChange={(v) =>
+                                field.onChange(
+                                  v
+                                    ? [...(field.value || []), b.id]
+                                    : (field.value || []).filter((x) => x !== b.id)
+                                )
+                              }
+                            />
+                            <span>
+                              <span className="text-[13px] font-medium block">{b.label}</span>
+                              <span className="text-[11px] text-muted-foreground">{b.descricao}</span>
+                            </span>
+                          </label>
+                        );
+                      })}
                     </FormItem>
                   )} />
 

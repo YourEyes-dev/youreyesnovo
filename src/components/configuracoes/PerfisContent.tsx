@@ -141,6 +141,7 @@ export default function PerfisContent() {
       descricao: perfil.descricao,
       cor: perfil.cor,
       icone: perfil.icone,
+      inicio_blocos: perfil.inicio_blocos ?? null,
       tipo: "personalizado",
       permissoes: perfil.permissoes || [],
     });

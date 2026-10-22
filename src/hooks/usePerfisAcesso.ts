@@ -39,6 +39,8 @@ export interface PerfilAcesso {
   is_perfil_assistido?: boolean;
   /** Quando false, o salário/valores de remuneração são mascarados para quem tem este perfil. */
   pode_ver_salario?: boolean;
+  /** Blocos da tela Início visíveis para o perfil. null = painel completo (legado). */
+  inicio_blocos?: string[] | null;
   total_usuarios: number;
   criado_por?: string;
   criado_por_nome?: string;
@@ -365,6 +367,7 @@ export function usePerfisAcesso() {
     qc.invalidateQueries({ queryKey: ["usuarios-perfil-vinculos-lista"] });
     qc.invalidateQueries({ queryKey: ["perfil_audit_log"] });
     qc.invalidateQueries({ queryKey: ["meu_perfil_vinculo"] });
+    qc.invalidateQueries({ queryKey: ["meu_perfil_inicio"] });
     qc.invalidateQueries({ queryKey: ["minhas_perfil_permissoes"] });
   };
 

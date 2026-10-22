@@ -77,3 +77,41 @@ WHERE p.schemaname = 'storage' AND p.tablename = 'objects'
   AND lower(COALESCE(p.qual, '') || ' ' || COALESCE(p.with_check, '')) ~ 'has_(minimum_)?role'
   AND lower(COALESCE(p.qual, '') || ' ' || COALESCE(p.with_check, '')) !~ 'perfil_permite|perfil_escreve|ye_eh_dono'
 ORDER BY p.policyname;
+
+-- ── CONSULTA C: dado pessoal que QUALQUER membro da empresa le (rode separado) ─
+-- Ponto cego da consulta A: tabela com coluna de dado pessoal, SEM camada de perfil, cuja leitura
+-- e liberada so pelo tenant (nem papel, nem "proprio usuario"). Mostra a regra de leitura.
+WITH tabelas AS MATERIALIZED (
+  SELECT c.relname AS tabela, GREATEST(c.reltuples, 0)::bigint AS linhas_aprox
+  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity
+    AND c.relname NOT LIKE 'qa\_%' AND c.relname NOT LIKE 'backup\_%'
+    AND EXISTS (SELECT 1 FROM information_schema.columns k
+                 WHERE k.table_schema = 'public' AND k.table_name = c.relname AND k.column_name = 'tenant_id')
+),
+sens AS MATERIALIZED (
+  SELECT k.table_name AS tabela, string_agg(k.column_name, ', ' ORDER BY k.column_name) AS colunas
+  FROM information_schema.columns k
+  WHERE k.table_schema = 'public'
+    AND k.column_name ~* '(^cpf|_cpf|^rg$|^cid$|_cid$|^cid_|salario|remunera|atestado|diagnost|laudo|exame|nascimento|celular|telefone|endereco|^cep$|^pis$|ctps|biometr|selfie|denuncia|assedio)'
+  GROUP BY 1
+),
+pol AS MATERIALIZED (
+  SELECT p.tablename AS tabela, p.permissive, p.cmd, p.policyname,
+         lower(COALESCE(p.qual, '') || ' ' || COALESCE(p.with_check, '')) AS txt,
+         COALESCE(p.qual, '') AS qual
+  FROM pg_policies p WHERE p.schemaname = 'public'
+),
+agg AS MATERIALIZED (
+  SELECT t.tabela, t.linhas_aprox, s.colunas,
+    COALESCE(bool_or(p.txt ~ 'perfil_permite|perfil_escreve|perfil_amplo|ye_eh_dono|pode_gerir_acesso'), false) AS camada_perfil,
+    (array_agg(p.policyname || ': ' || left(regexp_replace(p.qual, '\s+', ' ', 'g'), 130))
+       FILTER (WHERE p.permissive = 'PERMISSIVE' AND p.cmd IN ('SELECT', 'ALL')
+                 AND p.txt ~ 'tenant' AND p.txt !~ 'has_(minimum_)?role|auth\.uid\(\)|perfil_|ye_|pode_gerir'))[1] AS leitura_aberta_ao_tenant
+  FROM tabelas t JOIN sens s ON s.tabela = t.tabela LEFT JOIN pol p ON p.tabela = t.tabela
+  GROUP BY t.tabela, t.linhas_aprox, s.colunas
+)
+SELECT tabela, linhas_aprox, left(colunas, 100) AS colunas_sensiveis, leitura_aberta_ao_tenant
+FROM agg
+WHERE NOT camada_perfil AND leitura_aberta_ao_tenant IS NOT NULL
+ORDER BY linhas_aprox DESC, tabela;

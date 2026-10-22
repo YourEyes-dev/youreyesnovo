@@ -29732,8 +29732,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      epi_devolver_entrega: {
+        Args: { p_destino: string; p_entrega: string; p_obs?: string }
+        Returns: Json
+      }
       epi_registrar_entrega: {
-        Args: { p_entrega: Json; p_local?: string }
+        Args: {
+          p_destino_substituicao?: string
+          p_entrega: Json
+          p_local?: string
+          p_substitui?: string
+        }
         Returns: Json
       }
       esocial_rejeicao_traduzir: { Args: { p_codigo: string }; Returns: string }

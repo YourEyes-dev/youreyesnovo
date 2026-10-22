@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -53,6 +54,7 @@ import { Loader2, Download, ArrowLeft, ArrowRight, XCircle, Check, ChevronsUpDow
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import type { EpiTipo, EpiEntrega } from "@/types/epi";
+import { BUCKET_EVIDENCIA_EPI } from "@/lib/epiEvidencia";
 import { cn } from "@/lib/utils";
 import { useEpiTamanhos } from "@/hooks/useEpiTamanhos";
 import { Badge } from "@/components/ui/badge";
@@ -118,6 +120,9 @@ export function EpiEntregaWizard({
   // CT-34: Entregas ativas do colaborador para verificar substituição
   const [entregasAtivas, setEntregasAtivas] = useState<Array<{ id: string; epi_tipo_id: string; epi_tipo_nome: string; data_entrega: string }>>([]);
   const [substituicaoDetectada, setSubstituicaoDetectada] = useState<{ id: string; epi_tipo_nome: string; data_entrega: string } | null>(null);
+  // Destino do EPI que está sendo substituído; escolhido a cada vez. Descarte é o
+  // padrão porque devolver ao estoque um EPI desgastado seria risco de segurança.
+  const [destinoSubstituicao, setDestinoSubstituicao] = useState<"descarte" | "estoque" | "manutencao">("descarte");
 
   const [showRecusaDialog, setShowRecusaDialog] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -177,6 +182,7 @@ export function EpiEntregaWizard({
     setSignatureData(null);
     setEntregaResult(null);
     setPdfArquivado(false);
+    setDestinoSubstituicao("descarte");
   };
 
   const handleClose = () => {
@@ -184,19 +190,20 @@ export function EpiEntregaWizard({
     onOpenChange(false);
   };
 
-  // Upload base64 para storage
+  // Upload base64 para o bucket PRIVADO da evidência de EPI. Devolve o CAMINHO
+  // do arquivo (o primeiro nível é a empresa, exigido pela política de storage);
+  // o link de leitura é gerado sob demanda por urlDaEvidenciaEpi. Sem upsert: a
+  // evidência não pode ser sobrescrita.
   const uploadToStorage = async (base64Data: string, fileName: string): Promise<string> => {
     const base64 = base64Data.split(",")[1];
     const byteArray = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    
+
     const { data, error } = await supabase.storage
-      .from("epi-signatures")
-      .upload(fileName, byteArray, { contentType: "image/png", upsert: true });
-    
+      .from(BUCKET_EVIDENCIA_EPI)
+      .upload(fileName, byteArray, { contentType: "image/png", upsert: false });
+
     if (error) throw error;
-    
-    const { data: urlData } = supabase.storage.from("epi-signatures").getPublicUrl(data.path);
-    return urlData.publicUrl;
+    return data.path;
   };
 
   // Salvar entrega
@@ -313,27 +320,21 @@ export function EpiEntregaWizard({
           entregue_por_nome: profile?.nome_completo ?? null,
         },
         p_local: usarControleEstoque && formData.localEstoqueId ? formData.localEstoqueId : null,
+        // Substituição: o EPI anterior é devolvido na mesma transação, com o
+        // destino escolhido. Se qualquer parte falhar, nada é gravado.
+        p_substitui: substituicaoDetectada && status === "entregue" ? substituicaoDetectada.id : undefined,
+        p_destino_substituicao: substituicaoDetectada && status === "entregue" ? destinoSubstituicao : undefined,
       });
 
       if (error) throw error;
       const data = entregaGravada as unknown as EpiEntrega;
 
-      // CT-34: Se é substituição, marcar entrega anterior como devolvida
-      if (substituicaoDetectada && status === "entregue") {
-        await supabase
-          .from("epi_entregas")
-          .update({
-            status: "devolvido",
-            data_devolucao: new Date().toISOString(),
-            observacoes_devolucao: `Devolução automática por substituição. Nova entrega: ${data.id}`,
-          })
-          .eq("id", substituicaoDetectada.id);
-      }
-
       setEntregaResult({
         ...data,
-        fotoUrl,
-        assinaturaUrl,
+        // O recibo mostra a foto e a assinatura que já estão na memória; o que
+        // fica gravado na entrega é o caminho no bucket privado, não uma URL.
+        fotoUrl: photoData ?? undefined,
+        assinaturaUrl: signatureData ?? undefined,
         // Hora gravada pelo servidor: é a que consta no hash e no recibo.
         signedAt: data.signed_at ?? signedAt,
       });
@@ -769,10 +770,34 @@ export function EpiEntregaWizard({
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Este colaborador já possui uma entrega ativa de <strong>{substituicaoDetectada.epi_tipo_nome}</strong> (entregue em {format(new Date(substituicaoDetectada.data_entrega), "dd/MM/yyyy")}).
-                          Ao confirmar, a entrega anterior será marcada para devolução automaticamente.
+                          Ao confirmar, a entrega anterior será devolvida junto com esta. O que fazer com o EPI antigo?
                         </p>
                       </div>
                     </div>
+                    <RadioGroup
+                      value={destinoSubstituicao}
+                      onValueChange={(v) => setDestinoSubstituicao(v as "descarte" | "estoque" | "manutencao")}
+                      className="mt-3 gap-2"
+                    >
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem id="subst-descarte" value="descarte" className="mt-0.5" />
+                        <Label htmlFor="subst-descarte" className="text-xs font-normal leading-snug">
+                          <strong>Descartar</strong>: desgastado, danificado ou vencido (recomendado).
+                        </Label>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem id="subst-manutencao" value="manutencao" className="mt-0.5" />
+                        <Label htmlFor="subst-manutencao" className="text-xs font-normal leading-snug">
+                          <strong>Enviar para manutenção</strong>: fica no local Em Manutenção.
+                        </Label>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem id="subst-estoque" value="estoque" className="mt-0.5" />
+                        <Label htmlFor="subst-estoque" className="text-xs font-normal leading-snug">
+                          <strong>Voltar ao estoque</strong>: só se estiver em bom estado e puder ser reutilizado.
+                        </Label>
+                      </div>
+                    </RadioGroup>
                   </div>
                 )}
 

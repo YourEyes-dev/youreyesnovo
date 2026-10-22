@@ -36,7 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import type { EpiTipo, EpiCompleto } from "@/types/epi";
+import type { EpiTipo, EpiCompleto, EpiEdicaoPayload } from "@/types/epi";
 import { CATEGORIAS_EPI, UNIDADES_MEDIDA, TIPOS_DURABILIDADE } from "@/types/epi";
 import { useEpiLocais } from "@/hooks/useEpiLocais";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,7 +79,13 @@ type FormData = z.infer<typeof schema>;
 interface EpiFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: any) => Promise<void>;
+  /**
+   * Chamado SÓ na edição (quando `epi` vem preenchido), com o que pertence a
+   * cada tabela: `epi` vai para epis, `tipo` para epi_tipos. O cadastro novo
+   * segue por onCreateTipo. Antes esta prop era recebida e nunca chamada, e
+   * "Salvar Alterações" cadastrava um EPI novo em vez de editar o existente.
+   */
+  onSubmit: (data: EpiEdicaoPayload) => Promise<void>;
   onCreateTipo: (data: {
     nome: string;
     descricao?: string;
@@ -212,17 +218,19 @@ export function EpiForm({
         setCaExistente(null);
         return;
       }
-      const { data: existente } = await supabase
+      let consulta = supabase
         .from("epi_tipos")
         .select("id, nome")
-        .eq("ca_numero", caValue)
-        .limit(1)
-        .maybeSingle();
+        .eq("ca_numero", caValue);
+      // Na edição o próprio tipo guarda esse CA: sem excluí-lo, o item era
+      // acusado de duplicar a si mesmo e o botão ficava bloqueado.
+      if (epi?.tipo_id) consulta = consulta.neq("id", epi.tipo_id);
+      const { data: existente } = await consulta.limit(1).maybeSingle();
       setCaExistente(existente ? existente.nome : null);
     };
     const timer = setTimeout(verificarCA, 500);
     return () => clearTimeout(timer);
-  }, [caValue, epi?.ca]);
+  }, [caValue, epi?.ca, epi?.tipo_id]);
 
   const handleSubmit = async (data: FormData) => {
     // Exigência de CA conforme a categoria escolhida (NR-06 para o que é EPI
@@ -253,6 +261,46 @@ export function EpiForm({
 
     // First create the tipo, then create the EPI record
     const categoria = selectedCategoria || data.categoria;
+
+    // EDIÇÃO: altera o item existente (epis) e o seu tipo (epi_tipos). Estoque
+    // não entra aqui: quantidade só muda por Ajustar Estoque, que deixa
+    // movimentação e motivo.
+    if (epi) {
+      const vazio = (v?: string | null) => (v && v.trim() ? v.trim() : null);
+      try {
+        await onSubmit({
+          epi: {
+            ca: vazio(data.ca),
+            codigo: vazio(data.codigo),
+            marca: vazio(data.marca),
+            modelo: vazio(data.modelo),
+            data_fabricacao: vazio(data.data_fabricacao),
+            data_validade: vazio(data.data_validade),
+            quantidade_minima: data.quantidade_minima,
+            custo_unitario: data.custo_unitario ? Number(data.custo_unitario) : null,
+            localizacao: vazio(data.localizacao),
+            observacoes: vazio(data.observacoes),
+          },
+          tipo: {
+            nome: data.nome.trim(),
+            categoria: vazio(categoria),
+            unidade_medida: vazio(data.unidade_medida),
+            tipo_durabilidade: vazio(data.tipo_durabilidade),
+            periodicidade_troca_dias: data.periodicidade_troca_dias
+              ? Number(data.periodicidade_troca_dias) : null,
+            marca: vazio(data.marca),
+            fabricante: vazio(data.fabricante),
+            ca_numero: vazio(data.ca),
+            // Mesma convenção do cadastro: a validade do CA é a data do formulário.
+            ca_validade: vazio(data.data_validade),
+          },
+        });
+        onOpenChange(false);
+      } catch (error) {
+        console.error("Erro ao editar EPI:", error);
+      }
+      return;
+    }
     
     try {
       const result = await onCreateTipo({
@@ -509,7 +557,12 @@ export function EpiForm({
               <FormField control={form.control} name="quantidade_estoque" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Quantidade em Estoque *</FormLabel>
-                  <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                  <FormControl><Input type="number" min={0} {...field} disabled={!!epi} /></FormControl>
+                  {epi && (
+                    <p className="text-xs text-muted-foreground">
+                      Para mudar a quantidade use "Ajustar Estoque" no menu da linha: assim fica o motivo no histórico.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )} />
@@ -527,7 +580,7 @@ export function EpiForm({
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="local_estoque_id" render={({ field }) => (
+              {!epi && <FormField control={form.control} name="local_estoque_id" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Local de Estoque</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value || ""}>
@@ -549,7 +602,7 @@ export function EpiForm({
                   </Select>
                   <FormMessage />
                 </FormItem>
-              )} />
+              )} />}
               <FormField control={form.control} name="localizacao" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Localização</FormLabel>
@@ -567,8 +620,8 @@ export function EpiForm({
               </FormItem>
             )} />
 
-            {/* Controle por Tamanho */}
-            <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
+            {/* Controle por Tamanho — só no cadastro: a grade nasce com o estoque inicial */}
+            {!epi && <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">Controlar por Tamanho</p>
@@ -684,7 +737,7 @@ export function EpiForm({
                   )}
                 </div>
               )}
-            </div>
+            </div>}
 
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

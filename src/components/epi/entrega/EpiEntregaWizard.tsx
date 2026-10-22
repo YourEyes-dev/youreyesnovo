@@ -302,7 +302,9 @@ export function EpiEntregaWizard({
           signed_at: status === "entregue" ? signedAt : null,
           liveness_detected: livenessData !== null,
           liveness_data: livenessData || { actions: [], timestamps: [] },
-          ip_address: "",
+          // IP e dispositivo reais são gravados pelo servidor (gatilho
+          // epi_entrega_origem_pelo_servidor) a partir da requisição; o que o
+          // navegador mandasse aqui não valeria como prova.
           user_agent: navigator.userAgent,
           observacoes: status === "recusado"
             ? `RECUSADO: Colaborador recusou assinar. ${formData.observacoes}`
@@ -332,7 +334,8 @@ export function EpiEntregaWizard({
         ...data,
         fotoUrl,
         assinaturaUrl,
-        signedAt,
+        // Hora gravada pelo servidor: é a que consta no hash e no recibo.
+        signedAt: data.signed_at ?? signedAt,
       });
 
       if (status === "entregue") {

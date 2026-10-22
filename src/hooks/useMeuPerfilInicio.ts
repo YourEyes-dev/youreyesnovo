@@ -27,7 +27,7 @@ export function useMeuPerfilInicio() {
   const { user, tenantId, isSuperAdmin, hasMinimumRole } = useAuth();
   const isOwner = hasMinimumRole("owner") || isSuperAdmin;
 
-  const { data: usuarioBase } = useQuery({
+  const { data: usuarioBase, isLoading: carregandoBase } = useQuery({
     queryKey: ["meu_usuario_base_id", user?.id, tenantId],
     queryFn: async () => {
       if (!user?.id || !tenantId) return null;
@@ -42,10 +42,10 @@ export function useMeuPerfilInicio() {
     staleTime: 1000,
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["meu_perfil_inicio", usuarioBase?.id, tenantId],
     queryFn: async (): Promise<{ nome: string | null; blocos: InicioBloco[] | null }> => {
-      const { data: vinc } = await fromTable("usuario_perfil_vinculos")
+      const { data: vinc, error: vincErro } = await fromTable("usuario_perfil_vinculos")
         .select("perfil_id")
         .eq("usuario_id", usuarioBase!.id)
         .eq("tenant_id", tenantId!)
@@ -53,11 +53,14 @@ export function useMeuPerfilInicio() {
         .order("is_perfil_principal", { ascending: false })
         .limit(1)
         .maybeSingle();
+      // Erro de leitura NÃO pode virar "sem perfil" (painel completo): vira erro, e o consumidor falha fechado.
+      if (vincErro) throw vincErro;
       const perfilId = (vinc as { perfil_id: string } | null)?.perfil_id;
       if (!perfilId) return { nome: null, blocos: null };
 
       let res = await fromTable("perfis_acesso").select("nome, inicio_blocos").eq("id", perfilId).maybeSingle();
       if (res.error) res = await fromTable("perfis_acesso").select("nome").eq("id", perfilId).maybeSingle();
+      if (res.error) throw res.error;
       const row = res.data as { nome?: string; inicio_blocos?: string[] | null } | null;
       return {
         nome: row?.nome ?? null,
@@ -72,8 +75,9 @@ export function useMeuPerfilInicio() {
 
   return {
     perfilNome: data?.nome ?? null,
-    /** Dono e superadmin sempre veem o painel completo. */
-    blocos: isOwner ? null : data?.blocos ?? null,
-    isLoading: !!usuarioBase?.id && isLoading,
+    /** Dono e superadmin sempre veem o painel completo. Falha de leitura = nenhum bloco (fecha, não abre). */
+    blocos: isOwner ? null : isError ? [] : data?.blocos ?? null,
+    /** Inclui a busca do cadastro: sem isso o painel completo piscaria antes de o perfil chegar. */
+    isLoading: carregandoBase || (!!usuarioBase?.id && isLoading),
   };
 }

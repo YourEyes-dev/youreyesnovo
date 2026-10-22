@@ -267,11 +267,11 @@ export function OuvidoriaCard({
             </div>
           )}
 
-          {/* Ações do Manager */}
-          {isManager && (
+          {/* Ações de gestão: só aparecem para quem pode agir (a tela decide pelo perfil) */}
+          {isManager && (onResponder || onAtualizarStatus || onDeletar) && (
             <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t">
               <div className="flex gap-2 flex-1">
-                <Select value={manifestacao.status} onValueChange={handleStatusChange}>
+                <Select value={manifestacao.status} onValueChange={handleStatusChange} disabled={!onAtualizarStatus}>
                   <SelectTrigger className="w-[140px]">
                     <SelectValue />
                   </SelectTrigger>
@@ -283,7 +283,7 @@ export function OuvidoriaCard({
                   </SelectContent>
                 </Select>
 
-                <Select value={manifestacao.prioridade} onValueChange={handlePrioridadeChange}>
+                <Select value={manifestacao.prioridade} onValueChange={handlePrioridadeChange} disabled={!onAtualizarStatus}>
                   <SelectTrigger className="w-[120px]">
                     <SelectValue />
                   </SelectTrigger>
@@ -306,7 +306,7 @@ export function OuvidoriaCard({
                   Criar Ações
                 </Button>
 
-                {!manifestacao.resposta && (
+                {!manifestacao.resposta && onResponder && (
                   <Button
                     variant="outline"
                     size="sm"

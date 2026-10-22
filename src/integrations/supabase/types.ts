@@ -29732,6 +29732,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      epi_registrar_entrega: {
+        Args: { p_entrega: Json; p_local?: string }
+        Returns: Json
+      }
       esocial_rejeicao_traduzir: { Args: { p_codigo: string }; Returns: string }
       esocial_s2220_prazo: { Args: { p_data_aso: string }; Returns: string }
       estabilidades_vigentes: {

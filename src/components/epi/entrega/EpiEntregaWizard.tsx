@@ -52,7 +52,7 @@ import { format, addDays } from "date-fns";
 import { Loader2, Download, ArrowLeft, ArrowRight, XCircle, Check, ChevronsUpDown, AlertCircle, User, MapPin } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import type { EpiTipo } from "@/types/epi";
+import type { EpiTipo, EpiEntrega } from "@/types/epi";
 import { cn } from "@/lib/utils";
 import { useEpiTamanhos } from "@/hooks/useEpiTamanhos";
 import { Badge } from "@/components/ui/badge";
@@ -227,7 +227,6 @@ export function EpiEntregaWizard({
       // A tabela epi_entregas referencia `epis.id` (item de estoque),
       // então precisamos resolver o epi_id a partir do tipo selecionado (epi_tipos).
       let epiId: string;
-      let estoqueAnterior: number;
       
       // Buscar EPI existente com estoque suficiente
       const { data: epiRow, error: epiError } = await supabase
@@ -242,7 +241,6 @@ export function EpiEntregaWizard({
       
       if (epiRow?.id) {
         epiId = epiRow.id;
-        estoqueAnterior = epiRow.quantidade_estoque || 0;
       } else {
         // Não existe EPI para este tipo, criar um automaticamente
         const { data: newEpi, error: createError } = await supabase
@@ -259,7 +257,6 @@ export function EpiEntregaWizard({
         
         if (createError) throw createError;
         epiId = newEpi.id;
-        estoqueAnterior = newEpi.quantidade_estoque || 1000;
       }
 
       let fotoUrl: string | undefined;
@@ -281,10 +278,13 @@ export function EpiEntregaWizard({
         );
       }
 
-      // Criar registro de entrega
-      const { data, error } = await supabase
-        .from("epi_entregas")
-        .insert({
+      // Registro da entrega, baixa do estoque (global e do local) e movimentação
+      // numa única transação do banco. Se qualquer passo falhar, nada é gravado:
+      // não existe mais DELETE de entrega assinada nem baixa em duas etapas (a
+      // segunda "otimista" nunca batia, porque o gatilho já tinha baixado o
+      // global, e o código então apagava a ficha com o estoque já descontado).
+      const { data: entregaGravada, error } = await supabase.rpc("epi_registrar_entrega", {
+        p_entrega: {
           tenant_id: tenantId,
           epi_id: epiId,
           colaborador_nome: formData.colaboradorNome,
@@ -297,102 +297,24 @@ export function EpiEntregaWizard({
           data_validade: formData.dataValidade || null,
           status: status === "recusado" ? "extraviado" : "ativa",
           tamanho: formData.tamanho || null,
-          foto_entrega_url: fotoUrl,
-          assinatura_url: assinaturaUrl,
+          foto_entrega_url: fotoUrl ?? null,
+          assinatura_url: assinaturaUrl ?? null,
           signed_at: status === "entregue" ? signedAt : null,
           liveness_detected: livenessData !== null,
           liveness_data: livenessData || { actions: [], timestamps: [] },
           ip_address: "",
           user_agent: navigator.userAgent,
-          observacoes: status === "recusado" 
+          observacoes: status === "recusado"
             ? `RECUSADO: Colaborador recusou assinar. ${formData.observacoes}`
             : formData.observacoes,
-          entregue_por: user?.id,
-          entregue_por_nome: profile?.nome_completo,
-        })
-        .select()
-        .single();
+          entregue_por: user?.id ?? null,
+          entregue_por_nome: profile?.nome_completo ?? null,
+        },
+        p_local: usarControleEstoque && formData.localEstoqueId ? formData.localEstoqueId : null,
+      });
 
       if (error) throw error;
-
-      // CT-46/47: Baixar estoque com controle otimista e rollback em caso de falha
-      if (usarControleEstoque && formData.localEstoqueId && status === "entregue") {
-        try {
-          // CT-47: Atualizar estoque global com compare-and-swap
-          const novoEstoqueGlobal = Math.max(0, estoqueAnterior - formData.quantidade);
-          const { data: casResult } = await supabase.rpc("epi_atualizar_estoque_otimista", {
-            p_epi_id: epiId,
-            p_quantidade_esperada: estoqueAnterior,
-            p_nova_quantidade: novoEstoqueGlobal,
-          });
-
-          if (!casResult) {
-            // Race condition detectada — rollback da entrega
-            await supabase.from("epi_entregas").delete().eq("id", data.id);
-            throw new Error("Conflito de concorrência: o estoque foi alterado por outro usuário. Tente novamente.");
-          }
-
-          // CT-47: Atualizar estoque local com compare-and-swap
-          let queryEstoque = supabase
-            .from("epi_estoque_local")
-            .select("id, quantidade")
-            .eq("epi_id", epiId)
-            .eq("local_estoque_id", formData.localEstoqueId)
-            .eq("tenant_id", tenantId);
-
-          if (formData.tamanho) {
-            queryEstoque = queryEstoque.eq("tamanho", formData.tamanho);
-          } else {
-            queryEstoque = queryEstoque.is("tamanho", null);
-          }
-
-          const { data: estoqueLocal } = await queryEstoque.maybeSingle();
-
-          if (estoqueLocal) {
-            const novaQtdLocal = Math.max(0, estoqueLocal.quantidade - formData.quantidade);
-            const { data: casLocalResult } = await supabase.rpc("epi_atualizar_estoque_local_otimista", {
-              p_estoque_local_id: estoqueLocal.id,
-              p_quantidade_esperada: estoqueLocal.quantidade,
-              p_nova_quantidade: novaQtdLocal,
-            });
-
-            if (!casLocalResult) {
-              // Rollback: reverter estoque global e deletar entrega
-              await supabase.rpc("epi_atualizar_estoque_otimista", {
-                p_epi_id: epiId,
-                p_quantidade_esperada: novoEstoqueGlobal,
-                p_nova_quantidade: estoqueAnterior,
-              });
-              await supabase.from("epi_entregas").delete().eq("id", data.id);
-              throw new Error("Conflito de concorrência no estoque local. Tente novamente.");
-            }
-          }
-
-          // Registrar movimentação
-          await supabase.from("epi_movimentacoes").insert({
-            tenant_id: tenantId,
-            epi_id: epiId,
-            tipo: "saida",
-            subtipo: "entrega",
-            local_estoque_id: formData.localEstoqueId,
-            quantidade: formData.quantidade,
-            quantidade_anterior: estoqueAnterior,
-            quantidade_atual: novoEstoqueGlobal,
-            motivo: `Entrega para ${formData.colaboradorNome}`,
-            tamanho: formData.tamanho || null,
-            realizado_por: user?.id,
-            realizado_por_nome: profile?.nome_completo,
-          });
-        } catch (stockError: any) {
-          // CT-46: Se falhou durante atualização de estoque, reverter entrega
-          if (stockError.message?.includes("Conflito de concorrência")) {
-            throw stockError;
-          }
-          // Para outros erros de estoque, deletar a entrega e propagar o erro
-          await supabase.from("epi_entregas").delete().eq("id", data.id);
-          throw new Error("Erro ao atualizar estoque. A entrega foi revertida. " + stockError.message);
-        }
-      }
+      const data = entregaGravada as unknown as EpiEntrega;
 
       // CT-34: Se é substituição, marcar entrega anterior como devolvida
       if (substituicaoDetectada && status === "entregue") {

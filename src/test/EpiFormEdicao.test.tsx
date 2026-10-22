@@ -75,7 +75,7 @@ describe("EpiForm: edição x cadastro", () => {
     await waitFor(() => expect(props.onSubmit).toHaveBeenCalledTimes(1));
     expect(props.onCreateTipo).not.toHaveBeenCalled();
 
-    const payload = props.onSubmit.mock.calls[0][0];
+    const payload = vi.mocked(props.onSubmit).mock.calls[0][0];
     expect(payload.tipo.nome).toBe("Protetor Auricular Plus");
     expect(payload.tipo.ca_numero).toBe("12345");
     expect(payload.tipo.ca_validade).toBe("2030-01-01");

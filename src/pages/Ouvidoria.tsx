@@ -4,6 +4,7 @@ import { MessageSquareHeart, Plus, List, Settings } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOuvidoria } from "@/hooks/useOuvidoria";
 import { useAuth } from "@/hooks/useAuth";
+import { usePerfilPermissions } from "@/hooks/usePerfilPermissions";
 import { OuvidoriaForm } from "@/components/ouvidoria/OuvidoriaForm";
 import { OuvidoriaList } from "@/components/ouvidoria/OuvidoriaList";
 import { OuvidoriaStats } from "@/components/ouvidoria/OuvidoriaStats";
@@ -26,8 +27,17 @@ const Ouvidoria = () => {
     stats,
   } = useOuvidoria();
 
-  const isManager = hasMinimumRole("manager");
-  const isAdmin = hasMinimumRole("admin");
+  const { perfilVinculado, isOwner, temAcessoModuloAdmin, temAcaoAmpla } = usePerfilPermissions();
+
+  // Quem tem perfil de acesso vinculado é decidido SÓ pelo perfil (o papel técnico, como
+  // "Gestor", não abre a Ouvidoria). Sem perfil vinculado vale o papel, como sempre (legado).
+  // Espelha as travas do banco: ver todas = módulo com escopo amplo; responder = editar/aprovar
+  // amplo; excluir e configurar = excluir/parametrizar amplo. "Próprio usuário" não conta.
+  const porPerfil = perfilVinculado && !isOwner;
+  const isManager = porPerfil ? temAcessoModuloAdmin("ouvidoria") : hasMinimumRole("manager");
+  const podeResponder = porPerfil ? temAcaoAmpla("ouvidoria", ["editar", "aprovar"]) : hasMinimumRole("manager");
+  const isAdmin = porPerfil ? temAcaoAmpla("ouvidoria", ["excluir", "parametrizar"]) : hasMinimumRole("admin");
+  const podeExcluir = porPerfil ? temAcaoAmpla("ouvidoria", "excluir") : hasMinimumRole("admin");
 
   const handleSubmit = async (data: Parameters<typeof criarManifestacao>[0]) => {
     await criarManifestacao(data);
@@ -111,9 +121,9 @@ const Ouvidoria = () => {
               manifestacoes={manifestacoes}
               isLoading={manifestacoesLoading}
               isManager={isManager}
-              onResponder={isManager ? handleResponder : undefined}
-              onAtualizarStatus={isManager ? handleAtualizarStatus : undefined}
-              onDeletar={isAdmin ? deletarManifestacao : undefined}
+              onResponder={podeResponder ? handleResponder : undefined}
+              onAtualizarStatus={podeResponder ? handleAtualizarStatus : undefined}
+              onDeletar={podeExcluir ? deletarManifestacao : undefined}
             />
           </motion.div>
         </TabsContent>

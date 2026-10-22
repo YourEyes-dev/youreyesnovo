@@ -133,29 +133,21 @@ export function useOuvidoria() {
         departamento_destino: departamentoDestino,
       };
 
-      const { data: result, error } = await supabase
+      // O id nasce aqui para os anexos subirem ANTES e a manifestação ser gravada de uma vez,
+      // já com eles. Assim não há UPDATE depois (só a gestão atualiza manifestação) nem
+      // `.select()` de volta (quem registra de forma anônima não enxerga a própria linha:
+      // não há autor para o banco reconhecer).
+      const id = crypto.randomUUID();
+      const anexosUploadados =
+        data.anexos && data.anexos.length > 0 ? await uploadAnexos(data.anexos, id) : [];
+
+      const { error } = await supabase
         .from("ouvidoria")
-        .insert(manifestacao)
-        .select()
-        .single();
+        .insert({ id, ...manifestacao, anexos: anexosUploadados });
 
       if (error) throw error;
 
-      // Se há anexos, fazer upload e atualizar a manifestação
-      if (data.anexos && data.anexos.length > 0) {
-        const anexosUploadados = await uploadAnexos(data.anexos, result.id);
-
-        if (anexosUploadados.length > 0) {
-          const { error: updateError } = await supabase
-            .from("ouvidoria")
-            .update({ anexos: anexosUploadados })
-            .eq("id", result.id);
-
-          if (updateError) {
-            console.error("Erro ao atualizar anexos:", updateError);
-          }
-        }
-      }
+      const result = { id };
 
       return result;
     },

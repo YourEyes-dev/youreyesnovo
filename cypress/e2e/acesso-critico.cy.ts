@@ -76,6 +76,14 @@ describe("Acesso crítico", () => {
     cy.contains("Esta área é restrita a Super Administradores.").should("be.visible");
   });
 
+  // ACAD-030
+  it("a Academia é restrita ao Super Admin", () => {
+    entrar();
+    cy.visit(`${baseUrl}/academia`);
+    cy.contains("Acesso Restrito", { timeout: 20000 }).should("be.visible");
+    cy.contains("Esta área é restrita a Super Administradores.").should("be.visible");
+  });
+
   // AUTH-031
   it("redefinir senha sem sessão de recuperação é barrado", () => {
     cy.visit(`${baseUrl}/reset-password`);

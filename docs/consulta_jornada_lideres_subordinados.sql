@@ -28,7 +28,7 @@ SELECT l.cliente, l.nome_completo,
       AND regexp_replace(COALESCE(s.gestor_cpf, ''), '[^0-9]', '', 'g') = l.cpf)            AS equipe_pelo_cpf_do_gestor,
   (SELECT count(DISTINCT regexp_replace(COALESCE(s.cpf, ''), '[^0-9]', '', 'g'))
      FROM public.admissoes s
-     JOIN public.departamentos d ON d.id = s.departamento_id AND d.tenant_id = l.tenant_id
+     JOIN public.departamentos d ON lower(trim(d.nome)) = lower(trim(s.departamento)) AND d.tenant_id = l.tenant_id
      JOIN public.admissoes g ON g.id = d.gestor_admissao_id AND g.tenant_id = l.tenant_id
       AND regexp_replace(COALESCE(g.cpf, ''), '[^0-9]', '', 'g') = l.cpf
     WHERE s.tenant_id = l.tenant_id AND l.cpf <> '')                                        AS equipe_pelo_departamento

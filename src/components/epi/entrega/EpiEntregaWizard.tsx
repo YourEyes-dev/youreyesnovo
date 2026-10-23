@@ -36,7 +36,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
-import { LivenessDetection } from "./LivenessDetection";
+import { LivenessDetection, type LivenessResultado } from "./LivenessDetection";
+import { precarregarDetector } from "@/lib/liveness/detector";
 import { PhotoCapture } from "./PhotoCapture";
 import { SignatureCapture } from "./SignatureCapture";
 import { EpiEntregaRecibo } from "./EpiEntregaRecibo";
@@ -93,6 +94,12 @@ export function EpiEntregaWizard({
 }: EpiEntregaWizardProps) {
   const { tenantId, user, profile } = useAuth();
   const queryClient = useQueryClient();
+
+  // Baixa o modelo de detecção em segundo plano assim que o wizard abre, para a
+  // etapa de verificação já encontrá-lo pronto (são ~13 MB na primeira vez).
+  useEffect(() => {
+    if (open) precarregarDetector();
+  }, [open]);
   const { colaboradores, isLoading: colaboradoresLoading } = useColaboradores();
   const { getAfastamento } = useAfastamentosAtivos();
   const { upload: uploadDocumento } = useDocumentos();
@@ -144,7 +151,7 @@ export function EpiEntregaWizard({
   });
 
   // Capture data
-  const [livenessData, setLivenessData] = useState<{ actions: string[]; timestamps: string[]; frames?: string[] } | null>(null);
+  const [livenessData, setLivenessData] = useState<LivenessResultado | null>(null);
   const [photoData, setPhotoData] = useState<string | null>(null);
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [entregaResult, setEntregaResult] = useState<any>(null);
@@ -335,10 +342,30 @@ export function EpiEntregaWizard({
           foto_entrega_url: fotoUrl ?? null,
           assinatura_url: assinaturaUrl ?? null,
           signed_at: status === "entregue" ? signedAt : null,
-          liveness_detected: livenessData !== null,
+          // "Detectada" só com a detecção automática de TODAS as ações; qualquer
+          // confirmação manual fica registrada como não verificada. O banco
+          // também confere o método antes de aceitar o rótulo (EPI-056).
+          liveness_detected: livenessData?.metodo === "face-landmarker",
           liveness_data: livenessData
-            ? { actions: livenessData.actions, timestamps: livenessData.timestamps, frames_paths: framesPaths }
-            : { actions: [], timestamps: [], frames_paths: [] },
+            ? {
+                metodo: livenessData.metodo,
+                versao_do_detector: livenessData.versao_do_detector ?? null,
+                actions: livenessData.actions,
+                timestamps: livenessData.timestamps,
+                detalhes: livenessData.detalhes.map((d) => ({
+                  tipo: d.tipo,
+                  confirmada_por: d.confirmada_por,
+                  detectado_em: d.detectado_em,
+                  pontuacao: d.pontuacao ?? null,
+                })),
+                tentativas_sem_sucesso: livenessData.tentativas_sem_sucesso.map((t) => ({
+                  tipo: t.tipo,
+                  pico_giro: t.pico_giro,
+                  pico_piscar: t.pico_piscar,
+                })),
+                frames_paths: framesPaths,
+              }
+            : { metodo: "nenhum", actions: [], timestamps: [], detalhes: [], frames_paths: [] },
           // IP e dispositivo reais são gravados pelo servidor (gatilho
           // epi_entrega_origem_pelo_servidor) a partir da requisição; o que o
           // navegador mandasse aqui não valeria como prova.

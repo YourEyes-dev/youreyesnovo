@@ -315,6 +315,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Empresa de quem chama: a função usa a chave de serviço (ignora a RLS), então a conferência de empresa é nossa.
+    // Sem ela, quem soubesse o identificador de um certificado, evento ou transmissão de OUTRA empresa os lia.
+    const { data: chamador } = await supabase
+      .from("profiles").select("tenant_id").eq("user_id", userData.user.id).maybeSingle();
+    const tenantDoChamador = (chamador as any)?.tenant_id as string | undefined;
+    // O Super Admin atende qualquer empresa; os demais ficam restritos a própria.
+    const { data: ehSuper } = await supabase.rpc("is_superadmin", { _user_id: userData.user.id });
+    const superadmin = ehSuper === true;
+    if (!tenantDoChamador && !superadmin) {
+      return new Response(JSON.stringify({ error: "Usuário sem empresa" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = await req.json();
     const {
       action,
@@ -334,6 +349,9 @@ Deno.serve(async (req) => {
       ]);
       if (certRes.error || !certRes.data) throw new Error("Certificado não encontrado");
       if (evtRes.error || !evtRes.data) throw new Error("Evento SST não encontrado");
+      // Mesma resposta de "não encontrado" quando o registro é de outra empresa: não revela que ele existe.
+      if (!superadmin && (certRes.data as any).tenant_id !== tenantDoChamador) throw new Error("Certificado não encontrado");
+      if (!superadmin && (evtRes.data as any).tenant_id !== tenantDoChamador) throw new Error("Evento SST não encontrado");
       return { cert: certRes.data as any, evento: evtRes.data as any, profile: profileRes.data as any };
     };
 
@@ -480,12 +498,13 @@ Deno.serve(async (req) => {
 
     // ── ACTION: consultar ──
     if (action === "consultar") {
-      const { data: trans } = await supabase
+      let consulta = supabase
         .from("esocial_transmissoes" as any)
         .select("*")
-        .eq("id", transmissao_id)
-        .single();
-      return new Response(JSON.stringify({ transmissao: trans }), {
+        .eq("id", transmissao_id);
+      if (!superadmin) consulta = consulta.eq("tenant_id", tenantDoChamador);
+      const { data: trans } = await consulta.maybeSingle();
+      return new Response(JSON.stringify({ transmissao: trans ?? null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

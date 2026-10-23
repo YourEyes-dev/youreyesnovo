@@ -32,7 +32,7 @@ export type EpiEntrega = Database["public"]["Tables"]["epi_entregas"]["Row"] & {
   user_agent?: string | null;
   signed_at?: string | null;
   liveness_detected?: boolean | null;
-  liveness_data?: { actions: string[]; timestamps: string[] } | null;
+  liveness_data?: LivenessDataEpi | null;
   data_validade?: string | null;
   employee_id?: string | null;
 };
@@ -168,4 +168,22 @@ export interface EpiEdicaoPayload {
     ca_numero: string | null;
     ca_validade: string | null;
   };
+}
+
+/**
+ * O que a verificação de presença grava em epi_entregas.liveness_data.
+ * `metodo` = 'face-landmarker' só quando TODAS as ações foram detectadas
+ * automaticamente no aparelho; 'manual' quando houve confirmação por botão;
+ * 'nenhum' quando não houve verificação. As fotos ficam no bucket privado
+ * (`frames_paths`); fichas antigas podem trazer `frames` em base64.
+ */
+export interface LivenessDataEpi {
+  metodo?: "face-landmarker" | "manual" | "nenhum";
+  versao_do_detector?: string | null;
+  actions?: string[];
+  timestamps?: string[];
+  detalhes?: { tipo: string; confirmada_por: "automatica" | "manual"; detectado_em: string; pontuacao: number | null }[];
+  tentativas_sem_sucesso?: { tipo: string; pico_giro: number; pico_piscar: number }[];
+  frames_paths?: string[];
+  frames?: string[];
 }

@@ -22,3 +22,24 @@ export async function urlDaEvidenciaEpi(
   if (error || !data) return null;
   return data.signedUrl;
 }
+
+/**
+ * A entrega só pode ser gravada como ASSINADA com a foto e a imagem da
+ * assinatura em mãos. Devolve a mensagem do que falta, ou null se está tudo certo.
+ * (A recusa de assinatura não leva foto nem assinatura.)
+ */
+export function evidenciaFaltandoNaEntrega(
+  status: "entregue" | "recusado",
+  foto: string | null | undefined,
+  assinatura: string | null | undefined
+): string | null {
+  if (status !== "entregue") return null;
+  if (!assinatura) return "a assinatura do colaborador não foi capturada";
+  if (!foto) return "a foto do colaborador não foi capturada";
+  return null;
+}
+
+/** Tipo do arquivo de uma imagem em data URL (padrão png). */
+export function tipoDaImagem(dataUrl: string): string {
+  return /^data:([^;,]+)[;,]/.exec(dataUrl)?.[1] ?? "image/png";
+}

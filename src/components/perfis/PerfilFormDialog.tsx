@@ -63,8 +63,9 @@ export function PerfilFormDialog({ open, onClose, perfilInicial, onSubmit, loadi
       icone: perfilInicial?.icone || "",
       expira_em: perfilInicial?.expira_em ? perfilInicial.expira_em.substring(0, 10) : "",
       is_perfil_assistido: perfilInicial?.is_perfil_assistido || false,
-      // Default TRUE: perfis novos e existentes veem salário até ser desligado.
-      pode_ver_salario: perfilInicial?.pode_ver_salario ?? true,
+      // Perfil NOVO nasce SEM ver salário (menor acesso por omissão); o RH liga quando o perfil precisa.
+      // Perfis existentes mantêm o que já têm.
+      pode_ver_salario: perfilInicial?.pode_ver_salario ?? false,
       // Perfil antigo (null) enxerga o painel completo: o editor mostra tudo marcado.
       // Perfil NOVO nasce sem nenhum bloco: informação da empresa só aparece se liberada.
       inicio_blocos: perfilInicial ? (perfilInicial.inicio_blocos ?? [...TODOS_BLOCOS]) : [],

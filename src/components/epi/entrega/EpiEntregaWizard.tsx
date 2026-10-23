@@ -337,7 +337,7 @@ export function EpiEntregaWizard({
           quantidade: formData.quantidade,
           data_entrega: formData.dataEntrega,
           data_validade: formData.dataValidade || null,
-          status: status === "recusado" ? "extraviado" : "ativa",
+          status: status === "recusado" ? "recusado" : "ativa",
           tamanho: formData.tamanho || null,
           foto_entrega_url: fotoUrl ?? null,
           assinatura_url: assinaturaUrl ?? null,

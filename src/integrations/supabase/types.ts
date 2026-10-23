@@ -40585,7 +40585,7 @@ export type Database = {
         | "concluido"
         | "expirado"
       documento_status: "pendente" | "enviado" | "aprovado" | "rejeitado"
-      entrega_status: "ativa" | "devolvido" | "extraviado" | "vencido"
+      entrega_status: "ativa" | "devolvido" | "extraviado" | "vencido" | "recusado"
       epi_status:
         | "disponivel"
         | "em_uso"
@@ -41271,7 +41271,7 @@ export const Constants = {
         "expirado",
       ],
       documento_status: ["pendente", "enviado", "aprovado", "rejeitado"],
-      entrega_status: ["ativa", "devolvido", "extraviado", "vencido"],
+      entrega_status: ["ativa", "devolvido", "extraviado", "vencido", "recusado"],
       epi_status: [
         "disponivel",
         "em_uso",

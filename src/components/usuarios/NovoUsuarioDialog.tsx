@@ -141,7 +141,9 @@ export function NovoUsuarioDialog({ open, onOpenChange }: Props) {
 
   const { register, handleSubmit, watch, setValue, reset, trigger, getValues, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schemaEtapa1),
-    defaultValues: { tipo_usuario: "gestor", tipo_vinculo: "gestor" },
+    // Padrão de MENOR acesso: sem escolha, a pessoa entra como colaborador (perfil Colaborador padrão, só autosserviço).
+    // Quem precisa de gestão escolhe o tipo ou um perfil; o RH ajusta depois. Era "gestor" (acesso amplo a 44 módulos).
+    defaultValues: { tipo_usuario: "colaborador", tipo_vinculo: "colaborador" },
   });
 
   const watchedValues = watch();
@@ -908,7 +910,7 @@ export function NovoUsuarioDialog({ open, onOpenChange }: Props) {
                       )}
                     </Label>
                     <Select
-                      value={watchedValues.tipo_vinculo || "gestor"}
+                      value={watchedValues.tipo_vinculo || "colaborador"}
                       onValueChange={v => setValue("tipo_vinculo", v)}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>

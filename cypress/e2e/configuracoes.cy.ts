@@ -1,13 +1,13 @@
 /// <reference types="cypress" />
 
 // =====================================================================
-// Módulo Configurações (menu "Usuários", rota /configuracoes) — testes de tela (nível e2e).
+// Módulo Configurações (menu "Usuários", rota /usuarios) — testes de tela (nível e2e).
 //
 // Toda a tela é restrita a admin. A conta-robô do ambiente de teste é
 // owner/administrador, então as abas administrativas renderizam.
 // Cada it() corresponde a um caso documentado (qa_casos_teste, nível e2e)
 // ligado pela ponte qa_cobertura_e2e.
-// Casos cobertos: CFG-001, CFG-010, CFG-011, CFG-020, CFG-030
+// Casos cobertos: CFG-001, CFG-010, CFG-011, CFG-020, CFG-030, CFG-090 (endereço antigo redireciona)
 //   (estrutura; a antiga aba Logo mudou para Empresa — CFG-040 vive em empresa.cy.ts) + CFG-051 (sem banner de pendência), CFG-060 (troca de
 //   abas estável), CFG-070 (criar usuário exige campos essenciais).
 // =====================================================================
@@ -38,7 +38,7 @@ describe("Módulo Configurações", () => {
   }
 
   function goToModulo() {
-    cy.visit(`${baseUrl}/configuracoes`);
+    cy.visit(`${baseUrl}/usuarios`);
     cy.contains("h1", "Usuários", { timeout: 20000 }).should("be.visible");
   }
 
@@ -59,6 +59,12 @@ describe("Módulo Configurações", () => {
     cy.contains('[role="tab"]', "Auditoria").should("exist");
     // A logo mudou para a tela Empresa: não há mais aba Logo aqui.
     cy.contains('[role="tab"]', "Logo").should("not.exist");
+  });
+
+  it("o endereço antigo /configuracoes redireciona para /usuarios", () => {
+    cy.visit(`${baseUrl}/configuracoes`);
+    cy.location("pathname", { timeout: 20000 }).should("match", /\/usuarios$/);
+    cy.contains("h1", "Usuários", { timeout: 20000 }).should("be.visible");
   });
 
   it("abre a aba de Usuários", () => {

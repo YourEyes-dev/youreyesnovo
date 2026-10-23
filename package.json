@@ -17,14 +17,17 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "cypress run",
+    "test:e2e:fumaca": "cypress run --spec \"$(node scripts/cypress-specs.mjs --fumaca)\"",
     "test:e2e:abrir": "cypress open",
     "qa:cobertura-e2e": "node scripts/verificar-cobertura-e2e.mjs",
+    "qa:pontes": "node scripts/verificar-pontes-offline.mjs",
     "qa:carimbos": "node scripts/verificar-carimbos.mjs",
     "qa:rede": "bash qa-harness/rodar-local.sh && node scripts/qa-diff-baseline.mjs",
     "qa:baseline": "bash qa-harness/rodar-local.sh && cp qa-harness/resultado-atual.tsv qa-harness/baseline.tsv && echo 'baseline da Rede de Seguranca atualizada'"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@mediapipe/tasks-vision": "^0.10.21",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",

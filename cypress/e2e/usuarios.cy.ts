@@ -17,6 +17,7 @@ import { credenciaisDeTeste } from "../support/credenciais";
 describe("Módulo Usuários", () => {
   const { email, senha: password } = credenciaisDeTeste();
   const baseUrl = Cypress.config("baseUrl") as string;
+  const SELETOR_FILTRO_EMPRESA = '[role="combobox"][aria-label="Filtrar por empresa"]';
 
   function login() {
     cy.visit(`${baseUrl}/login`);
@@ -49,9 +50,13 @@ describe("Módulo Usuários", () => {
   // então a asserção da opção/input começava antes do conteúdo montar. Aqui
   // clicamos e, se o conteúdo esperado não montou, dispensamos o humor e
   // clicamos de novo; só então afirmamos que o conteúdo está visível.
-  function abrirFiltro(rotuloTrigger: string, seletorConteudo: string) {
+  function abrirFiltro(rotuloTrigger: string | { seletor: string }, seletorConteudo: string) {
+    // O filtro por empresa começa na empresa ATIVA (o texto do botão é o nome dela, não
+    // "Todas as empresas"), então ele é achado pelo aria-label, que não muda.
     const trigger = () =>
-      cy.contains('[role="combobox"]', rotuloTrigger, { timeout: 20000 });
+      typeof rotuloTrigger === "string"
+        ? cy.contains('[role="combobox"]', rotuloTrigger, { timeout: 20000 })
+        : cy.get(rotuloTrigger.seletor, { timeout: 20000 });
     // Garante que o overlay do "humor" não vai engolir o clique.
     fecharHumorSePresente();
     trigger().should("be.visible").scrollIntoView().click({ force: true });
@@ -90,7 +95,7 @@ describe("Módulo Usuários", () => {
   // USR-TELA-02
   it("mostra os filtros de busca, empresa, status e tipo", () => {
     cy.get('input[placeholder*="Buscar por nome"]', { timeout: 20000 }).should("exist");
-    cy.contains('[role="combobox"]', "Todas as empresas").should("exist");
+    cy.get(SELETOR_FILTRO_EMPRESA).should("exist");
     cy.contains('[role="combobox"]', "Todos os status").should("exist");
     cy.contains('[role="combobox"]', "Todos os tipos de usuário").should("exist");
   });
@@ -132,7 +137,9 @@ describe("Módulo Usuários", () => {
   it("o filtro por empresa abre", () => {
     // O seletor de conteúdo já é o próprio input de busca de empresa: abrirFiltro
     // clica (com re-tentativa) e afirma que o input ficou visível.
-    abrirFiltro("Todas as empresas", 'input[placeholder*="Buscar empresa"]');
+    abrirFiltro({ seletor: SELETOR_FILTRO_EMPRESA }, 'input[placeholder*="Buscar empresa"]');
+    // "Todas as empresas" fica sempre disponível, mesmo com uma empresa ativa pré-selecionada.
+    cy.contains('[role="option"]', "Todas as empresas").should("exist");
     cy.get("body").type("{esc}", { force: true });
   });
 });

@@ -128,7 +128,7 @@ BEGIN
      base_legal, objetivo, pre_condicoes, passos, resultado_esperado, observacoes)
   VALUES
   (v_mod, 'PERFIL-032', 'Quem e criado sem tipo definido entra como colaborador (menor acesso)',
-   'positivo', 'alta', 'aprovado', 'api', 'LGPD arts. 6º e 46',
+   'feliz', 'alta', 'aprovado', 'api', 'LGPD arts. 6º e 46',
    'O tipo padrao de usuario e de vinculo era gestor: quem criava um usuario sem escolher o tipo dava a ele o perfil Gestor (padrao), com acesso amplo, e o papel de gestao. Decisao do dono do produto: o padrao e colaborador (perfil Colaborador padrao, so autosservico) e o RH corrige depois. Vale para o formulario de Novo Usuario e para o padrao das colunas.',
    'Script de tipo padrao aplicado.',
    '[{"ordem":1,"acao":"Conferir o padrao das colunas usuarios_base.tipo_usuario e usuario_vinculos.tipo_vinculo","resultado_esperado":"colaborador"},{"ordem":2,"acao":"Conferir que perfil_modelo_para_tipo manda o tipo desconhecido ao Colaborador padrao","resultado_esperado":"Presente"}]'::jsonb,

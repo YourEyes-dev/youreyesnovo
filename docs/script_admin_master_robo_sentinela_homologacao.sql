@@ -19,7 +19,9 @@
 --   - Idempotente: rodar duas vezes nao duplica nem quebra.
 --   - Guarda o estado anterior em backup_admin_master_sentinela_<aaaammdd>,
 --     com o comando de desfazer no fim.
---   - Nao cria usuario nem perfil: se faltar um dos dois, aborta dizendo qual.
+--   - Nao cria usuario. Se a empresa nao tiver o perfil Administrador Master (caso da
+--     homologacao, onde os nomes foram embaralhados), cria o perfil e chama a sincronia
+--     oficial admin_master_sincronizar para dar as permissoes.
 --   - Nao concede SuperAdmin; so o perfil de acesso Administrador Master.
 -- Roda inteiro em UMA transacao.
 -- ============================================================================
@@ -35,6 +37,7 @@ DECLARE
   v_tenant     uuid;
   v_perfil     uuid;
   v_religou    boolean := false;
+  v_perfil_criado boolean := false;
   v_bkp        text := 'backup_admin_master_sentinela_' || to_char(CURRENT_DATE, 'YYYYMMDD');
 BEGIN
   -- (1) TRAVA DE AMBIENTE
@@ -71,7 +74,18 @@ BEGIN
                 WHERE pa.tenant_id = v_tenant AND pa.nome = 'Administrador Master'
                 ORDER BY pa.created_at LIMIT 1);
   IF v_perfil IS NULL THEN
-    RAISE EXCEPTION 'RECUSADO: a empresa-cliente (tenant %) nao tem o perfil "Administrador Master".', v_tenant;
+    -- Na homologacao os nomes dos perfis foram embaralhados (anon-...), entao o Master
+    -- nao existe pelo nome. Cria-se o perfil; as permissoes vem da sincronia mais abaixo.
+    INSERT INTO public.perfis_acesso
+      (tenant_id, nome, descricao, cor, tipo, ativo, nivel_risco, tipo_usuario_sugerido,
+       pode_ver_salario, permite_acumulo, criado_por_nome)
+    VALUES
+      (v_tenant, 'Administrador Master',
+       'Acesso total à plataforma, incluindo configurações e gestão de usuários.',
+       '#dc2626', 'clonado', true, 'critico', 'administrador', true, false,
+       'Sistema (ajuste de homologacao)')
+    RETURNING id INTO v_perfil;
+    v_perfil_criado := true;
   END IF;
 
   -- (3) BACKUP do que sera tocado (tabela nasce fechada para a API)
@@ -116,6 +130,18 @@ BEGIN
          auth_user_id = COALESCE(auth_user_id, v_uid)
    WHERE id = v_ub;
 
+  -- (7) PERMISSOES: a sincronia oficial acrescenta os verbos do Administrador Master nos
+  -- modulos que o plano da empresa libera (precisa de assinatura ativa no tenant).
+  IF to_regprocedure('public.admin_master_sincronizar()') IS NOT NULL THEN
+    PERFORM public.admin_master_sincronizar();
+  ELSE
+    RAISE NOTICE 'admin_master_sincronizar ausente: perfil criado sem permissoes.';
+  END IF;
+
+  IF v_perfil_criado AND NOT EXISTS (SELECT 1 FROM public.perfil_permissoes WHERE perfil_id = v_perfil) THEN
+    RAISE NOTICE 'ATENCAO: perfil Administrador Master criado SEM permissoes (a empresa nao tem assinatura ativa?).';
+  END IF;
+
   RAISE NOTICE 'Administrador Master atribuido a % (usuario_base %).', v_email, v_ub;
 END $ajuste$;
 
@@ -141,7 +167,9 @@ SELECT email, tipo_usuario, perfil_ativo, principal, qtd_vinculos_ativos,
   FROM x;
 
 -- ---------------------------------------------------------------------------
--- COMO DESFAZER (troque AAAAMMDD pela data da tabela de backup)
+-- COMO DESFAZER (se o perfil Administrador Master foi criado por este script, apague-o por
+-- ultimo, depois de desativar o vinculo: DELETE em perfis_acesso pelo nome e tenant.)
+-- (troque AAAAMMDD pela data da tabela de backup)
 --
 --   UPDATE public.usuarios_base ub SET tipo_usuario = b.tipo_usuario_antes,
 --          auth_user_id = b.auth_user_id_antes

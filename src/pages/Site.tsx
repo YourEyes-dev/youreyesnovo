@@ -479,7 +479,7 @@ export default function Site() {
               <img
                 src={mascotUrl}
                 alt="EYE — assistente de IA da YourEyes"
-                className="relative z-10 h-[360px] md:h-[420px] w-auto rounded-2xl drop-shadow-[0_25px_60px_rgba(96,171,239,0.35)] -scale-x-100"
+                className="relative z-10 h-[360px] md:h-[420px] w-auto rounded-2xl drop-shadow-[0_25px_60px_rgba(96,171,239,0.35)]"
                 style={{ animation: "floatMascot 6s ease-in-out infinite" }}
               />
             </div>

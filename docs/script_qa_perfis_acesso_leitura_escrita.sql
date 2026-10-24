@@ -16,10 +16,12 @@ DECLARE
   v_vinc bigint;
   v_exc bigint;
   v_total_perfis bigint;
+  v_meus_vinc bigint;
+  v_meus_perfis bigint;
 BEGIN
   r.passo_ordem := 1;
   r.passo_acao  := 'AUDITORIA + FUNCIONAL (somente leitura): quem ve e mexe em perfis e permissoes e decidido pelo perfil';
-  r.esperado    := '16 politicas RESTRICTIVE nas 4 tabelas; usuario restrito le no maximo o proprio perfil e o proprio vinculo';
+  r.esperado    := '16 politicas RESTRICTIVE nas 4 tabelas; usuario restrito le apenas o(s) proprio(s) perfil e vinculo(s)';
 
   v_n := (SELECT count(*) FROM pg_policies
            WHERE schemaname = 'public' AND permissive = 'RESTRICTIVE'
@@ -38,6 +40,10 @@ BEGIN
     RETURN r;
   END IF;
 
+  v_meus_vinc := (SELECT count(*) FROM public.usuario_perfil_vinculos v
+                   JOIN public.usuarios_base ub ON ub.id = v.usuario_id WHERE ub.auth_user_id = v_uid);
+  v_meus_perfis := (SELECT count(DISTINCT v.perfil_id) FROM public.usuario_perfil_vinculos v
+                     JOIN public.usuarios_base ub ON ub.id = v.usuario_id WHERE ub.auth_user_id = v_uid);
   v_total_perfis := (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.perfis_acesso', false, true, '')))[1]::text::bigint;
   v_claims := current_setting('request.jwt.claims', true);
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_uid, 'role', 'authenticated')::text, true);
@@ -46,10 +52,10 @@ BEGIN
   v_exc    := qa_rls.conta_auth('SELECT count(*) FROM public.perfil_excecoes');
   PERFORM set_config('request.jwt.claims', COALESCE(v_claims, ''), true);
 
-  IF COALESCE(v_perfis, 0) > 1 OR COALESCE(v_vinc, 0) > 1 THEN
+  IF COALESCE(v_perfis, 0) > COALESCE(v_meus_perfis, 0) OR COALESCE(v_vinc, 0) > COALESCE(v_meus_vinc, 0) THEN
     r.situacao := 'falhou';
-    r.obtido   := 'FALHA GRAVE: o usuario restrito le ' || COALESCE(v_perfis, 0) || ' perfis e ' || COALESCE(v_vinc, 0) || ' vinculos (deveria ler no maximo o proprio).';
-  ELSIF COALESCE(v_total_perfis, 0) <= 1 THEN
+    r.obtido   := 'FALHA GRAVE: o usuario restrito le ' || COALESCE(v_perfis, 0) || ' perfis e ' || COALESCE(v_vinc, 0) || ' vinculos (os dele sao ' || COALESCE(v_meus_perfis, 0) || ' e ' || COALESCE(v_meus_vinc, 0) || ').';
+  ELSIF COALESCE(v_total_perfis, 0) <= COALESCE(v_meus_perfis, 0) THEN
     r.situacao := 'nao_implementado';
     r.obtido   := 'Travas presentes, mas ha poucos perfis para provar o bloqueio.';
   ELSE

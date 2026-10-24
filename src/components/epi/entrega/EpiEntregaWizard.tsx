@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -35,7 +36,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
-import { LivenessDetection } from "./LivenessDetection";
+import { LivenessDetection, type LivenessResultado } from "./LivenessDetection";
+import { precarregarDetector } from "@/lib/liveness/detector";
 import { PhotoCapture } from "./PhotoCapture";
 import { SignatureCapture } from "./SignatureCapture";
 import { EpiEntregaRecibo } from "./EpiEntregaRecibo";
@@ -52,7 +54,9 @@ import { format, addDays } from "date-fns";
 import { Loader2, Download, ArrowLeft, ArrowRight, XCircle, Check, ChevronsUpDown, AlertCircle, User, MapPin } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import type { EpiTipo } from "@/types/epi";
+import type { EpiTipo, EpiEntrega } from "@/types/epi";
+import { BUCKET_EVIDENCIA_EPI, evidenciaFaltandoNaEntrega, tipoDaImagem } from "@/lib/epiEvidencia";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useEpiTamanhos } from "@/hooks/useEpiTamanhos";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +93,13 @@ export function EpiEntregaWizard({
   onSuccess,
 }: EpiEntregaWizardProps) {
   const { tenantId, user, profile } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Baixa o modelo de detecção em segundo plano assim que o wizard abre, para a
+  // etapa de verificação já encontrá-lo pronto (são ~13 MB na primeira vez).
+  useEffect(() => {
+    if (open) precarregarDetector();
+  }, [open]);
   const { colaboradores, isLoading: colaboradoresLoading } = useColaboradores();
   const { getAfastamento } = useAfastamentosAtivos();
   const { upload: uploadDocumento } = useDocumentos();
@@ -118,6 +129,9 @@ export function EpiEntregaWizard({
   // CT-34: Entregas ativas do colaborador para verificar substituição
   const [entregasAtivas, setEntregasAtivas] = useState<Array<{ id: string; epi_tipo_id: string; epi_tipo_nome: string; data_entrega: string }>>([]);
   const [substituicaoDetectada, setSubstituicaoDetectada] = useState<{ id: string; epi_tipo_nome: string; data_entrega: string } | null>(null);
+  // Destino do EPI que está sendo substituído; escolhido a cada vez. Descarte é o
+  // padrão porque devolver ao estoque um EPI desgastado seria risco de segurança.
+  const [destinoSubstituicao, setDestinoSubstituicao] = useState<"descarte" | "estoque" | "manutencao">("descarte");
 
   const [showRecusaDialog, setShowRecusaDialog] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -137,7 +151,7 @@ export function EpiEntregaWizard({
   });
 
   // Capture data
-  const [livenessData, setLivenessData] = useState<{ actions: string[]; timestamps: string[] } | null>(null);
+  const [livenessData, setLivenessData] = useState<LivenessResultado | null>(null);
   const [photoData, setPhotoData] = useState<string | null>(null);
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [entregaResult, setEntregaResult] = useState<any>(null);
@@ -177,6 +191,7 @@ export function EpiEntregaWizard({
     setSignatureData(null);
     setEntregaResult(null);
     setPdfArquivado(false);
+    setDestinoSubstituicao("descarte");
   };
 
   const handleClose = () => {
@@ -184,23 +199,32 @@ export function EpiEntregaWizard({
     onOpenChange(false);
   };
 
-  // Upload base64 para storage
+  // Upload base64 para o bucket PRIVADO da evidência de EPI. Devolve o CAMINHO
+  // do arquivo (o primeiro nível é a empresa, exigido pela política de storage);
+  // o link de leitura é gerado sob demanda por urlDaEvidenciaEpi. Sem upsert: a
+  // evidência não pode ser sobrescrita.
   const uploadToStorage = async (base64Data: string, fileName: string): Promise<string> => {
     const base64 = base64Data.split(",")[1];
     const byteArray = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    
+
     const { data, error } = await supabase.storage
-      .from("epi-signatures")
-      .upload(fileName, byteArray, { contentType: "image/png", upsert: true });
-    
-    if (error) throw error;
-    
-    const { data: urlData } = supabase.storage.from("epi-signatures").getPublicUrl(data.path);
-    return urlData.publicUrl;
+      .from(BUCKET_EVIDENCIA_EPI)
+      .upload(fileName, byteArray, { contentType: tipoDaImagem(base64Data), upsert: false });
+
+    if (error) {
+      // Diz o passo que falhou: só "violates row-level security policy" não
+      // permite saber se foi o envio da foto/assinatura ou a gravação da entrega.
+      throw new Error(`envio da foto/assinatura ao armazenamento seguro: ${error.message}`);
+    }
+    return data.path;
   };
 
   // Salvar entrega
-  const saveEntrega = async (status: "entregue" | "recusado" = "entregue") => {
+  // A assinatura capturada chega como argumento: no clique de "Confirmar
+  // Assinatura" o estado do React (signatureData) ainda está vazio, e ler dele
+  // gravava a entrega como assinada SEM a assinatura e sem a foto.
+  const saveEntrega = async (status: "entregue" | "recusado" = "entregue", assinaturaCapturada?: string) => {
+    const assinatura = assinaturaCapturada ?? signatureData;
     if (!tenantId) {
       toast.error("Tenant não identificado");
       return;
@@ -227,7 +251,6 @@ export function EpiEntregaWizard({
       // A tabela epi_entregas referencia `epis.id` (item de estoque),
       // então precisamos resolver o epi_id a partir do tipo selecionado (epi_tipos).
       let epiId: string;
-      let estoqueAnterior: number;
       
       // Buscar EPI existente com estoque suficiente
       const { data: epiRow, error: epiError } = await supabase
@@ -242,7 +265,6 @@ export function EpiEntregaWizard({
       
       if (epiRow?.id) {
         epiId = epiRow.id;
-        estoqueAnterior = epiRow.quantidade_estoque || 0;
       } else {
         // Não existe EPI para este tipo, criar um automaticamente
         const { data: newEpi, error: createError } = await supabase
@@ -259,32 +281,52 @@ export function EpiEntregaWizard({
         
         if (createError) throw createError;
         epiId = newEpi.id;
-        estoqueAnterior = newEpi.quantidade_estoque || 1000;
       }
 
       let fotoUrl: string | undefined;
       let assinaturaUrl: string | undefined;
       const signedAt = new Date().toISOString();
 
+      // Entrega assinada só com a foto e a assinatura em mãos (nunca mais uma
+      // ficha "assinada" sem prova).
+      const faltando = evidenciaFaltandoNaEntrega(status, photoData, assinatura);
+      if (faltando) {
+        throw new Error(`${faltando}. Volte e capture novamente antes de salvar`);
+      }
+
+      // Frames da verificação de presença: vão para o bucket privado, e só o
+      // caminho fica na entrega (antes as fotos em base64 iam dentro da linha).
+      let framesPaths: string[] = [];
+
       // Upload foto e assinatura se não for recusa
-      if (status === "entregue" && photoData && signatureData) {
+      if (status === "entregue" && photoData && assinatura) {
         const timestamp = Date.now();
-        
+
         fotoUrl = await uploadToStorage(
           photoData,
           `${tenantId}/fotos/${timestamp}-${formData.colaboradorId}.png`
         );
-        
+
         assinaturaUrl = await uploadToStorage(
-          signatureData,
+          assinatura,
           `${tenantId}/assinaturas/${timestamp}-${formData.colaboradorId}.png`
+        );
+
+        const frames = livenessData?.frames ?? [];
+        framesPaths = await Promise.all(
+          frames.map((frame, i) =>
+            uploadToStorage(frame, `${tenantId}/presenca/${timestamp}-${formData.colaboradorId}-${i + 1}.jpg`)
+          )
         );
       }
 
-      // Criar registro de entrega
-      const { data, error } = await supabase
-        .from("epi_entregas")
-        .insert({
+      // Registro da entrega, baixa do estoque (global e do local) e movimentação
+      // numa única transação do banco. Se qualquer passo falhar, nada é gravado:
+      // não existe mais DELETE de entrega assinada nem baixa em duas etapas (a
+      // segunda "otimista" nunca batia, porque o gatilho já tinha baixado o
+      // global, e o código então apagava a ficha com o estoque já descontado).
+      const { data: entregaGravada, error } = await supabase.rpc("epi_registrar_entrega", {
+        p_entrega: {
           tenant_id: tenantId,
           epi_id: epiId,
           colaborador_nome: formData.colaboradorNome,
@@ -295,122 +337,63 @@ export function EpiEntregaWizard({
           quantidade: formData.quantidade,
           data_entrega: formData.dataEntrega,
           data_validade: formData.dataValidade || null,
-          status: status === "recusado" ? "extraviado" : "ativa",
+          status: status === "recusado" ? "recusado" : "ativa",
           tamanho: formData.tamanho || null,
-          foto_entrega_url: fotoUrl,
-          assinatura_url: assinaturaUrl,
+          foto_entrega_url: fotoUrl ?? null,
+          assinatura_url: assinaturaUrl ?? null,
           signed_at: status === "entregue" ? signedAt : null,
-          liveness_detected: livenessData !== null,
-          liveness_data: livenessData || { actions: [], timestamps: [] },
-          ip_address: "",
+          // "Detectada" só com a detecção automática de TODAS as ações; qualquer
+          // confirmação manual fica registrada como não verificada. O banco
+          // também confere o método antes de aceitar o rótulo (EPI-056).
+          liveness_detected: livenessData?.metodo === "face-landmarker",
+          liveness_data: livenessData
+            ? {
+                metodo: livenessData.metodo,
+                versao_do_detector: livenessData.versao_do_detector ?? null,
+                actions: livenessData.actions,
+                timestamps: livenessData.timestamps,
+                detalhes: livenessData.detalhes.map((d) => ({
+                  tipo: d.tipo,
+                  confirmada_por: d.confirmada_por,
+                  detectado_em: d.detectado_em,
+                  pontuacao: d.pontuacao ?? null,
+                })),
+                tentativas_sem_sucesso: livenessData.tentativas_sem_sucesso.map((t) => ({
+                  tipo: t.tipo,
+                  pico_giro: t.pico_giro,
+                  pico_piscar: t.pico_piscar,
+                })),
+                frames_paths: framesPaths,
+              }
+            : { metodo: "nenhum", actions: [], timestamps: [], detalhes: [], frames_paths: [] },
+          // IP e dispositivo reais são gravados pelo servidor (gatilho
+          // epi_entrega_origem_pelo_servidor) a partir da requisição; o que o
+          // navegador mandasse aqui não valeria como prova.
           user_agent: navigator.userAgent,
-          observacoes: status === "recusado" 
+          observacoes: status === "recusado"
             ? `RECUSADO: Colaborador recusou assinar. ${formData.observacoes}`
             : formData.observacoes,
-          entregue_por: user?.id,
-          entregue_por_nome: profile?.nome_completo,
-        })
-        .select()
-        .single();
+          entregue_por: user?.id ?? null,
+          entregue_por_nome: profile?.nome_completo ?? null,
+        },
+        p_local: usarControleEstoque && formData.localEstoqueId ? formData.localEstoqueId : null,
+        // Substituição: o EPI anterior é devolvido na mesma transação, com o
+        // destino escolhido. Se qualquer parte falhar, nada é gravado.
+        p_substitui: substituicaoDetectada && status === "entregue" ? substituicaoDetectada.id : undefined,
+        p_destino_substituicao: substituicaoDetectada && status === "entregue" ? destinoSubstituicao : undefined,
+      });
 
-      if (error) throw error;
-
-      // CT-46/47: Baixar estoque com controle otimista e rollback em caso de falha
-      if (usarControleEstoque && formData.localEstoqueId && status === "entregue") {
-        try {
-          // CT-47: Atualizar estoque global com compare-and-swap
-          const novoEstoqueGlobal = Math.max(0, estoqueAnterior - formData.quantidade);
-          const { data: casResult } = await supabase.rpc("epi_atualizar_estoque_otimista", {
-            p_epi_id: epiId,
-            p_quantidade_esperada: estoqueAnterior,
-            p_nova_quantidade: novoEstoqueGlobal,
-          });
-
-          if (!casResult) {
-            // Race condition detectada — rollback da entrega
-            await supabase.from("epi_entregas").delete().eq("id", data.id);
-            throw new Error("Conflito de concorrência: o estoque foi alterado por outro usuário. Tente novamente.");
-          }
-
-          // CT-47: Atualizar estoque local com compare-and-swap
-          let queryEstoque = supabase
-            .from("epi_estoque_local")
-            .select("id, quantidade")
-            .eq("epi_id", epiId)
-            .eq("local_estoque_id", formData.localEstoqueId)
-            .eq("tenant_id", tenantId);
-
-          if (formData.tamanho) {
-            queryEstoque = queryEstoque.eq("tamanho", formData.tamanho);
-          } else {
-            queryEstoque = queryEstoque.is("tamanho", null);
-          }
-
-          const { data: estoqueLocal } = await queryEstoque.maybeSingle();
-
-          if (estoqueLocal) {
-            const novaQtdLocal = Math.max(0, estoqueLocal.quantidade - formData.quantidade);
-            const { data: casLocalResult } = await supabase.rpc("epi_atualizar_estoque_local_otimista", {
-              p_estoque_local_id: estoqueLocal.id,
-              p_quantidade_esperada: estoqueLocal.quantidade,
-              p_nova_quantidade: novaQtdLocal,
-            });
-
-            if (!casLocalResult) {
-              // Rollback: reverter estoque global e deletar entrega
-              await supabase.rpc("epi_atualizar_estoque_otimista", {
-                p_epi_id: epiId,
-                p_quantidade_esperada: novoEstoqueGlobal,
-                p_nova_quantidade: estoqueAnterior,
-              });
-              await supabase.from("epi_entregas").delete().eq("id", data.id);
-              throw new Error("Conflito de concorrência no estoque local. Tente novamente.");
-            }
-          }
-
-          // Registrar movimentação
-          await supabase.from("epi_movimentacoes").insert({
-            tenant_id: tenantId,
-            epi_id: epiId,
-            tipo: "saida",
-            subtipo: "entrega",
-            local_estoque_id: formData.localEstoqueId,
-            quantidade: formData.quantidade,
-            quantidade_anterior: estoqueAnterior,
-            quantidade_atual: novoEstoqueGlobal,
-            motivo: `Entrega para ${formData.colaboradorNome}`,
-            tamanho: formData.tamanho || null,
-            realizado_por: user?.id,
-            realizado_por_nome: profile?.nome_completo,
-          });
-        } catch (stockError: any) {
-          // CT-46: Se falhou durante atualização de estoque, reverter entrega
-          if (stockError.message?.includes("Conflito de concorrência")) {
-            throw stockError;
-          }
-          // Para outros erros de estoque, deletar a entrega e propagar o erro
-          await supabase.from("epi_entregas").delete().eq("id", data.id);
-          throw new Error("Erro ao atualizar estoque. A entrega foi revertida. " + stockError.message);
-        }
-      }
-
-      // CT-34: Se é substituição, marcar entrega anterior como devolvida
-      if (substituicaoDetectada && status === "entregue") {
-        await supabase
-          .from("epi_entregas")
-          .update({
-            status: "devolvido",
-            data_devolucao: new Date().toISOString(),
-            observacoes_devolucao: `Devolução automática por substituição. Nova entrega: ${data.id}`,
-          })
-          .eq("id", substituicaoDetectada.id);
-      }
+      if (error) throw new Error(`gravação da entrega: ${error.message}`);
+      const data = entregaGravada as unknown as EpiEntrega;
 
       setEntregaResult({
         ...data,
-        fotoUrl,
-        assinaturaUrl,
-        signedAt,
+        // O recibo mostra a foto e a assinatura que já estão na memória; o que
+        // fica gravado na entrega é o caminho no bucket privado, não uma URL.
+        fotoUrl: photoData ?? undefined,
+        assinaturaUrl: assinatura ?? undefined,
+        // Hora gravada pelo servidor: é a que consta no hash e no recibo.
+        signedAt: data.signed_at ?? signedAt,
       });
 
       if (status === "entregue") {
@@ -424,6 +407,11 @@ export function EpiEntregaWizard({
         handleClose();
       }
 
+      // A tela de EPIs passa um onSuccess vazio; sem isto a entrega gravada só
+      // aparecia na lista depois de recarregar a página.
+      queryClient.invalidateQueries({ queryKey: ["epi-entregas"] });
+      queryClient.invalidateQueries({ queryKey: ["epis"] });
+      queryClient.invalidateQueries({ queryKey: ["epi-movimentacoes"] });
       onSuccess();
     } catch (error: any) {
       toast.error("Erro ao salvar entrega: " + error.message);
@@ -844,10 +832,34 @@ export function EpiEntregaWizard({
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Este colaborador já possui uma entrega ativa de <strong>{substituicaoDetectada.epi_tipo_nome}</strong> (entregue em {format(new Date(substituicaoDetectada.data_entrega), "dd/MM/yyyy")}).
-                          Ao confirmar, a entrega anterior será marcada para devolução automaticamente.
+                          Ao confirmar, a entrega anterior será devolvida junto com esta. O que fazer com o EPI antigo?
                         </p>
                       </div>
                     </div>
+                    <RadioGroup
+                      value={destinoSubstituicao}
+                      onValueChange={(v) => setDestinoSubstituicao(v as "descarte" | "estoque" | "manutencao")}
+                      className="mt-3 gap-2"
+                    >
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem id="subst-descarte" value="descarte" className="mt-0.5" />
+                        <Label htmlFor="subst-descarte" className="text-xs font-normal leading-snug">
+                          <strong>Descartar</strong>: desgastado, danificado ou vencido (recomendado).
+                        </Label>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem id="subst-manutencao" value="manutencao" className="mt-0.5" />
+                        <Label htmlFor="subst-manutencao" className="text-xs font-normal leading-snug">
+                          <strong>Enviar para manutenção</strong>: fica no local Em Manutenção.
+                        </Label>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <RadioGroupItem id="subst-estoque" value="estoque" className="mt-0.5" />
+                        <Label htmlFor="subst-estoque" className="text-xs font-normal leading-snug">
+                          <strong>Voltar ao estoque</strong>: só se estiver em bom estado e puder ser reutilizado.
+                        </Label>
+                      </div>
+                    </RadioGroup>
                   </div>
                 )}
 
@@ -1082,7 +1094,7 @@ export function EpiEntregaWizard({
                   colaboradorNome={formData.colaboradorNome}
                   onCapture={(data) => {
                     setSignatureData(data);
-                    saveEntrega("entregue");
+                    saveEntrega("entregue", data);
                   }}
                 />
                 {isLoading && (

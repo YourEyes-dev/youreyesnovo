@@ -32,7 +32,7 @@ export type EpiEntrega = Database["public"]["Tables"]["epi_entregas"]["Row"] & {
   user_agent?: string | null;
   signed_at?: string | null;
   liveness_detected?: boolean | null;
-  liveness_data?: { actions: string[]; timestamps: string[] } | null;
+  liveness_data?: LivenessDataEpi | null;
   data_validade?: string | null;
   employee_id?: string | null;
 };
@@ -72,6 +72,7 @@ export const ENTREGA_STATUS_LABELS: Record<EntregaStatus, string> = {
   ativa: "Ativa",
   devolvido: "Devolvido",
   extraviado: "Extraviado",
+  recusado: "Recusada",
   vencido: "Vencido",
 };
 
@@ -79,6 +80,7 @@ export const ENTREGA_STATUS_COLORS: Record<EntregaStatus, string> = {
   ativa: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
   devolvido: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
   extraviado: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+  recusado: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300",
   vencido: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
 };
 
@@ -142,3 +144,48 @@ export const MOTIVOS_ENTREGA = [
   "Treinamento",
   "Outro",
 ];
+
+// Payload da edição de um EPI: cada bloco vai para a sua tabela
+export interface EpiEdicaoPayload {
+  epi: {
+    ca: string | null;
+    codigo: string | null;
+    marca: string | null;
+    modelo: string | null;
+    data_fabricacao: string | null;
+    data_validade: string | null;
+    quantidade_minima: number;
+    custo_unitario: number | null;
+    localizacao: string | null;
+    observacoes: string | null;
+  };
+  tipo: {
+    nome: string;
+    categoria: string | null;
+    unidade_medida: string | null;
+    tipo_durabilidade: string | null;
+    periodicidade_troca_dias: number | null;
+    marca: string | null;
+    fabricante: string | null;
+    ca_numero: string | null;
+    ca_validade: string | null;
+  };
+}
+
+/**
+ * O que a verificação de presença grava em epi_entregas.liveness_data.
+ * `metodo` = 'face-landmarker' só quando TODAS as ações foram detectadas
+ * automaticamente no aparelho; 'manual' quando houve confirmação por botão;
+ * 'nenhum' quando não houve verificação. As fotos ficam no bucket privado
+ * (`frames_paths`); fichas antigas podem trazer `frames` em base64.
+ */
+export interface LivenessDataEpi {
+  metodo?: "face-landmarker" | "manual" | "nenhum";
+  versao_do_detector?: string | null;
+  actions?: string[];
+  timestamps?: string[];
+  detalhes?: { tipo: string; confirmada_por: "automatica" | "manual"; detectado_em: string; pontuacao: number | null }[];
+  tentativas_sem_sucesso?: { tipo: string; pico_giro: number; pico_piscar: number }[];
+  frames_paths?: string[];
+  frames?: string[];
+}

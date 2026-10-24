@@ -22,14 +22,14 @@ import { EntradasEstoqueTab } from "@/components/epi/EntradasEstoqueTab";
 import { SaldoLocalDashboard } from "@/components/epi/SaldoLocalDashboard";
 import { EpiStatsCards } from "@/components/epi/EpiStatsCards";
 import { GuiaRapidoEpi } from "@/components/epi/GuiaRapidoEpi";
-import type { EpiCompleto } from "@/types/epi";
+import type { EpiCompleto, EpiEdicaoPayload } from "@/types/epi";
 
 const Epis = () => {
   const {
     tipos, tiposLoading, customCategorias, categorias, epis, episLoading,
     entregas, entregasLoading, movimentacoes, movimentacoesLoading,
     stats, criarCategoria, criandoCategoria, criarTipo, criandoTipo,
-    criarEpi, criandoEpi, atualizarEpi, atualizandoEpi, excluirEpi,
+    criarEpi, criandoEpi, editarEpi, editandoEpi, excluirEpi,
     ajustarEstoque, registrarEntrega, registrandoEntrega, registrarDevolucao,
   } = useEpis();
 
@@ -57,8 +57,12 @@ const Epis = () => {
   const [ajustarEstoqueEpi, setAjustarEstoqueEpi] = useState<EpiCompleto | null>(null);
 
   const handleCreateEpi = async (data: any) => { await criarEpi(data); };
-  const handleUpdateEpi = async (data: any) => {
-    if (editingEpi) { await atualizarEpi({ id: editingEpi.id, ...data }); setEditingEpi(null); }
+  // O formulário devolve o que é de cada tabela (epis x epi_tipos). Se a
+  // gravação falhar, o erro sobe e o formulário continua aberto com o que foi digitado.
+  const handleUpdateEpi = async (data: EpiEdicaoPayload) => {
+    if (!editingEpi) return;
+    await editarEpi({ id: editingEpi.id, tipoId: editingEpi.tipo_id, ...data });
+    setEditingEpi(null);
   };
   const handleEditEpi = (epi: EpiCompleto) => { setEditingEpi(epi); setShowEpiForm(true); };
 
@@ -225,7 +229,7 @@ const Epis = () => {
         onCreateCategoria={async (nome) => { await criarCategoria(nome); }}
         tipos={tipos} customCategorias={customCategorias}
         categoriasExigemCa={categoriasExigemCa} epi={editingEpi}
-        isLoading={criandoEpi || atualizandoEpi}
+        isLoading={criandoEpi || editandoEpi}
       />
       <EpiEntregaWizard open={showEntregaForm} onOpenChange={setShowEntregaForm}
         epiTipos={tipos} onSuccess={() => {}}

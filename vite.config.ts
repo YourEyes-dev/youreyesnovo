@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import fs from "fs";
 import { componentTagger } from "lovable-tagger";
 
 /** Projeto Supabase de PRODUÇÃO. Nenhum outro ambiente pode apontar para ele. */
@@ -32,6 +33,43 @@ function exigirAmbienteCoerente(mode: string, env: Record<string, string>) {
   }
 }
 
+
+/**
+ * Arquivos WASM do MediaPipe (verificação de presença do EPI).
+ *
+ * Não ficam no repositório (~19 MB): saem de node_modules e são copiados para o
+ * build, em `mediapipe/wasm`, na pasta de saída de CADA build (teste, homologação
+ * e produção usam saídas e subcaminhos diferentes). No desenvolvimento, o servidor
+ * os entrega direto de node_modules. O modelo (.task) fica em public/mediapipe.
+ */
+function copiarMediapipe() {
+  const origem = path.resolve(__dirname, "node_modules/@mediapipe/tasks-vision/wasm");
+  let saida = path.resolve(__dirname, "dist");
+  return {
+    name: "copiar-mediapipe-wasm",
+    configResolved(config: { root: string; build: { outDir: string } }) {
+      saida = path.resolve(config.root, config.build.outDir);
+    },
+    configureServer(server: { middlewares: { use: (rota: string, fn: (req: { url?: string }, res: { setHeader: (k: string, v: string) => void; end: (b?: Buffer) => void; statusCode: number }, next: () => void) => void) => void } }) {
+      server.middlewares.use("/mediapipe/wasm", (req, res, next) => {
+        const nome = path.basename((req.url || "").split("?")[0]);
+        const arquivo = path.join(origem, nome);
+        if (!nome || !fs.existsSync(arquivo)) return next();
+        res.setHeader("Content-Type", nome.endsWith(".wasm") ? "application/wasm" : "text/javascript");
+        res.end(fs.readFileSync(arquivo));
+      });
+    },
+    closeBundle() {
+      if (!fs.existsSync(origem)) return;
+      const destino = path.join(saida, "mediapipe", "wasm");
+      fs.mkdirSync(destino, { recursive: true });
+      for (const nome of fs.readdirSync(origem)) {
+        fs.copyFileSync(path.join(origem, nome), path.join(destino, nome));
+      }
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   exigirAmbienteCoerente(mode, loadEnv(mode, process.cwd(), ""));
@@ -43,7 +81,7 @@ export default defineConfig(({ mode }) => {
       overlay: false,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [react(), mode === "development" && componentTagger(), copiarMediapipe()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

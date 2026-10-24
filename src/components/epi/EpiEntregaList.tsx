@@ -230,6 +230,7 @@ export function EpiEntregaList({
                 <SelectItem value="ativa">🟢 Em Uso (Ativas)</SelectItem>
                 <SelectItem value="devolvido">🔵 Devolvidas</SelectItem>
                 <SelectItem value="extraviado">🔴 Extraviadas</SelectItem>
+                <SelectItem value="recusado">🟠 Recusadas</SelectItem>
                 <SelectItem value="vencido">🟠 Vencidas</SelectItem>
               </SelectContent>
             </Select>

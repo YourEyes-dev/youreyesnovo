@@ -14,6 +14,7 @@ import type {
   EpiEntregaUpdate,
   EpiMovimentacao,
   EpiCompleto,
+  EpiEdicaoPayload,
   EpiStatus,
   EntregaStatus,
 } from "@/types/epi";
@@ -401,6 +402,34 @@ export function useEpis() {
     },
   });
 
+  // Edição de um EPI: o que é do item (CA, validade, mínimo, local...) vai para
+  // epis; o que é do cadastro do tipo (nome, categoria, vida útil...) vai para
+  // epi_tipos. O estoque não passa por aqui: muda por Ajustar Estoque.
+  const editarEpiMutation = useMutation({
+    mutationFn: async ({ id, tipoId, epi, tipo }: { id: string; tipoId: string } & EpiEdicaoPayload) => {
+      const { error: tipoError } = await supabase
+        .from("epi_tipos")
+        .update(tipo)
+        .eq("id", tipoId);
+      if (tipoError) throw tipoError;
+
+      const { error: epiError } = await supabase
+        .from("epis")
+        .update(epi)
+        .eq("id", id);
+      if (epiError) throw epiError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["epis"] });
+      queryClient.invalidateQueries({ queryKey: ["epi-tipos"] });
+      queryClient.invalidateQueries({ queryKey: ["epi-entregas"] });
+      toast.success("EPI atualizado com sucesso!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar EPI: " + error.message);
+    },
+  });
+
   const excluirEpiMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("epis").delete().eq("id", id);
@@ -567,102 +596,15 @@ export function useEpis() {
       observacoes?: string;
       destino?: "manutencao" | "descarte" | "estoque";
     }) => {
-      if (!tenantId) throw new Error("Tenant não identificado");
-
-      // Get the entrega details to know the epi and quantity
-      const { data: entrega, error: entregaErr } = await supabase
-        .from("epi_entregas")
-        .select("epi_id, quantidade")
-        .eq("id", entregaId)
-        .single();
-      if (entregaErr) throw entregaErr;
-
-      const { data, error } = await supabase
-        .from("epi_entregas")
-        .update({
-          status: "devolvido" as EntregaStatus,
-          data_devolucao_efetiva: new Date().toISOString(),
-          observacoes: observacoes ? `${observacoes} | Destino: ${destino === "manutencao" ? "Manutenção" : destino === "descarte" ? "Descarte" : "Estoque"}` : `Destino: ${destino === "manutencao" ? "Manutenção" : destino === "descarte" ? "Descarte" : "Estoque"}`,
-        })
-        .eq("id", entregaId)
-        .select()
-        .single();
+      // Devolução, ajuste de saldo pelo destino e movimentações numa transação
+      // só (função epi_devolver_entrega). Antes eram vários passos soltos, e o
+      // descarte devolvia o item ao saldo do estoque.
+      const { data, error } = await supabase.rpc("epi_devolver_entrega", {
+        p_entrega: entregaId,
+        p_destino: destino ?? "estoque",
+        p_obs: observacoes || undefined,
+      });
       if (error) throw error;
-
-      // If maintenance, create/update stock at "Em Manutenção" location
-      if (destino === "manutencao" && entrega) {
-        // Find or create "Em Manutenção" location
-        let { data: localManutencao } = await supabase
-          .from("epi_locais_estoque")
-          .select("id")
-          .eq("tenant_id", tenantId)
-          .eq("nome", "Em Manutenção")
-          .maybeSingle();
-
-        if (!localManutencao) {
-          const { data: novoLocal, error: localErr } = await supabase
-            .from("epi_locais_estoque")
-            .insert({ tenant_id: tenantId, nome: "Em Manutenção", tipo: "almoxarifado_setorial" })
-            .select("id")
-            .single();
-          if (localErr) throw localErr;
-          localManutencao = novoLocal;
-        }
-
-        // Upsert stock at maintenance location
-        const { data: saldoExistente } = await supabase
-          .from("epi_estoque_local")
-          .select("id, quantidade")
-          .eq("epi_id", entrega.epi_id)
-          .eq("local_estoque_id", localManutencao.id)
-          .maybeSingle();
-
-        if (saldoExistente) {
-          await supabase.from("epi_estoque_local").update({
-            quantidade: saldoExistente.quantidade + (entrega.quantidade || 1),
-          }).eq("id", saldoExistente.id);
-        } else {
-          await supabase.from("epi_estoque_local").insert({
-            tenant_id: tenantId,
-            epi_id: entrega.epi_id,
-            local_estoque_id: localManutencao.id,
-            quantidade: entrega.quantidade || 1,
-          });
-        }
-
-        // Register movement
-        await supabase.from("epi_movimentacoes").insert({
-          tenant_id: tenantId,
-          epi_id: entrega.epi_id,
-          tipo: "entrada",
-          quantidade: entrega.quantidade || 1,
-          quantidade_anterior: saldoExistente?.quantidade || 0,
-          quantidade_atual: (saldoExistente?.quantidade || 0) + (entrega.quantidade || 1),
-          motivo: "Devolução para manutenção",
-          realizado_por: user?.id,
-          realizado_por_nome: profile?.nome_completo,
-        });
-      } else if (entrega) {
-        // Register movement for estoque/descarte returns
-        const { data: epiAtual } = await supabase
-          .from("epis")
-          .select("quantidade_estoque")
-          .eq("id", entrega.epi_id)
-          .single();
-
-        await supabase.from("epi_movimentacoes").insert({
-          tenant_id: tenantId,
-          epi_id: entrega.epi_id,
-          tipo: "entrada",
-          quantidade: entrega.quantidade || 1,
-          quantidade_anterior: (epiAtual?.quantidade_estoque || 0) - (entrega.quantidade || 1),
-          quantidade_atual: epiAtual?.quantidade_estoque || 0,
-          motivo: `Devolução para ${destino === "descarte" ? "descarte" : "estoque"}`,
-          realizado_por: user?.id,
-          realizado_por_nome: profile?.nome_completo,
-        });
-      }
-
       return data;
     },
     onSuccess: () => {
@@ -723,6 +665,8 @@ export function useEpis() {
     // Mutations - EPIs
     criarEpi: criarEpiMutation.mutateAsync,
     criandoEpi: criarEpiMutation.isPending,
+    editarEpi: editarEpiMutation.mutateAsync,
+    editandoEpi: editarEpiMutation.isPending,
     atualizarEpi: atualizarEpiMutation.mutateAsync,
     atualizandoEpi: atualizarEpiMutation.isPending,
     excluirEpi: excluirEpiMutation.mutateAsync,

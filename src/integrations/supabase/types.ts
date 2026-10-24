@@ -29732,6 +29732,19 @@ export type Database = {
         }
         Returns: boolean
       }
+      epi_devolver_entrega: {
+        Args: { p_destino: string; p_entrega: string; p_obs?: string }
+        Returns: Json
+      }
+      epi_registrar_entrega: {
+        Args: {
+          p_destino_substituicao?: string
+          p_entrega: Json
+          p_local?: string
+          p_substitui?: string
+        }
+        Returns: Json
+      }
       esocial_rejeicao_traduzir: { Args: { p_codigo: string }; Returns: string }
       esocial_s2220_prazo: { Args: { p_data_aso: string }; Returns: string }
       estabilidades_vigentes: {
@@ -40572,7 +40585,7 @@ export type Database = {
         | "concluido"
         | "expirado"
       documento_status: "pendente" | "enviado" | "aprovado" | "rejeitado"
-      entrega_status: "ativa" | "devolvido" | "extraviado" | "vencido"
+      entrega_status: "ativa" | "devolvido" | "extraviado" | "vencido" | "recusado"
       epi_status:
         | "disponivel"
         | "em_uso"
@@ -41258,7 +41271,7 @@ export const Constants = {
         "expirado",
       ],
       documento_status: ["pendente", "enviado", "aprovado", "rejeitado"],
-      entrega_status: ["ativa", "devolvido", "extraviado", "vencido"],
+      entrega_status: ["ativa", "devolvido", "extraviado", "vencido", "recusado"],
       epi_status: [
         "disponivel",
         "em_uso",

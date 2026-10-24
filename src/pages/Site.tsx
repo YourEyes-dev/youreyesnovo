@@ -512,7 +512,7 @@ export default function Site() {
                 Este é o painel real da plataforma. Descubra o da sua empresa em 3 minutos.
               </div>
             </div>
-            <style>{`@keyframes floatMascot { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }`}</style>
+            <style>{`@keyframes floatMascot { 0%,100%{transform:scaleX(-1) translateY(0)} 50%{transform:scaleX(-1) translateY(-14px)} }`}</style>
           </div>
         </div>
       </section>

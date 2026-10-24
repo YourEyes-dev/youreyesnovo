@@ -25,6 +25,10 @@ export const useDashboardKPIs = () => {
 
       const empresaFilter = empresaAtivaId ? { empresa_id: empresaAtivaId } : {};
 
+      // Totais de colaboradores/admissões vêm de uma função do banco (só números, sem dado pessoal).
+      const contagensP = (supabase.rpc as any)("admissoes_contagens", { p_empresa_id: empresaAtivaId ?? null })
+        .then((r: any) => (r?.data ?? {}) as { concluidos?: number; pendentes?: number });
+
       const [
         colaboradoresRes,
         admissoesRes,
@@ -36,22 +40,10 @@ export const useDashboardKPIs = () => {
         riscosRes,
       ] = await Promise.all([
         // Colaboradores ativos (admissões com status concluído)
-        supabase
-          .from("admissoes")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenant.id)
-          .eq("status", "concluido")
-          .match(empresaFilter),
+        contagensP.then((c: any) => ({ count: c.concluidos ?? 0 })),
 
         // Admissões pendentes
-        supabase
-          .from("admissoes")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenant.id)
-          .neq("status", "concluido")
-          .neq("status", "reprovado")
-          .neq("status", "desligado")
-          .match(empresaFilter),
+        contagensP.then((c: any) => ({ count: c.pendentes ?? 0 })),
 
         // EPIs com estoque baixo
         supabase

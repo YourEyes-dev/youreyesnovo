@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fromTable } from "@/integrations/supabase/untypedClient";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { calcularCelebracoes, type Celebracao, type PessoaCelebravel } from "@/lib/celebracoes";
@@ -24,12 +25,8 @@ export function useCelebracoes({ exigirEmpresa = false }: Opcoes = {}) {
   const { data: pessoas = [], isLoading: carregandoPessoas } = useQuery({
     queryKey: ["celebracoes-pessoas", tenantId, empresaAtivaId],
     queryFn: async (): Promise<PessoaCelebravel[]> => {
-      let query = fromTable("admissoes")
-        .select("id, nome_completo, data_nascimento, data_admissao, cargo")
-        .eq("tenant_id", tenantId)
-        .eq("status", "concluido");
-      if (empresaAtivaId) query = query.eq("empresa_id", empresaAtivaId);
-      const { data, error } = await query;
+      // Função do banco: devolve só nome, cargo, data de admissão e dia/mês do aniversário (o ano de nascimento não sai).
+      const { data, error } = await (supabase.rpc as any)("celebracoes_pessoas", { p_empresa_id: empresaAtivaId ?? null });
       if (error) throw error;
       return (data || []) as PessoaCelebravel[];
     },

@@ -118,7 +118,7 @@ export function useIndicatorHistory(indicator: IndicatorType, monthsBack = 6) {
         }
 
         case "admissoes": {
-          const res = await supabase.from("admissoes").select("id, status, created_at").eq("tenant_id", tenant.id).gte("created_at", from).lte("created_at", to).match(empresaAtivaId ? { empresa_id: empresaAtivaId } : {});
+          const res = await (supabase.rpc as any)("admissoes_historico_status", { p_empresa_id: empresaAtivaId ?? null, p_de: from, p_ate: to });
           const data = res.data || [];
           return months.map((m) => {
             const s = startOfMonth(m.year, m.month);

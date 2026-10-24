@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useColaboradores } from "@/hooks/useColaboradores";
-import { useUsuarios } from "@/hooks/useUsuarios";
+import { useUsuariosDiretorio } from "@/hooks/useUsuariosDiretorio";
 
 interface GestorComboboxFieldProps {
   value: string;
@@ -42,7 +42,7 @@ type OpcaoGestor = {
 export function GestorComboboxField({ value, onChange, onChangeCpf, disabled }: GestorComboboxFieldProps) {
   const [open, setOpen] = useState(false);
   const { colaboradores } = useColaboradores();
-  const { usuarios } = useUsuarios();
+  const { usuarios } = useUsuariosDiretorio();
 
   // Une colaboradores + usuários do sistema, sem repetir (deduplicado por CPF).
   // Só entram quem tem CPF — o vínculo de chefia depende dele. Colaborador tem

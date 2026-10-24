@@ -269,15 +269,11 @@ export function useCargos(options?: { skipEmpresaFilter?: boolean }) {
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", tenantId!)
           .eq("cargo", nome),
-        supabase
-          .from("usuarios_base")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenantId!)
-          .eq("cargo_funcao", nome),
+        (supabase.rpc as any)("usuarios_contar_por_cargo", { p_cargo: nome }),
       ]);
       if (adm.error) throw adm.error;
       if (usr.error) throw usr.error;
-      const vinculados = (adm.count ?? 0) + (usr.count ?? 0);
+      const vinculados = (adm.count ?? 0) + (Number(usr.data) || 0);
       if (vinculados > 0) {
         throw new Error(
           `Não é possível excluir a função "${nome}": há ${vinculados} colaborador(es) vinculado(s). Reatribua ou desvincule antes de excluir.`,

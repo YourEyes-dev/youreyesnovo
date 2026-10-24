@@ -9,7 +9,7 @@ import { capturarRefDaUrl, lerRef } from "@/lib/parceiroRef";
 import { capturarOrigemDaVisita } from "@/lib/siteOrigem";
 import { iniciarMetaPixel, pausarMetaPixel } from "@/lib/metaConversions";
 import { trackConversion } from "@/lib/metaConversions";
-import mascot from "@/assets/mascot-ye.png.asset.json";
+import mascotUrl from "@/assets/mascot-ye.webp";
 import {
   ShieldCheck,
   Brain,
@@ -477,7 +477,7 @@ export default function Site() {
                 <div className="w-[380px] h-[380px] rounded-full bg-[#60ABEF]/20 blur-3xl" />
               </div>
               <img
-                src={mascot.url}
+                src={mascotUrl}
                 alt="EYE — assistente de IA da YourEyes"
                 className="relative z-10 h-[360px] md:h-[420px] w-auto rounded-2xl drop-shadow-[0_25px_60px_rgba(96,171,239,0.35)] -scale-x-100"
                 style={{ animation: "floatMascot 6s ease-in-out infinite" }}

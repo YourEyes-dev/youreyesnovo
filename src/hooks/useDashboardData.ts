@@ -67,7 +67,7 @@ export const useDashboardData = () => {
         // Pilar 1 - Organização
         supabase.from("cargos").select("id", { count: "exact" }).eq("tenant_id", tenant.id).eq("ativo", true),
         supabase.from("departamentos").select("id", { count: "exact" }).eq("tenant_id", tenant.id).eq("ativo", true),
-        supabase.from("admissoes").select("id", { count: "exact" }).eq("tenant_id", tenant.id).neq("status", "concluido").neq("status", "reprovado").match(empresaAtivaId ? { empresa_id: empresaAtivaId } : {}),
+        (supabase.rpc as any)("admissoes_contagens", { p_empresa_id: empresaAtivaId ?? null }).then((r: any) => ({ count: r?.data?.em_aberto ?? 0 })),
         
         // Pilar 2 - Condições
         supabase.from("ergonomia_itens_nr17").select("id, status").eq("tenant_id", tenant.id),

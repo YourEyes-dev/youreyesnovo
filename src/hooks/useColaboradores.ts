@@ -68,17 +68,12 @@ export function useColaboradores(options: UseColaboradoresOptions = {}) {
     queryFn: async (): Promise<{ lista: Colaborador[]; cpfsConflitantes: CpfConflito[] }> => {
       if (!tenantId) return { lista: [], cpfsConflitantes: [] };
 
-      let query = supabase
-        .from("admissoes")
-        .select("id, nome_completo, cpf, cargo, cargo_id, departamento, email, celular, filial, data_admissao, empresa_id, gestor_imediato, foto_url, tipo_contrato, bate_ponto, inativo")
-        .eq("tenant_id", tenantId)
-        .eq("status", "concluido");
-
-      if (empresaAtivaId) {
-        query = query.eq("empresa_id", empresaAtivaId);
-      }
-
-      const { data, error } = await query.order("data_admissao", { ascending: false });
+      // Lê pelo diretório do banco: nome, cargo, departamento, gestor, foto e afins vêm para todos; CPF, e-mail e celular
+      // só para a própria pessoa, para quem tem acesso de gestão a dados de pessoas e, no caso do líder, para a equipe.
+      // (Antes lia a tabela admissoes direto, que traz o cadastro completo de todos.)
+      const { data, error } = await (supabase.rpc as any)("colaboradores_diretorio", {
+        p_empresa_id: empresaAtivaId ?? null,
+      });
 
       if (error) throw error;
 

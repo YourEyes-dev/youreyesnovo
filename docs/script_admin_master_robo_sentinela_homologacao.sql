@@ -3,7 +3,9 @@
 -- "Administrador Master", no ambiente de HOMOLOGACAO
 --
 -- O QUE FAZ
---   1. acha o usuario (auth.users) e o cadastro dele (usuarios_base);
+--   1. acha o usuario (auth.users) e o cadastro dele (usuarios_base); se o
+--      cadastro existe pelo e-mail mas nao esta ligado ao login (auth_user_id
+--      vazio), religa. Cadastro ligado a OUTRO login nunca e tocado;
 --   2. acha o perfil "Administrador Master" da MESMA empresa-cliente (tenant);
 --   3. desativa o vinculo de perfil ativo que ele tinha (se tinha outro) e
 --      ativa o vinculo com o Administrador Master como perfil principal;
@@ -32,6 +34,7 @@ DECLARE
   v_ub         uuid;
   v_tenant     uuid;
   v_perfil     uuid;
+  v_religou    boolean := false;
   v_bkp        text := 'backup_admin_master_sentinela_' || to_char(CURRENT_DATE, 'YYYYMMDD');
 BEGIN
   -- (1) TRAVA DE AMBIENTE
@@ -49,6 +52,16 @@ BEGIN
 
   v_ub := (SELECT ub.id FROM public.usuarios_base ub
             WHERE ub.auth_user_id = v_uid ORDER BY ub.created_at LIMIT 1);
+  IF v_ub IS NULL THEN
+    v_ub := (SELECT ub.id FROM public.usuarios_base ub
+              WHERE lower(ub.email_principal) = lower(v_email) AND ub.auth_user_id IS NULL
+              ORDER BY ub.created_at LIMIT 1);
+    v_religou := v_ub IS NOT NULL;
+    IF v_ub IS NULL AND EXISTS (SELECT 1 FROM public.usuarios_base ub
+                                 WHERE lower(ub.email_principal) = lower(v_email)) THEN
+      RAISE EXCEPTION 'RECUSADO: o cadastro de % esta ligado a OUTRO login; nada foi alterado.', v_email;
+    END IF;
+  END IF;
   v_tenant := (SELECT ub.tenant_id FROM public.usuarios_base ub WHERE ub.id = v_ub);
   IF v_ub IS NULL THEN
     RAISE EXCEPTION 'RECUSADO: % tem login mas nao tem cadastro em usuarios_base (nao esta vinculado a nenhuma empresa-cliente).', v_email;
@@ -64,14 +77,14 @@ BEGIN
   -- (3) BACKUP do que sera tocado (tabela nasce fechada para a API)
   EXECUTE 'CREATE ' || 'TABLE IF NOT EXISTS public.' || quote_ident(v_bkp) || ' (
             momento timestamptz NOT NULL DEFAULT now(),
-            usuario_id uuid, tipo_usuario_antes text,
+            usuario_id uuid, auth_user_id_antes uuid, tipo_usuario_antes text,
             vinculo_id uuid, vinculo_perfil_id uuid, vinculo_ativo boolean, vinculo_principal boolean)';
   EXECUTE 'ALTER TABLE public.' || quote_ident(v_bkp) || ' ENABLE ROW LEVEL SECURITY';
   EXECUTE 'REVOKE ALL ON TABLE public.' || quote_ident(v_bkp) || ' FROM anon, authenticated';
 
   EXECUTE 'INSERT INTO public.' || quote_ident(v_bkp) ||
-          ' (usuario_id, tipo_usuario_antes, vinculo_id, vinculo_perfil_id, vinculo_ativo, vinculo_principal)
-            SELECT $1, ub.tipo_usuario::text, v.id, v.perfil_id, v.ativo, v.is_perfil_principal
+          ' (usuario_id, auth_user_id_antes, tipo_usuario_antes, vinculo_id, vinculo_perfil_id, vinculo_ativo, vinculo_principal)
+            SELECT $1, ub.auth_user_id, ub.tipo_usuario::text, v.id, v.perfil_id, v.ativo, v.is_perfil_principal
               FROM public.usuarios_base ub
               LEFT JOIN public.usuario_perfil_vinculos v
                      ON v.usuario_id = ub.id AND v.empresa_id IS NULL
@@ -98,7 +111,10 @@ BEGIN
                       WHERE x.usuario_id = v_ub AND x.empresa_id IS NULL AND x.perfil_id = v_perfil);
 
   -- (6) TIPO DE USUARIO
-  UPDATE public.usuarios_base SET tipo_usuario = 'administrador' WHERE id = v_ub;
+  UPDATE public.usuarios_base
+     SET tipo_usuario = 'administrador',
+         auth_user_id = COALESCE(auth_user_id, v_uid)
+   WHERE id = v_ub;
 
   RAISE NOTICE 'Administrador Master atribuido a % (usuario_base %).', v_email, v_ub;
 END $ajuste$;
@@ -127,7 +143,8 @@ SELECT email, tipo_usuario, perfil_ativo, principal, qtd_vinculos_ativos,
 -- ---------------------------------------------------------------------------
 -- COMO DESFAZER (troque AAAAMMDD pela data da tabela de backup)
 --
---   UPDATE public.usuarios_base ub SET tipo_usuario = b.tipo_usuario_antes
+--   UPDATE public.usuarios_base ub SET tipo_usuario = b.tipo_usuario_antes,
+--          auth_user_id = b.auth_user_id_antes
 --     FROM public.backup_admin_master_sentinela_AAAAMMDD b
 --    WHERE ub.id = b.usuario_id AND b.tipo_usuario_antes IS NOT NULL;
 --

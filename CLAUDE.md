@@ -142,8 +142,13 @@ Regras dos scripts de entrega (aprendidas a caro preço):
   roda em UMA transação, script que dá erro se desfaz sozinho — o risco real é
   o script que roda com SUCESSO e faz a coisa errada. Então, antes do
   `UPDATE`/`DELETE`, copie o que será tocado:
-  `CREATE TABLE IF NOT EXISTS backup_<assunto>_<aaaammdd> AS SELECT * FROM <tabela> WHERE <mesmo filtro do update>;`
-  e deixe no comentário final o `UPDATE ... FROM backup_...` que desfaz. Isso
+  `CREATE TABLE IF NOT EXISTS backup.<assunto>_<aaaammdd> AS SELECT * FROM <tabela> WHERE <mesmo filtro do update>;`
+  **no schema privado `backup`, NUNCA em `public`** (SEG-0006, 26/10/2026: em
+  `public` o role `anon` — a chave pública embutida no site — tem grant por
+  padrão, e um backup sem RLS vazou salário e PII de produção; o schema `backup`
+  fica fora da API, criado por `20261026140419_backup_schema_privado.sql` e
+  `docs/script_backup_schema_privado.sql`). Deixe no comentário final o
+  `UPDATE ... FROM backup.<assunto>_...` que desfaz. Isso
   é mais cirúrgico que PITR (devolve só as linhas afetadas, sem descartar o
   trabalho legítimo dos outros clientes no período) e não depende de add-on.
   Não vale para script que só CRIA coisa nova (tabela, função, política).

@@ -59,15 +59,21 @@ jobs:
 
       - name: Conferências de segurança (destino NÃO é produção; script existe)
         run: |
-          HOST="${HOST_INPUT:-$HOST_SECRET}"
+          RAW="${HOST_INPUT:-$HOST_SECRET}"
           erro=0
-          [ -n "$HOST" ]       || { echo "::error::Falta o host da homologação (input ou secret HOMOLOGACAO_DB_HOST)."; erro=1; }
+          [ -n "$RAW" ]        || { echo "::error::Falta o host da homologação (input ou secret HOMOLOGACAO_DB_HOST)."; erro=1; }
           [ -n "$PGPASSWORD" ] || { echo "::error::Falta o secret HOMOLOGACAO_DB_PASSWORD."; erro=1; }
           [ "$erro" = 0 ] || exit 1
-          # host tem de ser do pooler
+          # Limpa o host (igual a homologacao.yml): tolera espaco, usuario@host,
+          # postgresql://, /banco e :porta — o painel do Supabase e os secrets
+          # costumam trazer esses pedacos. O host efetivo e so o nome do pooler.
+          HOST="$(printf '%s' "$RAW" | tr -d '[:space:]')"
+          HOST="${HOST##*@}"; HOST="${HOST#*://}"; HOST="${HOST%%/*}"; HOST="${HOST%%:*}"
           case "$HOST" in
+            *"db."*".supabase.co")
+              echo "::error::Host e o de conexao DIRETA (IPv6, nao atende no GitHub). Use o do Session pooler (.pooler.supabase.com)."; exit 1 ;;
             *.pooler.supabase.com) : ;;
-            *) echo "::error::Host não parece o do Session pooler (deveria terminar em .pooler.supabase.com)."; exit 1 ;;
+            *) echo "::error::Host '$HOST' nao parece o do Session pooler (deveria terminar em .pooler.supabase.com)."; exit 1 ;;
           esac
           # destino NUNCA pode ser produção
           case "$HOMOLOGACAO_USER$HOST" in

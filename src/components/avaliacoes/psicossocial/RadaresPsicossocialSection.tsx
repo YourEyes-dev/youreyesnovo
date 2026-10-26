@@ -141,8 +141,8 @@ const BURNOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'sobrecargaCognitiva', label: 'Sobrecarga Cognitiva', fallback: 62, icon: Brain,
     descricao: 'Excesso de tarefas e demandas mentais intensas',
-    detailedAnalysis: 'Analisamos a quantidade e complexidade dos riscos cognitivos no ambiente de trabalho, incluindo demandas de atenção, memória e processamento de informações.',
-    dataSource: ['Inventário de Riscos Cognitivos', 'Análise de Carga Mental'],
+    detailedAnalysis: 'Vem da dimensão de demandas cognitivas do questionário SIPRO: quanto mais os trabalhadores relatam exigência de atenção, memória e concentração, maior o risco calculado. Reflete a percepção respondida na campanha, não uma medição automática da carga mental.',
+    dataSource: ['Questionário SIPRO', 'Dimensão: Demandas Cognitivas'],
     sugestoes: [
       { titulo: 'Implementar rodízio de tarefas complexas', porque: 'Reduzir a sobrecarga mental causada pela exposição prolongada a tarefas de alta complexidade cognitiva' },
       { titulo: 'Criar pausas programadas para recuperação mental', porque: 'Permitir recuperação cognitiva adequada e prevenir fadiga mental acumulada' },
@@ -153,8 +153,8 @@ const BURNOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'ritmoTrabalho', label: 'Ritmo de Trabalho', fallback: 71, icon: Clock,
     descricao: 'Pressão por velocidade e volume de produção',
-    detailedAnalysis: 'Avaliamos os riscos organizacionais relacionados ao ritmo, pressão por prazos e metas, intensidade das demandas e controle sobre o próprio trabalho.',
-    dataSource: ['Riscos Organizacionais', 'Análise de Jornada'],
+    detailedAnalysis: 'Vem da dimensão de demandas quantitativas do questionário SIPRO: parte da percepção dos trabalhadores sobre volume, prazos e pressão por velocidade. É a resposta ao questionário, não uma leitura automática do ponto ou da jornada.',
+    dataSource: ['Questionário SIPRO', 'Dimensão: Demandas Quantitativas'],
     sugestoes: [
       { titulo: 'Revisar metas e prazos irrealistas', porque: 'Adequar as expectativas de entrega à capacidade real da equipe, evitando sobrecarga' },
       { titulo: 'Balancear carga de trabalho entre equipes', porque: 'Distribuir demandas de forma equitativa para evitar sobrecarga em indivíduos específicos' },
@@ -165,8 +165,8 @@ const BURNOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'faltaPausas', label: 'Falta de Pausas', fallback: 55, icon: AlertTriangle,
     descricao: 'Ausência de intervalos adequados para recuperação',
-    detailedAnalysis: 'Consideramos as ações pendentes relacionadas a pausas e recuperação, assim como a existência de políticas e práticas de descanso durante a jornada.',
-    dataSource: ['Ações Pendentes', 'Política de Pausas'],
+    detailedAnalysis: 'Vem da dimensão de recuperação e equilíbrio do questionário SIPRO: baseia-se em como os trabalhadores percebem suas pausas e o equilíbrio entre trabalho e descanso. Não verifica automaticamente políticas de pausa nem registros de ponto.',
+    dataSource: ['Questionário SIPRO', 'Dimensão: Recuperação e Equilíbrio'],
     sugestoes: [
       { titulo: 'Implementar pausas ativas obrigatórias', porque: 'Garantir momentos de recuperação física e mental durante a jornada de trabalho' },
       { titulo: 'Criar espaços de descanso adequados', porque: 'Oferecer ambientes propícios para recuperação e descompressão dos colaboradores' },
@@ -177,8 +177,8 @@ const BURNOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'humorNegativo', label: 'Humor Negativo', fallback: 44, icon: TrendingDown,
     descricao: 'Irritabilidade, negatividade e desgaste emocional',
-    detailedAnalysis: 'Monitoramos os registros de humor diário dos colaboradores, identificando padrões de estresse, cansaço, ansiedade e desânimo nos últimos 7 dias.',
-    dataSource: ['Humor Diário', 'Registros dos últimos 7 dias'],
+    detailedAnalysis: 'Vem da dimensão de demandas emocionais do questionário SIPRO, respondida pelos trabalhadores na campanha. Reflete a percepção relatada sobre desgaste e tensão emocional; não acompanha registros de humor diário.',
+    dataSource: ['Questionário SIPRO', 'Dimensão: Demandas Emocionais'],
     sugestoes: [
       { titulo: 'Realizar escuta ativa com gestores', porque: 'Identificar causas específicas do humor negativo através de conversas individuais' },
       { titulo: 'Oferecer apoio psicológico', porque: 'Disponibilizar suporte profissional para colaboradores em sofrimento emocional' },
@@ -189,8 +189,8 @@ const BURNOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'denuncias', label: 'Denúncias/Ocorrências', fallback: 30, icon: MessageSquareWarning,
     descricao: 'Relatos de conflitos, pressão indevida ou ambiente hostil',
-    detailedAnalysis: 'Analisamos as manifestações recebidas pela ouvidoria, incluindo denúncias, reclamações e sugestões relacionadas ao ambiente de trabalho e relações interpessoais.',
-    dataSource: ['Ouvidoria', 'Ocorrências em aberto'],
+    detailedAnalysis: 'Vem das dimensões de conflito de papéis e de relacionamentos e suporte do questionário SIPRO: mede a percepção de conflito e de apoio relatada pelos trabalhadores. Não lê as manifestações da Ouvidoria nem as ocorrências registradas.',
+    dataSource: ['Questionário SIPRO', 'Dimensões: Conflito de Papéis e Suporte'],
     sugestoes: [
       { titulo: 'Investigar denúncias pendentes', porque: 'Resolver situações reportadas que podem estar causando sofrimento aos colaboradores' },
       { titulo: 'Implementar ações corretivas', porque: 'Tratar as causas raiz das denúncias e prevenir novas ocorrências similares' },
@@ -201,8 +201,8 @@ const BURNOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'exigenciasEmocionais', label: 'Exigências Emocionais', fallback: 68, icon: Heart,
     descricao: 'Necessidade de suprimir emoções no exercício das funções',
-    detailedAnalysis: 'Combinamos indicadores de humor negativo com riscos cognitivos para avaliar a carga emocional exigida nas atividades laborais.',
-    dataSource: ['Humor Diário', 'Riscos Cognitivos'],
+    detailedAnalysis: 'Vem da dimensão de demandas emocionais do questionário SIPRO: parte de quanto os trabalhadores relatam precisar conter ou administrar emoções no trabalho. Baseia-se na percepção respondida, não no cruzamento automático de outros módulos.',
+    dataSource: ['Questionário SIPRO', 'Dimensão: Demandas Emocionais'],
     sugestoes: [
       { titulo: 'Oferecer treinamento de inteligência emocional', porque: 'Desenvolver habilidades para lidar com demandas emocionais do trabalho' },
       { titulo: 'Criar grupos de apoio entre pares', porque: 'Estabelecer rede de suporte entre colegas para compartilhar experiências e estratégias' },
@@ -216,8 +216,8 @@ const BOREOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'baixoDesafio', label: 'Baixo Desafio', fallback: 75, icon: Target,
     descricao: 'Tarefas excessivamente simples e sem estímulo intelectual',
-    detailedAnalysis: 'Avaliamos se há subutilização das competências dos colaboradores, analisando a relação entre capacidades identificadas e complexidade das tarefas atribuídas.',
-    dataSource: ['Inventário de Riscos', 'Ações Cadastradas'],
+    detailedAnalysis: 'Vem da dimensão de autonomia e controle do questionário SIPRO: quanto menos autonomia e influência os trabalhadores percebem, maior o risco de subcarga estimado. Reflete a percepção respondida, não um mapeamento automático de competências.',
+    dataSource: ['Questionário SIPRO', 'Dimensão: Autonomia e Controle'],
     sugestoes: [
       { titulo: 'Mapear competências e realocá-las', porque: 'Aproveitar melhor o potencial dos colaboradores e reduzir a subutilização de habilidades' },
       { titulo: 'Criar projetos especiais desafiadores', porque: 'Estimular o engajamento através de desafios que correspondam às capacidades do colaborador' },
@@ -228,8 +228,8 @@ const BOREOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'repetitividade', label: 'Repetitividade', fallback: 80, icon: RotateCcw,
     descricao: 'Ciclos repetitivos e monotonia nas atividades diárias',
-    detailedAnalysis: 'Analisamos riscos cognitivos relacionados à monotonia, avaliando a diversidade de tarefas e estímulos no ambiente de trabalho.',
-    dataSource: ['Riscos Cognitivos', 'Análise de Tarefas'],
+    detailedAnalysis: 'Vem da dimensão de clareza de papéis do questionário SIPRO, que capta a percepção sobre a natureza e a variação das tarefas. É a resposta ao questionário, não uma análise automática das atividades realizadas.',
+    dataSource: ['Questionário SIPRO', 'Dimensão: Clareza de Papéis'],
     sugestoes: [
       { titulo: 'Implementar rodízio de atividades', porque: 'Quebrar a monotonia através da alternância entre diferentes tipos de tarefas' },
       { titulo: 'Automatizar tarefas repetitivas', porque: 'Liberar colaboradores para atividades mais estimulantes e de maior valor agregado' },
@@ -240,8 +240,8 @@ const BOREOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'faltaSentido', label: 'Falta de Sentido', fallback: 60, icon: Minus,
     descricao: 'Percepção de que o trabalho não tem propósito ou impacto',
-    detailedAnalysis: 'Correlacionamos indicadores de humor com a percepção de propósito, avaliando se os colaboradores compreendem a importância de suas contribuições.',
-    dataSource: ['Humor Diário', 'Clima Organizacional'],
+    detailedAnalysis: 'Vem da dimensão de sentido do trabalho do questionário SIPRO: parte de quanto os trabalhadores enxergam propósito e importância no que fazem. Baseia-se na percepção respondida na campanha.',
+    dataSource: ['Questionário SIPRO', 'Dimensão: Sentido do Trabalho'],
     sugestoes: [
       { titulo: 'Comunicar propósito e impacto do trabalho', porque: 'Conectar as atividades diárias aos resultados e benefícios gerados pela empresa' },
       { titulo: 'Conectar tarefas aos objetivos maiores', porque: 'Demonstrar como cada função contribui para o sucesso organizacional' },
@@ -252,8 +252,8 @@ const BOREOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'apatia', label: 'Apatia Emocional', fallback: 55, icon: Meh,
     descricao: 'Perda de entusiasmo, envolvimento e motivação com o trabalho',
-    detailedAnalysis: 'Monitoramos a frequência de registros de humor neutro ou indiferente, que podem indicar desconexão emocional com o trabalho.',
-    dataSource: ['Humor Diário', 'Taxa de Neutralidade'],
+    detailedAnalysis: 'Vem da dimensão de reconhecimento e recompensas do questionário SIPRO: percepção de valorização e reconhecimento relatada pelos trabalhadores. Reflete a resposta ao questionário, não o acompanhamento de registros de humor.',
+    dataSource: ['Questionário SIPRO', 'Dimensão: Reconhecimento e Recompensas'],
     sugestoes: [
       { titulo: 'Realizar conversas individuais', porque: 'Identificar causas pessoais ou profissionais da apatia através de escuta ativa' },
       { titulo: 'Investigar causas da apatia', porque: 'Compreender fatores organizacionais que levam ao desinteresse e desengajamento' },
@@ -264,8 +264,8 @@ const BOREOUT_TEMPLATES: FatorTemplate[] = [
   {
     key: 'desconexao', label: 'Desconexão com Equipe', fallback: 48, icon: Users,
     descricao: 'Isolamento e falta de pertencimento ao grupo',
-    detailedAnalysis: 'Avaliamos indicadores de integração social, analisando a participação em atividades coletivas e a percepção de pertencimento ao grupo.',
-    dataSource: ['Humor Positivo', 'Engajamento Social'],
+    detailedAnalysis: 'Vem da dimensão de relacionamentos e suporte do questionário SIPRO: percepção de apoio de colegas e liderança e de pertencimento ao grupo. Baseia-se na resposta ao questionário, não em dados de participação em atividades.',
+    dataSource: ['Questionário SIPRO', 'Dimensão: Relacionamentos e Suporte'],
     sugestoes: [
       { titulo: 'Promover team building', porque: 'Fortalecer vínculos entre membros da equipe através de atividades conjuntas' },
       { titulo: 'Criar rituais de integração', porque: 'Estabelecer momentos regulares de conexão e fortalecimento do grupo' },
@@ -805,10 +805,10 @@ export function RadaresPsicossocialSection({ campanhas = [] }: RadaresPsicossoci
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {temDadosReais
-                  ? 'Radares calculados a partir das respostas reais da campanha psicossocial mais recente.'
-                  : 'Valores estimados — crie e aplique uma campanha psicossocial para obter dados reais.'
+                  ? 'Radares calculados a partir das respostas do questionário psicossocial da campanha mais recente. Cada fator reflete a percepção dos trabalhadores; quando uma dimensão não é medida na campanha, mostramos um valor de referência (estimativa), não uma medição.'
+                  : 'Valores de referência (estimativa). Crie e aplique uma campanha psicossocial para calcular os radares a partir das respostas reais.'
                 }
-                {' '}Expanda cada fator para ver a análise detalhada e criar ações específicas,
+                {' '}Expanda cada fator para ver de onde vem o indicador e criar ações específicas,
                 ou use a IA para gerar um plano preventivo completo.
               </p>
             </div>
@@ -896,7 +896,10 @@ export function RadaresPsicossocialSection({ campanhas = [] }: RadaresPsicossoci
             <strong>Metodologia:</strong> Os scores de Burnout e Boreout são derivados das dimensões IBO-S e IBD-S do instrumento SIPRO
             (Índice YourEyes de Risco Psicossocial Organizacional). Os critérios avaliados incluem fatores ocupacionais,
             organizacionais e individuais conforme ISO 45003, NR-01 e NR-17. Disponível quando houver mínimo de 5 respostas na campanha.
-            Clique em cada fator para ver a análise detalhada e criar ações corretivas/preventivas vinculadas ao Plano de Ação.
+            Cada fator traduz a percepção respondida no questionário em um score de risco; quando uma dimensão não é medida na campanha,
+            exibimos um valor de referência (estimativa), não uma medição. O cruzamento com dados operacionais (atestados, ponto, bem-estar,
+            feedback e ocorrências) é feito na Contraprova Organizacional, com um indicador de alinhamento global.
+            Clique em cada fator para ver de onde vem o indicador e criar ações corretivas/preventivas vinculadas ao Plano de Ação.
           </p>
         </CardContent>
       </Card>

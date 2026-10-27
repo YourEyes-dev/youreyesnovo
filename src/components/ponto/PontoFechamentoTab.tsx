@@ -133,7 +133,7 @@ export function PontoFechamentoTab() {
         // RN28: o crédito do banco de horas é a base de pagamento de HE.
         total_horas_extras_50_minutos: Number(r.he_50_min) || 0,
         total_horas_extras_100_minutos: Number(r.he_100_min) || 0,
-        total_adicional_noturno_minutos: 0,
+        total_adicional_noturno_minutos: Number((r as any).adicional_noturno_min) || 0,
         total_faltas: Number(r.total_faltas) || 0,
         total_atrasos_minutos: Number(r.atrasos_min) || 0,
         total_dsr: 0,

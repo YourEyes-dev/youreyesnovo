@@ -198,7 +198,6 @@ export function usePontoFechamento() {
             // (domingo/feriado trabalhado). Débito não gera hora extra.
             total_horas_extras_50_minutos: Number(l.he_50_min) || 0,
             total_horas_extras_100_minutos: Number(l.he_100_min) || 0,
-            total_adicional_noturno_minutos: Number((l as any).adicional_noturno_min) || 0,
             total_atrasos_minutos: Number(l.atrasos_min) || 0,
             banco_horas_saldo_minutos: Number(l.saldo_banco_min ?? l.saldo_min) || 0,
             total_faltas: Number(l.total_faltas) || 0,

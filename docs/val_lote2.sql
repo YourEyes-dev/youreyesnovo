@@ -23,10 +23,10 @@ BEGIN
   PERFORM public.qa_esc_admissao('11144477735', 'Gestor RH', NULL, 'RH');
   PERFORM public.qa_esc_admissao('52998224725', 'Pessoa RH', NULL, 'RH');
   PERFORM public.qa_esc_admissao('39053344705', 'Pessoa TI', NULL, 'TI');
-  -- perfil do A: bem_estar e ouvidoria em escopo SETOR
-  v_perf := public.qa_up_perfil('LOTE2', 'Setor BemEstar', 'bem_estar', 'setor', 'visualizar');
-  PERFORM public.qa_up_vincular(v_a, NULL, v_perf);
-  v_perf := public.qa_up_perfil('LOTE2', 'Setor Ouvidoria', 'ouvidoria', 'setor', 'visualizar');
+  -- perfil ÚNICO do A com bem_estar E ouvidoria em escopo SETOR (um vínculo só)
+  v_perf := public.qa_up_perfil('LOTE2', 'Setor BemEstar+Ouvidoria', 'bem_estar', 'setor', 'visualizar');
+  INSERT INTO public.perfil_permissoes (perfil_id, tenant_id, modulo, acao, escopo, ativo)
+  VALUES (v_perf, v_t, 'ouvidoria', 'visualizar'::public.perfil_acao, 'setor'::public.perfil_escopo_tipo, true);
   PERFORM public.qa_up_vincular(v_a, NULL, v_perf);
 
   PERFORM public.qa_up_entrar(v_uidA);

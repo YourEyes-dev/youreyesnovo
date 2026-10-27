@@ -186,8 +186,8 @@ BEGIN
       ('beneficios_consignado',        $p$public.perfil_ve_cpf(tenant_id, colaborador_cpf, 'beneficios')$p$),
       ('beneficios_dependentes',       $p$public.perfil_ve_cpf(tenant_id, colaborador_cpf, 'beneficios')$p$),
       ('beneficios_inss',              $p$public.perfil_ve_cpf(tenant_id, colaborador_cpf, 'beneficios')$p$),
-      ('beneficios_plr',               $p$public.perfil_ve_cpf(tenant_id, colaborador_cpf, 'beneficios')$p$),
-      ('beneficios_faturas',           $p$public.perfil_ve_cpf(tenant_id, colaborador_cpf, 'beneficios')$p$),
+      -- beneficios_plr (programa PLR da empresa) e beneficios_faturas (faturas da
+      -- operadora, agregado) são NÍVEL EMPRESA, não dado individual -> fora do escopo.
       ('beneficios_manutencao_plano',  $p$public.perfil_ve_cpf(tenant_id, colaborador_cpf, 'beneficios')$p$),
       -- Desligamento: CPF direto
       ('admissao_desligamento_historico', $p$public.perfil_ve_cpf(tenant_id, colaborador_cpf, 'desligamento', 'rescisao', 'colaboradores')$p$),
@@ -229,17 +229,17 @@ BEGIN
       ('meta_acoes',         $p$EXISTS (SELECT 1 FROM public.metas m WHERE m.id = meta_id)$p$),
       ('meta_historico',     $p$EXISTS (SELECT 1 FROM public.metas m WHERE m.id = meta_id)$p$),
       ('metas_evidencias',   $p$EXISTS (SELECT 1 FROM public.metas m WHERE m.id = meta_id)$p$),
-      ('metas_indicadores',  $p$EXISTS (SELECT 1 FROM public.metas m WHERE m.id = meta_id)$p$),
+      -- metas_indicadores = catálogo de indicadores reutilizáveis (sem meta/colaborador) -> fora do escopo.
       ('metas_participantes',$p$EXISTS (SELECT 1 FROM public.metas m WHERE m.id = meta_id)$p$),
       ('metas_checkins',     $p$EXISTS (SELECT 1 FROM public.metas m WHERE m.id = meta_id)$p$),
       ('metas_workflow_log', $p$EXISTS (SELECT 1 FROM public.metas m WHERE m.id = meta_id)$p$),
-      -- Sub de PDI com pdi_id -> pai public.pdis
-      ('pdi_checkins',       $p$EXISTS (SELECT 1 FROM public.pdis p WHERE p.id = pdi_id)$p$),
-      ('pdi_evidencias',     $p$EXISTS (SELECT 1 FROM public.pdis p WHERE p.id = pdi_id)$p$),
+      -- Sub de PDI com pdi_id direto -> pai public.pdis
       ('pdi_feedbacks',      $p$EXISTS (SELECT 1 FROM public.pdis p WHERE p.id = pdi_id)$p$),
       ('pdi_metas',          $p$EXISTS (SELECT 1 FROM public.pdis p WHERE p.id = pdi_id)$p$),
       ('pdi_assinatura_links', $p$EXISTS (SELECT 1 FROM public.pdis p WHERE p.id = pdi_id)$p$),
-      -- pdi_acoes só tem meta_id -> referencia pdi_metas (que herda de pdis)
+      -- pdi_checkins/evidencias/acoes ligam por meta_id -> pdi_metas (que herda de pdis)
+      ('pdi_checkins',       $p$EXISTS (SELECT 1 FROM public.pdi_metas pm WHERE pm.id = meta_id)$p$),
+      ('pdi_evidencias',     $p$EXISTS (SELECT 1 FROM public.pdi_metas pm WHERE pm.id = meta_id)$p$),
       ('pdi_acoes',          $p$EXISTS (SELECT 1 FROM public.pdi_metas pm WHERE pm.id = meta_id)$p$)
     ) AS t(tabela, predicado)
   LOOP
@@ -272,10 +272,10 @@ SELECT t.tabela,
        ) THEN 'OK (RESTRICTIVE/SELECT)' ELSE 'FALTA' END AS camada_perfil
 FROM (VALUES
   ('beneficios_consignado'),('beneficios_dependentes'),('beneficios_inss'),
-  ('beneficios_plr'),('beneficios_faturas'),('beneficios_manutencao_plano'),
+  ('beneficios_manutencao_plano'),
   ('admissao_desligamento_historico'),('desligamento_eventos'),('ocorrencias'),
   ('pdis'),('meta_acoes'),('meta_historico'),('metas_evidencias'),
-  ('metas_indicadores'),('metas_participantes'),('metas_checkins'),
+  ('metas_participantes'),('metas_checkins'),
   ('metas_workflow_log'),('pdi_checkins'),('pdi_evidencias'),('pdi_feedbacks'),
   ('pdi_metas'),('pdi_assinatura_links'),('pdi_acoes')
 ) AS t(tabela)

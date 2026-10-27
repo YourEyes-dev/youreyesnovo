@@ -46,7 +46,7 @@ RETURNS public.qa_retorno LANGUAGE plpgsql AS $fn$
 DECLARE
   v_uidA uuid := gen_random_uuid();
   v_a uuid; v_b uuid; v_perf uuid;
-  v_ve_a boolean; v_ve_b boolean;
+  v_ve_a boolean; v_ve_b boolean; v_me text; v_perm boolean;
 BEGIN
   PERFORM public.qa_modo_ligar();
   v_a := public.qa_up_usuario('PERFIL-050', 1, '11144477735', 'ativo', v_uidA);
@@ -57,12 +57,14 @@ BEGIN
   PERFORM public.qa_up_entrar(v_uidA);
   v_ve_a := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '11144477735', 'metas');
   v_ve_b := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '52998224725', 'metas');
+  v_me   := public.cpf_do_usuario_logado();
+  v_perm := public.perfil_permite_modulo(public.qa_sandbox_tenant_id(), 'metas');
   PERFORM public.qa_up_sair();
 
   RETURN public.qa_esc_resultado(
     'escopo proprio_usuario: vê o próprio (true) e NÃO vê outro (false)',
     (v_ve_a IS TRUE AND v_ve_b IS FALSE),
-    format('vê_próprio=%s  vê_outro=%s', v_ve_a, v_ve_b));
+    format('vê_próprio=%s vê_outro=%s cpf_me=[%s] permite_metas=%s', v_ve_a, v_ve_b, v_me, v_perm));
 EXCEPTION WHEN OTHERS THEN
   PERFORM public.qa_up_sair();
   RETURN public.qa_esc_resultado('sem erro', false, 'quebrou: ' || SQLERRM);

@@ -49,16 +49,10 @@ BEGIN
   IF public.is_superadmin(v_uid) THEN RETURN true; END IF;
   IF public.has_minimum_role(v_uid, 'owner'::public.app_role) THEN RETURN true; END IF;
 
-  -- Precisa ter o módulo; se nem isso, não vê.
-  IF NOT public.perfil_permite_modulo(p_tenant, VARIADIC p_modulos) THEN
-    RETURN false;
-  END IF;
-
-  -- Sempre vê o próprio.
-  IF v_sub <> '' AND v_cpf_me IS NOT NULL AND v_sub = v_cpf_me THEN
-    RETURN true;
-  END IF;
-
+  -- NÃO gateia em perfil_permite_modulo: esse porteiro trata escopo AMPLO e
+  -- exclui 'proprio_usuario' (como o #915, que faz permite_modulo OR próprio).
+  -- Aqui a posse do módulo + o escopo são decididos DENTRO do laço: ter uma
+  -- permissão no módulo (em qualquer escopo) já basta pra ver o PRÓPRIO.
   v_empresa := public.empresa_ativa();
 
   -- Varre o(s) escopo(s) do perfil do usuário para esses módulos. Se QUALQUER
@@ -84,6 +78,10 @@ BEGIN
       AND ub.status::text = 'ativo'
   LOOP
     v_tem_perfil := true;
+    -- Tendo o módulo (qualquer escopo), SEMPRE vê o próprio.
+    IF v_sub <> '' AND v_cpf_me IS NOT NULL AND v_sub = v_cpf_me THEN
+      RETURN true;
+    END IF;
     IF r.escopo IN ('empresa_inteira', 'grupo_economico', 'multiplas_empresas') THEN
       RETURN true;
     ELSIF r.escopo = 'subordinados_diretos' THEN

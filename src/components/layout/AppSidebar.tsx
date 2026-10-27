@@ -110,7 +110,7 @@ const SEARCH_KEYWORDS: Record<string, string[]> = {
   "/financeiro": ["financeiro", "guia", "pagamento", "certidao"],
   "/financeiro/beneficios": ["beneficio", "vale", "plano saude"],
   "/hub-contabil": ["contabil", "hub", "competencia", "folha"],
-  "/configuracoes": ["usuario", "perfil", "acesso", "auditoria", "esocial", "configuracao"],
+  "/usuarios": ["usuario", "perfil", "acesso", "auditoria", "esocial", "configuracao"],
   "/suporte": ["suporte", "ticket", "ajuda", "bug"],
   "/sobre-sistema": ["sobre", "versao", "versão", "ambiente", "publicacao", "publicação", "build"],
   "/meu-perfil": ["meu perfil", "conta", "avatar", "senha", "email"],
@@ -262,7 +262,7 @@ const menuSections: MenuSection[] = [
     items: [
       { title: "Meu Plano", icon: Layers, path: "/meu-plano" },
       { title: "Suporte", icon: LifeBuoy, path: "/suporte" },
-      { title: "Usuários", icon: Users, path: "/configuracoes" },
+      { title: "Usuários", icon: Users, path: "/usuarios" },
       { title: "Sobre o Sistema", icon: Info, path: "/sobre-sistema" },
     ],
   },

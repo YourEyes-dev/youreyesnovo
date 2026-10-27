@@ -107,7 +107,8 @@ export function useContratosExperiencia() {
     queryKey: ["contratos-experiencia", tenantId, empresaAtivaId],
     queryFn: async () => {
       if (!tenantId) return [];
-      let query = fromTable("contratos_experiencia")
+      // Lê pela visão com o salário mascarado por "pode ver salário" do perfil (as escritas seguem na tabela).
+      let query = fromTable("contratos_experiencia_segura")
         .select("*")
         .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false });
@@ -191,7 +192,7 @@ export function useContratosExperiencia() {
   const prorrogarMutation = useMutation({
     mutationFn: async ({ id, duracao_prorrogacao }: { id: string; duracao_prorrogacao: number }) => {
       // Buscar contrato atual
-      const { data: contrato } = await fromTable("contratos_experiencia")
+      const { data: contrato } = await fromTable("contratos_experiencia_segura")
         .select("*")
         .eq("id", id)
         .single() as { data: ContratoExperiencia | null };

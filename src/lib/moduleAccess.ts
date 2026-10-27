@@ -152,7 +152,8 @@ export const ALWAYS_ALLOWED_PATHS = new Set<string>([
   "/suporte",
   "/sobre-sistema", // página informativa, está no menu de todos; sem módulo mapeado ela ficava bloqueada para quem tem perfil
   "/pendencias",
-  "/configuracoes", // a página em si filtra por role; necessário p/ auto-serviço
+  "/configuracoes", // endereço antigo da tela de Usuários: só redireciona para /usuarios
+  "/usuarios", // a página em si filtra por role (abas só para admin); sempre liberada, como era /configuracoes
   "/onboarding-rh-self",
   "/bem-estar", // espaço pessoal de auto-percepção
 ]);

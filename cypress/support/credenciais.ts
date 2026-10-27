@@ -35,3 +35,32 @@ export function credenciaisDeTeste(): CredenciaisDeTeste {
 
   return { email, senha };
 }
+
+// ---------------------------------------------------------------------
+// Usuário RESTRITO (testes de permissão).
+//
+// Conta de colaborador comum com um perfil que só libera Documentos (escopo
+// próprio). É semeada pela função seed-e2e-user junto com a conta-robô, no
+// mesmo tenant de teste, com a MESMA senha da conta-robô (a suíte só conhece
+// uma). O e-mail é fixo e fictício: não é pessoa real.
+// ---------------------------------------------------------------------
+export const EMAIL_USUARIO_RESTRITO = "restrito.e2e@youreyes.local";
+
+export function credenciaisRestrito(): CredenciaisDeTeste {
+  const { senha } = credenciaisDeTeste();
+  return { email: EMAIL_USUARIO_RESTRITO, senha };
+}
+
+// ---------------------------------------------------------------------
+// Usuário da OUVIDORIA (escopo "Próprio usuário" COM papel de gestão).
+//
+// Reproduz o caso real da Taeco: papel `manager`, tipo `gestor` e perfil com Ouvidoria só
+// em "Próprio usuário". Semeado por seed-e2e-user com 3 manifestações fictícias (própria,
+// de outro autor e anônima). Mesma senha da conta-robô.
+// ---------------------------------------------------------------------
+export const EMAIL_USUARIO_OUVIDORIA = "ouvidoria.e2e@youreyes.local";
+
+export function credenciaisOuvidoria(): CredenciaisDeTeste {
+  const { senha } = credenciaisDeTeste();
+  return { email: EMAIL_USUARIO_OUVIDORIA, senha };
+}

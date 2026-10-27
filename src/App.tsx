@@ -63,7 +63,6 @@ import HubContabil from "./pages/HubContabil";
 import Configuracoes from "./pages/Configuracoes";
 import Suporte from "./pages/Suporte";
 import SobreSistema from "./pages/SobreSistema";
-import Usuarios from "./pages/Usuarios";
 import PerfisAcesso from "./pages/PerfisAcesso";
 import MeuPerfil from "./pages/MeuPerfil";
 import MeuPlano from "./pages/MeuPlano";
@@ -120,6 +119,13 @@ const BlogAdmin = lazy(() => import("./pages/admin/BlogAdmin"));
 const ContratosAceite = lazy(() => import("./pages/admin/ContratosAceite"));
 const AssinarContrato = lazy(() => import("./pages/AssinarContrato"));
 const TenantDetalhe = lazy(() => import("./pages/admin/TenantDetalhe"));
+
+// O endereço antigo da tela de Usuários era /configuracoes. Mantém a query e o hash,
+// para link salvo (favorito, e-mail, atalho) continuar abrindo a mesma aba.
+function RedirecionaParaUsuarios() {
+  const { search, hash } = useLocation();
+  return <Navigate to={`/usuarios${search}${hash}`} replace />;
+}
 
 /**
  * Porta de entrada do domínio principal (https://youreyes.com.br/).
@@ -305,8 +311,8 @@ const App = () => (
                 <Route path="/hub-contabil" element={<HubContabil />} />
                 <Route path="/academia" element={<SuperAdminRoute><Academia /></SuperAdminRoute>} />
                 <Route path="/analise-jornada" element={<AnaliseJornada />} />
-                <Route path="/usuarios" element={<Usuarios />} />
-                <Route path="/configuracoes" element={<Configuracoes />} />
+                <Route path="/usuarios" element={<Configuracoes />} />
+                <Route path="/configuracoes" element={<RedirecionaParaUsuarios />} />
                 <Route path="/suporte" element={<Suporte />} />
                 <Route path="/sobre-sistema" element={<SobreSistema />} />
                 <Route path="/meu-perfil" element={<MeuPerfil />} />

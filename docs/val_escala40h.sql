@@ -33,11 +33,13 @@ BEGIN
 
   SELECT horas_trabalhadas, status INTO v_trabA, v_stA FROM public.ponto_diario WHERE tenant_id=v_t AND colaborador_cpf=v_cpf AND data=v_dA;
   SELECT horas_trabalhadas, status INTO v_trabB, v_stB FROM public.ponto_diario WHERE tenant_id=v_t AND colaborador_cpf=v_cpf AND data=v_dB;
-  BEGIN v_jorA := public.ponto_jornada_do_dia(v_t, v_cpf, v_cid, v_dA); EXCEPTION WHEN OTHERS THEN v_jorA := -1; END;
-  BEGIN v_jorB := public.ponto_jornada_do_dia(v_t, v_cpf, v_cid, v_dB); EXCEPTION WHEN OTHERS THEN v_jorB := -1; END;
+  BEGIN SELECT jornada_min INTO v_jorA FROM public.ponto_jornada_do_dia(v_t, v_cpf, v_cpf, v_dA); EXCEPTION WHEN OTHERS THEN v_jorA := -1; END;
+  BEGIN SELECT jornada_min INTO v_jorB FROM public.ponto_jornada_do_dia(v_t, v_cpf, v_cpf, v_dB); EXCEPTION WHEN OTHERS THEN v_jorB := -1; END;
 
-  RAISE NOTICE 'ESCALA40h DiaA(8h): trabalhadas=% esperado_min=% status=% (saldo esperado 0)', v_trabA, v_jorA, v_stA;
-  RAISE NOTICE 'ESCALA40h DiaB(9h): trabalhadas=% esperado_min=% status=% (saldo esperado +60)', v_trabB, v_jorB, v_stB;
+  RAISE NOTICE 'ESCALA40h DiaA(8h=480min): trabalhadas=% esperado_min=% status=% -> saldo=% (esperado 0)',
+               v_trabA, v_jorA, v_stA, (EXTRACT(EPOCH FROM v_trabA)/60)::int - v_jorA;
+  RAISE NOTICE 'ESCALA40h DiaB(9h=540min): trabalhadas=% esperado_min=% status=% -> saldo=% (esperado +60)',
+               v_trabB, v_jorB, v_stB, (EXTRACT(EPOCH FROM v_trabB)/60)::int - v_jorB;
   RAISE EXCEPTION 'ROLLBACK_ME';
 EXCEPTION WHEN OTHERS THEN
   IF SQLERRM <> 'ROLLBACK_ME' THEN RAISE NOTICE 'ESCALA40h ERRO: %', SQLERRM; END IF;

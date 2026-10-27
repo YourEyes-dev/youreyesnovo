@@ -41,8 +41,8 @@ BEGIN
   SELECT adicional_noturno_minutos INTO v_pd FROM public.ponto_diario
     WHERE tenant_id=v_t AND colaborador_cpf=v_cpf AND data=v_d LIMIT 1;
   -- simula o upsert do fechamento mandando 0 no adicional
-  INSERT INTO public.ponto_espelhos (tenant_id, colaborador_cpf, colaborador_nome, competencia, total_adicional_noturno_minutos, status)
-  VALUES (v_t, v_cpf, 'QA B trig', '2026-09', 0, 'gerado');
+  INSERT INTO public.ponto_espelhos (tenant_id, colaborador_id, colaborador_cpf, colaborador_nome, competencia, total_adicional_noturno_minutos, status)
+  VALUES (v_t, (SELECT id FROM public.admissoes WHERE tenant_id=v_t AND cpf=v_cpf LIMIT 1), v_cpf, 'QA B trig', '2026-09', 0, 'gerado');
   SELECT total_adicional_noturno_minutos INTO v_esp FROM public.ponto_espelhos
     WHERE tenant_id=v_t AND regexp_replace(colaborador_cpf,'[^0-9]','','g')=v_cpf AND competencia='2026-09' LIMIT 1;
   RAISE NOTICE 'B-TRIG: ponto_diario.adicional=% | espelho.total_adicional_noturno=% (trigger deve ter posto o valor real, mesmo com upsert=0)', COALESCE(v_pd::text,'NULL'), COALESCE(v_esp::text,'NULL');

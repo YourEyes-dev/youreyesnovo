@@ -1,0 +1,101 @@
+# =====================================================================
+# Aplicar script de entrega na HOMOLOGAÇÃO — YourEyes
+#
+# Aplica UM script de entrega (docs/script_*.sql) no banco da HOMOLOGAÇÃO
+# (fgsblefvdabgdouipigz) via psql — o MESMO gesto que a fundadora faria no
+# SQL Editor, só que feito pela Engenharia (o agente dispara). Assim o degrau
+# da homologação sai do colo dela: sobra só a PRODUÇÃO.
+#
+# POR QUE psql do script, e NÃO `supabase db push`:
+#   A homologação recebeu mudanças por script colado à mão (decisão 09/2026),
+#   então o histórico de migrations dela divergiu do repositório. Um `db push`
+#   tentaria reaplicar migrations e quebraria. Aplicar o MESMO script de
+#   entrega (idempotente, numa transação) preserva o valor de "ensaio geral"
+#   do gesto de produção e evita o tiro no pé.
+#
+# NUNCA toca produção. Usa secrets que já existem (não precisa criar nenhum):
+#   HOMOLOGACAO_DB_PASSWORD   senha do banco da homologação
+#   HOMOLOGACAO_DB_HOST       host do Session pooler da homologação
+# =====================================================================
+name: homologacao-aplicar-script
+
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: 'Caminho do script de entrega no repo (ex.: docs/script_psicossocial_supressao_ghe.sql)'
+        required: true
+      host_homologacao:
+        description: 'Host do Session pooler da HOMOLOGAÇÃO (vazio = usa o secret HOMOLOGACAO_DB_HOST)'
+        required: false
+        default: ''
+
+jobs:
+  aplicar:
+    name: Aplicar script na homologação
+    runs-on: ubuntu-latest
+    # Serializa: dois scripts nunca aplicam concorrentes na mesma base.
+    concurrency:
+      group: homologacao-aplicar
+      cancel-in-progress: false
+    env:
+      HOMOLOGACAO_REF: fgsblefvdabgdouipigz
+      PRODUCAO_REF: diayjpsrcerycycyaxst
+      HOMOLOGACAO_USER: postgres.fgsblefvdabgdouipigz
+      PGPASSWORD: ${{ secrets.HOMOLOGACAO_DB_PASSWORD }}
+      HOST_SECRET: ${{ secrets.HOMOLOGACAO_DB_HOST }}
+      HOST_INPUT: ${{ github.event.inputs.host_homologacao }}
+      SCRIPT: ${{ github.event.inputs.script }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar o cliente do PostgreSQL 17
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          psql --version
+
+      - name: Conferências de segurança (destino NÃO é produção; script existe)
+        run: |
+          RAW="${HOST_INPUT:-$HOST_SECRET}"
+          erro=0
+          [ -n "$RAW" ]        || { echo "::error::Falta o host da homologação (input ou secret HOMOLOGACAO_DB_HOST)."; erro=1; }
+          [ -n "$PGPASSWORD" ] || { echo "::error::Falta o secret HOMOLOGACAO_DB_PASSWORD."; erro=1; }
+          [ "$erro" = 0 ] || exit 1
+          # Limpa o host (igual a homologacao.yml): tolera espaco, usuario@host,
+          # postgresql://, /banco e :porta — o painel do Supabase e os secrets
+          # costumam trazer esses pedacos. O host efetivo e so o nome do pooler.
+          HOST="$(printf '%s' "$RAW" | tr -d '[:space:]')"
+          HOST="${HOST##*@}"; HOST="${HOST#*://}"; HOST="${HOST%%/*}"; HOST="${HOST%%:*}"
+          case "$HOST" in
+            *"db."*".supabase.co")
+              echo "::error::Host e o de conexao DIRETA (IPv6, nao atende no GitHub). Use o do Session pooler (.pooler.supabase.com)."; exit 1 ;;
+            *.pooler.supabase.com) : ;;
+            *) echo "::error::Host '$HOST' nao parece o do Session pooler (deveria terminar em .pooler.supabase.com)."; exit 1 ;;
+          esac
+          # destino NUNCA pode ser produção
+          case "$HOMOLOGACAO_USER$HOST" in
+            *"$PRODUCAO_REF"*) echo "::error::O destino aponta para a PRODUÇÃO — abortando."; exit 1 ;;
+          esac
+          case "$HOMOLOGACAO_USER" in
+            *"$HOMOLOGACAO_REF"*) echo "Destino confere: homologação." ;;
+            *) echo "::error::Usuário não bate com a homologação."; exit 1 ;;
+          esac
+          # script tem de estar em docs/ e existir
+          case "$SCRIPT" in
+            docs/*.sql) : ;;
+            *) echo "::error::O script deve estar em docs/ e terminar em .sql."; exit 1 ;;
+          esac
+          [ -f "$SCRIPT" ] || { echo "::error::O script '$SCRIPT' não existe no repositório."; exit 1; }
+          echo "HOST=$HOST" >> "$GITHUB_ENV"
+          echo "Vai aplicar: $SCRIPT  →  $HOMOLOGACAO_USER @ $HOST"
+
+      - name: Aplicar o script de entrega (uma transação, aborta em erro)
+        run: |
+          # ON_ERROR_STOP + --single-transaction = mesma semântica do SQL Editor:
+          # roda o arquivo inteiro numa transação e desfaz tudo se algo falhar.
+          psql "host=$HOST port=5432 dbname=postgres user=$HOMOLOGACAO_USER sslmode=require" \
+            --single-transaction -v ON_ERROR_STOP=1 -f "$SCRIPT"
+          echo "Script aplicado na homologação sem erro."

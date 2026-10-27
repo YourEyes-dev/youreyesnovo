@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/hooks/useTenant";
 import { useColaboradores } from "@/hooks/useColaboradores";
-import { useUsuarios } from "@/hooks/useUsuarios";
+import { useUsuariosDiretorio } from "@/hooks/useUsuariosDiretorio";
 import { useDepartamentos } from "@/hooks/useCadastros";
 import {
   TIPO_MANIFESTACAO_LABELS,
@@ -37,7 +37,7 @@ const TIPOS: TipoManifestacao[] = ["sugestao", "reclamacao", "denuncia", "elogio
 export function OuvidoriaRoteamentoConfig() {
   const { tenantId } = useTenant();
   const { colaboradores } = useColaboradores();
-  const { usuarios } = useUsuarios();
+  const { usuarios } = useUsuariosDiretorio();
   const { departamentos } = useDepartamentos();
   const [roteamentos, setRoteamentos] = useState<Record<string, Roteamento>>({});
   const [loading, setLoading] = useState(true);

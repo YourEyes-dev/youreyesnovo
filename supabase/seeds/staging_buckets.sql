@@ -9,6 +9,7 @@ VALUES
   ('blog-media',             'blog-media',             true,  104857600),
   ('documentos',             'documentos',             false, 52428800),
   ('empresas-logos',         'empresas-logos',         true,  NULL),
+  ('epi-evidencias',         'epi-evidencias',         false, NULL),
   ('epi-fotos',              'epi-fotos',              true,  NULL),
   ('epi-signatures',         'epi-signatures',         true,  NULL),
   ('ergonomia-evidencias',   'ergonomia-evidencias',   false, NULL),

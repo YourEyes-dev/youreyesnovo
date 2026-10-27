@@ -292,12 +292,9 @@ export function AdmissaoForm({ onSubmit, onCancel, onAutoSave, onDocumentUploadI
     if (!tenantId || cpf.length !== 11) return;
     setBuscandoCpf(true);
     try {
-      const { data } = await (supabase as any)
-        .from('usuarios_base')
-        .select('id, nome_completo, email_principal, cpf, telefone_principal, cargo_funcao, data_nascimento')
-        .eq('tenant_id', tenantId)
-        .eq('cpf', cpf)
-        .maybeSingle();
+      // Funcao do banco (so devolve para quem tem acesso amplo a dados de pessoas).
+      const { data: achados } = await (supabase.rpc as any)('usuario_por_cpf', { p_cpf: cpf });
+      const data = Array.isArray(achados) ? achados[0] : achados;
       if (data) {
         setUsuarioEncontrado(data as UsuarioEncontrado);
       } else {

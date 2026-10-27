@@ -747,4 +747,42 @@ describe("Módulo EPI - Gestão de EPIs", () => {
       expect(hasAlerts, "Sistema gera alerta preventivo sem bloqueio").to.be.true;
     });
   });
+
+  // CT-49: Editar altera o item existente (TELA-EPI-049). Nasce vermelho de
+  // propósito: o EpiForm nunca chama onSubmit, então "Salvar Alterações"
+  // cadastra um tipo e um item NOVOS e deixa o original como estava.
+  it("CT-49: Editar EPI altera o item existente e não cria outro", () => {
+    const nomeAntes = `EPI Edição ${uniqueId} A`;
+    const nomeDepois = `EPI Edição ${uniqueId} B`;
+    const ca = `${Math.floor(10000 + Math.random() * 90000)}`;
+
+    function buscarNaLista(termo: string) {
+      cy.get('input[placeholder*="Buscar por nome"]', { timeout: 10000 }).clear().type(termo, { delay: 5 });
+      cy.wait(500);
+    }
+
+    abrirFormNovoEpi();
+    preencherFormEpiCompleto({ nome: nomeAntes, ca });
+    salvarFormEpi();
+    cy.get('[role="dialog"]', { timeout: 10000 }).should("not.exist");
+
+    goToEpisTab("tab-epi-estoque");
+    buscarNaLista(ca);
+    cy.get("tbody tr").should("have.length", 1).and("contain", nomeAntes);
+
+    // Menu da linha → Editar → troca o nome → Salvar Alterações
+    cy.get("tbody tr").first().find("button").last().click({ force: true });
+    cy.contains('[role="menuitem"]', "Editar").click({ force: true });
+    cy.get('[role="dialog"]', { timeout: 10000 }).should("be.visible").within(() => {
+      cy.contains("Editar EPI").should("exist");
+      cy.get('input[placeholder*="Protetor Auricular"]').clear().type(nomeDepois, { delay: 5 });
+      cy.contains("button", "Salvar Alterações").scrollIntoView().should("not.be.disabled").click({ force: true });
+    });
+    cy.get('[role="dialog"]', { timeout: 10000 }).should("not.exist");
+    cy.wait(1500);
+
+    // Mesmo CA: continua UMA linha, e com o nome novo (não duas, não a antiga).
+    buscarNaLista(ca);
+    cy.get("tbody tr").should("have.length", 1).and("contain", nomeDepois).and("not.contain", nomeAntes);
+  });
 });

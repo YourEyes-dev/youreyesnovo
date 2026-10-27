@@ -1,0 +1,24 @@
+# Fumaça crítica — specs que rodam PRIMEIRO em toda publicação (~10 min).
+# Um por linha, caminho relativo à raiz. Linhas com # são comentário.
+# Critério: acesso, pessoas, ponto/jornada, folha/financeiro, SST e canais legais.
+# Ao documentar/criar testes de ação da Camada 0 (docs/PLANO_COBERTURA_CYPRESS.md),
+# acrescente o spec aqui. Mantenha a soma perto de 10 min (ver cypress/duracoes.json).
+cypress/e2e/autenticacao.cy.ts
+cypress/e2e/usuarios.cy.ts
+cypress/e2e/configuracoes.cy.ts
+cypress/e2e/empresa.cy.ts
+cypress/e2e/colaboradores.cy.ts
+cypress/e2e/desligamento.cy.ts
+cypress/e2e/ponto.cy.ts
+cypress/e2e/afastamentos.cy.ts
+cypress/e2e/ferias.cy.ts
+cypress/e2e/folha-pagamento.cy.ts
+cypress/e2e/decimo-terceiro.cy.ts
+cypress/e2e/financeiro.cy.ts
+cypress/e2e/documentos.cy.ts
+cypress/e2e/saude-ocupacional.cy.ts
+cypress/e2e/ouvidoria.cy.ts
+cypress/e2e/suporte.cy.ts
+cypress/e2e/pendencias.cy.ts
+cypress/e2e/perfis-tela-inicial.cy.ts
+cypress/e2e/ouvidoria-escopo.cy.ts

@@ -1,6 +1,6 @@
 -- CRITICO #1 (Ponto): liga o ADICIONAL NOTURNO ao calculo real (art. 73).
--- calcular_he_adicional_noturno_dia era orfa; agora a consolidacao a chama e ela
--- grava SO o adicional noturno no ponto_diario. HE canonica = a do saldo (espelho).
+-- calcular_he_adicional_noturno_dia era orfa; a consolidacao a chama em dias
+-- com trabalho efetivo e ela grava SO o adicional noturno. HE = a do saldo.
 -- Idempotente (CREATE OR REPLACE). Nao altera dado.
 SET lock_timeout = '10s';
 
@@ -329,11 +329,14 @@ BEGIN
                       THEN public.ponto_diario.observacao ELSE EXCLUDED.observacao END,
     updated_at = now();
 
-  -- CRITICO #1: popula o adicional noturno do dia no ponto_diario (art. 73).
-  -- A HE segue sendo a do saldo (espelho); aqui so o adicional noturno.
-  BEGIN
-    PERFORM public.calcular_he_adicional_noturno_dia(v_cid, p_data);
-  EXCEPTION WHEN OTHERS THEN NULL; -- nunca derrubar a consolidacao por causa do adicional
-  END;
+  -- CRITICO #1: popula o adicional noturno do dia (art. 73) — SO em dias com
+  -- trabalho efetivo. Feriado/abono/falta nao tem adicional, e pular evita
+  -- re-disparar gatilhos de reconsolidacao em dia neutro (PONTO-402).
+  IF COALESCE(c.o_horas, interval '0') > interval '0' THEN
+    BEGIN
+      PERFORM public.calcular_he_adicional_noturno_dia(v_cid, p_data);
+    EXCEPTION WHEN OTHERS THEN NULL; -- nunca derrubar a consolidacao
+    END;
+  END IF;
 END;
 $function$;

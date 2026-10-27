@@ -49,14 +49,14 @@ DECLARE
   v_ve_a boolean; v_ve_b boolean;
 BEGIN
   PERFORM public.qa_modo_ligar();
-  v_a := public.qa_up_usuario('PERFIL-050', 1, '11111111111', 'ativo', v_uidA);
-  v_b := public.qa_up_usuario('PERFIL-050', 2, '22222222222', 'ativo', gen_random_uuid());
+  v_a := public.qa_up_usuario('PERFIL-050', 1, '11144477735', 'ativo', v_uidA);
+  v_b := public.qa_up_usuario('PERFIL-050', 2, '52998224725', 'ativo', gen_random_uuid());
   v_perf := public.qa_up_perfil('PERFIL-050', 'Próprio Metas', 'metas', 'proprio_usuario', 'visualizar');
   PERFORM public.qa_up_vincular(v_a, NULL, v_perf);
 
   PERFORM public.qa_up_entrar(v_uidA);
-  v_ve_a := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '11111111111', 'metas');
-  v_ve_b := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '22222222222', 'metas');
+  v_ve_a := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '11144477735', 'metas');
+  v_ve_b := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '52998224725', 'metas');
   PERFORM public.qa_up_sair();
 
   RETURN public.qa_esc_resultado(
@@ -75,13 +75,13 @@ DECLARE
   v_uidA uuid := gen_random_uuid(); v_a uuid; v_perf uuid; v_ve_b boolean;
 BEGIN
   PERFORM public.qa_modo_ligar();
-  v_a := public.qa_up_usuario('PERFIL-051', 1, '11111111111', 'ativo', v_uidA);
-  PERFORM public.qa_up_usuario('PERFIL-051', 2, '22222222222', 'ativo', gen_random_uuid());
+  v_a := public.qa_up_usuario('PERFIL-051', 1, '11144477735', 'ativo', v_uidA);
+  PERFORM public.qa_up_usuario('PERFIL-051', 2, '52998224725', 'ativo', gen_random_uuid());
   v_perf := public.qa_up_perfil('PERFIL-051', 'Empresa Metas', 'metas', 'empresa_inteira', 'visualizar');
   PERFORM public.qa_up_vincular(v_a, NULL, v_perf);
 
   PERFORM public.qa_up_entrar(v_uidA);
-  v_ve_b := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '22222222222', 'metas');
+  v_ve_b := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '52998224725', 'metas');
   PERFORM public.qa_up_sair();
 
   RETURN public.qa_esc_resultado(
@@ -100,13 +100,13 @@ DECLARE
   v_uidA uuid := gen_random_uuid(); v_a uuid; v_perf uuid; v_ve_a boolean;
 BEGIN
   PERFORM public.qa_modo_ligar();
-  v_a := public.qa_up_usuario('PERFIL-052', 1, '11111111111', 'ativo', v_uidA);
+  v_a := public.qa_up_usuario('PERFIL-052', 1, '11144477735', 'ativo', v_uidA);
   -- perfil amplo, mas em OUTRO módulo (ferias), não em metas
   v_perf := public.qa_up_perfil('PERFIL-052', 'Ferias Ampla', 'ferias', 'empresa_inteira', 'visualizar');
   PERFORM public.qa_up_vincular(v_a, NULL, v_perf);
 
   PERFORM public.qa_up_entrar(v_uidA);
-  v_ve_a := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '11111111111', 'metas');
+  v_ve_a := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '11144477735', 'metas');
   PERFORM public.qa_up_sair();
 
   RETURN public.qa_esc_resultado(
@@ -126,14 +126,14 @@ DECLARE
   v_ve_a boolean; v_ve_b boolean;
 BEGIN
   PERFORM public.qa_modo_ligar();
-  v_a := public.qa_up_usuario('PERFIL-053', 1, '11111111111', 'ativo', v_uidA);
-  PERFORM public.qa_up_usuario('PERFIL-053', 2, '22222222222', 'ativo', gen_random_uuid());
+  v_a := public.qa_up_usuario('PERFIL-053', 1, '11144477735', 'ativo', v_uidA);
+  PERFORM public.qa_up_usuario('PERFIL-053', 2, '52998224725', 'ativo', gen_random_uuid());
   v_perf := public.qa_up_perfil('PERFIL-053', 'Unidade Metas', 'metas', 'unidade', 'visualizar');
   PERFORM public.qa_up_vincular(v_a, NULL, v_perf);
 
   PERFORM public.qa_up_entrar(v_uidA);
-  v_ve_a := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '11111111111', 'metas');
-  v_ve_b := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '22222222222', 'metas');
+  v_ve_a := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '11144477735', 'metas');
+  v_ve_b := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '52998224725', 'metas');
   PERFORM public.qa_up_sair();
 
   RETURN public.qa_esc_resultado(
@@ -154,17 +154,17 @@ DECLARE
 BEGIN
   PERFORM public.qa_modo_ligar();
   -- A é o gestor logado
-  v_a := public.qa_up_usuario('PERFIL-054', 1, '11111111111', 'ativo', v_uidA);
+  v_a := public.qa_up_usuario('PERFIL-054', 1, '11144477735', 'ativo', v_uidA);
   -- admissões: B subordinado de A (gestor_cpf=A); C não-subordinado
-  PERFORM public.qa_esc_admissao('11111111111', 'Gestor A', NULL, 'RH');
-  PERFORM public.qa_esc_admissao('22222222222', 'Subordinado B', '11111111111', 'RH');
-  PERFORM public.qa_esc_admissao('33333333333', 'Outro C', '99999999999', 'RH');
+  PERFORM public.qa_esc_admissao('11144477735', 'Gestor A', NULL, 'RH');
+  PERFORM public.qa_esc_admissao('52998224725', 'Subordinado B', '11144477735', 'RH');
+  PERFORM public.qa_esc_admissao('39053344705', 'Outro C', '16899556278', 'RH');
   v_perf := public.qa_up_perfil('PERFIL-054', 'Subord Metas', 'metas', 'subordinados_diretos', 'visualizar');
   PERFORM public.qa_up_vincular(v_a, NULL, v_perf);
 
   PERFORM public.qa_up_entrar(v_uidA);
-  v_ve_sub := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '22222222222', 'metas');
-  v_ve_nao := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '33333333333', 'metas');
+  v_ve_sub := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '52998224725', 'metas');
+  v_ve_nao := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '39053344705', 'metas');
   PERFORM public.qa_up_sair();
 
   RETURN public.qa_esc_resultado(
@@ -184,16 +184,16 @@ DECLARE
   v_ve_mesmo boolean; v_ve_outro boolean;
 BEGIN
   PERFORM public.qa_modo_ligar();
-  v_a := public.qa_up_usuario('PERFIL-055', 1, '11111111111', 'ativo', v_uidA);
-  PERFORM public.qa_esc_admissao('11111111111', 'Pessoa A', NULL, 'RH');
-  PERFORM public.qa_esc_admissao('22222222222', 'Pessoa B', NULL, 'RH');  -- mesmo depto
-  PERFORM public.qa_esc_admissao('33333333333', 'Pessoa C', NULL, 'TI');  -- outro depto
+  v_a := public.qa_up_usuario('PERFIL-055', 1, '11144477735', 'ativo', v_uidA);
+  PERFORM public.qa_esc_admissao('11144477735', 'Pessoa A', NULL, 'RH');
+  PERFORM public.qa_esc_admissao('52998224725', 'Pessoa B', NULL, 'RH');  -- mesmo depto
+  PERFORM public.qa_esc_admissao('39053344705', 'Pessoa C', NULL, 'TI');  -- outro depto
   v_perf := public.qa_up_perfil('PERFIL-055', 'Setor Metas', 'metas', 'setor', 'visualizar');
   PERFORM public.qa_up_vincular(v_a, NULL, v_perf);
 
   PERFORM public.qa_up_entrar(v_uidA);
-  v_ve_mesmo := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '22222222222', 'metas');
-  v_ve_outro := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '33333333333', 'metas');
+  v_ve_mesmo := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '52998224725', 'metas');
+  v_ve_outro := public.perfil_ve_cpf(public.qa_sandbox_tenant_id(), '39053344705', 'metas');
   PERFORM public.qa_up_sair();
 
   RETURN public.qa_esc_resultado(

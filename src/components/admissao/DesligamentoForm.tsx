@@ -325,16 +325,27 @@ export const DesligamentoForm = ({ open, onOpenChange, admissao, onConfirmar }: 
     return true;
   }, [estabilidades, form.motivo_desligamento]);
 
-  // Alertas
-  const alertas = useMemo(() => {
+  // Bloqueios: SÓ o que de fato impede concluir (espelha o `disabled` do botão).
+  // Caixa vermelha = erro. Não misturar com recado, senão o RH acha que travou.
+  const bloqueios = useMemo(() => {
     const items: string[] = [];
-    // Erros de data (RNDES02)
+    // Erros de data (RNDES02) travam a confirmação
     items.push(...errosData);
-    // Estabilidades (RNDES25)
-    items.push(...estabilidades);
-    // ASO
+    // Estabilidade ativa trava (exceto justa causa / falecimento)
+    if (bloqueioEstabilidade) {
+      items.push("Desligamento bloqueado por estabilidade ativa — apenas justa causa ou falecimento permitidos.");
+    }
+    return items;
+  }, [errosData, bloqueioEstabilidade]);
+
+  // Avisos: recados de compliance que NÃO impedem a conclusão. Caixa âmbar.
+  const avisos = useMemo(() => {
+    const items: string[] = [];
+    // Contexto da estabilidade (quando não trava, ex.: justa causa)
+    if (!bloqueioEstabilidade) items.push(...estabilidades);
+    // ASO demissional (RNDES16): recomendado pela NR-7, mas pode faltar
     if (asoObrigatorioNaoPreenchido) {
-      items.push("⚠️ ASO demissional não informado — exame recomendado pela NR-7 (item 7.5.11). O desligamento pode ser concluído; registre a pendência nas observações.");
+      items.push("ASO demissional não informado — exame recomendado pela NR-7 (item 7.5.11). O desligamento pode ser concluído; registre a pendência nas observações.");
     }
     if (usarAsoAnterior && !asoValidacao.asoValido) {
       items.push(`ASO anterior fora do prazo de validade (${asoValidacao.limiteValidade} dias para GR ${asoValidacao.grauRisco ?? "desconhecido"}).`);
@@ -342,17 +353,14 @@ export const DesligamentoForm = ({ open, onOpenChange, admissao, onConfirmar }: 
     if (admissao.data_admissao) {
       const anos = differenceInYears(new Date(), new Date(admissao.data_admissao));
       if (anos >= 1 && !form.data_homologacao && form.motivo_desligamento !== "pedido_demissao") {
-        items.push("Homologação pode ser necessária conforme convenção coletiva");
+        items.push("Homologação pode ser necessária conforme convenção coletiva.");
       }
     }
     if (form.motivo_desligamento === "com_justa_causa") {
-      items.push("Justa causa requer documentação comprobatória robusta");
-    }
-    if (bloqueioEstabilidade) {
-      items.push("🚫 Desligamento bloqueado por estabilidade ativa — apenas justa causa ou falecimento permitidos");
+      items.push("Justa causa requer documentação comprobatória robusta.");
     }
     return items;
-  }, [form, admissao, usarAsoAnterior, asoValidacao]);
+  }, [form, admissao, estabilidades, bloqueioEstabilidade, asoObrigatorioNaoPreenchido, usarAsoAnterior, asoValidacao]);
 
   // Upload ASO para storage e vincular à pasta do colaborador
   const uploadAsoFile = async () => {
@@ -644,12 +652,24 @@ export const DesligamentoForm = ({ open, onOpenChange, admissao, onConfirmar }: 
           </DialogDescription>
         </DialogHeader>
 
-        {alertas.length > 0 && (
+        {bloqueios.length > 0 && (
           <Alert variant="destructive" className="border-destructive/50 bg-destructive/5">
             <AlertTriangle className="h-4 w-4 text-destructive" />
             <AlertDescription className="text-xs space-y-1">
-              {alertas.map((a, i) => (
-                <p key={i}>⚠️ {a}</p>
+              {bloqueios.map((a, i) => (
+                <p key={i}>🚫 {a}</p>
+              ))}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {avisos.length > 0 && (
+          <Alert className="border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400 [&>svg]:text-amber-500">
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-xs space-y-1 text-amber-700 dark:text-amber-400">
+              <p className="font-medium">Atenção (não impede concluir o desligamento):</p>
+              {avisos.map((a, i) => (
+                <p key={i}>• {a}</p>
               ))}
             </AlertDescription>
           </Alert>

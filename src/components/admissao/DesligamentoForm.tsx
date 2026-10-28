@@ -334,7 +334,7 @@ export const DesligamentoForm = ({ open, onOpenChange, admissao, onConfirmar }: 
     items.push(...estabilidades);
     // ASO
     if (asoObrigatorioNaoPreenchido) {
-      items.push("🚫 ASO demissional obrigatório não preenchido — confirmação bloqueada (NR-7, RNDES16)");
+      items.push("⚠️ ASO demissional não informado — exame recomendado pela NR-7 (item 7.5.11). O desligamento pode ser concluído; registre a pendência nas observações.");
     }
     if (usarAsoAnterior && !asoValidacao.asoValido) {
       items.push(`ASO anterior fora do prazo de validade (${asoValidacao.limiteValidade} dias para GR ${asoValidacao.grauRisco ?? "desconhecido"}).`);
@@ -421,12 +421,9 @@ export const DesligamentoForm = ({ open, onOpenChange, admissao, onConfirmar }: 
 
   const handleSubmit = async () => {
     if (!form.data_desligamento || !form.motivo_desligamento) return;
-    // RNDES19 – Validar chave FGTS obrigatória
-    const precisaChaveFgts = ["sem_justa_causa", "acordo_mutuo", "termino_contrato", "rescisao_indireta"].includes(form.motivo_desligamento);
-    if (precisaChaveFgts && !form.chave_conectividade?.trim()) {
-      toast.error("Chave de Conectividade Social (FGTS) é obrigatória para este tipo de rescisão.");
-      return;
-    }
+    // RNDES19 (revisado 2026): com o FGTS Digital (2024) a Chave de Conectividade
+    // Social deixou de ser gerada — as rescisões têm só a guia GFD. Campo opcional;
+    // não bloqueia a conclusão do desligamento.
 
     setSubmitting(true);
     try {
@@ -954,13 +951,12 @@ export const DesligamentoForm = ({ open, onOpenChange, admissao, onConfirmar }: 
           {/* Chave FGTS e Observações */}
           <div className="space-y-3">
             <div>
-              <Label>
-                Chave de Conectividade Social (FGTS)
-                {["sem_justa_causa", "acordo_mutuo", "termino_contrato", "rescisao_indireta"].includes(form.motivo_desligamento) && (
-                  <span className="text-destructive ml-1">*</span>
-                )}
-              </Label>
-              <Input value={form.chave_conectividade} onChange={e => set("chave_conectividade", e.target.value)} />
+              <Label>Chave de Conectividade Social (FGTS) ou guia GFD</Label>
+              <Input
+                value={form.chave_conectividade}
+                onChange={e => set("chave_conectividade", e.target.value)}
+                placeholder="Opcional — chave (legado) ou nº da guia GFD do FGTS Digital"
+              />
             </div>
             <div>
               <Label>Observações</Label>
@@ -987,7 +983,6 @@ export const DesligamentoForm = ({ open, onOpenChange, admissao, onConfirmar }: 
                 submitting ||
                 uploadingAso ||
                 errosData.length > 0 ||
-                asoObrigatorioNaoPreenchido ||
                 bloqueioEstabilidade
               }
               className="flex-1"

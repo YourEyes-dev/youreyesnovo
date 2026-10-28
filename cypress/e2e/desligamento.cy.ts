@@ -171,6 +171,20 @@ describe("Módulo Desligamento", () => {
     cy.get('[data-testid="btn-confirmar-desligamento"]').should("be.disabled");
   });
 
+  // DESL-067: a Chave de Conectividade (FGTS) e o ASO demissional deixaram de
+  // TRAVAR a conclusão (FGTS Digital/2024 extinguiu a chave; o exame pode faltar
+  // quando o funcionário não comparece). Com data e motivo válidos, o botão NÃO
+  // fica desabilitado por falta desses dois. Zero mutação: só verifica o estado.
+  it("DESL-067: Chave FGTS e ASO demissional não bloqueiam a conclusão", () => {
+    abrirDesligamento();
+    selecionarMotivo("Dispensa sem justa causa");
+    const hoje = new Date().toISOString().split("T")[0];
+    cy.get('[data-testid="input-data-desligamento"]').clear().type(hoje);
+    // Sem preencher a chave de conectividade nem o ASO demissional, o botão de
+    // confirmar deve ficar HABILITADO (os campos viraram aviso, não bloqueio).
+    cy.get('[data-testid="btn-confirmar-desligamento"]').should("not.be.disabled");
+  });
+
   // DESL-021: a lista de motivos cobre as hipóteses legais de extinção do contrato.
   it("DESL-021: Motivos disponíveis cobrem as hipóteses legais de extinção", () => {
     abrirDesligamento();

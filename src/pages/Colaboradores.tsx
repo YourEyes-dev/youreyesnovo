@@ -23,6 +23,7 @@ import {
   List,
   FolderOpen,
   UserPlus,
+  Pencil,
   AlertCircle,
   Share2,
   Copy,
@@ -1483,9 +1484,18 @@ function AdmissoesTab() {
 function DesligadosTab() {
   const { tenantId } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { temPermissao, isOwner } = usePerfilPermissions();
+  const canEditColaborador = isOwner || temPermissao("colaboradores", "editar");
+
+  // Edição de desligado: reaproveita o mesmo formulário dos ativos. Permitir
+  // ajustar dados cadastrais de quem já saiu (correções acontecem após o
+  // desligamento); o status 'desligado' não é alterado por aqui.
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingColaborador, setEditingColaborador] = useState<ColaboradorEditData | null>(null);
 
   const { empresaAtivaId } = useEmpresaAtiva();
-  const { data: desligados = [], isLoading } = useQuery({
+  const { data: desligados = [], isLoading, refetch } = useQuery({
     queryKey: ["colaboradores-desligados", tenantId, empresaAtivaId],
     queryFn: async (): Promise<ColaboradorExtendido[]> => {
       if (!tenantId) return [];
@@ -1505,6 +1515,52 @@ function DesligadosTab() {
     },
     enabled: !!tenantId,
   });
+
+  const handleEditDesligado = async (colab: ColaboradorExtendido) => {
+    if (!canEditColaborador) {
+      toast.error("Você não tem permissão para editar colaboradores.");
+      return;
+    }
+    const { data: full, error: fullErr } = await supabase
+      .from("admissoes")
+      .select("id, nome_completo, cpf, email, celular, tipo_contrato, cargo, cargo_id, departamento, filial, centro_custo, gestor_imediato, gestor_cpf, data_admissao, matricula_esocial, cbo, foto_url, bate_ponto, art62_inciso, art62_documento, teletrabalho_modalidade")
+      .eq("id", colab.id)
+      .maybeSingle();
+    if (fullErr) {
+      toast.error("Não foi possível carregar os dados completos do colaborador.");
+      return;
+    }
+    const src: any = full || colab;
+    setEditingColaborador({
+      id: colab.id,
+      nome_completo: src.nome_completo ?? colab.nome_completo,
+      cpf: src.cpf ?? colab.cpf,
+      email: src.email ?? colab.email,
+      celular: src.celular ?? colab.celular,
+      tipo_contrato: src.tipo_contrato ?? colab.tipo_contrato,
+      cargo: src.cargo ?? colab.cargo,
+      cargo_id: src.cargo_id ?? null,
+      departamento: src.departamento ?? colab.departamento,
+      filial: src.filial ?? colab.filial,
+      centro_custo: src.centro_custo ?? null,
+      gestor_imediato: src.gestor_imediato ?? null,
+      gestor_cpf: src.gestor_cpf ?? null,
+      data_admissao: src.data_admissao ?? colab.data_admissao,
+      matricula_esocial: src.matricula_esocial ?? null,
+      cbo: src.cbo ?? null,
+      foto_url: src.foto_url ?? colab.foto_url,
+      bate_ponto: src.bate_ponto,
+      art62_inciso: src.art62_inciso,
+      art62_documento: src.art62_documento,
+      teletrabalho_modalidade: src.teletrabalho_modalidade,
+    });
+    setShowEditForm(true);
+  };
+
+  const handleCloseEditForm = (open: boolean) => {
+    setShowEditForm(open);
+    if (!open) setEditingColaborador(null);
+  };
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -1554,14 +1610,31 @@ function DesligadosTab() {
                 <Badge className={cn("text-xs", statusStyles.desligado)}>Desligado</Badge>
               </TableCell>
               <TableCell>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/documentos?colaborador=${colab.id}`)}>
-                  <FolderOpen className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1 justify-end">
+                  {canEditColaborador && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar cadastro" onClick={() => handleEditDesligado(colab)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Abrir documentos" onClick={() => navigate(`/documentos?colaborador=${colab.id}`)}>
+                    <FolderOpen className="w-4 h-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      <ColaboradorForm
+        open={showEditForm}
+        onOpenChange={handleCloseEditForm}
+        onSuccess={() => {
+          refetch();
+          queryClient.invalidateQueries({ queryKey: ["colaboradores-desligados"] });
+        }}
+        colaborador={editingColaborador}
+      />
     </div>
   );
 }

@@ -43,6 +43,7 @@ export function PontoCompensacaoFaltaTab() {
   const {
     useCompensacoes,
     useFaltasDaCompetencia,
+    useAusenciasParciais,
     verificarCompensavel,
     registrar,
     autorizar,
@@ -53,6 +54,7 @@ export function PontoCompensacaoFaltaTab() {
 
   const { data: compensacoes = [], isLoading: loadingComp } = useCompensacoes(competencia);
   const { data: faltas = [], isLoading: loadingFaltas } = useFaltasDaCompetencia(competencia);
+  const { data: parciais = [], isLoading: loadingParciais } = useAusenciasParciais(competencia);
 
   // Mapa CPF -> nome, a partir das faltas do mês (para exibir nome nas compensações).
   const nomePorCpf = useMemo(() => {
@@ -257,6 +259,53 @@ export function PontoCompensacaoFaltaTab() {
                   </TableRow>
                 );
               })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">
+            Ausências de horas{" "}
+            <span className="text-xs font-normal text-muted-foreground">(atraso / saída antecipada)</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Alert className="m-3 mb-0">
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Dias trabalhados com déficit de horas. Quem tem banco de horas vigente já teve esses minutos{" "}
+              <b>debitados automaticamente no banco</b> — não é preciso compensar de novo aqui. Sem banco
+              vigente, o déficit vai para a folha.
+            </AlertDescription>
+          </Alert>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Colaborador</TableHead>
+                <TableHead className="text-center">Dia</TableHead>
+                <TableHead className="text-center">Horas</TableHead>
+                <TableHead className="text-center">Destino</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loadingParciais ? (
+                <TableRow><TableCell colSpan={4} className="text-center py-8">Carregando...</TableCell></TableRow>
+              ) : parciais.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhuma ausência de horas nesta competência.</TableCell></TableRow>
+              ) : parciais.map((p: any, i: number) => (
+                <TableRow key={`${p.colaborador_cpf}-${p.data}-${i}`}>
+                  <TableCell className="font-medium">{p.colaborador_nome || onlyDigits(p.colaborador_cpf)}</TableCell>
+                  <TableCell className="text-center text-sm">{format(new Date(p.data + "T00:00:00"), "dd/MM/yyyy")}</TableCell>
+                  <TableCell className="text-center text-sm">{formatarHoraMinuto(p.minutos_deficit)}</TableCell>
+                  <TableCell className="text-center">
+                    {p.no_banco
+                      ? <Badge variant="secondary">Banco de horas</Badge>
+                      : <Badge variant="outline">Folha</Badge>}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>

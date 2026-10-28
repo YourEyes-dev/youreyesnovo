@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -145,6 +146,16 @@ const FeriasCard = ({ item, index, onAprovar, onRecusar, onGerarAviso, onGerarRe
             <config.icon className="w-3 h-3 mr-1" />
             {config.label}
           </Badge>
+          {item.justificativa_excecao && (
+            <Tooltip>
+              <TooltipTrigger>
+                <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">
+                  Exceção art. 135
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs text-xs whitespace-pre-wrap">{item.justificativa_excecao}</TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </div>
 
@@ -281,6 +292,8 @@ const Ferias = () => {
     abonoPecuniario: false, diasAbono: 10, salarioBase: 0,
   });
   const [linkAssinaturaDialog, setLinkAssinaturaDialog] = useState<{ url: string; colaborador: string } | null>(null);
+  const [excecaoDialog, setExcecaoDialog] = useState<{ item: FeriasSolicitacao; dias: number } | null>(null);
+  const [justificativaExcecao, setJustificativaExcecao] = useState("");
 
   // Férias é direito CLT — exclui PJ/Pró-labore/Terceiros.
   const { colaboradores, isLoading: loadingColabs } = useColaboradores({ excluirPJ: true });
@@ -351,7 +364,30 @@ const Ferias = () => {
     if (sobrepostos.length > 0) {
       toast.warning(`⚠ Sobreposição no setor "${item.departamento}": ${sobrepostos.join(", ")}`, { duration: 6000 });
     }
+    // Fora do prazo de 30 dias (art. 135 CLT): a trava do banco só deixa aprovar
+    // com uma justificativa. Em vez de bater na trava, abrimos a via de exceção
+    // auditada (justificativa obrigatória + trilha de quem aprovou).
+    const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+    const inicio0 = new Date(item.data_inicio + "T00:00:00");
+    const diasAntecedencia = Math.floor((inicio0.getTime() - hoje0.getTime()) / 86400000);
+    if (diasAntecedencia < 30) {
+      setJustificativaExcecao("");
+      setExcecaoDialog({ item, dias: diasAntecedencia });
+      return;
+    }
     aprovar.mutate(id);
+  };
+
+  const confirmarAprovacaoExcecao = async () => {
+    if (!excecaoDialog) return;
+    const txt = justificativaExcecao.trim();
+    if (txt.length < 10) {
+      toast.error("Descreva a justificativa da exceção (mín. 10 caracteres).");
+      return;
+    }
+    await aprovar.mutateAsync({ id: excecaoDialog.item.id, justificativaExcecao: txt });
+    setExcecaoDialog(null);
+    setJustificativaExcecao("");
   };
 
   // ========== PUBLICAR NO FEED ==========
@@ -1026,6 +1062,44 @@ const Ferias = () => {
               <Send className="w-4 h-4 mr-2" /> Enviar via WhatsApp
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Via de exceção (art. 135): aprovar fora do prazo de 30 dias com justificativa auditável */}
+      <Dialog open={!!excecaoDialog} onOpenChange={(open) => !open && setExcecaoDialog(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Aprovar fora do prazo de 30 dias</DialogTitle>
+            <DialogDescription>
+              {excecaoDialog && (
+                <>
+                  Esta solicitação começa em {new Date(excecaoDialog.item.data_inicio + "T12:00:00").toLocaleDateString("pt-BR")}
+                  {" ("}
+                  {excecaoDialog.dias < 0
+                    ? `${Math.abs(excecaoDialog.dias)} dia(s) atrás`
+                    : `em ${excecaoDialog.dias} dia(s)`}
+                  {"). "}
+                  O art. 135 da CLT pede aviso com 30 dias de antecedência. Você pode aprovar como <b>exceção</b>,
+                  registrando o motivo — ele fica gravado como trilha. Nunca altere as datas para "encaixar" no prazo.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label className="text-xs">Justificativa da exceção (obrigatória)</Label>
+            <Textarea
+              value={justificativaExcecao}
+              onChange={(e) => setJustificativaExcecao(e.target.value)}
+              placeholder="Ex.: Férias já gozadas no período; aprovação retroativa de fato consumado. Ciência do colaborador colhida em papel no retorno."
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcecaoDialog(null)}>Cancelar</Button>
+            <Button className="gradient-primary" onClick={confirmarAprovacaoExcecao} disabled={aprovar.isPending}>
+              Aprovar com exceção
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

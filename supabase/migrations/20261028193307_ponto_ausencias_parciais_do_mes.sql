@@ -118,14 +118,7 @@ AS $function$
 $function$;
 
 COMMENT ON FUNCTION public.ponto_ausencias_parciais_do_mes(uuid, uuid, text) IS
-  'Somente leitura (visibilidade da aba Comp. Faltas): ausências PARCIAIS do mês '
-  || '(dias TRABALHADOS com déficit — atraso/saída antecipada), por colaborador/dia. '
-  || 'minutos_deficit = valor positivo devedor. no_banco = true quando há regime de banco '
-  || 'vigente (o déficit foi debitado automaticamente no banco); false = foi para a folha '
-  || '(CLT art. 59 §§2/5). Reúsa ponto_saldo_dias_competencia (déficit com tolerância), '
-  || 'ponto_jornada_do_dia + ponto_vinculo_cobre_periodo (escala/vínculo, iguais a '
-  || 'ponto_faltas_do_mes) e ponto_banco_regime_vigente (a mesma checagem do banco oficial). '
-  || 'Exclui dia cheio (falta), justificado, incompleto, protegido e o dia de equalização.';
+  'Somente leitura (visibilidade da aba Comp. Faltas): ausencias PARCIAIS do mes (dias TRABALHADOS com deficit, atraso/saida antecipada), por colaborador/dia. minutos_deficit = valor positivo devedor. no_banco = true quando ha regime de banco vigente (o deficit foi debitado automaticamente no banco); false = foi para a folha (CLT art. 59). Reusa ponto_saldo_dias_competencia (deficit com tolerancia), ponto_jornada_do_dia + ponto_vinculo_cobre_periodo (escala/vinculo, iguais a ponto_faltas_do_mes) e ponto_banco_regime_vigente (a mesma checagem do banco oficial). Exclui dia cheio (falta), justificado, incompleto, protegido e o dia de equalizacao.';
 
 REVOKE ALL ON FUNCTION public.ponto_ausencias_parciais_do_mes(uuid, uuid, text) FROM anon;
 GRANT EXECUTE ON FUNCTION public.ponto_ausencias_parciais_do_mes(uuid, uuid, text) TO authenticated;

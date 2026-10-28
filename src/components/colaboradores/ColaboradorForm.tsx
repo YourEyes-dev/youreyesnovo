@@ -109,14 +109,30 @@ export interface ColaboradorEditData {
   teletrabalho_modalidade?: string | null;
 }
 
+export interface RecontratarData {
+  /** Dados da pessoa (do vínculo anterior) para pré-preencher o novo cadastro. */
+  pessoa: ColaboradorEditData;
+  /** Data do desligamento anterior (para o alerta dos 90 dias). */
+  dataDesligamento: string | null;
+  /** Motivo do desligamento anterior (código). */
+  motivoDesligamento: string | null;
+}
+
 interface ColaboradorFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   colaborador?: ColaboradorEditData | null;
+  /**
+   * Recontratação: abre em modo NOVO (INSERT = novo vínculo), pré-preenchido com
+   * os dados da pessoa, mas com data de admissão e matrícula novas. O vínculo
+   * anterior (desligado) NÃO é tocado. É um novo contrato, como a lei e o
+   * eSocial exigem (novo S-2200, nova matrícula) — nunca reativar o anterior.
+   */
+  recontratarDe?: RecontratarData | null;
 }
 
-export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: ColaboradorFormProps) {
+export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador, recontratarDe }: ColaboradorFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -128,6 +144,29 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
   const { empresaAtivaId } = useEmpresaAtiva();
 
   const isEditMode = !!colaborador;
+  // Recontratação só vale como "novo" (nunca em cima de uma edição existente).
+  const isRecontratar = !!recontratarDe && !colaborador;
+
+  // Alertas de compliance da recontratação (90 dias / seguro-desemprego).
+  const avisosRecontratacao = useMemo(() => {
+    if (!recontratarDe?.dataDesligamento) return [] as string[];
+    const ms = Date.now() - new Date(recontratarDe.dataDesligamento).getTime();
+    const dias = Math.floor(ms / 86400000);
+    const motivo = recontratarDe.motivoDesligamento || "";
+    const geraSeguro = motivo === "sem_justa_causa" || motivo === "rescisao_indireta";
+    const avisos: string[] = [];
+    if (dias >= 0 && dias < 90 && (geraSeguro || motivo === "acordo_mutuo")) {
+      avisos.push(
+        `Passaram-se apenas ${dias} dia(s) desde o desligamento anterior — faltam ${90 - dias} para completar 90 dias. Recontratar antes de 90 dias de uma dispensa sem justa causa pode ser presumido como fraude ao FGTS/seguro-desemprego (Portaria MTb 384/92) e levar a Justiça do Trabalho a reconhecer unicidade contratual.`,
+      );
+    }
+    if (geraSeguro) {
+      avisos.push(
+        "Se a pessoa está recebendo seguro-desemprego, a recontratação cancela o benefício, e parcelas recebidas após a admissão podem ter de ser devolvidas.",
+      );
+    }
+    return avisos;
+  }, [recontratarDe]);
 
   const departamentosOptions = departamentos.filter(
     (d) => typeof d?.nome === "string" && d.nome.trim().length > 0,
@@ -188,6 +227,32 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
         art62_documento: colaborador.art62_documento || "",
         teletrabalho_modalidade: colaborador.teletrabalho_modalidade || "nao_se_aplica",
       });
+    } else if (open && recontratarDe) {
+      // Recontratação: reaproveita os dados da pessoa, mas com data de admissão
+      // de hoje e matrícula em branco (novo vínculo = nova matrícula no eSocial).
+      const p = recontratarDe.pessoa;
+      form.reset({
+        nome_completo: p.nome_completo || "",
+        cpf: p.cpf || "",
+        email: p.email || "",
+        celular: p.celular || "",
+        tipo_contrato: p.tipo_contrato || "clt",
+        cargo: p.cargo || "",
+        cargo_id: p.cargo_id ?? null,
+        departamento: p.departamento || "",
+        estabelecimento: p.filial || "",
+        centro_custo: p.centro_custo || "",
+        gestor_imediato: p.gestor_imediato || "",
+        gestor_cpf: p.gestor_cpf ?? null,
+        data_admissao: new Date().toISOString().split("T")[0],
+        matricula_esocial: "",
+        cbo: p.cbo || "",
+        foto_url: p.foto_url || "",
+        bate_ponto: p.bate_ponto !== false,
+        art62_inciso: p.art62_inciso || "nenhum",
+        art62_documento: p.art62_documento || "",
+        teletrabalho_modalidade: p.teletrabalho_modalidade || "nao_se_aplica",
+      });
     } else if (open && !colaborador) {
       form.reset({
         nome_completo: "",
@@ -211,7 +276,7 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
       teletrabalho_modalidade: "nao_se_aplica",
       });
     }
-  }, [open, colaborador, form]);
+  }, [open, colaborador, recontratarDe, form]);
 
   const handleUploadPhoto = async (file: File) => {
     if (!tenantId) return;
@@ -395,11 +460,13 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
         {/* Header fixo */}
         <div className="px-6 pt-5 pb-4 border-b shrink-0">
           <DialogHeader>
-            <DialogTitle>{isEditMode ? "Editar Colaborador" : "Novo Colaborador"}</DialogTitle>
+            <DialogTitle>{isEditMode ? "Editar Colaborador" : isRecontratar ? "Recontratar Colaborador" : "Novo Colaborador"}</DialogTitle>
             <DialogDescription className="text-sm">
               {isEditMode
                 ? "Atualize os dados do colaborador."
-                : "Preencha os dados para cadastrar um novo colaborador."}
+                : isRecontratar
+                  ? "Novo vínculo da mesma pessoa. Os dados foram reaproveitados; confira o cargo, o salário e a data. Gera uma nova matrícula; o desligamento anterior é preservado."
+                  : "Preencha os dados para cadastrar um novo colaborador."}
             </DialogDescription>
           </DialogHeader>
           <div className="mt-3">
@@ -411,6 +478,19 @@ export function ColaboradorForm({ open, onOpenChange, onSuccess, colaborador }: 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+
+              {/* Alerta de compliance da recontratação (90 dias / seguro-desemprego) */}
+              {isRecontratar && avisosRecontratacao.length > 0 && (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1.5">
+                  <div className="flex items-center gap-2 font-medium">
+                    <ShieldAlert className="h-4 w-4 shrink-0" />
+                    Atenção à recontratação (não impede cadastrar)
+                  </div>
+                  {avisosRecontratacao.map((a, i) => (
+                    <p key={i} className="pl-6">• {a}</p>
+                  ))}
+                </div>
+              )}
 
               {/* Foto */}
               <div className="flex flex-col items-center justify-center space-y-3 pb-4">

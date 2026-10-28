@@ -23,6 +23,9 @@ import {
   List,
   FolderOpen,
   UserPlus,
+  Pencil,
+  History,
+  RefreshCw,
   AlertCircle,
   Share2,
   Copy,
@@ -51,6 +54,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -65,7 +69,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { ColaboradorForm, ColaboradorEditData } from "@/components/colaboradores/ColaboradorForm";
+import { ColaboradorForm, ColaboradorEditData, RecontratarData } from "@/components/colaboradores/ColaboradorForm";
 import { ImportPlanilhaModal } from "@/components/import/ImportPlanilhaModal";
 import type { ResultadoImportacao } from "@/hooks/useImportacaoPlanilha";
 import { DesligamentoForm } from "@/components/admissao/DesligamentoForm";
@@ -130,6 +134,8 @@ interface ColaboradorExtendido {
   onboarding_token: string | null;
   onboarding_status: string | null;
   foto_url: string | null;
+  data_desligamento?: string | null;
+  motivo_desligamento?: string | null;
 }
 
 function ColaboradorAvatar({ fotoUrl, nome }: { fotoUrl: string | null; nome: string }) {
@@ -1480,18 +1486,120 @@ function AdmissoesTab() {
 }
 
 // ========== Desligados Tab Component ==========
+const MOTIVO_DESLIGAMENTO_LABEL: Record<string, string> = {
+  sem_justa_causa: "Dispensa sem justa causa",
+  com_justa_causa: "Dispensa com justa causa",
+  pedido_demissao: "Pedido de demissão",
+  acordo_mutuo: "Acordo mútuo (art. 484-A)",
+  termino_contrato: "Término de contrato",
+  aposentadoria: "Aposentadoria",
+  falecimento: "Falecimento",
+  rescisao_indireta: "Rescisão indireta",
+  culpa_reciproca: "Culpa recíproca",
+};
+
+interface VinculoRow {
+  id: string;
+  cargo: string;
+  data_admissao: string | null;
+  data_desligamento: string | null;
+  status: string;
+  motivo_desligamento: string | null;
+}
+
+// Linha do tempo dos vínculos de uma pessoa (mesmo CPF): cada período de
+// trabalho com cargo, datas e motivo de saída. Uma PESSOA, N VÍNCULOS —
+// recontratar acrescenta um vínculo, nunca apaga o anterior.
+function HistoricoVinculosDialog({ pessoa, onClose }: { pessoa: { cpf: string; nome: string } | null; onClose: () => void }) {
+  const { tenantId } = useAuth();
+  const { empresaAtivaId } = useEmpresaAtiva();
+  const { data: vinculos = [], isLoading } = useQuery({
+    queryKey: ["historico-vinculos", tenantId, empresaAtivaId, pessoa?.cpf],
+    queryFn: async (): Promise<VinculoRow[]> => {
+      if (!tenantId || !pessoa) return [];
+      let q = supabase
+        .from("admissoes")
+        .select("id, cargo, data_admissao, data_desligamento, status, motivo_desligamento")
+        .eq("tenant_id", tenantId)
+        .eq("cpf", pessoa.cpf);
+      if (empresaAtivaId) q = q.eq("empresa_id", empresaAtivaId);
+      const { data, error } = await q.order("data_admissao", { ascending: false });
+      if (error) throw error;
+      return (data || []) as VinculoRow[];
+    },
+    enabled: !!tenantId && !!pessoa,
+  });
+
+  const fmt = (d: string | null) => (d ? new Date(d + "T00:00:00").toLocaleDateString("pt-BR") : "—");
+
+  return (
+    <Dialog open={!!pessoa} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Histórico de vínculos</DialogTitle>
+          <DialogDescription>{pessoa?.nome} — todos os períodos de trabalho na empresa.</DialogDescription>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+        ) : vinculos.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">Nenhum vínculo encontrado.</p>
+        ) : (
+          <ol className="relative border-l border-border ml-2 space-y-4 py-2">
+            {vinculos.map((v) => {
+              const ativo = v.status !== "desligado";
+              return (
+                <li key={v.id} className="ml-4">
+                  <span className={cn("absolute -left-[5px] w-2.5 h-2.5 rounded-full", ativo ? "bg-success" : "bg-muted-foreground")} />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-sm text-foreground">{v.cargo || "Cargo não informado"}</p>
+                    <Badge className={cn("text-[10px]", ativo ? statusStyles.concluido : statusStyles.desligado)}>
+                      {ativo ? "Ativo" : "Desligado"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {fmt(v.data_admissao)} → {ativo ? "atual" : fmt(v.data_desligamento)}
+                  </p>
+                  {!ativo && v.motivo_desligamento && (
+                    <p className="text-xs text-muted-foreground">
+                      Motivo: {MOTIVO_DESLIGAMENTO_LABEL[v.motivo_desligamento] || v.motivo_desligamento}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DesligadosTab() {
   const { tenantId } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { temPermissao, isOwner } = usePerfilPermissions();
+  const canEditColaborador = isOwner || temPermissao("colaboradores", "editar");
+
+  // Edição de desligado: reaproveita o mesmo formulário dos ativos. Permitir
+  // ajustar dados cadastrais de quem já saiu (correções acontecem após o
+  // desligamento); o status 'desligado' não é alterado por aqui.
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingColaborador, setEditingColaborador] = useState<ColaboradorEditData | null>(null);
+  // Recontratação: novo vínculo pré-preenchido com os dados da pessoa.
+  const [showRecontratarForm, setShowRecontratarForm] = useState(false);
+  const [recontratarDados, setRecontratarDados] = useState<RecontratarData | null>(null);
+  // Histórico de vínculos (por pessoa).
+  const [historicoPessoa, setHistoricoPessoa] = useState<{ cpf: string; nome: string } | null>(null);
 
   const { empresaAtivaId } = useEmpresaAtiva();
-  const { data: desligados = [], isLoading } = useQuery({
+  const { data: desligados = [], isLoading, refetch } = useQuery({
     queryKey: ["colaboradores-desligados", tenantId, empresaAtivaId],
     queryFn: async (): Promise<ColaboradorExtendido[]> => {
       if (!tenantId) return [];
       let query = supabase
         .from("admissoes")
-        .select("id, nome_completo, cpf, cargo, departamento, email, celular, filial, data_admissao, status, tipo_contrato, onboarding_token, onboarding_status, foto_url")
+        .select("id, nome_completo, cpf, cargo, departamento, email, celular, filial, data_admissao, data_desligamento, motivo_desligamento, status, tipo_contrato, onboarding_token, onboarding_status, foto_url")
         .eq("tenant_id", tenantId)
         .eq("status", "desligado");
 
@@ -1505,6 +1613,99 @@ function DesligadosTab() {
     },
     enabled: !!tenantId,
   });
+
+  const handleEditDesligado = async (colab: ColaboradorExtendido) => {
+    if (!canEditColaborador) {
+      toast.error("Você não tem permissão para editar colaboradores.");
+      return;
+    }
+    const { data: full, error: fullErr } = await supabase
+      .from("admissoes")
+      .select("id, nome_completo, cpf, email, celular, tipo_contrato, cargo, cargo_id, departamento, filial, centro_custo, gestor_imediato, gestor_cpf, data_admissao, matricula_esocial, cbo, foto_url, bate_ponto, art62_inciso, art62_documento, teletrabalho_modalidade")
+      .eq("id", colab.id)
+      .maybeSingle();
+    if (fullErr) {
+      toast.error("Não foi possível carregar os dados completos do colaborador.");
+      return;
+    }
+    const src: any = full || colab;
+    setEditingColaborador({
+      id: colab.id,
+      nome_completo: src.nome_completo ?? colab.nome_completo,
+      cpf: src.cpf ?? colab.cpf,
+      email: src.email ?? colab.email,
+      celular: src.celular ?? colab.celular,
+      tipo_contrato: src.tipo_contrato ?? colab.tipo_contrato,
+      cargo: src.cargo ?? colab.cargo,
+      cargo_id: src.cargo_id ?? null,
+      departamento: src.departamento ?? colab.departamento,
+      filial: src.filial ?? colab.filial,
+      centro_custo: src.centro_custo ?? null,
+      gestor_imediato: src.gestor_imediato ?? null,
+      gestor_cpf: src.gestor_cpf ?? null,
+      data_admissao: src.data_admissao ?? colab.data_admissao,
+      matricula_esocial: src.matricula_esocial ?? null,
+      cbo: src.cbo ?? null,
+      foto_url: src.foto_url ?? colab.foto_url,
+      bate_ponto: src.bate_ponto,
+      art62_inciso: src.art62_inciso,
+      art62_documento: src.art62_documento,
+      teletrabalho_modalidade: src.teletrabalho_modalidade,
+    });
+    setShowEditForm(true);
+  };
+
+  const handleCloseEditForm = (open: boolean) => {
+    setShowEditForm(open);
+    if (!open) setEditingColaborador(null);
+  };
+
+  const handleRecontratar = async (colab: ColaboradorExtendido) => {
+    if (!canEditColaborador) {
+      toast.error("Você não tem permissão para cadastrar colaboradores.");
+      return;
+    }
+    const { data: full } = await supabase
+      .from("admissoes")
+      .select("id, nome_completo, cpf, email, celular, tipo_contrato, cargo, cargo_id, departamento, filial, centro_custo, gestor_imediato, gestor_cpf, data_admissao, cbo, foto_url, bate_ponto, art62_inciso, art62_documento, teletrabalho_modalidade")
+      .eq("id", colab.id)
+      .maybeSingle();
+    const src: any = full || colab;
+    const pessoa: ColaboradorEditData = {
+      id: colab.id,
+      nome_completo: src.nome_completo ?? colab.nome_completo,
+      cpf: src.cpf ?? colab.cpf,
+      email: src.email ?? colab.email,
+      celular: src.celular ?? colab.celular,
+      tipo_contrato: src.tipo_contrato ?? colab.tipo_contrato,
+      cargo: src.cargo ?? colab.cargo,
+      cargo_id: src.cargo_id ?? null,
+      departamento: src.departamento ?? colab.departamento,
+      filial: src.filial ?? colab.filial,
+      centro_custo: src.centro_custo ?? null,
+      gestor_imediato: src.gestor_imediato ?? null,
+      gestor_cpf: src.gestor_cpf ?? null,
+      data_admissao: src.data_admissao ?? colab.data_admissao,
+      matricula_esocial: null, // novo vínculo = nova matrícula
+      cbo: src.cbo ?? null,
+      foto_url: src.foto_url ?? colab.foto_url,
+      bate_ponto: src.bate_ponto,
+      art62_inciso: src.art62_inciso,
+      art62_documento: src.art62_documento,
+      teletrabalho_modalidade: src.teletrabalho_modalidade,
+    };
+    setRecontratarDados({
+      pessoa,
+      dataDesligamento: colab.data_desligamento ?? null,
+      motivoDesligamento: colab.motivo_desligamento ?? null,
+    });
+    setShowRecontratarForm(true);
+  };
+
+  const handleCloseRecontratar = (open: boolean) => {
+    setShowRecontratarForm(open);
+    if (!open) setRecontratarDados(null);
+  };
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -1554,14 +1755,56 @@ function DesligadosTab() {
                 <Badge className={cn("text-xs", statusStyles.desligado)}>Desligado</Badge>
               </TableCell>
               <TableCell>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/documentos?colaborador=${colab.id}`)}>
-                  <FolderOpen className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1 justify-end">
+                  {canEditColaborador && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" title="Recontratar (novo vínculo)" onClick={() => handleRecontratar(colab)}>
+                      <RefreshCw className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Histórico de vínculos" onClick={() => setHistoricoPessoa({ cpf: colab.cpf, nome: colab.nome_completo })}>
+                    <History className="w-4 h-4" />
+                  </Button>
+                  {canEditColaborador && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar cadastro" onClick={() => handleEditDesligado(colab)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Abrir documentos" onClick={() => navigate(`/documentos?colaborador=${colab.id}`)}>
+                    <FolderOpen className="w-4 h-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      <ColaboradorForm
+        open={showEditForm}
+        onOpenChange={handleCloseEditForm}
+        onSuccess={() => {
+          refetch();
+          queryClient.invalidateQueries({ queryKey: ["colaboradores-desligados"] });
+        }}
+        colaborador={editingColaborador}
+      />
+
+      <ColaboradorForm
+        open={showRecontratarForm}
+        onOpenChange={handleCloseRecontratar}
+        onSuccess={() => {
+          refetch();
+          queryClient.invalidateQueries({ queryKey: ["colaboradores-list"] });
+          queryClient.invalidateQueries({ queryKey: ["colaboradores-desligados"] });
+          toast.success("Recontratação registrada como um novo vínculo. O desligamento anterior foi preservado.");
+        }}
+        recontratarDe={recontratarDados}
+      />
+
+      <HistoricoVinculosDialog
+        pessoa={historicoPessoa}
+        onClose={() => setHistoricoPessoa(null)}
+      />
     </div>
   );
 }

@@ -135,6 +135,24 @@ export function useDocumentoPastas() {
     enabled: !!tenantId,
   });
 
+  // Ids de TODAS as admissões da empresa (qualquer status, inclusive desligados).
+  // O módulo Documentos é a evidência de todos que passaram pela empresa — a pasta
+  // de um desligado NUNCA pode sumir da árvore (guarda legal: FGTS, eSocial, PCMSO).
+  // Usado só para validar "pertence a esta empresa" (o filtro de empresa real é o
+  // empresa_id da própria pasta); por isso aqui não se filtra por status.
+  const { data: admissaoIdsDaEmpresa = [] } = useQuery({
+    queryKey: ["documento-admissao-ids", tenantId, empresaAtivaId],
+    queryFn: async (): Promise<string[]> => {
+      if (!tenantId) return [];
+      let q = supabase.from("admissoes").select("id").eq("tenant_id", tenantId);
+      if (empresaAtivaId) q = q.eq("empresa_id", empresaAtivaId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []).map((a: { id: string }) => a.id);
+    },
+    enabled: !!tenantId,
+  });
+
   // Buscar auditoria
   const { data: auditLogs = [], isLoading: loadingAudit, refetch: refetchAudit } = useQuery({
     queryKey: ["documento-audit", tenantId],
@@ -227,13 +245,18 @@ export function useDocumentoPastas() {
       }
     });
 
-    // Set de colaboradores válidos da empresa ativa (evita exibir pastas vazadas)
-    const colaboradorIdsValidos = new Set(colaboradores.map((c: Colaborador) => c.id));
+    // Set de colaboradores válidos da empresa ativa (evita exibir pastas vazadas).
+    // Inclui ativos E desligados (via admissaoIdsDaEmpresa): o desligado continua
+    // sendo da empresa e sua pasta de documentos não pode ser ocultada.
+    const colaboradorIdsValidos = new Set<string>([
+      ...colaboradores.map((c: Colaborador) => c.id),
+      ...admissaoIdsDaEmpresa,
+    ]);
 
     // Construir hierarquia (excluindo pastas de colaborador que não pertencem à empresa ativa)
     pastas.forEach(pasta => {
       const node = nodeMap.get(pasta.id)!;
-      // Bloqueia pastas de colaborador "vazadas" de outra empresa
+      // Bloqueia pastas de colaborador "vazadas" de outra empresa (não as de desligado)
       if (pasta.tipo === "colaborador" && pasta.colaborador_id && !colaboradorIdsValidos.has(pasta.colaborador_id)) {
         return;
       }

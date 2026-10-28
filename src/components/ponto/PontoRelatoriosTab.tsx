@@ -844,7 +844,7 @@ export function PontoRelatoriosTab() {
       assinatura = (arq || [])[0]?.hash_arquivo || null;
     } catch (e: any) {
       // O arquivo oficial continua saindo; só o arquivamento falhou.
-      toast.warning("AEJ gerado, mas não foi possível arquivar a cópia assinada: " + (e?.message || ""));
+      toast.warning("AEJ gerado, mas não foi possível arquivar a cópia com hash: " + (e?.message || ""));
     }
 
     const blob = new Blob([conteudo], { type: "text/plain;charset=utf-8" });
@@ -857,7 +857,7 @@ export function PontoRelatoriosTab() {
     await registrarExportacao("exportou_aej", `AEJ da competência ${competencia}: ${totais.marcacoes} marcações, ${totais.empregados} empregados.`);
     toast.success(
       `AEJ gerado: ${totais.marcacoes} marcações (${totais.ajustes} ajustes aprovados), ${totais.ocorrencias} ocorrências, ${totais.empregados} empregados.`
-      + (assinatura ? ` Cópia arquivada e assinada (${assinatura.slice(0, 12)}...).` : ""),
+      + (assinatura ? ` Cópia arquivada com hash de integridade (${assinatura.slice(0, 12)}...).` : ""),
     );
   };
 
@@ -887,7 +887,7 @@ export function PontoRelatoriosTab() {
     a.download = `AEJ_TRATADO_${competencia.replace("-", "")}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    void registrarExportacao("exportou_aej", `Cópia arquivada e assinada do AEJ da competência ${competencia}.`);
+    void registrarExportacao("exportou_aej", `Cópia arquivada (com hash de integridade) do AEJ da competência ${competencia}.`);
   };
 
 
@@ -1362,7 +1362,7 @@ export function PontoRelatoriosTab() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Archive className="w-4 h-4 text-primary" />
-              Cópia arquivada e assinada desta competência
+              Cópia arquivada desta competência (com hash de integridade)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0 space-y-3">

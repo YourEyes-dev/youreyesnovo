@@ -217,7 +217,9 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
           <div>
             <h3 className="text-base font-bold tracking-tight">Folha de Aprovação de Ajustes</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Cada linha = um dia. Aprove ou rejeite o dia inteiro de uma só vez.
+              Cada linha = um dia. Aprove ou rejeite o dia inteiro de uma só vez. Aprovar um horário
+              grava a marcação como trabalho — se o pedido é de ausência com declaração ou atestado,
+              rejeite e lance em Atestados.
             </p>
           </div>
           <div className="flex items-center gap-2">

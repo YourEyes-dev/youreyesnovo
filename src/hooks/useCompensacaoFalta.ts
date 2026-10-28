@@ -114,6 +114,29 @@ export function useCompensacaoFalta() {
       enabled: !!tenantId && !!competencia,
     });
 
+  /**
+   * Ausências PARCIAIS do mês (atraso/saída antecipada) — dias TRABALHADOS com
+   * déficit de minutos. Somente leitura: quem tem regime de banco vigente já teve
+   * esses minutos debitados AUTOMATICAMENTE no banco (no_banco=true); sem regime,
+   * o déficit vai pra folha (no_banco=false). Não cria compensação — é só
+   * visibilidade do que já foi apurado. Fonte: ponto_ausencias_parciais_do_mes.
+   */
+  const useAusenciasParciais = (competencia: string) =>
+    useQuery({
+      queryKey: ["ponto-ausencias-parciais", tenantId, competencia, empresaAtivaId],
+      queryFn: async () => {
+        if (!tenantId || !competencia) return [] as any[];
+        const { data, error } = await (supabase.rpc as any)("ponto_ausencias_parciais_do_mes", {
+          p_tenant_id: tenantId,
+          p_empresa_id: empresaAtivaId || null,
+          p_competencia: competencia,
+        });
+        if (error) throw error;
+        return (data || []) as any[];
+      },
+      enabled: !!tenantId && !!competencia,
+    });
+
   /** Trava: a falta do dia é compensável? (somente leitura) */
   const verificarCompensavel = async (
     colaboradorCpf: string,
@@ -228,6 +251,7 @@ export function useCompensacaoFalta() {
   return {
     useCompensacoes,
     useFaltasDaCompetencia,
+    useAusenciasParciais,
     verificarCompensavel,
     registrar,
     autorizar,

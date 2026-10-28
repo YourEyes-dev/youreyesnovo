@@ -36,6 +36,7 @@ export interface FeriasSolicitacao {
   recibo_gerado: boolean;
   aviso_ciencia_em: string | null;
   aviso_ciencia_origem: string | null;
+  justificativa_excecao: string | null;
   assinatura_link_id: string | null;
   assinatura_status: string | null;
   inr_score_momento: number | null;
@@ -159,29 +160,39 @@ export function useFerias() {
   });
 
   const aprovar = useMutation({
-    mutationFn: async (id: string) => {
+    // `justificativaExcecao` só é usado na regularização de fato consumado:
+    // a trava do banco (ferias_solic_valida_aviso_30d, art. 135) barra aprovar
+    // com menos de 30 dias de antecedência SEM aviso E SEM justificativa. Ao
+    // informar a justificativa, a trava libera e o motivo fica gravado como
+    // trilha auditável da exceção. Aprovação dentro do prazo não passa nada.
+    mutationFn: async (arg: string | { id: string; justificativaExcecao?: string }) => {
       if (!tenantId) throw new Error("Tenant não encontrado");
+      const id = typeof arg === "string" ? arg : arg.id;
+      const justificativa = typeof arg === "string" ? undefined : arg.justificativaExcecao?.trim();
+      const patch: Record<string, unknown> = {
+        status: "aprovado",
+        // Quem aprovou precisa ser o USUÁRIO, não um nome de exibição.
+        // Até 14/08 gravávamos só `aprovado_por_nome` — texto livre, que
+        // não prova nada: 19 das 19 solicitações da produção estavam sem
+        // autor identificável. Aprovação de férias é ato com efeito
+        // trabalhista; sem o autor, não há trilha auditável (RNF-003 do
+        // documento de requisitos) e nenhuma trava de segregação tem
+        // sobre o que agir.
+        aprovado_por: user?.id ?? null,
+        aprovado_por_nome: profile?.nome_completo || "Gestor",
+        data_aprovacao: new Date().toISOString(),
+      };
+      if (justificativa) patch.justificativa_excecao = justificativa;
       const { error } = await supabase
         .from("ferias_solicitacoes" as any)
-        .update({
-          status: "aprovado",
-          // Quem aprovou precisa ser o USUÁRIO, não um nome de exibição.
-          // Até 14/08 gravávamos só `aprovado_por_nome` — texto livre, que
-          // não prova nada: 19 das 19 solicitações da produção estavam sem
-          // autor identificável. Aprovação de férias é ato com efeito
-          // trabalhista; sem o autor, não há trilha auditável (RNF-003 do
-          // documento de requisitos) e nenhuma trava de segregação tem
-          // sobre o que agir.
-          aprovado_por: user?.id ?? null,
-          aprovado_por_nome: profile?.nome_completo || "Gestor",
-          data_aprovacao: new Date().toISOString(),
-        } as any)
+        .update(patch as any)
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_d, arg) => {
       queryClient.invalidateQueries({ queryKey: ["ferias_solicitacoes"] });
-      toast.success("Férias aprovadas!");
+      const comExcecao = typeof arg !== "string" && !!arg.justificativaExcecao?.trim();
+      toast.success(comExcecao ? "Férias aprovadas com registro de exceção (art. 135)." : "Férias aprovadas!");
     },
     onError: (err: any) => toast.error(err.message),
   });

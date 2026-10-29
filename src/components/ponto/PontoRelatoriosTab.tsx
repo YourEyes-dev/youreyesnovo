@@ -692,7 +692,7 @@ export function PontoRelatoriosTab() {
       filtrarEmpresa(
         fromTable("ponto_ajustes")
           .select(
-            "id, colaborador_cpf, colaborador_nome, data_referencia, tipo_ajuste, hora_solicitada, motivo, dia_inteiro, horas_abonadas, status",
+            "id, colaborador_cpf, colaborador_nome, data_referencia, tipo_ajuste, hora_solicitada, motivo, dia_inteiro, horas_abonadas, status, natureza, ausencia_hora_inicio, ausencia_hora_fim",
           )
           .eq("status", "aprovado")
           .gte("data_referencia", inicio)
@@ -801,6 +801,23 @@ export function PontoRelatoriosTab() {
       // Abono/dia inteiro vira ocorrência.
       if (a.hora_solicitada && !a.dia_inteiro) {
         return;
+      } else if (a.natureza === "ausencia") {
+        // Ausência (declaração/atestado) aprovada: ocorrência própria, com os
+        // minutos do período quando é parcial.
+        const ini = String(a.ausencia_hora_inicio || "");
+        const fimH = String(a.ausencia_hora_fim || "");
+        const paraMin = (t: string) => (/^\d{2}:\d{2}/.test(t) ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : null);
+        const mi = paraMin(ini);
+        const mf = paraMin(fimH);
+        ocorrencias.push({
+          cpf,
+          data,
+          codigo: "AUSENCIA",
+          minutos: !a.dia_inteiro && mi !== null && mf !== null && mf > mi
+            ? mf - mi
+            : Math.round(Number(a.horas_abonadas || 0) * 60),
+          descricao: a.motivo || "",
+        });
       } else {
         ocorrencias.push({
           cpf,

@@ -692,6 +692,7 @@ const PontoExterno = () => {
           token={token!}
           cpf={modo === "compartilhado" ? cleanCpf(cpf) : undefined}
           colaboradorNome={colaborador.colaborador_nome}
+          exigirSelfie={exigirSelfie}
         />
       )}
     </div>

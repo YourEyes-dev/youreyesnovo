@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { fromTable } from "@/integrations/supabase/untypedClient";
@@ -62,17 +63,29 @@ interface PeriodoJust {
 }
 const EMPTY_PJ: PeriodoJust = { justificativaId: "", observacao: "", abonarSeAprovado: false };
 
+/**
+ * Modo do dia (Fase 2 do Ponto):
+ *  - correcao: edita horários (vira marcação na aprovação);
+ *  - ausencia: declaração/atestado, dia inteiro ou início/fim, anexo obrigatório
+ *    (vira lançamento em Atestados na aprovação, nunca marcação);
+ *  - dia_rh: lançamento do RH no dia inteiro (folga, day off, abono).
+ */
+type ModoDia = "correcao" | "ausencia" | "dia_rh";
+
 interface DiaEdit {
   // undefined = não editado (usa as marcações originais).
   marcacoes?: string[];
-  diaInteiro: boolean;
+  modo: ModoDia;
+  ausDiaInteiro: boolean;
+  ausInicio: string;
+  ausFim: string;
   // Justificativa por PERÍODO (par entrada+saída). Chave = índice do par
   // ("0", "1", …) na lista de marcações; DIA_KEY para o dia inteiro.
   just: Record<string, PeriodoJust>;
   anexo: File | null;
 }
 
-const EMPTY_EDIT: DiaEdit = { diaInteiro: false, just: {}, anexo: null };
+const EMPTY_EDIT: DiaEdit = { modo: "correcao", ausDiaInteiro: true, ausInicio: "", ausFim: "", just: {}, anexo: null };
 
 export function SolicitarAjusteFolhaInterno({
   open, onOpenChange, colaboradores, tenantId, empresaAtivaId, colaboradorIdInicial,
@@ -82,6 +95,12 @@ export function SolicitarAjusteFolhaInterno({
   const { solicitarAjuste } = usePonto();
   const { justificativas } = usePontoJustificativas();
   const justAtivas = useMemo(() => justificativas.filter((j) => j.ativo), [justificativas]);
+  // Cada modo só oferece as justificativas da sua natureza.
+  const justPorModo = useMemo(() => ({
+    correcao: justAtivas.filter((j) => j.natureza === "correcao_batida" || !j.natureza),
+    ausencia: justAtivas.filter((j) => j.natureza === "ausencia"),
+    dia_rh: justAtivas.filter((j) => !j.natureza),
+  }), [justAtivas]);
   const justById = useMemo(() => {
     const m: Record<string, typeof justAtivas[number]> = {};
     justAtivas.forEach((j) => { m[j.id] = j; });
@@ -277,8 +296,11 @@ export function SolicitarAjusteFolhaInterno({
     patchDia(data, { marcacoes: lista, just });
   };
 
-  const toggleDiaInteiro = (data: string, v: boolean) => {
-    patchDia(data, { diaInteiro: v });
+  // Trocar o modo limpa as justificativas escolhidas (a de um modo não serve
+  // para o outro).
+  const setModo = (data: string, modo: ModoDia) => {
+    if (editDia(data).modo === modo) return;
+    patchDia(data, { modo, just: {} });
   };
 
   // Diferença POR POSIÇÃO (a posição na lista define tudo, batendo com os
@@ -296,7 +318,7 @@ export function SolicitarAjusteFolhaInterno({
   const itensAlterados = useMemo(() => {
     const out: { data: string; tipo: TipoMarc; hora: string; horaOriginal: string; par: number }[] = [];
     Object.entries(edits).forEach(([data, ed]) => {
-      if (ed.diaInteiro) return;
+      if (ed.modo !== "correcao") return;
       if (ed.marcacoes === undefined) return;
       const original = marcsPorDia[data] || [];
       const raw = marcsRawPorDia[data] || [];
@@ -323,7 +345,7 @@ export function SolicitarAjusteFolhaInterno({
     const set = new Set<string>();
     itensAlterados.forEach((i) => set.add(i.data));
     Object.entries(edits).forEach(([data, ed]) => {
-      if (ed.diaInteiro) set.add(data);
+      if (ed.modo === "dia_rh" || ed.modo === "ausencia") set.add(data);
     });
     return Array.from(set).filter((data) => (pendentesPorDia[data] ?? 0) === 0);
   }, [itensAlterados, edits, pendentesPorDia]);
@@ -343,17 +365,31 @@ export function SolicitarAjusteFolhaInterno({
 
   const validar = (): string | null => {
     if (!colaborador) return "Selecione o colaborador.";
-    if (totalAlteracoes === 0) return "Altere um horário ou marque \"Dia Inteiro\" em ao menos um dia.";
+    if (totalAlteracoes === 0) return "Altere um horário, informe uma ausência ou lance um dia inteiro em ao menos um dia.";
     if (itensAlterados.length > MAX_ITENS) return `Máximo de ${MAX_ITENS} ajustes de horário por envio.`;
     const now = new Date();
     for (const data of diasComAlteracao) {
       const ed = editDia(data);
 
-      if (ed.diaInteiro) {
+      if (ed.modo === "dia_rh") {
         const pj = getPJ(data, DIA_KEY);
         const just = justById[pj.justificativaId];
-        if (!just) return `Selecione uma justificativa para o Dia Inteiro em ${isoToBR(data)}.`;
+        if (!just || just.natureza) return `Selecione uma justificativa de lançamento do RH para o dia inteiro em ${isoToBR(data)}.`;
         if (just.requer_anexo && !ed.anexo) return `O anexo é obrigatório para a justificativa "${just.nome}" em ${isoToBR(data)}.`;
+        continue;
+      }
+
+      if (ed.modo === "ausencia") {
+        const pj = getPJ(data, DIA_KEY);
+        const just = justById[pj.justificativaId];
+        if (!just || just.natureza !== "ausencia") return `Selecione a justificativa da ausência em ${isoToBR(data)}.`;
+        if (!ed.ausDiaInteiro) {
+          const ini = toMin(ed.ausInicio);
+          const fim = toMin(ed.ausFim);
+          if (ini === null || fim === null) return `Informe o início e o fim da ausência em ${isoToBR(data)}, ou marque "Dia inteiro".`;
+          if (fim <= ini) return `Na ausência de ${isoToBR(data)}, o fim precisa ser depois do início.`;
+        }
+        if (!ed.anexo) return `Anexe a declaração ou o atestado da ausência em ${isoToBR(data)}.`;
         continue;
       }
 
@@ -363,6 +399,7 @@ export function SolicitarAjusteFolhaInterno({
         const pj = getPJ(data, String(par));
         const just = justById[pj.justificativaId];
         if (!just) return `Selecione a justificativa do ${par + 1}º período em ${isoToBR(data)}.`;
+        if (just.natureza === "ausencia") return `A justificativa "${just.nome}" é de ausência e não serve para corrigir horário (${isoToBR(data)}). Use o modo Ausência.`;
         if (just.requer_anexo && !ed.anexo) return `O anexo é obrigatório para a justificativa "${just.nome}" em ${isoToBR(data)}.`;
       }
 
@@ -402,7 +439,29 @@ export function SolicitarAjusteFolhaInterno({
         const ed = editDia(data);
         const anexos = ed.anexo ? [ed.anexo] : undefined;
 
-        if (ed.diaInteiro) {
+        if (ed.modo === "ausencia") {
+          const pj = getPJ(data, DIA_KEY);
+          const just = justById[pj.justificativaId];
+          await solicitarAjuste({
+            colaboradorId: colaborador.id,
+            colaboradorNome: colaborador.nome_completo,
+            colaboradorCpf: cpf,
+            dataReferencia: data,
+            tipoAjuste: "justificativa",
+            natureza: "ausencia",
+            motivo: just?.nome || "",
+            justificativaId: pj.justificativaId,
+            observacao: pj.observacao || undefined,
+            abonarSeAprovado: just?.tipo_abono === "configuravel" ? pj.abonarSeAprovado : undefined,
+            diaInteiro: ed.ausDiaInteiro,
+            ausenciaHoraInicio: ed.ausDiaInteiro ? undefined : `${ed.ausInicio}:00`,
+            ausenciaHoraFim: ed.ausDiaInteiro ? undefined : `${ed.ausFim}:00`,
+            anexos,
+          });
+          continue;
+        }
+
+        if (ed.modo === "dia_rh") {
           const pj = getPJ(data, DIA_KEY);
           const just = justById[pj.justificativaId];
           await solicitarAjuste({
@@ -472,7 +531,7 @@ export function SolicitarAjusteFolhaInterno({
   }, [mesAtivo]);
 
   // Bloco de justificativa (select + observação + "abonar se aprovado").
-  const renderJustBlock = (data: string, key: string, label: string) => {
+  const renderJustBlock = (data: string, key: string, label: string, lista = justPorModo.correcao) => {
     const pj = getPJ(data, key);
     const just = justById[pj.justificativaId];
     return (
@@ -481,10 +540,10 @@ export function SolicitarAjusteFolhaInterno({
         <Select value={pj.justificativaId} onValueChange={(v) => setPJ(data, key, { justificativaId: v })}>
           <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Justificativa…" /></SelectTrigger>
           <SelectContent>
-            {justAtivas.length === 0 && (
-              <SelectItem value="__none__" disabled className="text-xs">Nenhuma justificativa cadastrada</SelectItem>
+            {lista.length === 0 && (
+              <SelectItem value="__none__" disabled className="text-xs">Nenhuma justificativa cadastrada para este modo</SelectItem>
             )}
-            {justAtivas.map((j) => (
+            {lista.map((j) => (
               <SelectItem key={j.id} value={j.id} className="text-xs">{j.nome}</SelectItem>
             ))}
           </SelectContent>
@@ -573,7 +632,7 @@ export function SolicitarAjusteFolhaInterno({
                 <div className="flex-1">
                   <DialogTitle>Folha de Ponto · Ajustes</DialogTitle>
                   <DialogDescription>
-                    A folha mostra o mês todo. Edite horários e informe a justificativa de cada período, ou use "Dia inteiro" para lançar uma folga/justificativa no dia todo (folga, licença, abono…). Cada justificativa mostra se abona ou não — o abono só é aplicado na aprovação de "Dia inteiro". Ao editar horários, a aprovação grava as marcações informadas como trabalho: use para corrigir batidas esquecidas ou erradas. Ausência de parte do dia com declaração ou atestado deve ser lançada em Atestados.
+                    A folha mostra o mês todo. Em cada dia escolha o modo: <strong>Correção de batida</strong> (edite os horários; a aprovação grava as marcações como trabalho), <strong>Ausência</strong> (declaração ou atestado, dia inteiro ou início/fim, com o documento anexado; a aprovação lança em Atestados e não grava marcação) ou <strong>Dia inteiro (RH)</strong> (folga, day off, abono no dia todo). Cada justificativa mostra se abona ou não.
                   </DialogDescription>
                 </div>
               </div>
@@ -640,7 +699,7 @@ export function SolicitarAjusteFolhaInterno({
                         ed.marcacoes.length !== original.length ||
                         ed.marcacoes.some((v, i) => (v || "") !== (original[i] || ""))
                       );
-                      const ativo = ed.diaInteiro || temAlteracaoHora;
+                      const ativo = ed.modo !== "correcao" || temAlteracaoHora;
                       const isWeekend = [0, 6].includes(new Date(data + "T12:00:00").getDay());
                       const futuro = data > today;
                       const itensDia = itensAlterados.filter((i) => i.data === data);
@@ -708,13 +767,16 @@ export function SolicitarAjusteFolhaInterno({
                               </Badge>
                             )}
                             {!diaBloqueado(data) && !futuro && (
-                              <label className="flex items-center gap-1 mt-1.5 text-[10px] cursor-pointer">
-                                <Checkbox
-                                  checked={ed.diaInteiro}
-                                  onCheckedChange={(c) => toggleDiaInteiro(data, c === true)}
-                                />
-                                <span>Dia inteiro</span>
-                              </label>
+                              <Select value={ed.modo} onValueChange={(v) => setModo(data, v as ModoDia)}>
+                                <SelectTrigger className="h-7 mt-1.5 text-[10px] px-1.5" aria-label="Modo do dia">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="correcao" className="text-xs">Correção de batida</SelectItem>
+                                  <SelectItem value="ausencia" className="text-xs">Ausência</SelectItem>
+                                  <SelectItem value="dia_rh" className="text-xs">Dia inteiro (RH)</SelectItem>
+                                </SelectContent>
+                              </Select>
                             )}
                           </td>
                           <td className="px-2 py-1.5 align-top" colSpan={2}>
@@ -728,13 +790,32 @@ export function SolicitarAjusteFolhaInterno({
                                   </p>
                                 </div>
                               </div>
-                            ) : ed.diaInteiro ? (
+                            ) : ed.modo === "dia_rh" ? (
                               <div className="grid grid-cols-[240fr_280fr] gap-2 items-start">
                                 <div className="text-[10px] text-muted-foreground py-1 space-y-0.5">
-                                  <p className="font-medium text-foreground">Lançamento de dia inteiro</p>
-                                  <p className="italic">Folga, licença ou abono no dia todo, pela escala do colaborador (horários não editáveis). A justificativa ao lado define se o dia é abonado.</p>
+                                  <p className="font-medium text-foreground">Lançamento de dia inteiro (RH)</p>
+                                  <p className="italic">Folga, day off ou abono no dia todo, pela escala do colaborador (horários não editáveis). A justificativa ao lado define se o dia é abonado.</p>
                                 </div>
-                                <div>{renderJustBlock(data, DIA_KEY, "Justificativa do dia (folga, licença, abono…)")}</div>
+                                <div>{renderJustBlock(data, DIA_KEY, "Justificativa do dia (folga, day off, abono…)", justPorModo.dia_rh)}</div>
+                              </div>
+                            ) : ed.modo === "ausencia" ? (
+                              <div className="grid grid-cols-[240fr_280fr] gap-2 items-start">
+                                <div className="text-[10px] text-muted-foreground py-1 space-y-1.5">
+                                  <p className="font-medium text-violet-700 dark:text-violet-300">Ausência (declaração/atestado)</p>
+                                  <label className="flex items-center gap-2 cursor-pointer text-foreground">
+                                    <Switch checked={ed.ausDiaInteiro} onCheckedChange={(v) => patchDia(data, { ausDiaInteiro: v })} />
+                                    <span>Dia inteiro</span>
+                                  </label>
+                                  {!ed.ausDiaInteiro && (
+                                    <div className="flex items-center gap-1.5">
+                                      <Input type="time" value={ed.ausInicio} onChange={(e) => patchDia(data, { ausInicio: e.target.value })} className="h-7 text-xs font-mono w-[88px]" aria-label="Início da ausência" />
+                                      <span>às</span>
+                                      <Input type="time" value={ed.ausFim} onChange={(e) => patchDia(data, { ausFim: e.target.value })} className="h-7 text-xs font-mono w-[88px]" aria-label="Fim da ausência" />
+                                    </div>
+                                  )}
+                                  <p className="italic">Na aprovação vira lançamento em Atestados com o documento — não grava marcação. Anexo obrigatório (coluna ao lado).</p>
+                                </div>
+                                <div>{renderJustBlock(data, DIA_KEY, "Justificativa da ausência", justPorModo.ausencia)}</div>
                               </div>
                             ) : preAssinalado ? (
                               /* Escala pré-assinalada: só 1 par (Entrada/Saída). O intervalo
@@ -817,7 +898,7 @@ export function SolicitarAjusteFolhaInterno({
                                 )}
                                 {marcs.length > 0 && itensDia.length === 0 && (
                                   <div className="text-[10px] text-muted-foreground italic">
-                                    Altere um horário ou marque "Dia inteiro" para justificar.
+                                    Altere um horário, ou troque o modo do dia (Ausência / Dia inteiro).
                                   </div>
                                 )}
                               </div>

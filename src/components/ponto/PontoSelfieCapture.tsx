@@ -13,9 +13,15 @@ interface PontoSelfieCaptureProps {
    * quando a selfie é opcional.
    */
   obrigatoria?: boolean;
+  /**
+   * Abre a câmera sozinha ao montar. Padrão: igual a `obrigatoria`. A folha de
+   * ajustes desliga (a pessoa toca em "Tirar selfie" quando for enviar).
+   */
+  abrirSozinha?: boolean;
 }
 
-export function PontoSelfieCapture({ selfieFile, selfiePreview, onChange, obrigatoria = true }: PontoSelfieCaptureProps) {
+export function PontoSelfieCapture({ selfieFile, selfiePreview, onChange, obrigatoria = true, abrirSozinha }: PontoSelfieCaptureProps) {
+  const abrirAoMontar = abrirSozinha ?? obrigatoria;
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -94,7 +100,7 @@ export function PontoSelfieCapture({ selfieFile, selfiePreview, onChange, obriga
   // pessoa toca em "Abrir câmera" se quiser, e o navegador não pede permissão à
   // toa a cada abertura do link.
   useEffect(() => {
-    if (obrigatoria && !selfieFile && !isCameraOpen && !stream) {
+    if (abrirAoMontar && !selfieFile && !isCameraOpen && !stream) {
       startCamera();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

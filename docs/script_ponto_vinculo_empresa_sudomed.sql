@@ -33,7 +33,7 @@ SET lock_timeout = '10s';
 DO $bkp$
 DECLARE
   v_tenants text := 'SELECT ec.tenant_id FROM public.empresa_cadastro ec '
-    || 'WHERE regexp_replace(COALESCE(ec.cnpj,),[^0-9],,''g'') '
+    || 'WHERE regexp_replace(COALESCE(ec.cnpj,''''),''[^0-9]'','''',''g'') '
     || '= ANY (ARRAY[''26114701000145'',''41085456000189'',''41085456000260'',''31219374000126''])';
 BEGIN
   CREATE SCHEMA IF NOT EXISTS backup;

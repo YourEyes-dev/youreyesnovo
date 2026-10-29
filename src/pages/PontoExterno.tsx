@@ -322,8 +322,8 @@ const PontoExterno = () => {
           .from("ponto-selfies")
           .upload(fileName, selfieFile, { contentType: "image/jpeg" });
         if (!uploadError && uploadData) {
-          const { data: urlData } = supabasePublic.storage.from("ponto-selfies").getPublicUrl(uploadData.path);
-          selfieUrl = urlData.publicUrl;
+          // Bucket privado: grava o caminho; o RH vê por link temporário.
+          selfieUrl = uploadData.path;
           selfieNome = selfieFile.name || `selfie_${proximoTipo}.jpg`;
         } else if (exigirSelfie) {
           // A pessoa TIROU a selfie, mas o envio da foto falhou. Se a selfie é

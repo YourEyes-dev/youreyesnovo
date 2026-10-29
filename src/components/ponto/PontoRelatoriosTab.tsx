@@ -481,7 +481,8 @@ export function PontoRelatoriosTab() {
       lista.push({
         hora: String(m.hora_marcacao || "").substring(0, 5),
         tipo: m.tipo_marcacao ?? null,
-        origem: (m.origem_marcacao ?? (m.marcacao_original === false ? "A" : "O")) === "O" ? "O" : "A",
+        // Marcação não original é sempre incluída ("A"), mesmo com rótulo antigo "O".
+        origem: m.marcacao_original === false || m.origem_marcacao === "A" ? "A" : "O",
       });
       porCpfDia.set(chave, lista);
     });
@@ -598,6 +599,9 @@ export function PontoRelatoriosTab() {
 
     let query = fromTable("ponto_marcacoes")
       .select("colaborador_cpf, colaborador_nome, data_marcacao, hora_marcacao, hash_marcacao")
+      // AFD = registro bruto do relógio (Portaria MTP 671/2021): só batidas
+      // originais. Marcação incluída por ajuste é tratamento e vai no AEJ.
+      .or("marcacao_original.is.null,marcacao_original.eq.true")
       .gte("data_marcacao", startDate2)
       .lte("data_marcacao", endDate2)
       .order("data_marcacao")
@@ -676,7 +680,7 @@ export function PontoRelatoriosTab() {
     const [marcRes, ajusteRes, escalaRes, atribRes] = await Promise.all([
       filtrarEmpresa(
         fromTable("ponto_marcacoes")
-          .select("colaborador_cpf, colaborador_nome, data_marcacao, hora_marcacao, origem_marcacao")
+          .select("colaborador_cpf, colaborador_nome, data_marcacao, hora_marcacao, origem_marcacao, marcacao_original, ajuste_id")
           // O AEJ é a jornada APURADA (Portaria MTP 671/2021): só entram as
           // batidas que a conta reconhece. A batida desconsiderada (duplicada/
           // incorreta) fica de fora — ela segue preservada no AFD (REP bruto).
@@ -688,7 +692,7 @@ export function PontoRelatoriosTab() {
       filtrarEmpresa(
         fromTable("ponto_ajustes")
           .select(
-            "colaborador_cpf, colaborador_nome, data_referencia, tipo_ajuste, hora_solicitada, motivo, dia_inteiro, horas_abonadas, status",
+            "id, colaborador_cpf, colaborador_nome, data_referencia, tipo_ajuste, hora_solicitada, motivo, dia_inteiro, horas_abonadas, status",
           )
           .eq("status", "aprovado")
           .gte("data_referencia", inicio)
@@ -769,29 +773,34 @@ export function PontoRelatoriosTab() {
     }));
     void escalaPorId;
 
+    const motivoPorAjuste = new Map<string, string>();
+    ajustesDb.forEach((a) => { if (a.id) motivoPorAjuste.set(String(a.id), a.motivo || "AJUSTE APROVADO"); });
+
     const marcacoes: AejMarcacao[] = marcacoesDb
       .filter((m) => soDigitos(m.colaborador_cpf).length === 11)
-      .map((m) => ({
-        cpf: soDigitos(m.colaborador_cpf),
-        data: String(m.data_marcacao).slice(0, 10),
-        hora: String(m.hora_marcacao || "00:00:00"),
-        origem: (m.origem_marcacao === "A" ? "A" : "O") as "O" | "A",
-      }));
+      .map((m) => {
+        const incluida = m.marcacao_original === false || m.origem_marcacao === "A";
+        return {
+          cpf: soDigitos(m.colaborador_cpf),
+          data: String(m.data_marcacao).slice(0, 10),
+          hora: String(m.hora_marcacao || "00:00:00"),
+          origem: (incluida ? "A" : "O") as "O" | "A",
+          ...(incluida
+            ? { justificativa: (m.ajuste_id && motivoPorAjuste.get(String(m.ajuste_id))) || "AJUSTE APROVADO" }
+            : {}),
+        };
+      });
 
     const ocorrencias: AejOcorrencia[] = [];
     ajustesDb.forEach((a) => {
       const cpf = soDigitos(a.colaborador_cpf);
       if (cpf.length !== 11) return;
       const data = String(a.data_referencia).slice(0, 10);
-      // Ajuste de horário aprovado vira marcação origem "A"; abono/dia inteiro vira ocorrência.
+      // Ajuste de horário aprovado já está no banco como marcação incluída
+      // (origem "A", acima) — reempurrá-lo duplicava a batida no AEJ.
+      // Abono/dia inteiro vira ocorrência.
       if (a.hora_solicitada && !a.dia_inteiro) {
-        marcacoes.push({
-          cpf,
-          data,
-          hora: String(a.hora_solicitada),
-          origem: "A",
-          justificativa: a.motivo || "AJUSTE APROVADO",
-        });
+        return;
       } else {
         ocorrencias.push({
           cpf,

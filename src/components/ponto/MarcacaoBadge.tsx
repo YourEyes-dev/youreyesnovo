@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { confirm } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { urlTemporariaSelfie } from "@/lib/ponto/selfie";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
@@ -47,9 +48,12 @@ export function MarcacaoBadge({
   // é registrado na trilha, com quem viu, o que viu e quando. Antes ela era
   // servida a quem apenas abrisse a lista, sem deixar rastro.
   const [selfieRevelada, setSelfieRevelada] = useState(false);
+  // Bucket privado: a imagem sai por link temporário gerado na hora de revelar.
+  const [selfieSrc, setSelfieSrc] = useState<string | null>(null);
 
   const revelarSelfie = async () => {
     setSelfieRevelada(true);
+    void urlTemporariaSelfie(selfieUrl).then(setSelfieSrc);
     if (!tenantId) return;
     try {
       await (supabase.rpc as any)("ponto_log_acesso_sensivel", {
@@ -132,16 +136,16 @@ export function MarcacaoBadge({
         </button>
       )}
 
-      {selfieUrl && selfieRevelada && (
+      {selfieUrl && selfieRevelada && selfieSrc && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="w-8 h-8 rounded border bg-muted overflow-hidden shrink-0">
-                <img src={selfieUrl} alt="Selfie" className="w-full h-full object-cover" />
+                <img src={selfieSrc} alt="Selfie" className="w-full h-full object-cover" />
               </div>
             </TooltipTrigger>
             <TooltipContent className="p-0 border-none">
-              <img src={selfieUrl} alt="Selfie ampliada" className="w-48 h-48 object-cover rounded-lg shadow-xl" />
+              <img src={selfieSrc} alt="Selfie ampliada" className="w-48 h-48 object-cover rounded-lg shadow-xl" />
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

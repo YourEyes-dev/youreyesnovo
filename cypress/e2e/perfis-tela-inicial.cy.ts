@@ -59,7 +59,9 @@ describe("Perfil de acesso × tela Início", () => {
     cy.contains('[role="tab"]', "Perfis").scrollIntoView().click({ force: true });
     cy.contains("button", "Novo Perfil", { timeout: 20000 }).click();
 
-    cy.get('[role="dialog"]', { timeout: 15000 }).within(() => {
+    // Pega a janela pelo título: pode haver outro [role="dialog"] oculto no DOM
+    // (cy.within exige um único elemento).
+    cy.contains('[role="dialog"]', "Novo Perfil", { timeout: 15000 }).within(() => {
       // A seção fica abaixo da dobra do formulário (área rolável): rola antes de exigir visibilidade.
       cy.contains("Tela inicial (Início)").scrollIntoView().should("be.visible");
       BLOCOS.forEach((bloco) => {
@@ -70,7 +72,7 @@ describe("Perfil de acesso × tela Início", () => {
       });
       cy.contains("button", "Cancelar").click();
     });
-    cy.get('[role="dialog"]').should("not.exist");
+    cy.contains('[role="dialog"]', "Novo Perfil").should("not.exist");
   });
 
   // PERFIL-023

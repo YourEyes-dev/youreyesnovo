@@ -154,7 +154,7 @@ const Ponto = () => {
     queryFn: async () => {
       if (!tenantIdAtivo) return [] as any[];
       let q = fromTable("ponto_marcacoes")
-        .select("id,colaborador_cpf,hora_marcacao,tipo_marcacao,marcacao_original,hash_marcacao,endereco_geolocalizacao,selfie_url,distancia_metros,dentro_cerca,desconsiderada,desconsiderada_motivo")
+        .select("id,colaborador_cpf,hora_marcacao,tipo_marcacao,marcacao_original,ajuste_id,hash_marcacao,endereco_geolocalizacao,selfie_url,distancia_metros,dentro_cerca,desconsiderada,desconsiderada_motivo")
         .eq("tenant_id", tenantIdAtivo)
         .eq("data_marcacao", dataSelStr);
       // NÃO filtramos por empresa_id aqui de propósito. As marcações são
@@ -295,6 +295,7 @@ const Ponto = () => {
         tipo: m.tipo_marcacao,
         original: m.marcacao_original ?? true,
         hash: m.hash_marcacao || undefined,
+        ajusteId: m.ajuste_id || undefined,
         endereco: m.endereco_geolocalizacao,
         selfieUrl: m.selfie_url,
         distanciaMetros: m.distancia_metros ?? null,
@@ -321,7 +322,11 @@ const Ponto = () => {
   }, [ajustesDoDia]);
 
   /** Motivo (justificativa) da marcação, se ela veio de um ajuste aprovado. */
-  const motivoDaMarcacao = (cpfDigits: string, m: { hora: string; hash?: string }): string | undefined => {
+  const motivoDaMarcacao = (cpfDigits: string, m: { hora: string; hash?: string; ajusteId?: string }): string | undefined => {
+    if (m.ajusteId) {
+      const viaId = motivoAjuste.porId.get(m.ajusteId);
+      if (viaId) return viaId;
+    }
     const idMatch = /^AJUSTE-([0-9a-f-]{36})/i.exec(m.hash || "");
     if (idMatch) {
       const via = motivoAjuste.porId.get(idMatch[1]);
@@ -590,13 +595,13 @@ const Ponto = () => {
       let selfieUrl: string | null = null;
       let selfieNome: string | null = null;
       if (selfieFile) {
-        const fileName = `${selectedColaborador.cpf}/${format(new Date(), "yyyy-MM-dd")}_${tipoMarcacao}_${Date.now()}.jpg`;
+        // Caminho sem CPF, por empresa; grava-se o CAMINHO (bucket privado — exibe por link temporário).
+        const fileName = `${tenantIdAtivo}/${format(new Date(), "yyyy-MM-dd")}_${tipoMarcacao}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("ponto-selfies")
           .upload(fileName, selfieFile, { contentType: "image/jpeg" });
         if (!uploadError && uploadData) {
-          const { data: urlData } = supabase.storage.from("ponto-selfies").getPublicUrl(uploadData.path);
-          selfieUrl = urlData.publicUrl;
+          selfieUrl = uploadData.path;
           selfieNome = selfieFile.name;
         }
       }

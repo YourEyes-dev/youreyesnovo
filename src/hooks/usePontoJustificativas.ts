@@ -7,6 +7,11 @@ import { toast } from "sonner";
 
 export type TipoAbono = "sim" | "nao" | "configuravel";
 
+/** correcao_batida = corrige horário (trabalho, nunca abona);
+ *  ausencia = declaração/atestado (sempre com anexo);
+ *  null = lançamento do RH (folga, day off...), fora do app. */
+export type NaturezaJustificativa = "correcao_batida" | "ausencia" | null;
+
 export interface PontoJustificativa {
   id: string;
   tenant_id: string;
@@ -26,6 +31,10 @@ export interface PontoJustificativa {
   /** Citação legal quando o abono é obrigatório por lei (art. 473 CLT).
    *  Preenchido => abono travado em "sim", linha não editável/excluível. */
   base_legal: string | null;
+  /** Natureza da justificativa (Fase 2 do Ponto). */
+  natureza: NaturezaJustificativa;
+  /** true = o colaborador pode escolher no app novo (exige natureza). */
+  aparece_no_app: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +72,9 @@ export function usePontoJustificativas() {
         ativo: j.ativo !== false,
         ordem: j.ordem ?? 0,
         tipo_abono: (j.tipo_abono as TipoAbono) || "nao",
+        natureza: j.natureza ?? null,
+        // sem natureza não pode aparecer no app (CHECK no banco)
+        aparece_no_app: j.natureza ? !!j.aparece_no_app : false,
       };
       if (j.id) {
         // NÃO sobrescreve empresa_id de uma justificativa existente: as padrão
@@ -100,6 +112,10 @@ export function usePontoJustificativas() {
       if (!tenantId) throw new Error("Não autenticado");
       const { error } = await (supabase.rpc as any)("seed_justificativas_padrao", { p_tenant_id: tenantId });
       if (error) throw error;
+      // Catálogo do app novo (APP_* + ausências). Idempotente; checa o tenant no banco.
+      const rpc = supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ error: Error | null }>;
+      const { error: errApp } = await rpc("seed_justificativas_app", { p_tenant: tenantId });
+      if (errApp) throw errApp;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ponto-justificativas"] });

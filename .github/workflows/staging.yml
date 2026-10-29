@@ -415,8 +415,18 @@ jobs:
         env:
           QA_E2E_ORIGEM: esteira staging (fumaça)
         run: npx cypress run --spec "$(node scripts/cypress-specs.mjs --fumaca)"
+      - name: Modo fechamento — suíte reduzida à fumaça
+        # Chave temporária (Settings > Variables > CYPRESS_ESCOPO = fumaca),
+        # para liberar mais rápido em período crítico (fechamento de folha).
+        # A suíte completa continua rodando toda noite pelo cypress.yml.
+        # Desligar: apagar a variável (gh variable delete CYPRESS_ESCOPO).
+        if: ${{ vars.CYPRESS_ESCOPO == 'fumaca' }}
+        run: |
+          echo "::warning::Suíte reduzida (fechamento): só a fumaça crítica rodou nesta liberação. A suíte completa roda toda noite (workflow cypress). Para voltar ao normal, apague a variável CYPRESS_ESCOPO."
+          echo "### ⚠️ Suíte reduzida (fechamento)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Só a fumaça crítica (cypress/smoke.txt) rodou nesta liberação. A suíte completa roda toda noite (workflow \`cypress\`). Para voltar ao normal: apagar a variável \`CYPRESS_ESCOPO\`." >> "$GITHUB_STEP_SUMMARY"
       - name: Rodar a suíte
-        if: ${{ !cancelled() && steps.fumaca.conclusion != 'skipped' }}
+        if: ${{ !cancelled() && steps.fumaca.conclusion != 'skipped' && vars.CYPRESS_ESCOPO != 'fumaca' }}
         run: npm run test:e2e
       - name: Guardar prints e vídeos da corrida
         if: always()

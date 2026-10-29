@@ -136,6 +136,10 @@ export interface Atestado {
   arquivo_url: string | null;
   arquivo_nome: string | null;
   arquivo_tamanho: number | null;
+  /** Bucket do arquivo: 'atestados' (padrão) ou 'ponto-ajustes-anexos' (ausência aprovada pelo ponto). */
+  arquivo_bucket?: string | null;
+  /** Pedido de ajuste de ponto cuja aprovação lançou este atestado. */
+  ajuste_id?: string | null;
   
   evento_saude_id: string | null;
   afastamento_id: string | null;

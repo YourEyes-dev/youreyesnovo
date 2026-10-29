@@ -630,8 +630,10 @@ export function useAtestados() {
   // Delete atestado
   const deleteAtestadoMutation = useMutation({
     mutationFn: async (atestado: Atestado) => {
-      // Delete file from storage if exists
-      if (atestado.arquivo_url) {
+      // Delete file from storage if exists. O arquivo de uma ausência aprovada
+      // pelo ponto mora no bucket do pedido de ajuste e pertence ao ajuste:
+      // não é apagado junto com o lançamento.
+      if (atestado.arquivo_url && (atestado.arquivo_bucket ?? "atestados") === "atestados") {
         await supabase.storage.from("atestados").remove([atestado.arquivo_url]);
       }
 
@@ -763,9 +765,9 @@ export function useAtestados() {
   });
 
   // Get signed URL for file
-  const getSignedUrl = async (storagePath: string): Promise<string | null> => {
+  const getSignedUrl = async (storagePath: string, bucket: string = "atestados"): Promise<string | null> => {
     const { data, error } = await supabase.storage
-      .from("atestados")
+      .from(bucket || "atestados")
       .createSignedUrl(storagePath, 3600);
     if (error) {
       toast.error("Erro ao gerar link de download");

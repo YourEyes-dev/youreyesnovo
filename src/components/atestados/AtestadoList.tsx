@@ -65,7 +65,7 @@ interface AtestadoListProps {
   onDelete: (atestado: Atestado) => Promise<void>;
   onView?: (atestado: Atestado) => void;
   onEdit?: (atestado: Atestado) => void;
-  onDownload: (storagePath: string) => Promise<string | null>;
+  onDownload: (storagePath: string, bucket?: string) => Promise<string | null>;
   deleting?: boolean;
 }
 
@@ -110,7 +110,7 @@ export function AtestadoList({
 
   const handleDownload = async (atestado: Atestado) => {
     if (!atestado.arquivo_url) return;
-    const url = await onDownload(atestado.arquivo_url);
+    const url = await onDownload(atestado.arquivo_url, atestado.arquivo_bucket || "atestados");
     if (url) {
       window.open(url, "_blank");
     }

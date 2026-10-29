@@ -595,13 +595,13 @@ const Ponto = () => {
       let selfieUrl: string | null = null;
       let selfieNome: string | null = null;
       if (selfieFile) {
-        const fileName = `${selectedColaborador.cpf}/${format(new Date(), "yyyy-MM-dd")}_${tipoMarcacao}_${Date.now()}.jpg`;
+        // Caminho sem CPF, por empresa; grava-se o CAMINHO (bucket privado — exibe por link temporário).
+        const fileName = `${tenantIdAtivo}/${format(new Date(), "yyyy-MM-dd")}_${tipoMarcacao}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("ponto-selfies")
           .upload(fileName, selfieFile, { contentType: "image/jpeg" });
         if (!uploadError && uploadData) {
-          const { data: urlData } = supabase.storage.from("ponto-selfies").getPublicUrl(uploadData.path);
-          selfieUrl = urlData.publicUrl;
+          selfieUrl = uploadData.path;
           selfieNome = selfieFile.name;
         }
       }

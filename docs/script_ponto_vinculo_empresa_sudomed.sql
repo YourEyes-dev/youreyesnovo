@@ -1,27 +1,25 @@
 -- ============================================================================
--- SCRIPT DE ENTREGA — Ponto: vincula à empresa (CNPJ) as batidas, dias e
--- dias que ficaram SEM empresa (empresa_id nulo) nas 4 empresas do grupo.
+-- SCRIPT DE ENTREGA — Ponto: vincula à empresa (CNPJ) os DIAS do ponto
+-- (ponto_diario) que ficaram SEM empresa (empresa_id nulo) nas 4 empresas.
 --
--- Por quê: os relatórios (espelho, AFD, AEJ, banco de horas) são gerados por
--- CNPJ. Batida sem empresa some do AFD/AEJ do estabelecimento e o dia sem
--- empresa aparece misturado no espelho de todas. A empresa certa é a que o
--- próprio sistema atribui pelo cadastro (ponto_empresa_do_cpf); só corrige
--- quando o resultado é uma das 4 empresas abaixo.
+-- Por quê: o espelho e o banco de horas são montados por empresa e incluem
+-- os dias sem empresa em TODAS as empresas — o espelho de um CNPJ mistura
+-- colaboradores de outro. A empresa certa é a que o próprio sistema atribui
+-- pelo cadastro (ponto_empresa_do_cpf); só corrige quando o resultado é uma
+-- das 4 empresas abaixo.
 --
--- O que NÃO muda: horário, data, tipo, CPF, NSR, hash, origem. Só a coluna
--- empresa_id (não é protegida pela trava de imutabilidade; o gatilho de
--- auditoria registra cada alteração de batida).
+-- Batidas (ponto_marcacoes) NÃO são alteradas: o NSR é numerado por empresa
+-- ("balde") e as batidas sem empresa têm sequência própria; movê-las colidiria
+-- NSR. O espelho já casa as batidas pelo CPF. Ajustes também não são alterados
+-- (o gatilho de consolidação reprocessaria o dia).
 --
--- Ajustes (pedidos) NÃO são alterados: o gatilho de consolidação do ajuste
--- reprocessaria o dia; o relatório de ajustes resolve a empresa pelo CPF.
--- Dia (ponto_diario) que já tem linha com a empresa certa no mesmo dia NÃO é
--- tocado (evita duplicar) — aparece na conferência como "dias_conflito".
--- A trava de período fechado do ponto_diario é desligada só durante este
--- script (dentro da transação) porque vincular a empresa não altera jornada.
+-- O que muda: só a coluna empresa_id do dia. Nenhum valor do dia (horas,
+-- status, saldo) é recalculado: os gatilhos de recálculo e a trava de período
+-- fechado ficam desligados só durante o UPDATE, dentro da transação.
+-- Dia que já tem linha com a empresa certa no mesmo dia NÃO é tocado (evita
+-- duplicar) — aparece na conferência como "dias_conflito_ou_sem_cpf".
 --
 -- Backup antes (schema privado backup). Desfazer:
---   UPDATE public.ponto_marcacoes m SET empresa_id = NULL
---     FROM backup.ponto_vinc_emp_marc_20261029 b WHERE b.id = m.id;
 --   UPDATE public.ponto_diario d SET empresa_id = NULL
 --     FROM backup.ponto_vinc_emp_diario_20261029 b WHERE b.id = d.id;
 -- Idempotente.
@@ -49,28 +47,7 @@ BEGIN
 END
 $bkp$;
 
--- 2) Batidas
-WITH emp AS MATERIALIZED (
-  SELECT ec.id AS empresa_id, ec.tenant_id
-  FROM public.empresa_cadastro ec
-  WHERE regexp_replace(COALESCE(ec.cnpj,''),'[^0-9]','','g')
-        = ANY (ARRAY['26114701000145','41085456000189','41085456000260','31219374000126'])
-),
-mapa AS MATERIALIZED (
-  SELECT x.tenant_id, x.colaborador_cpf,
-         public.ponto_empresa_do_cpf(x.tenant_id, x.colaborador_cpf) AS empresa_id
-  FROM (SELECT DISTINCT tenant_id, colaborador_cpf FROM backup.ponto_vinc_emp_marc_20261029
-        WHERE COALESCE(colaborador_cpf,'') <> '') x
-)
-UPDATE public.ponto_marcacoes m
-   SET empresa_id = mp.empresa_id
-  FROM mapa mp
- WHERE m.empresa_id IS NULL
-   AND m.tenant_id = mp.tenant_id
-   AND m.colaborador_cpf = mp.colaborador_cpf
-   AND mp.empresa_id IN (SELECT empresa_id FROM emp);
-
--- 4) Dias (sem duplicar dia que já tem linha com a empresa certa)
+-- 2) Dias (sem duplicar dia que já tem linha com a empresa certa)
 -- Só a empresa muda: os gatilhos que RECALCULAM o dia (pré-assinalação,
 -- adicional noturno, supressão de intervalo, semanal, alertas) e a trava de
 -- período fechado ficam desligados durante este UPDATE, para nenhum valor
@@ -124,13 +101,9 @@ BEGIN
 END
 $religa$;
 
--- 5) Conferência
+-- 3) Conferência
 SELECT json_build_object(
-  'batidas_sem_empresa_antes', (SELECT count(*) FROM backup.ponto_vinc_emp_marc_20261029),
-  'batidas_vinculadas', (SELECT count(*) FROM backup.ponto_vinc_emp_marc_20261029 b
-                          JOIN public.ponto_marcacoes m ON m.id = b.id WHERE m.empresa_id IS NOT NULL),
-  'batidas_ainda_sem_empresa', (SELECT count(*) FROM backup.ponto_vinc_emp_marc_20261029 b
-                          JOIN public.ponto_marcacoes m ON m.id = b.id WHERE m.empresa_id IS NULL),
+  'batidas_sem_empresa_info', (SELECT count(*) FROM backup.ponto_vinc_emp_marc_20261029),
   'dias_sem_empresa_antes', (SELECT count(*) FROM backup.ponto_vinc_emp_diario_20261029),
   'dias_vinculados', (SELECT count(*) FROM backup.ponto_vinc_emp_diario_20261029 b
                        JOIN public.ponto_diario d ON d.id = b.id WHERE d.empresa_id IS NOT NULL),

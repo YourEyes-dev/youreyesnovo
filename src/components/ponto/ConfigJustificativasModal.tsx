@@ -82,7 +82,7 @@ export function ConfigJustificativasModal({ open, onOpenChange }: Props) {
             <Clock className="w-5 h-5" /> Justificativas de Ponto
           </DialogTitle>
           <DialogDescription>
-            Cadastre os motivos que o gestor pode escolher ao ajustar o ponto. Cada justificativa tem uma regra de <strong>abono automático</strong> (Sim / Não / Configurável), aplicada na aprovação do ajuste — não é mais preciso informar horas de abono manualmente.
+            Cadastre os motivos que o gestor pode escolher ao ajustar o ponto. Cada justificativa tem uma regra de <strong>abono automático</strong> (Sim / Não / Configurável), aplicada na aprovação de um lançamento de <strong>dia inteiro</strong>. Atenção: quando o ajuste é de <strong>horário</strong>, a aprovação grava as marcações informadas como trabalho e não aplica a regra — use só para corrigir batidas esquecidas ou erradas. Ausência de parte do dia com declaração ou atestado deve ser lançada em <strong>Atestados</strong>.
           </DialogDescription>
         </DialogHeader>
 

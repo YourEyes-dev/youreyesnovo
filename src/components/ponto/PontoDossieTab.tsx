@@ -96,7 +96,7 @@ export function PontoDossieTab() {
           </h3>
           <p className="text-sm text-muted-foreground max-w-3xl">
             Reúne, numa competência, as peças que o Auditor-Fiscal pede — AEJ, comprovantes,
-            espelhos e o AFD importado —, com índice, contagens e as assinaturas (hashes) que
+            espelhos e o AFD importado —, com índice, contagens e os códigos de integridade (hashes) que
             permitem conferir que nada foi trocado. O pacote fica arquivado no módulo Documentos.
           </p>
         </div>
@@ -126,7 +126,7 @@ export function PontoDossieTab() {
                 <TableRow>
                   <TableHead>Peça</TableHead>
                   <TableHead className="text-center">Quantidade</TableHead>
-                  <TableHead>Assinatura (hash)</TableHead>
+                  <TableHead>Hash de integridade</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -144,7 +144,7 @@ export function PontoDossieTab() {
               </TableBody>
             </Table>
             <div>
-              <p className="text-xs text-muted-foreground">Assinatura do pacote</p>
+              <p className="text-xs text-muted-foreground">Hash de integridade do pacote</p>
               <p className="font-mono text-[11px] break-all">{doCompetencia.hash_pacote || "—"}</p>
             </div>
             <p className="text-xs text-muted-foreground">

@@ -573,7 +573,7 @@ export function SolicitarAjusteFolhaInterno({
                 <div className="flex-1">
                   <DialogTitle>Folha de Ponto · Ajustes</DialogTitle>
                   <DialogDescription>
-                    A folha mostra o mês todo. Edite horários e informe a justificativa de cada período, ou use "Dia inteiro" para lançar uma folga/justificativa no dia todo (folga, licença, abono…). Cada justificativa mostra se abona ou não — o abono é aplicado automaticamente na aprovação, conforme a configuração.
+                    A folha mostra o mês todo. Edite horários e informe a justificativa de cada período, ou use "Dia inteiro" para lançar uma folga/justificativa no dia todo (folga, licença, abono…). Cada justificativa mostra se abona ou não — o abono só é aplicado na aprovação de "Dia inteiro". Ao editar horários, a aprovação grava as marcações informadas como trabalho: use para corrigir batidas esquecidas ou erradas. Ausência de parte do dia com declaração ou atestado deve ser lançada em Atestados.
                   </DialogDescription>
                 </div>
               </div>

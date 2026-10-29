@@ -187,11 +187,12 @@ export function PontoCertificadoTab() {
             <ShieldCheck className="w-5 h-5 text-primary" /> Certificado digital (ICP-Brasil)
           </h3>
           <p className="text-sm text-muted-foreground max-w-3xl">
-            É o certificado que assina o AFD e o AEJ entregues à fiscalização (Portaria MTP
-            671/2021). Aqui ficam só os dados de vigência para acompanhamento —
-            <strong> a chave privada não é guardada no sistema</strong>. Certificado vencido
-            paralisa a emissão assinada bem na hora da auditoria, por isso o vencimento é
-            avisado com antecedência.
+            Cadastro para acompanhar a validade do certificado ICP-Brasil da empresa, com aviso
+            antes do vencimento. <strong>Hoje o sistema ainda não assina o AFD e o AEJ</strong>:
+            os arquivos são baixados em .txt e, quando a fiscalização pedir a versão assinada
+            (Portaria MTP 671/2021), a assinatura é feita fora do sistema, com o seu certificado
+            em um assinador ICP-Brasil. Os dados abaixo são informados à mão —
+            <strong> a chave privada não é guardada no sistema</strong>.
           </p>
         </div>
         <Button onClick={onNovo} className="shrink-0"><Plus className="w-4 h-4 mr-2" /> Novo certificado</Button>
@@ -200,7 +201,7 @@ export function PontoCertificadoTab() {
       {/* O que assina hoje */}
       <Card className={vigente ? "" : "border-amber-300"}>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Certificado em uso hoje</CardTitle>
+          <CardTitle className="text-sm font-medium">Certificado cadastrado (vigência)</CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0">
           {vigente ? (
@@ -233,8 +234,9 @@ export function PontoCertificadoTab() {
             <div className="flex items-start gap-2 text-sm text-amber-900">
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>
-                Nenhum certificado vigente cadastrado. Sem ele, o AFD e o AEJ não têm com que ser
-                assinados — cadastre antes da próxima entrega à fiscalização.
+                Nenhum certificado vigente cadastrado. Cadastre a validade do certificado da empresa
+                para ser avisado antes do vencimento — é com ele que os arquivos são assinados
+                quando a fiscalização pedir.
               </span>
             </div>
           )}

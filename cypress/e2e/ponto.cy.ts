@@ -20,7 +20,8 @@
 // Casos cobertos: PONTO-HOM-A1 (nova declaração de intervalo),
 //   PONTO-HOM-E1 (novo certificado digital), PONTO-HOM-B1 (fechamento),
 //   PONTO-HOM-E2 (dossiê fiscal), PONTO-HOM-I1 (alertas CLT),
-//   PONTO-HOM-H1 (escalas), PONTO-HOM-F1 (feriados unificados).
+//   PONTO-HOM-H1 (escalas), PONTO-HOM-F1 (feriados unificados),
+//   PONTO-498 (justificativas: natureza, app e aviso de nome × regra).
 // =====================================================================
 
 import { credenciaisDeTeste } from "../support/credenciais";
@@ -126,6 +127,25 @@ describe("Módulo Ponto", () => {
     cy.get('[role="dialog"]', { timeout: 15000 }).should("exist");
     // a abrangência 'Filial / unidade' saiu do cadastro por localização
     cy.get('[role="dialog"]').contains("Filial / unidade").should("not.exist");
+    cy.get("body").type("{esc}", { force: true });
+  });
+
+  // PONTO-498 — Configurações › Geral › Justificativas: colunas Natureza e
+  // No app, e o aviso ao vivo quando o nome contradiz a regra de abono.
+  // Não salva nada (o aviso aparece antes de salvar).
+  it("abre Configurações › Geral › Justificativas com natureza, app e aviso de nome × regra", () => {
+    abrirArea("tab-ponto-configuracoes");
+    cy.contains('[role="tab"]', /^\s*Geral\s*$/, { timeout: 20000 }).click({ force: true });
+    cy.contains("button", "Configurar Justificativas", { timeout: 20000 }).should("be.visible").click({ force: true });
+    cy.get('[role="dialog"]', { timeout: 15000 }).should("exist");
+    cy.get('[role="dialog"]').contains("th", "Natureza", { timeout: 20000 }).should("exist");
+    cy.get('[role="dialog"]').contains("th", "No app").should("exist");
+    cy.get('[role="dialog"]').find('input[placeholder="Ex.: Atestado médico"]').clear().type("Falta não abonada");
+    cy.get('[data-testid="just-abono"]').click({ force: true });
+    cy.contains('[role="option"]', "Sim (abona)", { timeout: 10000 }).click({ force: true });
+    cy.get('[data-testid="just-aviso-divergencia"]', { timeout: 10000 })
+      .should("be.visible")
+      .and("contain.text", "NÃO abona");
     cy.get("body").type("{esc}", { force: true });
   });
 });

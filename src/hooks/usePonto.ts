@@ -71,7 +71,7 @@ export interface PontoAjuste {
   hora_original: string | null;
   hora_solicitada: string | null;
   motivo: string;
-  status: "pendente" | "aprovado" | "rejeitado";
+  status: "pendente" | "aprovado" | "rejeitado" | "pendente_comprovacao";
   aprovado_por: string | null;
   aprovado_por_nome: string | null;
   data_aprovacao: string | null;
@@ -86,6 +86,14 @@ export interface PontoAjuste {
   dia_inteiro?: boolean | null;
   abonar_se_aprovado?: boolean | null;
   observacao?: string | null;
+  /** Fase 2: 'correcao_batida' | 'ausencia'; null = pedido antigo ou lançamento do RH. */
+  natureza?: "correcao_batida" | "ausencia" | null;
+  ausencia_hora_inicio?: string | null;
+  ausencia_hora_fim?: string | null;
+  /** Atestado lançado pela aprovação da ausência. */
+  atestado_id?: string | null;
+  /** Caminho da selfie do pedido (bucket privado ponto-selfies). */
+  selfie_url?: string | null;
 }
 
 export interface PontoAuditLog {
@@ -460,6 +468,9 @@ export function usePonto() {
       diaInteiro,
       observacao,
       abonarSeAprovado,
+      natureza,
+      ausenciaHoraInicio,
+      ausenciaHoraFim,
     }: {
       colaboradorId: string;
       colaboradorNome: string;
@@ -476,6 +487,10 @@ export function usePonto() {
       diaInteiro?: boolean;
       observacao?: string;
       abonarSeAprovado?: boolean;
+      /** Fase 2: natureza do pedido. Sem ela, o banco deriva da justificativa. */
+      natureza?: "correcao_batida" | "ausencia";
+      ausenciaHoraInicio?: string;
+      ausenciaHoraFim?: string;
     }) => {
       if (!tenantId || !user) throw new Error("Usuário não autenticado");
 
@@ -497,7 +512,11 @@ export function usePonto() {
       if (anexos && anexos.length > 0) {
         for (const file of anexos) {
           const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-          const path = `${user.id}/${dataReferencia}/${Date.now()}_${safeName}`;
+          // Pasta da EMPRESA: a leitura do bucket é por empresa, então o anexo
+          // fica visível para todo o RH (e para Atestados, quando o pedido é
+          // uma ausência aprovada). A pasta antiga (id do usuário) só o próprio
+          // autor conseguia abrir.
+          const path = `${tenantId}/ajustes/${dataReferencia}/${Date.now()}_${safeName}`;
           const { data: up, error: upErr } = await supabase
             .storage.from("ponto-ajustes-anexos").upload(path, file, { contentType: file.type });
           if (upErr) throw upErr;
@@ -524,6 +543,10 @@ export function usePonto() {
           dia_inteiro: diaInteiro ?? false,
           observacao: observacao || null,
           abonar_se_aprovado: abonarSeAprovado ?? false,
+          ...(natureza ? { natureza } : {}),
+          ...(natureza === "ausencia" && !diaInteiro
+            ? { ausencia_hora_inicio: ausenciaHoraInicio ?? null, ausencia_hora_fim: ausenciaHoraFim ?? null }
+            : {}),
           created_by: user.id,
           created_by_nome: profile?.nome_completo,
         } as any)

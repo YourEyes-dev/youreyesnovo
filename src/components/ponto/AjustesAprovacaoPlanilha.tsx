@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronRight, CheckCircle, XCircle, Paperclip, FileText, Shield, Search, Trash2, ShieldAlert } from "lucide-react";
+import { ChevronDown, ChevronRight, CheckCircle, XCircle, Paperclip, FileText, Shield, Search, Trash2, ShieldAlert, Camera, Loader2 } from "lucide-react";
 import { confirm } from "@/components/ui/confirm-dialog";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { urlTemporariaSelfie } from "@/lib/ponto/selfie";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +38,13 @@ const MOTIVOS_REJEICAO = [
   "Esqueceu de registrar no horário correto",
   "Outro"
 ];
+
+const hhmm = (t?: string | null) => (t || "").slice(0, 5);
+
+// RPCs novas ainda fora dos tipos gerados do Supabase.
+type RpcLivre = (fn: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+const rpcLivre = (fn: string, args: Record<string, unknown>) =>
+  (supabase.rpc as unknown as RpcLivre)(fn, args);
 
 const formatDate = (iso: string) => {
   const raw = (iso || "").toString().slice(0, 10);
@@ -82,6 +94,51 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
   const ajusteAbona = (aj: PontoAjuste): boolean => {
     const ta = aj.justificativa_id ? abonoPorId[aj.justificativa_id] : undefined;
     return ta === "sim" || (ta === "configuravel" && !!aj.abonar_se_aprovado);
+  };
+  const regraAbono = (aj: PontoAjuste): string | undefined =>
+    aj.justificativa_id ? abonoPorId[aj.justificativa_id] : undefined;
+  const ehAusencia = (aj: PontoAjuste) => aj.natureza === "ausencia";
+
+  // Fase 2: na ausência com regra "Configurável", quem decide o abono é o RH,
+  // antes de aprovar (o colaborador não decide abono).
+  const queryClient = useQueryClient();
+  const [definindoAbono, setDefinindoAbono] = useState<string | null>(null);
+  const definirAbono = async (aj: PontoAjuste, abonar: boolean) => {
+    setDefinindoAbono(aj.id);
+    try {
+      const { error } = await rpcLivre("ponto_ajuste_definir_abono", {
+        p_ajuste_id: aj.id,
+        p_abonar: abonar,
+      });
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["ponto-ajustes-pendentes"] });
+    } catch (e) {
+      toast.error("Não foi possível marcar o abono: " + (e as Error).message);
+    } finally {
+      setDefinindoAbono(null);
+    }
+  };
+
+  // Selfie do pedido (app): bucket privado, link temporário, acesso registrado
+  // na trilha (LGPD arts. 11 e 46) — mesmo cuidado da selfie da batida.
+  const [selfieAberta, setSelfieAberta] = useState<{ nome: string; src: string | null; carregando: boolean } | null>(null);
+  const verSelfie = async (aj: PontoAjuste) => {
+    setSelfieAberta({ nome: aj.colaborador_nome, src: null, carregando: true });
+    const src = await urlTemporariaSelfie(aj.selfie_url);
+    setSelfieAberta({ nome: aj.colaborador_nome, src, carregando: false });
+    if (!src) toast.error("Não foi possível abrir a selfie.");
+    try {
+      await rpcLivre("ponto_log_acesso_sensivel", {
+        p_tenant_id: aj.tenant_id,
+        p_acao: "visualizou_selfie",
+        p_recurso: "ponto_ajustes",
+        p_recurso_id: aj.id,
+        p_colaborador_cpf: aj.colaborador_cpf || null,
+        p_descricao: "Selfie do pedido de ajuste exibida na Folha de Aprovação.",
+      });
+    } catch {
+      // O registro não pode impedir o RH de trabalhar.
+    }
   };
 
   // Group: colaborador_id -> data_referencia -> ajustes[]
@@ -143,6 +200,21 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
     const pendentes = [...pendentesRaw].sort(
       (a, b) => String(a.hora_solicitada || "").localeCompare(String(b.hora_solicitada || ""))
     );
+
+    // Ausência parcial que abona: até a Fase 4 o sistema abona o DIA INTEIRO.
+    // O RH precisa confirmar isso conscientemente.
+    const parciaisQueAbonam = pendentes.filter(
+      (a) => ehAusencia(a) && !a.dia_inteiro && ajusteAbona(a)
+    );
+    if (parciaisQueAbonam.length > 0) {
+      const ok = await confirm({
+        title: "Ausência de parte do dia que abona",
+        description:
+          "Este dia tem uma ausência de parte do dia com justificativa que abona. Por enquanto, ao aprovar, o sistema abona o DIA INTEIRO (não só as horas do documento) e avisa o DP para conferir. Deseja aprovar mesmo assim?",
+        confirmLabel: "Aprovar",
+      });
+      if (!ok) return;
+    }
 
     // Auto-lançamento: exige justificativa antes de enviar ao backend
     // (o RPC rejeita observação com menos de 10 caracteres).
@@ -217,9 +289,9 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
           <div>
             <h3 className="text-base font-bold tracking-tight">Folha de Aprovação de Ajustes</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Cada linha = um dia. Aprove ou rejeite o dia inteiro de uma só vez. Aprovar um horário
-              grava a marcação como trabalho — se o pedido é de ausência com declaração ou atestado,
-              rejeite e lance em Atestados.
+              Cada linha = um dia. Aprove ou rejeite o dia inteiro de uma só vez. <strong>Correção de batida</strong> grava
+              o horário como trabalho. <strong>Ausência</strong> vira lançamento em Atestados, com o documento anexado e a
+              regra de abono da justificativa — não grava marcação.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -259,8 +331,12 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
             <span>Sem alteração</span>
           </div>
           <div className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded bg-violet-100 border border-violet-300" />
+            <span>Ausência (vira Atestado)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded bg-indigo-100 border border-indigo-300" />
-            <span>Justificativa</span>
+            <span>Lançamento do RH (dia inteiro)</span>
           </div>
         </div>
 
@@ -322,7 +398,7 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
                                   com os blocos de motivo do corpo (grid 248px + gap 12px). */}
                               <th className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2 px-3 text-left w-[260px] min-w-[260px]">Marcações (Entrada / Saída)</th>
                               <th className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2 px-3 text-left min-w-[180px]">Motivo</th>
-                              <th className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2 px-3 text-center w-16">Anexos</th>
+                              <th className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2 px-3 text-center w-20">Anexos</th>
                               <th className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2 px-3 text-right w-52">Ações do Dia</th>
                             </tr>
                           </thead>
@@ -335,6 +411,7 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
                                 items.flatMap((a) => a.anexos ?? []).map((x: any) => x.url ?? x.path ?? x.nome)
                               ).size;
                               const firstAjusteAnexo = items.find((a) => (a.anexos?.length ?? 0) > 0);
+                              const comSelfie = items.find((a) => !!a.selfie_url);
 
                               return (
                                 <tr key={date} className={cn("border-t hover:bg-muted/20", !hasPendente && "opacity-90")}>
@@ -351,7 +428,8 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
                                     const ordenados = [...items]
                                       .filter((a) => a.tipo_ajuste !== "justificativa")
                                       .sort((a, b) => String(a.hora_solicitada || "").localeCompare(String(b.hora_solicitada || "")));
-                                    const justificativas = items.filter((a) => a.tipo_ajuste === "justificativa");
+                                    const ausencias = items.filter((a) => ehAusencia(a));
+                                    const justificativas = items.filter((a) => a.tipo_ajuste === "justificativa" && !ehAusencia(a));
 
                                     // Monta linhas Entrada|Saída pelo TIPO salvo (não pela
                                     // posição): cada linha = uma Entrada (coluna esquerda) +
@@ -422,11 +500,32 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
 
                                     // Motivo/observação do PERÍODO: cada par mostra a SUA
                                     // justificativa ao lado, em vez de juntar as do dia todo.
-                                    const renderMotivoPeriodo = (ajustes: (PontoAjuste | null)[]) => {
+                                    const renderMotivoPeriodo = (ajustes: (PontoAjuste | null)[], semSelo = false) => {
                                       const ms = Array.from(new Set(ajustes.map((a) => a?.motivo).filter((x): x is string => !!x)));
                                       const obs = Array.from(new Set(ajustes.map((a) => a?.observacao).filter((x): x is string => !!x)));
+                                      const presentes = ajustes.filter((a): a is PontoAjuste => !!a);
+                                      const correcao = presentes.some((a) => a.natureza === "correcao_batida");
+                                      const antigo = presentes.some((a) => !a.natureza && (a.tipo_ajuste === "inclusao" || a.tipo_ajuste === "correcao"));
                                       return (
                                         <div className="min-w-0 pt-4">
+                                          {!semSelo && correcao && (
+                                            <Badge variant="outline" className="text-[9px] mb-0.5 border-amber-300 text-amber-800">Correção de batida</Badge>
+                                          )}
+                                          {!semSelo && !correcao && antigo && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Badge variant="outline" className="text-[9px] mb-0.5 border-slate-300 text-slate-600 cursor-help">Pedido antigo</Badge>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="top" className="max-w-xs">
+                                                <p className="text-xs">
+                                                  Pedido feito antes da separação entre Correção de batida e Ausência, com motivo
+                                                  em texto livre. Aprovar grava o horário como trabalho. Se na verdade for uma
+                                                  ausência com declaração ou atestado, rejeite e peça para o colaborador reenviar
+                                                  como <strong>Ausência</strong>, com o documento.
+                                                </p>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          )}
                                           <p className="text-xs font-medium leading-snug">{ms.join(" • ") || "—"}</p>
                                           {obs.length > 0 && (
                                             <p className="text-[11px] text-muted-foreground italic leading-snug mt-0.5">{obs.join(" • ")}</p>
@@ -438,7 +537,7 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
                                     return (
                                       <td className="py-2.5 px-3 align-top" colSpan={2}>
                                         <div className="flex flex-col gap-1.5">
-                                          {ordenados.length === 0 && justificativas.length === 0 && (
+                                          {ordenados.length === 0 && justificativas.length === 0 && ausencias.length === 0 && (
                                             <span className="text-xs text-muted-foreground/60">—</span>
                                           )}
                                           {/* Cada linha = um PERÍODO: par Entrada+Saída à esquerda,
@@ -452,6 +551,59 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
                                               {renderMotivoPeriodo([linha.entrada, linha.saida])}
                                             </div>
                                           ))}
+                                          {ausencias.map((aj) => {
+                                            const regra = regraAbono(aj);
+                                            const abona = ajusteAbona(aj);
+                                            const pendente = aj.status === "pendente";
+                                            const periodo = aj.dia_inteiro
+                                              ? "Dia inteiro"
+                                              : `${hhmm(aj.ausencia_hora_inicio)}–${hhmm(aj.ausencia_hora_fim)}`;
+                                            return (
+                                              <div key={aj.id} className="grid grid-cols-[248px_1fr] gap-3 items-start">
+                                                <div className="flex flex-col gap-0.5">
+                                                  <span className="text-[9px] font-semibold text-violet-700">Ausência</span>
+                                                  <div className="rounded border px-2 py-1.5 text-[11px] bg-violet-50 border-violet-300 text-violet-900 w-fit min-w-[160px] space-y-1">
+                                                    <span className="block font-mono font-semibold text-sm">{periodo}</span>
+                                                    {regra === "configuravel" ? (
+                                                      pendente ? (
+                                                        <label className="flex items-center gap-1.5 cursor-pointer">
+                                                          {definindoAbono === aj.id ? (
+                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                          ) : (
+                                                            <Checkbox
+                                                              checked={!!aj.abonar_se_aprovado}
+                                                              onCheckedChange={(c) => definirAbono(aj, c === true)}
+                                                              disabled={processando || !!definindoAbono}
+                                                            />
+                                                          )}
+                                                          <span className="text-[10px]">Abonar (decisão do RH)</span>
+                                                        </label>
+                                                      ) : (
+                                                        <span className="block text-[10px]">{abona ? "abonou ✓" : "não abonou"}</span>
+                                                      )
+                                                    ) : (
+                                                      <span className={cn("block text-[10px]", abona ? "text-emerald-700" : "text-rose-700")}>
+                                                        {abona ? "abona ✓" : "não abona (débito segue)"}
+                                                      </span>
+                                                    )}
+                                                    <div className="flex items-center gap-1 pt-0.5">
+                                                      {(aj.anexos?.length ?? 0) > 0 && (
+                                                        <Button size="sm" variant="outline" className="h-6 gap-1 px-1.5 text-[10px]" onClick={() => onOpenAnexos(aj)}>
+                                                          <Paperclip className="w-3 h-3" /> Documento
+                                                        </Button>
+                                                      )}
+                                                      {aj.atestado_id && (
+                                                        <Badge variant="outline" className="text-[9px] border-violet-300 text-violet-700">
+                                                          <FileText className="w-3 h-3 mr-0.5" /> Em Atestados
+                                                        </Badge>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                                {renderMotivoPeriodo([aj], true)}
+                                              </div>
+                                            );
+                                          })}
                                           {justificativas.map((aj) => {
                                             const abona = ajusteAbona(aj);
                                             return (
@@ -487,14 +639,29 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
                                   })()}
 
                                   <td className="py-2.5 px-3 text-center align-top">
-                                    {totalAnexos > 0 && firstAjusteAnexo ? (
-                                      <Button size="sm" variant="outline" className="h-7 gap-1 px-2" onClick={() => onOpenAnexos(firstAjusteAnexo)}>
-                                        <Paperclip className="w-3 h-3" />
-                                        <span className="text-[11px]">{totalAnexos}</span>
-                                      </Button>
-                                    ) : (
-                                      <span className="text-xs text-muted-foreground">—</span>
-                                    )}
+                                    <div className="flex flex-col items-center gap-1">
+                                      {totalAnexos > 0 && firstAjusteAnexo ? (
+                                        <Button size="sm" variant="outline" className="h-7 gap-1 px-2" onClick={() => onOpenAnexos(firstAjusteAnexo)}>
+                                          <Paperclip className="w-3 h-3" />
+                                          <span className="text-[11px]">{totalAnexos}</span>
+                                        </Button>
+                                      ) : null}
+                                      {comSelfie && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 gap-1 px-2"
+                                          onClick={() => verSelfie(comSelfie)}
+                                          title="Ver a selfie tirada no envio do pedido"
+                                        >
+                                          <Camera className="w-3 h-3" />
+                                          <span className="text-[11px]">Selfie</span>
+                                        </Button>
+                                      )}
+                                      {!(totalAnexos > 0 && firstAjusteAnexo) && !comSelfie && (
+                                        <span className="text-xs text-muted-foreground">—</span>
+                                      )}
+                                    </div>
                                   </td>
 
                                   <td className="py-2.5 px-3 text-right align-top">
@@ -602,6 +769,26 @@ export function AjustesAprovacaoPlanilha({ ajustes, processarAjuste, processando
           Logs de auditoria em conformidade com Portaria 671 MTP
         </div>
       </motion.div>
+      <Dialog open={!!selfieAberta} onOpenChange={(v) => { if (!v) setSelfieAberta(null); }}>
+        <DialogContent className="sm:max-w-[380px]">
+          <DialogHeader>
+            <DialogTitle>Selfie do pedido</DialogTitle>
+            <DialogDescription>
+              Foto tirada por {selfieAberta?.nome} ao enviar o pedido de ajuste. O acesso fica registrado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center min-h-[200px]">
+            {selfieAberta?.carregando ? (
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            ) : selfieAberta?.src ? (
+              <img src={selfieAberta.src} alt="Selfie do pedido de ajuste" className="max-h-[60vh] rounded-md" />
+            ) : (
+              <span className="text-sm text-muted-foreground">Selfie indisponível.</span>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={rejeitarDialogOpen} onOpenChange={setRejeitarDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

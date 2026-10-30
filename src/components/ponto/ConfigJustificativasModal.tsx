@@ -122,7 +122,7 @@ export function ConfigJustificativasModal({ open, onOpenChange }: Props) {
             <Clock className="w-5 h-5" /> Justificativas de Ponto
           </DialogTitle>
           <DialogDescription>
-            Cadastre os motivos que o gestor pode escolher ao ajustar o ponto. Cada justificativa tem uma regra de <strong>abono automático</strong> (Sim / Não / Configurável), aplicada na aprovação de um lançamento de <strong>dia inteiro</strong>. A <strong>natureza</strong> prepara o novo app do colaborador: <em>correção de batida</em> grava o horário como trabalho (nunca abona) e <em>ausência</em> exige a declaração ou o atestado anexado. Atenção: quando o ajuste é de <strong>horário</strong>, a aprovação grava as marcações informadas como trabalho e não aplica a regra — use só para corrigir batidas esquecidas ou erradas. Ausência de parte do dia com declaração ou atestado deve ser lançada em <strong>Atestados</strong>.
+            Cadastre os motivos que o gestor pode escolher ao ajustar o ponto. Cada justificativa tem uma regra de <strong>abono automático</strong> (Sim / Não / Configurável), aplicada na aprovação de um lançamento de <strong>dia inteiro</strong>. A <strong>natureza</strong> define o uso no app do colaborador e na tela de ajuste: <em>correção de batida</em> grava o horário como trabalho (nunca abona); <em>ausência</em> exige a declaração ou o atestado anexado e, na aprovação, vira lançamento em <strong>Atestados</strong> com o documento e a regra de abono (não grava marcação). Sem natureza = lançamento só do RH (folga, day off…), fora do app.
           </DialogDescription>
         </DialogHeader>
 

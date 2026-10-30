@@ -62,6 +62,16 @@ export interface PontoEspelho {
   empresa_id?: string | null;
 }
 
+/**
+ * Ciência que vale como do colaborador: assinatura eletrônica ou papel assinado.
+ * Só ela bloqueia um novo envio para assinatura ou um novo registro em papel.
+ * A ciência antiga do RH (rh_legado) NÃO conta: o espelho pode ser enviado e a
+ * nova ciência substitui a antiga (o portão do fechamento segue aceitando-a).
+ */
+export const temCienciaValidaDoColaborador = (e: Pick<PontoEspelho, "ciencia_origem" | "status">) =>
+  (e.ciencia_origem === "colaborador_eletronica" || e.ciencia_origem === "papel_digitalizado") &&
+  e.status !== "contestado";
+
 export function usePontoFechamento() {
   const { tenantId, user, profile } = useAuth();
   const { empresaAtivaId } = useEmpresaAtiva();
@@ -336,7 +346,7 @@ export function usePontoFechamento() {
         const MSG: Record<string, string> = {
           anexo_obrigatorio: "Anexe o papel assinado.",
           anexo_de_outro_colaborador: "O papel anexado é de outro colaborador.",
-          espelho_ja_tem_ciencia: "Este espelho já tem ciência registrada.",
+          espelho_ja_tem_ciencia: "Este espelho já tem a ciência do colaborador (assinatura eletrônica ou papel).",
           sem_permissao: "Seu acesso não permite registrar ciência de espelho.",
           espelho_de_outra_empresa: "Este espelho é de outra empresa.",
         };

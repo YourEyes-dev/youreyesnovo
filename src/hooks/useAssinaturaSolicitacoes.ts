@@ -48,7 +48,7 @@ const MENSAGENS: Record<string, string> = {
   sem_email: "O colaborador não tem e-mail cadastrado: o link não pode ser assinado. Use a ciência em papel.",
   ja_existe_ativa: "Este espelho já tem um envio em andamento.",
   competencia_nao_fechada: "Feche a competência antes de enviar o espelho para assinatura.",
-  espelho_ja_tem_ciencia: "Este espelho já tem ciência registrada.",
+  espelho_ja_tem_ciencia: "Este espelho já tem a ciência do colaborador (assinatura eletrônica ou papel).",
   hash_obrigatorio: "Não foi possível congelar o PDF do espelho.",
   solicitacao_inativa: "Este envio não está mais aberto.",
   sem_permissao: "Seu acesso não permite gerir assinaturas do espelho.",

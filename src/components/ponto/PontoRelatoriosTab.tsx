@@ -39,7 +39,7 @@ import { IncluirBancoHorasDialog } from "@/components/ponto/IncluirBancoHorasDia
 import { EspelhoVisualizarDialog } from "@/components/ponto/EspelhoVisualizarDialog";
 import { EspelhoAssinaturaStatus } from "@/components/ponto/EspelhoAssinaturaStatus";
 import { useAssinaturaSolicitacoes } from "@/hooks/useAssinaturaSolicitacoes";
-import type { PontoEspelho } from "@/hooks/usePontoFechamento";
+import { temCienciaValidaDoColaborador, type PontoEspelho } from "@/hooks/usePontoFechamento";
 
 
 type ReportType = "cartao_ponto" | "espelho" | "horas_extras" | "banco_horas" | "absenteismo" | "afd" | "aej";
@@ -449,8 +449,8 @@ export function PontoRelatoriosTab() {
         ? "Este colaborador não tem espelho gerado na competência."
         : solicitacaoDoFiltrado && ["na_fila", "enviado", "visualizado"].includes(solicitacaoDoFiltrado.status)
           ? "Este espelho já está com o colaborador para assinatura."
-          : espelhoDoColaboradorFiltrado.ciencia_origem && espelhoDoColaboradorFiltrado.status !== "contestado"
-            ? "Este espelho já tem ciência registrada."
+          : temCienciaValidaDoColaborador(espelhoDoColaboradorFiltrado)
+            ? "Este espelho já tem a ciência do colaborador (assinatura eletrônica ou papel)."
             : null;
 
   const enviarDoFiltro = async () => {

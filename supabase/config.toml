@@ -139,3 +139,10 @@ project_id = "diayjpsrcerycycyaxst"
     verify_jwt = false
   [functions.hubspot-lead]
     verify_jwt = false
+  # Assinatura eletrônica (espelho de ponto): a página pública /assinar chama
+  # assinatura-documento sem login (identidade = CPF + código + prova de vida);
+  # assinatura-despachar é chamada pelo pg_cron e confere o segredo de app_config.
+  [functions.assinatura-documento]
+    verify_jwt = false
+  [functions.assinatura-despachar]
+    verify_jwt = false

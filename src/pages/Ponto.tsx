@@ -240,21 +240,19 @@ const Ponto = () => {
       const ativas = (atribuicoes || []).filter((a: any) => a.ativa !== false);
       const escalaIds = [...new Set(ativas.map((a: any) => a.escala_id).filter(Boolean))];
       if (escalaIds.length === 0) return { atribuicoes: ativas, periodos: [] as any[] };
-      const DIAS = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
-      const [y, mo, d] = dataSelStr.split("-").map(Number);
-      const diaSemana = DIAS[new Date(y, (mo || 1) - 1, d || 1).getDay()];
-      const { data: periodos, error: e2 } = await fromTable("ponto_escala_periodos")
-        .select("escala_id, ordem_bloco, hora_inicio, hora_fim")
-        .eq("tenant_id", tenantIdAtivo)
-        .eq("dia_semana", diaSemana)
-        .in("escala_id", escalaIds) as { data: any[] | null; error: Error | null };
+      // Blocos e jornada da escala VÁLIDOS NA DATA (EC 141 F1): com uma
+      // alteração agendada, os dias anteriores à data seguem com os antigos.
+      const { data: periodos, error: e2 } = await (supabase.rpc as any)("ponto_escalas_periodos_na_data", {
+        p_escala_ids: escalaIds,
+        p_data: dataSelStr,
+      }) as { data: any[] | null; error: Error | null };
       if (e2) throw e2;
       // Jornada diária da escala — usada como fallback do teto legal (RN17)
       // quando a escala não tem blocos cadastrados para o dia.
-      const { data: escalas, error: e3 } = await fromTable("ponto_escalas")
-        .select("id, jornada_diaria_minutos")
-        .eq("tenant_id", tenantIdAtivo)
-        .in("id", escalaIds) as { data: any[] | null; error: Error | null };
+      const { data: escalas, error: e3 } = await (supabase.rpc as any)("ponto_escalas_na_data", {
+        p_data: dataSelStr,
+        p_escala_ids: escalaIds,
+      }) as { data: any[] | null; error: Error | null };
       if (e3) throw e3;
       return { atribuicoes: ativas, periodos: periodos || [], escalas: escalas || [] };
     },

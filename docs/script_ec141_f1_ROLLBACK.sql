@@ -8,8 +8,9 @@
 --   2) desativa os marcos EC 141 (global e exceções de conta);
 --   3) devolve o gatilho de versão e o overlay da PONTO-153 ao corpo original
 --      (congela sempre até ontem, 7 campos);
---   4) retira as duas reinjeções marcadas [ec141-f1] (formalização e
---      equalização), removendo exatamente o texto injetado.
+--   4) retira todas as reinjeções marcadas [ec141-f1] (formalização,
+--      equalização, saldo, intervalo, débito, batidas de dia inteiro, troca de
+--      turno), trocando exatamente o texto injetado pela âncora original.
 -- As tabelas/colunas novas ficam (inertes): não guardam dado pessoal e
 -- preservam o histórico. Nada de dado de cliente é apagado.
 -- Conferência final em um SELECT.
@@ -107,59 +108,32 @@ BEGIN
 END;
 $fn$;
 
--- 4a) Retira a reinjeção da formalização (texto exato injetado).
-DO $rb_form$
+-- 4) Retira TODAS as reinjeções [ec141-f1], pelo mesmo registro que as
+--    aplicou (troca exata do texto novo pela âncora original).
+DO $rb_reinj$
 DECLARE
-  v_def text;
-  v_add text := E'\n  -- [ec141-f1] versao do dia + instrumento coletivo da empresa na data (ver ponto_escala_formalizacao_status_em)\n  RETURN public.ponto_escala_formalizacao_status_em(p_escala_id, CURRENT_DATE);\n';
+  r record;
+  v text;
 BEGIN
-  v_def := (SELECT pg_get_functiondef(p.oid) FROM pg_proc p
-             WHERE p.oid = to_regprocedure('public.ponto_escala_formalizacao_status(uuid)'));
-  IF v_def IS NULL OR position(v_add IN v_def) = 0 THEN
-    RAISE NOTICE 'Rollback EC141 F1: formalizacao sem reinjecao (nada a retirar).';
+  IF to_regprocedure('public._ponto_ec141_reinjecoes()') IS NULL THEN
+    RAISE NOTICE 'Rollback EC141 F1: registro de reinjecoes ausente (nada a retirar).';
     RETURN;
   END IF;
-  EXECUTE replace(v_def, v_add, '');
+  FOR r IN SELECT * FROM public._ponto_ec141_reinjecoes() LOOP
+    v := public._ponto_ec141_reinjetar(r.fn, r.pares, true);
+    RAISE NOTICE 'Rollback EC141 F1: %: %', r.fn, v;
+  END LOOP;
 EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'Rollback EC141 F1: formalizacao nao restaurada: %', SQLERRM;
-END $rb_form$;
-
--- 4b) Retira a reinjeção da equalização (texto exato injetado).
-DO $rb_eq$
-DECLARE
-  v_def text;
-  v_add text := E'\n\n  -- [ec141-f1] parametros da versao vigente no ultimo dia da competencia (escala com "vigente a partir de").\n'
-    || E'  --   So vale para versoes gravadas com os campos novos; versoes antigas leem como antes.\n'
-    || E'  DECLARE v_ec141_ver public.ponto_escalas;\n'
-    || E'  BEGIN\n'
-    || E'    IF EXISTS (SELECT 1 FROM public.ponto_escala_param_versoes pv\n'
-    || E'                WHERE pv.escala_id = v_esc.id AND v_fim BETWEEN pv.vigencia_inicio AND pv.vigencia_fim\n'
-    || E'                  AND pv.inclui_campos_ec141) THEN\n'
-    || E'      v_ec141_ver := public.ponto_escala_na_data(v_esc.id, v_fim);\n'
-    || E'      v_esc.dias_config := v_ec141_ver.dias_config;\n'
-    || E'      v_esc.jornada_diaria_minutos := v_ec141_ver.jornada_diaria_minutos;\n'
-    || E'      v_esc.ativa := COALESCE(v_ec141_ver.equalizacao_mensal_ativa, false);\n'
-    || E'      v_contratada := COALESCE(v_ec141_ver.carga_semanal_contratada_min, 2640);\n'
-    || E'    END IF;\n'
-    || E'  END;';
-BEGIN
-  v_def := (SELECT pg_get_functiondef(p.oid) FROM pg_proc p
-             WHERE p.oid = to_regprocedure('public.ponto_equalizacao_competencia(uuid,uuid,text)'));
-  IF v_def IS NULL OR position(v_add IN v_def) = 0 THEN
-    RAISE NOTICE 'Rollback EC141 F1: equalizacao sem reinjecao (nada a retirar).';
-    RETURN;
-  END IF;
-  EXECUTE replace(v_def, v_add, '');
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'Rollback EC141 F1: equalizacao nao restaurada: %', SQLERRM;
-END $rb_eq$;
+  RAISE NOTICE 'Rollback EC141 F1: reinjecoes nao retiradas: %', SQLERRM;
+END $rb_reinj$;
 
 -- Conferência (um SELECT).
 SELECT
   (SELECT count(*) FROM public.ponto_escala_param_versoes WHERE vigencia_fim >= CURRENT_DATE) AS agendamentos_pendentes_deve_ser_0,
   (SELECT string_agg(codigo || '=' || CASE WHEN ativo THEN 'ATIVO' ELSE 'inativo' END, ' | ' ORDER BY codigo)
      FROM public.ponto_marcos_legais WHERE tenant_id IS NULL) AS marcos,
-  position('[ec141-f1]' IN pg_get_functiondef('public.ponto_escala_formalizacao_status(uuid)'::regprocedure)) = 0 AS formalizacao_restaurada,
-  position('[ec141-f1]' IN pg_get_functiondef('public.ponto_equalizacao_competencia(uuid,uuid,text)'::regprocedure)) = 0 AS equalizacao_restaurada,
+  (SELECT string_agg(r.fn, ', ') FROM public._ponto_ec141_reinjecoes() r
+     WHERE to_regprocedure(r.fn) IS NOT NULL
+       AND position('[ec141-f1]' IN pg_get_functiondef(to_regprocedure(r.fn))) > 0) AS reinjecoes_restantes_deve_ser_nulo,
   position('parametros_vigentes_desde' IN pg_get_functiondef('public.ponto_escala_arquiva_versao()'::regprocedure)) = 0 AS gatilho_restaurado,
   position('inclui_campos_ec141' IN pg_get_functiondef('public.ponto_escala_com_versao(public.ponto_escalas,date)'::regprocedure)) = 0 AS overlay_restaurado;

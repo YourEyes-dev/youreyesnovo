@@ -17,7 +17,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PontoEscalaAvisos } from "@/components/ponto/PontoEscalaAvisos";
 import { PontoEc141Painel } from "@/components/ponto/PontoEc141Painel";
-import { Textarea } from "@/components/ui/textarea";
 import {
   useTetoLegal,
   useAgendamentosEscalas,
@@ -340,17 +339,16 @@ export function PontoEscalasTab() {
       if (vigencia.modo === "data" && !agendamentoEditando) {
         const hoje = hojeISO();
         if (!vigencia.data) { toast.error("Informe a data a partir da qual a alteração vale."); return; }
-        const retroativa = vigencia.data < hoje;
-        if (retroativa && vigencia.motivo.trim().length < 5) {
-          toast.error("Alteração com data anterior a hoje exige justificativa.");
+        // Data passada fica bloqueada nesta entrega: os dias já apurados
+        // precisariam ser recalculados (EC 141 F2).
+        if (vigencia.data < hoje) {
+          toast.error("Por enquanto a alteração só pode valer de hoje em diante (data passada exigiria recalcular dias já apurados).");
           return;
         }
         const ok = await confirm({
-          title: retroativa ? "Aplicar a alteração com data passada?" : "Agendar a alteração da escala?",
-          description: retroativa
-            ? `Os novos horários passam a valer desde ${formatarDataBR(vigencia.data)}. Os dias a partir dessa data passam a ser apurados com a nova jornada (competências fechadas não podem ser atingidas). Até ${formatarDataBR(diaAnteriorISO(vigencia.data))} nada muda.`
-            : `Até ${formatarDataBR(diaAnteriorISO(vigencia.data))} a escala continua com os valores de hoje. A partir de ${formatarDataBR(vigencia.data)} passam a valer os novos horários. Você pode cancelar o agendamento até essa data.`,
-          confirmLabel: retroativa ? "Aplicar" : "Agendar",
+          title: "Agendar a alteração da escala?",
+          description: `Até ${formatarDataBR(diaAnteriorISO(vigencia.data))} a escala continua exatamente como hoje (horários, jornada e apuração). A partir de ${formatarDataBR(vigencia.data)} passam a valer os novos horários. Só mudam horários, jornada, tolerâncias, compensações e equalização — percentuais, feriado e adicional noturno devem ser salvos separadamente. Você pode cancelar o agendamento até essa data.`,
+          confirmLabel: "Agendar",
           variant: "default",
         });
         if (!ok) return;
@@ -1199,7 +1197,7 @@ export function PontoEscalasTab() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                     <div className="space-y-1">
                       <Label className="text-xs">Vale a partir de</Label>
-                      <Input type="date" value={vigencia.data} onChange={e => setVigencia({ ...vigencia, data: e.target.value })} />
+                      <Input type="date" min={hojeISO()} value={vigencia.data} onChange={e => setVigencia({ ...vigencia, data: e.target.value })} />
                     </div>
                     {marcosAtivos.length > 0 && (
                       <div className="space-y-1">
@@ -1213,20 +1211,6 @@ export function PontoEscalasTab() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                    )}
-                    {vigencia.data && vigencia.data < hojeISO() && (
-                      <div className="space-y-1 md:col-span-2">
-                        <Label className="text-xs">Justificativa (obrigatória para data passada)</Label>
-                        <Textarea
-                          rows={2}
-                          value={vigencia.motivo}
-                          onChange={e => setVigencia({ ...vigencia, motivo: e.target.value })}
-                          placeholder="Ex.: correção do cadastro, a escala real mudou nesse dia"
-                        />
-                        <p className="text-[11px] text-amber-700">
-                          Os dias a partir dessa data passam a ser apurados com a nova jornada. Competência já fechada não pode ser atingida.
-                        </p>
                       </div>
                     )}
                     {vigencia.data && (

@@ -19,8 +19,13 @@
 --      a versão guarda também compensacoes_mensais, carga_semanal_contratada_min,
 --      equalizacao_mensal_ativa, tipo e jornada_semanal_minutos. A edição SEM
 --      data segue byte a byte como antes (só os 7 campos da PONTO-153).
---      Regras: retroativo recusado sobre competência fechada; data anterior a
---      hoje só com justificativa; um agendamento pendente por escala.
+--      Os blocos diários (ponto_escala_periodos) de antes também ficam
+--      copiados na versão: para dias anteriores à data, TUDO lê o antigo.
+--      Regras: data anterior a hoje BLOQUEADA nesta entrega (os dias já
+--      apurados precisariam ser reconsolidados — fica para a F2; a checagem
+--      de justificativa e de competência fechada já está no gatilho); um
+--      agendamento pendente por escala; numa alteração com data não podem
+--      mudar campos não versionados (percentuais, feriado, noturno, ciclo).
 --      RPCs: ponto_escala_cancelar_agendamento, ponto_escalas_cancelar_
 --      agendamentos_lote (revogação da lei), ponto_escalas_agendamentos.
 --   3) ponto_ec141_impacto(tenant, empresa, marco): prévia por empresa e
@@ -28,10 +33,12 @@
 --      Para o cliente só aparece com marco EC 141 ativo; o SuperAdmin vê sempre.
 --   4) ponto_escala_validar_teto(escala, data): AVISOS, nunca bloqueia nada
 --      (nem a escala, nem a batida — Portaria MTP 671/2021).
---   5) Leitores que ignoravam a data passam a usar a versão do dia:
---      equalização mensal (reinjeção [ec141-f1], só para versões gravadas a
---      partir daqui) e formalização (nova ponto_escala_formalizacao_status_em
---      com empresa + data; a antiga delega a ela por reinjeção).
+--   5) Leitores que ignoravam a data passam a usar a versão do dia, por
+--      reinjeção [ec141-f1] (registro _ponto_ec141_reinjecoes): formalização,
+--      equalização (1º dia da competência) e equalização da conta, fallback de
+--      jornada/tolerância do saldo, intervalo pela janela entre blocos, débito
+--      por batida, batidas de dia inteiro e troca de turno. As telas leem por
+--      ponto_escalas_na_data / ponto_escalas_periodos_na_data.
 --
 -- GARANTIAS
 --   · Sem marco EC 141 ativo e sem agendamento, a apuração sai idêntica.
@@ -428,7 +435,14 @@ ALTER TABLE public.ponto_escala_param_versoes
   ADD COLUMN IF NOT EXISTS motivo text,
   ADD COLUMN IF NOT EXISTS marco_codigo text,
   ADD COLUMN IF NOT EXISTS criado_por uuid,
-  ADD COLUMN IF NOT EXISTS vigentes_desde_anterior date;
+  ADD COLUMN IF NOT EXISTS vigentes_desde_anterior date,
+  ADD COLUMN IF NOT EXISTS periodos jsonb,
+  ADD COLUMN IF NOT EXISTS escala_anterior jsonb;
+
+COMMENT ON COLUMN public.ponto_escala_param_versoes.periodos IS
+  'EC 141 F1 — copia exata dos blocos diarios (ponto_escala_periodos) antes da alteracao com data: os dias anteriores a data continuam lendo os blocos antigos.';
+COMMENT ON COLUMN public.ponto_escala_param_versoes.escala_anterior IS
+  'EC 141 F1 — linha da escala antes da alteracao com data (para o cancelamento devolver o estado exato).';
 
 COMMENT ON COLUMN public.ponto_escala_param_versoes.inclui_campos_ec141 IS
   'EC 141 F1 — true quando a versao veio de uma edicao COM data (agendamento ou retroativo) e por isso tambem sobrepoe compensacoes, carga contratada, equalizacao, tipo e jornada semanal. Versoes de edicao sem data (e as antigas) ficam false: a leitura delas segue identica a de antes.';
@@ -458,14 +472,19 @@ LANGUAGE plpgsql
 SET search_path TO 'public'
 AS $fn$
 DECLARE
-  v_inicio    date;
-  v_desde     date;
-  v_pend_fim  date;
-  v_origem    text;
-  v_motivo    text;
-  v_marco     text;
-  v_fechada   text;
-  v_mudou7    boolean;
+  v_inicio     date;
+  v_desde      date;
+  v_pend_fim   date;
+  v_origem     text;
+  v_motivo     text;
+  v_marco      text;
+  v_fechada    text;
+  v_mudou7     boolean;
+  v_mudou12    boolean;
+  v_outros     boolean;
+  v_explicito  boolean;
+  v_ajuste     boolean;
+  v_periodos   jsonb;
 BEGIN
   -- Argumentos transitórios da gravação: consumidos aqui, nunca ficam na linha.
   v_motivo := NULLIF(btrim(COALESCE(NEW.parametros_vigencia_motivo, '')), '');
@@ -487,37 +506,55 @@ BEGIN
      OR NEW.hora_saida_padrao              IS DISTINCT FROM OLD.hora_saida_padrao
      OR NEW.intervalo_intrajornada_minutos IS DISTINCT FROM OLD.intervalo_intrajornada_minutos
      OR NEW.dias_config                    IS DISTINCT FROM OLD.dias_config);
-
-  -- Só versiona se um parâmetro que a apuração usa realmente mudou.
-  IF NOT (
-        NEW.jornada_diaria_minutos         IS DISTINCT FROM OLD.jornada_diaria_minutos
-     OR NEW.tolerancia_minutos             IS DISTINCT FROM OLD.tolerancia_minutos
-     OR NEW.tolerancia_diaria_minutos      IS DISTINCT FROM OLD.tolerancia_diaria_minutos
-     OR NEW.hora_entrada_padrao            IS DISTINCT FROM OLD.hora_entrada_padrao
-     OR NEW.hora_saida_padrao              IS DISTINCT FROM OLD.hora_saida_padrao
-     OR NEW.intervalo_intrajornada_minutos IS DISTINCT FROM OLD.intervalo_intrajornada_minutos
-     OR NEW.dias_config                    IS DISTINCT FROM OLD.dias_config
+  -- + os 5 que só a alteração COM data versiona.
+  v_mudou12 := v_mudou7
      OR NEW.compensacoes_mensais           IS DISTINCT FROM OLD.compensacoes_mensais
      OR NEW.carga_semanal_contratada_min   IS DISTINCT FROM OLD.carga_semanal_contratada_min
      OR NEW.equalizacao_mensal_ativa       IS DISTINCT FROM OLD.equalizacao_mensal_ativa
      OR NEW.tipo                           IS DISTINCT FROM OLD.tipo
-     OR NEW.jornada_semanal_minutos        IS DISTINCT FROM OLD.jornada_semanal_minutos
-  ) THEN
+     OR NEW.jornada_semanal_minutos        IS DISTINCT FROM OLD.jornada_semanal_minutos;
+  -- Campos de cálculo que NÃO são versionados: numa alteração com data eles
+  -- valeriam de imediato (antes da data), então não podem mudar junto.
+  v_outros := (
+        NEW.comportamento_feriado          IS DISTINCT FROM OLD.comportamento_feriado
+     OR NEW.percentual_hora_extra_50       IS DISTINCT FROM OLD.percentual_hora_extra_50
+     OR NEW.percentual_hora_extra_100      IS DISTINCT FROM OLD.percentual_hora_extra_100
+     OR NEW.percentual_adicional_noturno   IS DISTINCT FROM OLD.percentual_adicional_noturno
+     OR NEW.usa_hora_ficta_noturna         IS DISTINCT FROM OLD.usa_hora_ficta_noturna
+     OR NEW.adicional_noturno_inicio       IS DISTINCT FROM OLD.adicional_noturno_inicio
+     OR NEW.adicional_noturno_fim          IS DISTINCT FROM OLD.adicional_noturno_fim
+     OR NEW.modalidade                     IS DISTINCT FROM OLD.modalidade
+     OR NEW.ciclo_horas_trabalho           IS DISTINCT FROM OLD.ciclo_horas_trabalho
+     OR NEW.ciclo_horas_descanso           IS DISTINCT FROM OLD.ciclo_horas_descanso
+     OR NEW.ciclo_inicio_data              IS DISTINCT FROM OLD.ciclo_inicio_data
+     OR NEW.ciclo_inicio_hora              IS DISTINCT FROM OLD.ciclo_inicio_hora
+     OR NEW.janela_flexivel                IS DISTINCT FROM OLD.janela_flexivel
+     OR NEW.regras_extras                  IS DISTINCT FROM OLD.regras_extras);
+
+  -- Agendamento pendente desta escala (período antigo que termina hoje ou depois).
+  v_pend_fim := (SELECT max(pv.vigencia_fim) FROM public.ponto_escala_param_versoes pv
+                  WHERE pv.escala_id = OLD.id AND pv.vigencia_fim >= CURRENT_DATE);
+  v_explicito := NEW.parametros_vigentes_desde IS NOT NULL
+                 AND NEW.parametros_vigentes_desde IS DISTINCT FROM OLD.parametros_vigentes_desde;
+  v_ajuste := NOT v_explicito AND v_pend_fim IS NOT NULL
+              AND OLD.parametros_vigentes_desde = v_pend_fim + 1;
+
+  IF (v_explicito OR v_ajuste) AND v_outros THEN
+    RAISE EXCEPTION 'Numa alteração com data só mudam horários, jornada, tolerâncias, compensações e equalização. Percentuais, feriado, adicional noturno e ciclo valeriam antes da data: salve-os separadamente (sem data) ou depois que a data chegar.'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  IF NOT v_mudou12 THEN
     -- Sem mudança de parâmetro, a data de vigência não muda sozinha.
     NEW.parametros_vigentes_desde := OLD.parametros_vigentes_desde;
     RETURN NEW;
   END IF;
 
-  -- Agendamento pendente desta escala (período antigo que termina hoje ou depois).
-  v_pend_fim := (SELECT max(pv.vigencia_fim) FROM public.ponto_escala_param_versoes pv
-                  WHERE pv.escala_id = OLD.id AND pv.vigencia_fim >= CURRENT_DATE);
-
-  IF NEW.parametros_vigentes_desde IS NOT NULL
-     AND NEW.parametros_vigentes_desde IS DISTINCT FROM OLD.parametros_vigentes_desde THEN
+  IF v_explicito THEN
     v_desde := NEW.parametros_vigentes_desde;
-  ELSIF v_pend_fim IS NOT NULL AND OLD.parametros_vigentes_desde = v_pend_fim + 1 THEN
+  ELSIF v_ajuste THEN
     -- Ajuste dos valores JÁ agendados, para a mesma data: o período antigo
-    -- continua congelado como estava.
+    -- (e os blocos antigos) continuam congelados como estavam.
     RETURN NEW;
   ELSE
     -- Edição sem data: EXATAMENTE como antes desta entrega. Só os 7 campos da
@@ -544,11 +581,6 @@ BEGIN
       RAISE EXCEPTION 'Alteração com data anterior a hoje (%) exige justificativa.', to_char(v_desde, 'DD/MM/YYYY')
         USING ERRCODE = 'P0001';
     END IF;
-    IF v_desde < v_inicio THEN
-      RAISE EXCEPTION 'A data % é anterior à última alteração registrada desta escala (vigente desde %).',
-        to_char(v_desde, 'DD/MM/YYYY'), to_char(v_inicio, 'DD/MM/YYYY')
-        USING ERRCODE = 'P0001';
-    END IF;
     v_fechada := (SELECT min(f.competencia) FROM public.ponto_fechamentos f
                    WHERE f.tenant_id = NEW.tenant_id
                      AND f.status = 'fechado'
@@ -559,11 +591,22 @@ BEGIN
         v_fechada
         USING ERRCODE = 'P0001';
     END IF;
-    v_origem := 'retroativo';
+    -- Decisão de segurança (F1): os dias já apurados entre a data e ontem
+    -- teriam de ser reconsolidados no ponto_diario. Enquanto essa
+    -- reconsolidação não existir (EC 141 F2), o retroativo fica bloqueado.
+    RAISE EXCEPTION 'Alteração com data anterior a hoje ainda não está disponível: os dias já apurados precisariam ser recalculados. Escolha hoje ou uma data futura.'
+      USING ERRCODE = 'P0001';
   ELSIF v_desde > CURRENT_DATE THEN
     v_origem := 'agendamento';
   ELSE
     v_origem := 'edicao';
+  END IF;
+
+  -- Blocos diários de ANTES da alteração (a tela os regrava logo depois):
+  -- a versão guarda a cópia exata para os dias anteriores à data.
+  IF v_origem <> 'edicao' THEN
+    v_periodos := COALESCE((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.dia_semana, p.ordem_bloco)
+                              FROM public.ponto_escala_periodos p WHERE p.escala_id = OLD.id), '[]'::jsonb);
   END IF;
 
   -- Se o intervalo não é válido (parâmetros vigoraram só a partir da data),
@@ -575,13 +618,15 @@ BEGIN
        intervalo_intrajornada_minutos, tolerancia_minutos, tolerancia_diaria_minutos,
        dias_config, compensacoes_mensais, carga_semanal_contratada_min,
        equalizacao_mensal_ativa, tipo, jornada_semanal_minutos,
-       inclui_campos_ec141, origem, motivo, marco_codigo, criado_por, vigentes_desde_anterior)
+       inclui_campos_ec141, origem, motivo, marco_codigo, criado_por, vigentes_desde_anterior,
+       periodos, escala_anterior)
     VALUES (OLD.id, OLD.tenant_id, v_inicio, v_desde - 1,
             OLD.jornada_diaria_minutos, OLD.hora_entrada_padrao, OLD.hora_saida_padrao,
             OLD.intervalo_intrajornada_minutos, OLD.tolerancia_minutos, OLD.tolerancia_diaria_minutos,
             OLD.dias_config, OLD.compensacoes_mensais, OLD.carga_semanal_contratada_min,
             OLD.equalizacao_mensal_ativa, OLD.tipo, OLD.jornada_semanal_minutos,
-            (v_origem <> 'edicao'), v_origem, v_motivo, v_marco, auth.uid(), OLD.parametros_vigentes_desde);
+            (v_origem <> 'edicao'), v_origem, v_motivo, v_marco, auth.uid(), OLD.parametros_vigentes_desde,
+            v_periodos, CASE WHEN v_origem <> 'edicao' THEN to_jsonb(OLD) END);
   END IF;
 
   NEW.parametros_vigentes_desde := v_desde;
@@ -665,6 +710,69 @@ SET search_path TO 'public'
 AS $fn$
   SELECT public.ponto_escala_com_versao(e, COALESCE(p_data, CURRENT_DATE))
   FROM public.ponto_escalas e WHERE e.id = p_escala_id
+$fn$;
+
+-- Escala na data SÓ quando há alteração COM data cobrindo o dia; senão a
+-- linha viva, exatamente como os leitores sempre leram. Sem SECURITY
+-- DEFINER: chamada pela tela, respeita a RLS da conta.
+CREATE OR REPLACE FUNCTION public.ponto_escala_na_data_agendada(p_escala_id uuid, p_data date)
+RETURNS public.ponto_escalas
+LANGUAGE sql
+STABLE
+SET search_path TO 'public'
+AS $fn$
+  SELECT CASE WHEN EXISTS (SELECT 1 FROM public.ponto_escala_param_versoes pv
+                            WHERE pv.escala_id = e.id AND pv.inclui_campos_ec141
+                              AND COALESCE(p_data, CURRENT_DATE) BETWEEN pv.vigencia_inicio AND pv.vigencia_fim)
+              THEN public.ponto_escala_com_versao(e, COALESCE(p_data, CURRENT_DATE))
+              ELSE e END
+  FROM public.ponto_escalas e WHERE e.id = p_escala_id
+$fn$;
+
+-- Blocos diários da escala válidos na data: antes de uma alteração com data,
+-- a cópia guardada na versão; senão, a tabela (como sempre).
+CREATE OR REPLACE FUNCTION public.ponto_escala_periodos_na_data(p_escala_id uuid, p_data date)
+RETURNS SETOF public.ponto_escala_periodos
+LANGUAGE sql
+STABLE
+SET search_path TO 'public'
+AS $fn$
+  WITH ver AS MATERIALIZED (
+    SELECT pv.periodos FROM public.ponto_escala_param_versoes pv
+     WHERE pv.escala_id = p_escala_id AND pv.inclui_campos_ec141 AND pv.periodos IS NOT NULL
+       AND COALESCE(p_data, CURRENT_DATE) BETWEEN pv.vigencia_inicio AND pv.vigencia_fim
+     ORDER BY pv.vigencia_inicio DESC LIMIT 1
+  )
+  SELECT x.* FROM ver CROSS JOIN LATERAL jsonb_populate_recordset(NULL::public.ponto_escala_periodos, ver.periodos) x
+  UNION ALL
+  SELECT p.* FROM public.ponto_escala_periodos p
+   WHERE p.escala_id = p_escala_id AND NOT EXISTS (SELECT 1 FROM ver)
+$fn$;
+
+-- Para as telas: escalas e blocos do dia, já resolvidos pela data.
+CREATE OR REPLACE FUNCTION public.ponto_escalas_na_data(p_data date, p_escala_ids uuid[] DEFAULT NULL, p_empresa_id uuid DEFAULT NULL)
+RETURNS SETOF public.ponto_escalas
+LANGUAGE sql
+STABLE
+SET search_path TO 'public'
+AS $fn$
+  SELECT x.*
+    FROM public.ponto_escalas e
+    CROSS JOIN LATERAL public.ponto_escala_na_data_agendada(e.id, p_data) x
+   WHERE (p_escala_ids IS NULL OR e.id = ANY (p_escala_ids))
+     AND (p_empresa_id IS NULL OR e.empresa_id = p_empresa_id)
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.ponto_escalas_periodos_na_data(p_escala_ids uuid[], p_data date)
+RETURNS SETOF public.ponto_escala_periodos
+LANGUAGE sql
+STABLE
+SET search_path TO 'public'
+AS $fn$
+  SELECT b.*
+    FROM unnest(p_escala_ids) AS u(escala_id)
+    CROSS JOIN LATERAL public.ponto_escala_periodos_na_data(u.escala_id, p_data) b
+   WHERE b.dia_semana = (ARRAY['domingo','segunda','terca','quarta','quinta','sexta','sabado'])[EXTRACT(DOW FROM p_data)::int + 1]
 $fn$;
 
 -- Carga semanal de uma escala (a mesma conta da tela de escalas).
@@ -849,12 +957,23 @@ BEGIN
     equalizacao_mensal_ativa       = COALESCE(v_ver.equalizacao_mensal_ativa, e.equalizacao_mensal_ativa),
     tipo                           = COALESCE(v_ver.tipo, e.tipo),
     jornada_semanal_minutos        = COALESCE(v_ver.jornada_semanal_minutos, e.jornada_semanal_minutos),
+    sabado_util                    = CASE WHEN v_ver.escala_anterior ? 'sabado_util'
+                                          THEN (v_ver.escala_anterior->>'sabado_util')::boolean ELSE e.sabado_util END,
+    domingo_util                   = CASE WHEN v_ver.escala_anterior ? 'domingo_util'
+                                          THEN (v_ver.escala_anterior->>'domingo_util')::boolean ELSE e.domingo_util END,
     parametros_vigentes_desde      = v_ver.vigentes_desde_anterior
   WHERE e.id = p_escala_id;
   PERFORM set_config('ponto.ec141_restaurando', 'off', true);
 
   DELETE FROM public.ponto_escala_param_versoes WHERE id = v_ver.id;
-  PERFORM public._ponto_ec141_sincronizar_periodos(p_escala_id);
+  -- Blocos diários: devolve a cópia exata de antes do agendamento.
+  IF v_ver.periodos IS NOT NULL THEN
+    DELETE FROM public.ponto_escala_periodos WHERE escala_id = p_escala_id;
+    INSERT INTO public.ponto_escala_periodos
+    SELECT x.* FROM jsonb_populate_recordset(NULL::public.ponto_escala_periodos, v_ver.periodos) x;
+  ELSE
+    PERFORM public._ponto_ec141_sincronizar_periodos(p_escala_id);
+  END IF;
 
   PERFORM public._ponto_ec141_audit_escala(v_esc.tenant_id, p_escala_id,
     jsonb_build_object('agendado_para', v_ver.vigencia_fim + 1, 'marco_codigo', v_ver.marco_codigo,
@@ -1181,81 +1300,125 @@ END $fn$;
 COMMENT ON FUNCTION public.ponto_escala_formalizacao_status_em(uuid, date) IS
   'Formalizacao da escala (ESC-001/ESC-031) na DATA: le a versao da escala vigente no dia e o instrumento coletivo vigente da conta/empresa naquela data. Devolve regular | pendente | nao_se_aplica.';
 
--- (b) A função antiga (sem data) passa a delegar à nova, com a data de hoje.
---     Reinjeção idempotente por marcador; âncora contada (= 1).
-DO $reinj_form$
-DECLARE
-  v_def    text;
-  v_anchor text := E'    RETURN ''nao_se_aplica'';\n  END IF;\n\n  -- Coletivo (act/cct) vigente para o tenant.';
-  v_add    text := E'\n  -- [ec141-f1] versao do dia + instrumento coletivo da empresa na data (ver ponto_escala_formalizacao_status_em)\n  RETURN public.ponto_escala_formalizacao_status_em(p_escala_id, CURRENT_DATE);\n';
-  v_n      int;
-BEGIN
-  v_def := (SELECT pg_get_functiondef(p.oid) FROM pg_proc p
-             WHERE p.oid = to_regprocedure('public.ponto_escala_formalizacao_status(uuid)'));
-  IF v_def IS NULL THEN
-    RAISE NOTICE '[ec141-f1] ponto_escala_formalizacao_status(uuid) ausente: nada alterado.';
-    RETURN;
-  END IF;
-  IF position('[ec141-f1]' IN v_def) > 0 THEN
-    RAISE NOTICE '[ec141-f1] formalizacao: reinjecao ja aplicada.';
-    RETURN;
-  END IF;
-  v_n := (length(v_def) - length(replace(v_def, v_anchor, ''))) / length(v_anchor);
-  IF v_n <> 1 THEN
-    RAISE NOTICE '[ec141-f1] formalizacao: ancora encontrada % vez(es) — corpo divergente, NADA alterado.', v_n;
-    RETURN;
-  END IF;
-  v_def := replace(v_def, v_anchor, replace(v_anchor, E'  END IF;\n', E'  END IF;\n' || v_add));
-  EXECUTE v_def;
-  RAISE NOTICE '[ec141-f1] formalizacao: reinjecao aplicada.';
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE '[ec141-f1] formalizacao: reinjecao NAO aplicada: %', SQLERRM;
-END $reinj_form$;
+-- (b) Reinjeções [ec141-f1]: leitores que liam a escala/blocos VIVOS sem
+--     olhar a data passam a ler a versão do dia (só quando há alteração com
+--     data cobrindo o dia — sem agendamento, leem exatamente o mesmo).
+--     Registro único dos pares (âncora, texto novo): o mesmo registro serve
+--     para aplicar (migration/script) e para desfazer (rollback). Cada âncora
+--     precisa aparecer exatamente 1 vez; senão a função NÃO é alterada.
+CREATE OR REPLACE FUNCTION public._ponto_ec141_reinjecoes()
+RETURNS TABLE(fn text, pares jsonb)
+LANGUAGE sql
+IMMUTABLE
+SET search_path TO 'public'
+AS $fn$
+  VALUES
+  -- Formalização sem data delega à versão com empresa + data (hoje).
+  ('public.ponto_escala_formalizacao_status(uuid)', jsonb_build_array(jsonb_build_array(
+     E'    RETURN ''nao_se_aplica'';\n  END IF;\n\n  -- Coletivo (act/cct) vigente para o tenant.',
+     E'    RETURN ''nao_se_aplica'';\n  END IF;\n\n  -- [ec141-f1] versao do dia + instrumento coletivo da empresa na data (ver ponto_escala_formalizacao_status_em)\n  RETURN public.ponto_escala_formalizacao_status_em(p_escala_id, CURRENT_DATE);\n\n  -- Coletivo (act/cct) vigente para o tenant.'))),
+  -- Equalização: parâmetros vigentes no PRIMEIRO dia da competência (o mês
+  -- que contém a data agendada segue inteiro com os valores antigos; o rateio
+  -- por dia é a entrega A7).
+  ('public.ponto_equalizacao_competencia(uuid,uuid,text)', jsonb_build_array(jsonb_build_array(
+     'v_contratada := v_esc.contratada;',
+     E'v_contratada := v_esc.contratada;\n\n  -- [ec141-f1] parametros vigentes no primeiro dia da competencia, so quando ha alteracao com data.\n'
+     || E'  DECLARE v_ec141_ver public.ponto_escalas;\n'
+     || E'  BEGIN\n'
+     || E'    IF EXISTS (SELECT 1 FROM public.ponto_escala_param_versoes pv\n'
+     || E'                WHERE pv.escala_id = v_esc.id AND v_ini BETWEEN pv.vigencia_inicio AND pv.vigencia_fim\n'
+     || E'                  AND pv.inclui_campos_ec141) THEN\n'
+     || E'      v_ec141_ver := public.ponto_escala_na_data(v_esc.id, v_ini);\n'
+     || E'      v_esc.dias_config := v_ec141_ver.dias_config;\n'
+     || E'      v_esc.jornada_diaria_minutos := v_ec141_ver.jornada_diaria_minutos;\n'
+     || E'      v_esc.ativa := COALESCE(v_ec141_ver.equalizacao_mensal_ativa, false);\n'
+     || E'      v_contratada := COALESCE(v_ec141_ver.carga_semanal_contratada_min, 2640);\n'
+     || E'    END IF;\n'
+     || E'  END;'))),
+  -- Equalização da conta (lista de escalas com equalização ligada).
+  ('public.ponto_equalizacao_competencia_tenant(uuid,text,uuid)', jsonb_build_array(jsonb_build_array(
+     'AND COALESCE(e.equalizacao_mensal_ativa, false) = true',
+     'AND COALESCE((public.ponto_escala_na_data_agendada(e.id, v_ini)).equalizacao_mensal_ativa, false) = true /* [ec141-f1] */'))),
+  -- Saldo diário: fallback de jornada e de tolerância pela versão do dia.
+  ('public.ponto_saldo_dias_competencia_bruto(uuid,text,text)', jsonb_build_array(
+     jsonb_build_array('v_esperado := COALESCE(v_fb_jornada, 0);',
+       'v_esperado := COALESCE((public.ponto_escala_na_data_agendada(v_fb_escala_id, r.data)).jornada_diaria_minutos, v_fb_jornada, 0); /* [ec141-f1] */'),
+     jsonb_build_array('ELSE COALESCE(v_fb_tol, 0) END;',
+       'ELSE COALESCE((public.ponto_escala_na_data_agendada(v_fb_escala_id, r.data)).tolerancia_diaria_minutos, v_fb_tol, 0) END; /* [ec141-f1] */'))),
+  -- Intervalo pela janela entre blocos: blocos do dia.
+  ('public.ponto_intervalo_janela_do_dia(uuid,text,text,date)', jsonb_build_array(
+     jsonb_build_array('FROM public.ponto_escala_periodos p1',
+       'FROM public.ponto_escala_periodos_na_data(v_escala.id, p_data) p1 /* [ec141-f1] */'),
+     jsonb_build_array('JOIN public.ponto_escala_periodos p2',
+       'JOIN public.ponto_escala_periodos_na_data(v_escala.id, p_data) p2'))),
+  -- Débito por batida: blocos e tolerância do dia.
+  ('public.ponto_debito_batida_do_dia(uuid,text,date,time without time zone,time without time zone)', jsonb_build_array(
+     jsonb_build_array(E'FROM public.ponto_escala_periodos\n',
+       E'FROM public.ponto_escala_periodos_na_data(v_escala_id, p_data) /* [ec141-f1] */\n'),
+     jsonb_build_array('FROM public.ponto_escalas e WHERE e.id = v_escala_id;',
+       'FROM public.ponto_escala_na_data_agendada(v_escala_id, p_data) e WHERE e.id = v_escala_id;'))),
+  -- Batidas geradas para dia inteiro abonado: horários do dia.
+  ('public._ponto_gera_batidas_dia_inteiro(uuid,uuid,text,text,date,uuid,uuid)', jsonb_build_array(jsonb_build_array(
+     'JOIN public.ponto_escalas e ON e.id = a.escala_id',
+     'JOIN LATERAL public.ponto_escala_na_data_agendada(a.escala_id, p_data) e ON e.id = a.escala_id /* [ec141-f1] */'))),
+  -- Troca de turno: horários das duas escalas na data da troca.
+  ('public.ponto_troca_turno_solicitar(uuid,uuid,uuid,date,date,uuid,text,text)', jsonb_build_array(
+     jsonb_build_array('FROM public.ponto_escalas WHERE id = a.escala_id;',
+       'FROM public.ponto_escala_na_data_agendada(a.escala_id, p_data_troca) WHERE id = a.escala_id; /* [ec141-f1] */'),
+     jsonb_build_array('FROM public.ponto_escalas WHERE id = b.escala_id;',
+       'FROM public.ponto_escala_na_data_agendada(b.escala_id, p_data_troca) WHERE id = b.escala_id;')))
+$fn$;
 
--- (c) Equalização mensal: versão vigente no ÚLTIMO dia da competência, só
---     quando essa versão foi gravada com os campos novos (inclui_campos_ec141).
---     Sem agendamento/edição nova, nada muda.
-DO $reinj_eq$
+-- Aplica (ou desfaz) os pares de uma função. Devolve a situação.
+CREATE OR REPLACE FUNCTION public._ponto_ec141_reinjetar(p_fn text, p_pares jsonb, p_desfazer boolean DEFAULT false)
+RETURNS text
+LANGUAGE plpgsql
+SET search_path TO 'public'
+AS $fn$
 DECLARE
-  v_def    text;
-  v_anchor text := 'v_contratada := v_esc.contratada;';
-  v_add    text := E'\n\n  -- [ec141-f1] parametros da versao vigente no ultimo dia da competencia (escala com "vigente a partir de").\n'
-    || E'  --   So vale para versoes gravadas com os campos novos; versoes antigas leem como antes.\n'
-    || E'  DECLARE v_ec141_ver public.ponto_escalas;\n'
-    || E'  BEGIN\n'
-    || E'    IF EXISTS (SELECT 1 FROM public.ponto_escala_param_versoes pv\n'
-    || E'                WHERE pv.escala_id = v_esc.id AND v_fim BETWEEN pv.vigencia_inicio AND pv.vigencia_fim\n'
-    || E'                  AND pv.inclui_campos_ec141) THEN\n'
-    || E'      v_ec141_ver := public.ponto_escala_na_data(v_esc.id, v_fim);\n'
-    || E'      v_esc.dias_config := v_ec141_ver.dias_config;\n'
-    || E'      v_esc.jornada_diaria_minutos := v_ec141_ver.jornada_diaria_minutos;\n'
-    || E'      v_esc.ativa := COALESCE(v_ec141_ver.equalizacao_mensal_ativa, false);\n'
-    || E'      v_contratada := COALESCE(v_ec141_ver.carga_semanal_contratada_min, 2640);\n'
-    || E'    END IF;\n'
-    || E'  END;';
-  v_n      int;
+  v_def  text;
+  v_par  jsonb;
+  v_de   text;
+  v_para text;
+  v_n    int;
 BEGIN
-  v_def := (SELECT pg_get_functiondef(p.oid) FROM pg_proc p
-             WHERE p.oid = to_regprocedure('public.ponto_equalizacao_competencia(uuid,uuid,text)'));
-  IF v_def IS NULL THEN
-    RAISE NOTICE '[ec141-f1] ponto_equalizacao_competencia ausente: nada alterado.';
-    RETURN;
+  IF to_regprocedure(p_fn) IS NULL THEN
+    RETURN 'ausente';
   END IF;
-  IF position('[ec141-f1]' IN v_def) > 0 THEN
-    RAISE NOTICE '[ec141-f1] equalizacao: reinjecao ja aplicada.';
-    RETURN;
+  v_def := pg_get_functiondef(to_regprocedure(p_fn));
+  IF NOT p_desfazer AND position('[ec141-f1]' IN v_def) > 0 THEN
+    RETURN 'ja_aplicada';
   END IF;
-  v_n := (length(v_def) - length(replace(v_def, v_anchor, ''))) / length(v_anchor);
-  IF v_n <> 1 THEN
-    RAISE NOTICE '[ec141-f1] equalizacao: ancora encontrada % vez(es) — corpo divergente, NADA alterado.', v_n;
-    RETURN;
+  IF p_desfazer AND position('[ec141-f1]' IN v_def) = 0 THEN
+    RETURN 'nada_a_desfazer';
   END IF;
-  v_def := replace(v_def, v_anchor, v_anchor || v_add);
+  FOR v_par IN SELECT x FROM jsonb_array_elements(p_pares) x LOOP
+    v_de   := CASE WHEN p_desfazer THEN v_par->>1 ELSE v_par->>0 END;
+    v_para := CASE WHEN p_desfazer THEN v_par->>0 ELSE v_par->>1 END;
+    v_n := (length(v_def) - length(replace(v_def, v_de, ''))) / length(v_de);
+    IF v_n <> 1 THEN
+      RETURN format('NAO aplicada: ancora encontrada %s vez(es) (corpo divergente)', v_n);
+    END IF;
+    v_def := replace(v_def, v_de, v_para);
+  END LOOP;
   EXECUTE v_def;
-  RAISE NOTICE '[ec141-f1] equalizacao: reinjecao aplicada.';
+  RETURN CASE WHEN p_desfazer THEN 'desfeita' ELSE 'aplicada' END;
 EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE '[ec141-f1] equalizacao: reinjecao NAO aplicada: %', SQLERRM;
-END $reinj_eq$;
+  RETURN 'NAO aplicada: ' || SQLERRM;
+END $fn$;
+
+DO $reinj$
+DECLARE
+  r record;
+  v text;
+BEGIN
+  FOR r IN SELECT * FROM public._ponto_ec141_reinjecoes() LOOP
+    v := public._ponto_ec141_reinjetar(r.fn, r.pares, false);
+    RAISE NOTICE '[ec141-f1] %: %', r.fn, v;
+  END LOOP;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '[ec141-f1] reinjecoes interrompidas: %', SQLERRM;
+END $reinj$;
 
 -- ---------------------------------------------------------------------
 -- Permissões
@@ -1286,6 +1449,11 @@ BEGIN
   GRANT EXECUTE ON FUNCTION public.ponto_ec141_impacto(uuid, uuid, text) TO authenticated, service_role;
   GRANT EXECUTE ON FUNCTION public.ponto_escala_formalizacao_status_em(uuid, date) TO authenticated, service_role;
   GRANT EXECUTE ON FUNCTION public.ponto_escala_na_data(uuid, date) TO authenticated, service_role;
+  GRANT EXECUTE ON FUNCTION public.ponto_escala_na_data_agendada(uuid, date) TO authenticated, service_role;
+  GRANT EXECUTE ON FUNCTION public.ponto_escala_periodos_na_data(uuid, date) TO authenticated, service_role;
+  GRANT EXECUTE ON FUNCTION public.ponto_escalas_na_data(date, uuid[], uuid) TO authenticated, service_role;
+  GRANT EXECUTE ON FUNCTION public.ponto_escalas_periodos_na_data(uuid[], date) TO authenticated, service_role;
+  REVOKE ALL ON FUNCTION public._ponto_ec141_reinjetar(text, jsonb, boolean) FROM PUBLIC, anon, authenticated;
   GRANT SELECT ON public.ponto_marcos_legais TO authenticated;
   GRANT SELECT ON public.ponto_marcos_legais_historico TO authenticated;
 EXCEPTION WHEN OTHERS THEN

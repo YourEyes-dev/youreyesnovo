@@ -7,7 +7,8 @@
 --                    8h48 = +24; D+1 com 8h24 = 0
 --   PONTO-EC141-003  cancelar o agendamento restaura a escala e a jornada de D
 --   PONTO-EC141-004  retroativo: sem justificativa recusado; sobre competência
---                    fechada recusado; em competência aberta com justificativa aceito
+--                    fechada recusado; em competência aberta também recusado nesta
+--                    entrega (falta a reconsolidação do ponto_diario — F2)
 --   PONTO-EC141-005  ponto_teto_legal ignora marco inativo e respeita ativação,
 --                    mudança de data, desativação e exceção por conta; só o
 --                    SuperAdmin altera marco
@@ -15,6 +16,9 @@
 --                    some para o cliente sem marco ativo
 --   PONTO-EC141-007  batida em escala acima do teto continua aceita (nunca
 --                    bloquear a batida — Portaria MTP 671/2021)
+--   PONTO-EC141-008  com um agendamento para D, TUDO dos dias < D fica idêntico
+--                    (saldo, jornada, horários e blocos, intervalo, débito,
+--                    equalização, espelho) e cancelar devolve o estado exato
 --
 -- As rotinas chamam as MESMAS funções da tela (UPDATE da escala pelo gatilho,
 -- ponto_escala_cancelar_agendamento, ponto_marco_*, ponto_teto_legal,
@@ -55,6 +59,8 @@ BEGIN
   INSERT INTO public.ponto_escala_atribuicoes
     (tenant_id, escala_id, colaborador_id, colaborador_nome, colaborador_cpf, data_inicio, ativa)
   VALUES (public.qa_sandbox_tenant_id(), v_id, p_cpf, '[QA-EC141] Colaborador', p_cpf, p_inicio, true);
+  -- Blocos diários, como a tela grava ao criar.
+  PERFORM public._ponto_ec141_sincronizar_periodos(v_id);
   RETURN v_id;
 END $fn$;
 
@@ -78,6 +84,8 @@ BEGIN
          parametros_vigencia_motivo = p_motivo,
          parametros_marco_codigo = p_marco
    WHERE e.id = p_escala;
+  -- A tela regrava os blocos diários logo depois de salvar.
+  PERFORM public._ponto_ec141_sincronizar_periodos(p_escala);
 END $fn$;
 
 -- Ajudante: saldo e jornada de um dia pela mesma função da tela.
@@ -279,6 +287,7 @@ DECLARE
   v_sem_mot  boolean := false;
   v_fechada  boolean := false;
   v_msg      text;
+  v_msg2     text;
   v_aberta   boolean := false;
   v_jd_ant   int;
 BEGIN
@@ -298,14 +307,14 @@ BEGIN
 
   r.passo_ordem := 2;
   r.passo_acao := 'Salvar valendo desde ontem COM justificativa (competência aberta)';
-  r.esperado := 'Aceito: o período antigo fica congelado até anteontem';
+  r.esperado := 'Recusado nesta entrega (dias já apurados exigiriam reconsolidação); a escala não muda';
   BEGIN
     PERFORM public.qa_ec141_salvar_escala(v_esc1, 504, CURRENT_DATE - 1, '[QA] correção de cadastro', NULL);
     v_aberta := true;
   EXCEPTION WHEN OTHERS THEN
-    v_msg := SQLERRM;
+    v_msg2 := SQLERRM;
   END;
-  v_jd_ant := (SELECT j.jornada_min FROM public.ponto_jornada_do_dia(v_t, v_cpf1, v_cpf1, CURRENT_DATE - 2) j LIMIT 1);
+  v_jd_ant := (SELECT j.jornada_min FROM public.ponto_jornada_do_dia(v_t, v_cpf1, v_cpf1, CURRENT_DATE - 1) j LIMIT 1);
 
   r.passo_ordem := 3;
   r.passo_acao := 'Fechar a competência do mês passado e salvar outra escala valendo desde o dia 1º dele, com justificativa';
@@ -321,15 +330,15 @@ BEGIN
 
   IF NOT v_sem_mot THEN
     r.situacao := 'falhou'; r.obtido := 'Retroativo sem justificativa foi aceito';
-  ELSIF NOT v_aberta THEN
-    r.situacao := 'falhou'; r.obtido := 'Retroativo com justificativa em competência aberta foi recusado: ' || COALESCE(v_msg, '');
+  ELSIF v_aberta OR position('ainda não está disponível' IN COALESCE(v_msg2, '')) = 0 THEN
+    r.situacao := 'falhou'; r.obtido := 'Retroativo em competência aberta devia ser bloqueado nesta entrega: ' || COALESCE(v_msg2, 'aceito');
   ELSIF v_jd_ant IS DISTINCT FROM 528 THEN
-    r.situacao := 'falhou'; r.obtido := format('O dia anterior à data devia manter 528 e veio %s', COALESCE(v_jd_ant::text, 'nulo'));
+    r.situacao := 'falhou'; r.obtido := format('Ontem devia manter 528 e veio %s', COALESCE(v_jd_ant::text, 'nulo'));
   ELSIF NOT v_fechada THEN
     r.situacao := 'falhou'; r.obtido := 'Retroativo sobre competência fechada não foi recusado como tal: ' || COALESCE(v_msg, 'aceito');
   ELSE
     r.situacao := 'passou';
-    r.obtido := 'Sem justificativa: recusado. Com justificativa em mês aberto: aceito (véspera mantém 528). Sobre mês fechado: recusado.';
+    r.obtido := 'Sem justificativa: recusado. Com justificativa em mês aberto: bloqueado (falta reconsolidação; F2), ontem segue 528. Sobre mês fechado: recusado.';
   END IF;
   RETURN r;
 EXCEPTION WHEN OTHERS THEN
@@ -552,6 +561,141 @@ EXCEPTION WHEN OTHERS THEN
   r.situacao := 'erro'; r.obtido := 'A rotina quebrou'; r.erro_tecnico := SQLERRM; RETURN r;
 END $fn$;
 
+-- Ajudante: "fotografia" de tudo o que a apuração e as telas leem da escala
+-- num intervalo de dias (por dia) e em competências (por mês).
+CREATE OR REPLACE FUNCTION public.qa_ec141_foto(
+  p_cpf text, p_escala uuid, p_de date, p_ate date, p_comps text[], p_comps_espelho text[])
+RETURNS jsonb LANGUAGE plpgsql SET search_path TO 'public' AS $fn$
+DECLARE
+  v_t uuid := public.qa_sandbox_tenant_id();
+BEGIN
+  RETURN jsonb_build_object(
+    'saldo', (SELECT jsonb_agg(to_jsonb(s) ORDER BY s.dia)
+                FROM (SELECT DISTINCT to_char(g::date, 'YYYY-MM') AS c
+                        FROM generate_series(p_de, p_ate, INTERVAL '1 day') g) cc
+                CROSS JOIN LATERAL public.ponto_saldo_dias_competencia(v_t, p_cpf, cc.c) s
+               WHERE s.dia BETWEEN p_de AND p_ate),
+    'dias', (SELECT jsonb_agg(jsonb_build_object(
+                'd', g::date,
+                'jornada', (SELECT to_jsonb(j) FROM public.ponto_jornada_do_dia(v_t, p_cpf, p_cpf, g::date) j LIMIT 1),
+                'escala', (SELECT to_jsonb(e) FROM public.ponto_escala_do_dia(v_t, p_cpf, p_cpf, g::date) e LIMIT 1),
+                'intervalo', (SELECT to_jsonb(i) FROM public.ponto_intervalo_janela_do_dia(v_t, p_cpf, p_cpf, g::date) i LIMIT 1),
+                'debito', public.ponto_debito_batida_do_dia(v_t, p_cpf, g::date, TIME '08:20', TIME '16:30'),
+                'blocos', (SELECT jsonb_agg(jsonb_build_object('b', b.ordem_bloco, 'i', b.hora_inicio, 'f', b.hora_fim) ORDER BY b.ordem_bloco)
+                             FROM public.ponto_escalas_periodos_na_data(ARRAY[p_escala], g::date) b),
+                'tela', (SELECT jsonb_build_object('jd', x.jornada_diaria_minutos, 'ent', x.hora_entrada_padrao, 'sai', x.hora_saida_padrao)
+                           FROM public.ponto_escalas_na_data(g::date, ARRAY[p_escala]) x))
+              ORDER BY g)
+               FROM generate_series(p_de, p_ate, INTERVAL '1 day') g),
+    'meses', (SELECT jsonb_agg(jsonb_build_object(
+                'c', c,
+                'equalizacao', public.ponto_equalizacao_competencia(v_t, p_escala, c) - 'gerado_em',
+                'equalizacao_conta', (SELECT jsonb_agg(jsonb_build_object('t', q.total_equalizacao_min, 'd', q.dias_uteis_efetivos))
+                     FROM public.ponto_equalizacao_competencia_tenant(v_t, c, NULL) q WHERE q.escala_id = p_escala),
+                'espelho', CASE WHEN c = ANY (p_comps_espelho)
+                                THEN (SELECT to_jsonb(er) FROM public.ponto_espelho_resumo(v_t, p_cpf, c) er LIMIT 1) END)
+              ORDER BY c)
+               FROM unnest(p_comps) c));
+END $fn$;
+
+-- ── PONTO-EC141-008 ───────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.qa_caso_ponto_ec141_008()
+RETURNS public.qa_retorno LANGUAGE plpgsql SET search_path TO 'public' AS $fn$
+DECLARE
+  r        public.qa_retorno;
+  v_t      uuid := public.qa_sandbox_tenant_id();
+  v_cpf    text := public.qa_cpf(6148);
+  v_mes    date := date_trunc('month', CURRENT_DATE + 45)::date;   -- mês que contém D
+  v_d      date;
+  v_ant    date;
+  v_comps  text[];
+  v_esc    uuid;
+  g        date;
+  v_antes_menor  jsonb; v_depois_menor jsonb;
+  v_antes_tudo   jsonb; v_cancel_tudo  jsonb;
+  v_row0   jsonb; v_row2 jsonb;
+  v_per0   jsonb; v_per2 jsonb;
+  v_jd_d   int;
+  v_res    jsonb;
+BEGIN
+  PERFORM public.qa_modo_ligar();
+  PERFORM set_config('request.jwt.claims', '', true);
+  v_d   := v_mes + 14;                                   -- dia 15
+  v_ant := (v_mes - INTERVAL '1 month')::date;           -- mês inteiro antes de D
+  v_comps := ARRAY[to_char(v_ant, 'YYYY-MM'), to_char(v_mes, 'YYYY-MM')];
+
+  -- Escala 5x2 8h (40h) com equalização mensal ligada (contratada 44h).
+  v_esc := public.qa_ec141_escala(v_cpf, 480, ARRAY['segunda','terca','quarta','quinta','sexta'], DATE '2026-01-01');
+  UPDATE public.ponto_escalas SET equalizacao_mensal_ativa = true, carga_semanal_contratada_min = 2640 WHERE id = v_esc;
+  -- Batidas: dias úteis variando em torno de 8h; o 1º sábado de cada mês trabalhado.
+  FOR g IN SELECT x::date FROM generate_series(v_ant, v_d + 10, INTERVAL '1 day') x LOOP
+    IF EXTRACT(ISODOW FROM g) BETWEEN 1 AND 5 THEN
+      PERFORM public.qa_ponto_dia_min(v_cpf, '[QA-EC141] Colaborador', g, 540 + ((EXTRACT(DAY FROM g)::int * 7) % 25) - 12);
+    ELSIF EXTRACT(ISODOW FROM g) = 6 AND EXTRACT(DAY FROM g) <= 7 THEN
+      PERFORM public.qa_ponto_dia_min(v_cpf, '[QA-EC141] Colaborador', g, 300);
+    END IF;
+  END LOOP;
+
+  r.passo_ordem := 1;
+  r.passo_acao := 'Fotografar tudo dos dias e meses antes de D; agendar para D (dia 15 do mês) 7h/dia, tolerâncias novas, equalização desligada e contratada 40h; a tela regrava os blocos';
+  r.esperado := 'A fotografia dos dias < D (saldo, jornada, horários, blocos, intervalo, débito, equalização, espelho do mês anterior) fica idêntica; D já usa 7h';
+  -- Espelho: o mês anterior (inteiro antes de D) na comparação "antes de D";
+  -- os dois meses na comparação do cancelamento.
+  v_antes_menor := public.qa_ec141_foto(v_cpf, v_esc, v_ant, v_d - 1, v_comps, v_comps[1:1]);
+  v_antes_tudo  := public.qa_ec141_foto(v_cpf, v_esc, v_ant, v_d + 10, v_comps, v_comps);
+  v_row0 := (SELECT to_jsonb(e) - 'updated_at' FROM public.ponto_escalas e WHERE e.id = v_esc);
+  v_per0 := (SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) FROM public.ponto_escala_periodos p WHERE p.escala_id = v_esc);
+
+  UPDATE public.ponto_escalas e
+     SET dias_config = (SELECT jsonb_object_agg(x.k, x.v || CASE WHEN COALESCE((x.v->>'trabalha')::boolean, false)
+                                                                  THEN jsonb_build_object('saida', '16:00') ELSE '{}'::jsonb END)
+                          FROM jsonb_each(e.dias_config) x(k, v)),
+         jornada_diaria_minutos = 420, jornada_semanal_minutos = 2100, hora_saida_padrao = TIME '16:00',
+         tolerancia_minutos = 3, tolerancia_diaria_minutos = 7,
+         equalizacao_mensal_ativa = false, carga_semanal_contratada_min = 2400,
+         parametros_vigentes_desde = v_d, parametros_marco_codigo = 'EC141_40H'
+   WHERE e.id = v_esc;
+  PERFORM public._ponto_ec141_sincronizar_periodos(v_esc);
+  v_depois_menor := public.qa_ec141_foto(v_cpf, v_esc, v_ant, v_d - 1, v_comps, v_comps[1:1]);
+  v_jd_d := (SELECT j.jornada_min FROM public.ponto_jornada_do_dia(v_t, v_cpf, v_cpf, v_d) j LIMIT 1);
+
+  r.passo_ordem := 2;
+  r.passo_acao := 'Cancelar o agendamento';
+  r.esperado := 'Escala, blocos e a fotografia de TODOS os dias (antes e depois de D) voltam exatamente ao estado anterior';
+  v_res := public.ponto_escala_cancelar_agendamento(v_esc);
+  v_cancel_tudo := public.qa_ec141_foto(v_cpf, v_esc, v_ant, v_d + 10, v_comps, v_comps);
+  v_row2 := (SELECT to_jsonb(e) - 'updated_at' FROM public.ponto_escalas e WHERE e.id = v_esc);
+  v_per2 := (SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id) FROM public.ponto_escala_periodos p WHERE p.escala_id = v_esc);
+
+  IF v_antes_menor IS DISTINCT FROM v_depois_menor THEN
+    r.situacao := 'falhou';
+    r.obtido := 'O agendamento mudou algo ANTES da data D: '
+      || COALESCE((SELECT string_agg(k, ', ') FROM jsonb_object_keys(v_antes_menor) k
+                    WHERE v_antes_menor->k IS DISTINCT FROM v_depois_menor->k), '?');
+    r.detalhe := jsonb_build_object('antes', v_antes_menor, 'depois', v_depois_menor);
+  ELSIF v_jd_d IS DISTINCT FROM 420 THEN
+    r.situacao := 'falhou'; r.obtido := format('Em D a jornada devia ser 420 e veio %s', COALESCE(v_jd_d::text, 'nula'));
+  ELSIF NOT COALESCE((v_res->>'ok')::boolean, false) THEN
+    r.situacao := 'falhou'; r.obtido := 'Cancelamento recusado: ' || COALESCE(v_res::text, 'nulo');
+  ELSIF v_row0 IS DISTINCT FROM v_row2 THEN
+    r.situacao := 'falhou'; r.obtido := 'A escala não voltou ao estado exato: '
+      || COALESCE((SELECT string_agg(k, ', ') FROM jsonb_object_keys(v_row0) k WHERE v_row0->k IS DISTINCT FROM v_row2->k), '?');
+  ELSIF v_per0 IS DISTINCT FROM v_per2 THEN
+    r.situacao := 'falhou'; r.obtido := 'Os blocos diários não voltaram ao estado exato';
+  ELSIF v_antes_tudo IS DISTINCT FROM v_cancel_tudo THEN
+    r.situacao := 'falhou';
+    r.obtido := 'Depois de cancelar a apuração não voltou ao estado anterior: '
+      || COALESCE((SELECT string_agg(k, ', ') FROM jsonb_object_keys(v_antes_tudo) k
+                    WHERE v_antes_tudo->k IS DISTINCT FROM v_cancel_tudo->k), '?');
+  ELSE
+    r.situacao := 'passou';
+    r.obtido := format('Agendado para %s: dias e meses anteriores idênticos (saldo, jornada, horários, blocos, intervalo, débito, equalização, espelho); D com 7h; cancelar devolveu escala, blocos e apuração exatos.', to_char(v_d, 'DD/MM/YYYY'));
+  END IF;
+  RETURN r;
+EXCEPTION WHEN OTHERS THEN
+  r.situacao := 'erro'; r.obtido := 'A rotina quebrou'; r.erro_tecnico := SQLERRM; RETURN r;
+END $fn$;
+
 -- Documentação dos casos + implementações
 DO $doc$
 DECLARE v_mod uuid;
@@ -600,13 +744,13 @@ BEGIN
    'Cancelamento devolve a escala ao estado anterior.',
    'O lote (ponto_escalas_cancelar_agendamentos_lote) chama a mesma função por escala.'),
   (v_mod, 'PONTO-EC141-004',
-   'Alteração retroativa da escala: exige justificativa e nunca atinge competência fechada',
+   'Alteração retroativa da escala: exige justificativa, nunca atinge competência fechada e, nesta entrega, fica bloqueada',
    'negativo', 'critica', 'aprovado', 'api',
    'Plano Mestre do Ponto, princípio 3 (meses fechados são intocáveis); Súmula 338 do TST',
-   'Uma data anterior a hoje reescreve dias já apurados. Só é aceita com justificativa e se nenhuma competência fechada for atingida.',
+   'Uma data anterior a hoje reescreve dias já apurados. Exige justificativa e nunca atinge competência fechada; como os dias já consolidados no ponto_diario precisariam ser recalculados e essa reconsolidação ainda não existe, a F1 bloqueia o retroativo (liberação prevista na F2).',
    'Cercado de QA; duas escalas 5x2 8h48; fechamento do mês passado criado no passo 3.',
    '[{"ordem":1,"acao":"Valer desde ontem, sem justificativa","resultado_esperado":"Recusado"},
-     {"ordem":2,"acao":"Valer desde ontem, com justificativa","resultado_esperado":"Aceito; anteontem mantém 528"},
+     {"ordem":2,"acao":"Valer desde ontem, com justificativa","resultado_esperado":"Bloqueado nesta entrega; ontem segue 528"},
      {"ordem":3,"acao":"Fechar o mês passado e valer desde o dia 1º dele","resultado_esperado":"Recusado (competência fechada)"}]'::jsonb,
    'Retroativo controlado; mês fechado protegido.',
    'Gatilho ponto_escala_arquiva_versao.'),
@@ -643,7 +787,17 @@ BEGIN
    'Cercado de QA; EC141_42H ativo para a conta desde 30 dias atrás; escala 5x2 8h48.',
    '[{"ordem":1,"acao":"Bater entrada e saída ontem e consolidar o dia","resultado_esperado":"2 marcações gravadas; dia apurado; validação com aviso acima_teto_semanal e bloqueia = false"}]'::jsonb,
    'Nunca bloquear a batida.',
-   'ponto_escala_validar_teto é a função usada como aviso na tela de escalas.')
+   'ponto_escala_validar_teto é a função usada como aviso na tela de escalas.'),
+  (v_mod, 'PONTO-EC141-008',
+   'Com uma alteração agendada para D, nada dos dias anteriores a D muda; cancelar devolve o estado exato',
+   'alternativo', 'critica', 'aprovado', 'api',
+   'CLT art. 468 (alteração só para frente); Plano Mestre do Ponto, princípios 1 e 4',
+   'Critério "nada muda antes da data D": saldo, jornada do dia, horários esperados e blocos diários, intervalo, débito por batida, equalização (da escala e da conta) e espelho seguem idênticos para os dias e meses anteriores a D. O cancelamento restaura escala, blocos e apuração exatamente.',
+   'Cercado de QA; escala 5x2 8h com equalização (contratada 44h); batidas do mês anterior a D até D+10.',
+   '[{"ordem":1,"acao":"Fotografar; agendar 7h/dia, tolerâncias, equalização desligada e contratada 40h para D (dia 15); a tela regrava os blocos","resultado_esperado":"Fotografia dos dias < D idêntica; D com jornada 420"},
+     {"ordem":2,"acao":"Cancelar o agendamento","resultado_esperado":"Escala, blocos e fotografia de todos os dias iguais ao estado anterior"}]'::jsonb,
+   'Nada muda antes de D; cancelamento exato.',
+   'Leitores cobertos por reinjeção [ec141-f1] e pelas funções ponto_escala_na_data_agendada / ponto_escala_periodos_na_data.')
   ON CONFLICT (codigo) DO UPDATE SET
     modulo_id = EXCLUDED.modulo_id, titulo = EXCLUDED.titulo, objetivo = EXCLUDED.objetivo,
     passos = EXCLUDED.passos, resultado_esperado = EXCLUDED.resultado_esperado,
@@ -665,7 +819,8 @@ BEGIN
       ('PONTO-EC141-004', 'qa_caso_ponto_ec141_004', true),
       ('PONTO-EC141-005', 'qa_caso_ponto_ec141_005', true),
       ('PONTO-EC141-006', 'qa_caso_ponto_ec141_006', true),
-      ('PONTO-EC141-007', 'qa_caso_ponto_ec141_007', true)
+      ('PONTO-EC141-007', 'qa_caso_ponto_ec141_007', true),
+      ('PONTO-EC141-008', 'qa_caso_ponto_ec141_008', true)
     ON CONFLICT (codigo) DO UPDATE SET funcao_sql = EXCLUDED.funcao_sql, ativo = true;
   END IF;
 EXCEPTION WHEN OTHERS THEN
@@ -691,7 +846,8 @@ BEGIN
       ('PONTO-EC141-001', 'qa_caso_ponto_ec141_001'), ('PONTO-EC141-002', 'qa_caso_ponto_ec141_002'),
       ('PONTO-EC141-003', 'qa_caso_ponto_ec141_003'), ('PONTO-EC141-004', 'qa_caso_ponto_ec141_004'),
       ('PONTO-EC141-005', 'qa_caso_ponto_ec141_005'), ('PONTO-EC141-006', 'qa_caso_ponto_ec141_006'),
-      ('PONTO-EC141-007', 'qa_caso_ponto_ec141_007'), ('PONTO-153', 'qa_caso_ponto_153'),
+      ('PONTO-EC141-007', 'qa_caso_ponto_ec141_007'), ('PONTO-EC141-008', 'qa_caso_ponto_ec141_008'),
+      ('PONTO-153', 'qa_caso_ponto_153'),
       ('PONTO-478', 'qa_caso_ponto_478')) AS x(cod, fn)
   LOOP
     IF to_regprocedure('public.' || v_fn || '()') IS NULL THEN

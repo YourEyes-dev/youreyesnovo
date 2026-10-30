@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useAuth } from "./useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { useColaboradoresEncerrados } from "./useColaboradoresEncerrados";
@@ -154,6 +155,30 @@ export function usePendencias() {
         revisao_sst: "Revisão SST",
       };
 
+      // Espelho de ponto enviado para assinatura eletrônica: contestação e prazo
+      // vencido pedem ação do RH já; pendente só aparece a partir de D+3
+      // (antes disso os lembretes automáticos ainda estão trabalhando).
+      let assinQuery = fromTable("assinatura_solicitacoes")
+        .select("id, colaborador_nome, colaborador_cpf, referencia, status, enviado_em, visualizado_em")
+        .eq("tenant_id", tenantId)
+        .eq("contexto", "ponto_espelho")
+        .in("status", ["contestado", "expirado", "enviado", "visualizado"])
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (empresaAtivaId) assinQuery = assinQuery.eq("empresa_id", empresaAtivaId);
+      const assinRes = await assinQuery;
+      const tresDiasAtras = Date.now() - 3 * 24 * 3600 * 1000;
+      const assinaturas = (((assinRes as any).data || []) as any[])
+        .filter((a) => ativo({ cpf: a.colaborador_cpf, nome: a.colaborador_nome }));
+      const assinUrgentes = assinaturas.filter((a) => a.status === "contestado" || a.status === "expirado");
+      const assinPendentes = assinaturas.filter(
+        (a) => (a.status === "enviado" || a.status === "visualizado") && a.enviado_em && Date.parse(a.enviado_em) < tresDiasAtras,
+      );
+      const compBr = (c?: string | null) => {
+        const [ano, mes] = String(c || "").split("-");
+        return ano && mes ? `${mes}/${ano}` : String(c || "");
+      };
+
       return [
         {
           key: "ferias",
@@ -259,6 +284,34 @@ export function usePendencias() {
             label: a.colaborador_nome || "Colaborador",
             sublabel: a.titulo || a.descricao || a.tipo,
             acao: "Revisar alerta de saúde",
+          })),
+        },
+        {
+          key: "espelhos_assinatura",
+          title: "Espelhos de ponto contestados ou sem resposta no prazo",
+          count: assinUrgentes.length,
+          path: "/ponto",
+          priority: "high" as const,
+          items: assinUrgentes.map((a) => ({
+            id: a.id,
+            label: a.colaborador_nome || "Colaborador",
+            sublabel: `${compBr(a.referencia)} • ${a.status === "contestado" ? "contestou o espelho" : "prazo encerrado sem resposta"}`,
+            acao: a.status === "contestado"
+              ? "Analisar a contestação (Ponto › Apuração › Relatórios › Espelho)"
+              : "Reenviar o espelho ou colher a ciência em papel",
+          })),
+        },
+        {
+          key: "espelhos_assinatura_pendentes",
+          title: "Espelhos de ponto aguardando assinatura",
+          count: assinPendentes.length,
+          path: "/ponto",
+          priority: "medium" as const,
+          items: assinPendentes.map((a) => ({
+            id: a.id,
+            label: a.colaborador_nome || "Colaborador",
+            sublabel: `${compBr(a.referencia)} • ${a.visualizado_em ? "visto, ainda sem resposta" : "ainda não abriu o link"}`,
+            acao: "Acompanhar a assinatura do espelho",
           })),
         },
       ];

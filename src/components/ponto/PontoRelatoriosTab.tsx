@@ -12,7 +12,7 @@ import { usePontoBancoHoras } from "@/hooks/usePontoBancoHoras";
 import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/integrations/supabase/untypedClient";
 import { format } from "date-fns";
-import { FileDown, FileText, Download, Archive } from "lucide-react";
+import { FileDown, FileText, Download, Archive, Eye, Send } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -24,10 +24,22 @@ import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import {
   MARCA, ALTURA_CABECALHO, carregarLogo, desenharCabecalho, desenharRodape, estiloTabela,
 } from "@/lib/ponto/pdfMarca";
-import { desenharCartaoPonto, desenharEspelhoPonto } from "@/lib/ponto/cartaoPonto";
+import {
+  carregarEspelhoDetalhado as carregarEspelhoDetalhadoLib,
+  idArquivoEstavel,
+  montarEspelhoPdf,
+  percentualHE,
+  type AlvoEspelho,
+  type ContextoEspelho,
+  type DiaEspelho,
+} from "@/lib/ponto/espelhoPdf";
 import { gerarAFD671 } from "@/lib/ponto/afd671";
 import { gerarAEJ671, type AejMarcacao, type AejOcorrencia } from "@/lib/ponto/aej671";
 import { IncluirBancoHorasDialog } from "@/components/ponto/IncluirBancoHorasDialog";
+import { EspelhoVisualizarDialog } from "@/components/ponto/EspelhoVisualizarDialog";
+import { EspelhoAssinaturaStatus } from "@/components/ponto/EspelhoAssinaturaStatus";
+import { useAssinaturaSolicitacoes } from "@/hooks/useAssinaturaSolicitacoes";
+import { temCienciaValidaDoColaborador, type PontoEspelho } from "@/hooks/usePontoFechamento";
 
 
 type ReportType = "cartao_ponto" | "espelho" | "horas_extras" | "banco_horas" | "absenteismo" | "afd" | "aej";
@@ -54,7 +66,7 @@ export function PontoRelatoriosTab() {
   const [colaboradorFiltro, setColaboradorFiltro] = useState<string>("todos");
 
   const { usePontoDiario } = usePonto();
-  const { useEspelhos } = usePontoFechamento();
+  const { useEspelhos, useFechamentos } = usePontoFechamento();
   const { useBancoHorasPorCompetencia, useBancoHorasOficial } = usePontoBancoHoras();
 
   const year = parseInt(competencia.split("-")[0]);
@@ -132,6 +144,11 @@ export function PontoRelatoriosTab() {
 
 
   const { data: espelhos = [] } = useEspelhos(competencia);
+  const { data: fechamentos = [] } = useFechamentos();
+  const fechamentoDaCompetencia = fechamentos.find((f) => f.competencia === competencia);
+  const competenciaFechada = fechamentoDaCompetencia?.status === "fechado";
+  const [visualizando, setVisualizando] = useState(false);
+  const assinaturas = useAssinaturaSolicitacoes(competencia);
   const { data: bancosHorasTodos = [] } = useBancoHorasPorCompetencia(competencia);
   // Fonte única do banco de horas: é dela que saem os números impressos, para
   // o espelho e o relatório de banco de horas não discordarem entre si.
@@ -294,53 +311,10 @@ export function PontoRelatoriosTab() {
 
   // ---------------------------------------------------------------------
   // Espelho de ponto: dia a dia, da MESMA fonte do Banco de Horas
-  // (`ponto_saldo_dias_competencia`). Antes o espelho lia os totais gravados
-  // em `ponto_espelhos` no fechamento — por isso os dois relatórios não
-  // batiam. Espelho é documento de conferência: precisa mostrar cada dia.
+  // (`ponto_saldo_dias_competencia`). O carregamento e o desenho vivem no
+  // gerador único (src/lib/ponto/espelhoPdf.ts), o mesmo do Fechamento e do
+  // envio para assinatura — aqui ficam só os rótulos da planilha.
   // ---------------------------------------------------------------------
-  type MarcacaoDia = {
-    hora: string;
-    tipo: string | null;
-    /** RN26 — origem: O = original do colaborador, A = ajuste do RH. */
-    origem: "O" | "A";
-  };
-
-  type DiaEspelho = {
-    dia: string;
-    entrada: string | null;
-    saida: string | null;
-    trabalhado_min: number;
-    jornada_min: number;
-    saldo_min: number;
-    protegido: boolean;
-    equalizacao: boolean;
-    excedente_retido_min: number;
-    marcacoes: MarcacaoDia[];
-    // Súmula 338/TST: intervalo declarado (pré-assinalado) em vez de batido.
-    intervalo_origem?: "marcado" | "pre_assinalado" | null;
-    intervalo_pre_assinalado_min?: number | null;
-    /**
-     * Dia com marcação sem par (ou com ajuste em aberto). A apuração não
-     * gera débito nesses dias — a falha de registro é do empregador (CLT
-     * art. 74, §2º; Súmula 338) —, então o documento precisa dizer que o dia
-     * está pendente, em vez de imprimir um zero silencioso.
-     */
-    pendencia?: boolean;
-    /**
-     * Dia declarado como folga compensatória. O débito dele vem da
-     * compensação registrada no banco, não de uma ausência inferida — e o
-     * documento precisa dizer isso: é o que distingue, para quem assina,
-     * folga acordada de falta (Súmula 338 do TST).
-     */
-    folga_compensatoria?: boolean;
-    /**
-     * Falta convertida em débito do banco (compensação efetivada): o banco é a
-     * única cobrança — a folha não desconta nem perde DSR. O documento marca
-     * como "Falta compensada em banco" para não parecer falta não justificada.
-     */
-    falta_compensada?: boolean;
-  };
-
   const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
   const diaDaSemana = (iso: string) => {
     const [a, m, d] = iso.split("-").map(Number);
@@ -371,185 +345,132 @@ export function PontoRelatoriosTab() {
     return "Trabalhando";
   };
 
-  /** Percentual aplicável ao excedente do dia (RN17 / art. 59 CLT). */
-  const percentualHE = (d: DiaEspelho) =>
-    ehDomingo(d.dia) || d.jornada_min === 0 ? "100%" : "50%";
-
   /** Marcações do dia formatadas com o indicador de origem (RN26). */
   const marcacoesTexto = (d: DiaEspelho) =>
     d.marcacoes.length > 0
       ? d.marcacoes.map((m) => `${m.hora}${m.origem}`).join("  ")
       : "—";
 
-  const carregarEspelhoDetalhado = async () => {
-    // Quem entra no espelho: os colaboradores do fechamento quando existe;
-    // caso contrário, quem tem marcação na competência.
+  /**
+   * Quem entra no espelho: os colaboradores do fechamento quando existe;
+   * caso contrário, quem tem marcação na competência. Sempre recortado pelo
+   * filtro de departamento/colaborador e pela vigência do contrato.
+   */
+  const alvosDoEspelho = (): AlvoEspelho[] => {
     const base = espelhos.length > 0
       ? espelhos.map((e: any) => ({ nome: e.colaborador_nome, cpf: soDigitos(e.colaborador_cpf) }))
       : Array.from(new Set(registrosMes.map(r => soDigitos(r.colaborador_cpf)))).map(cpf => ({
           nome: registrosMes.find(r => soDigitos(r.colaborador_cpf) === cpf)?.colaborador_nome || "N/A",
           cpf,
         }));
+    return base.filter(b => b.cpf && cpfPermitido(b.cpf));
+  };
 
-    const unicos = Array.from(new Map(base.filter(b => b.cpf && cpfPermitido(b.cpf)).map(b => [b.cpf, b])).values())
-      .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+  const carregarEspelhoDetalhado = () =>
+    carregarEspelhoDetalhadoLib({ tenantId: tenantId as string, competencia, alvos: alvosDoEspelho() });
 
-    // RN26 — todas as batidas da competência, com origem rastreável.
-    // Paginado: o limite padrão do PostgREST (1000 linhas) truncava as últimas batidas do dia.
-    const ultimoDia = new Date(year, month, 0).getDate();
-    const marcacoesMes: any[] = [];
-    const PAGINA = 1000;
-    for (let offset = 0; ; offset += PAGINA) {
-      const { data: pagina, error: errMarc } = await fromTable("ponto_marcacoes")
-        .select("colaborador_cpf, data_marcacao, hora_marcacao, tipo_marcacao, marcacao_original, origem_marcacao")
-        .eq("tenant_id", tenantId)
-        // Batida desconsiderada (duplicada/incorreta) sai do cálculo do dia em
-        // TODA a apuração (_ponto_calc_dia, corte da virada, reordenação). O
-        // espelho é a jornada APURADA que o trabalhador assina — tem de mostrar
-        // as MESMAS batidas que a conta usou. Listá-la aqui deixava a sequência
-        // ímpar e o dia "incompleto" no documento, mesmo com a conta já certa.
-        // A prova não se perde: a batida fica no acervo e no AFD (REP bruto).
-        .eq("desconsiderada", false)
-        .gte("data_marcacao", `${competencia}-01`)
-        .lte("data_marcacao", `${competencia}-${String(ultimoDia).padStart(2, "0")}`)
-        .order("data_marcacao")
-        .order("hora_marcacao")
-        .range(offset, offset + PAGINA - 1) as { data: any[] | null; error: any };
-      if (errMarc) throw errMarc;
-      const linhas = pagina || [];
-      marcacoesMes.push(...linhas);
-      if (linhas.length < PAGINA) break;
-    }
-
-
-    // Súmula 338/TST — origem do intervalo de cada dia (batido x declarado em
-    // pré-assinalação). Vive em ponto_diario, não no resumo de saldo; sem isso
-    // o cartão não consegue declarar o intervalo previsto.
-    const intervaloPorCpfDia = new Map<string, { origem: string | null; minutos: number | null }>();
-    // Dias em que a marcação ficou sem par (ou têm ajuste em aberto): a
-    // apuração não debita esses dias, e o documento tem de mostrar a
-    // pendência em vez de um zero sem explicação.
-    const pendenciaPorCpfDia = new Set<string>();
-    const folgaPorCpfDia = new Set<string>();
-    {
-      const { data: diarios, error: errDia } = await fromTable("ponto_diario")
-        .select("colaborador_cpf, data, status, tipo_dia, intervalo_origem, intervalo_pre_assinalado_minutos")
-        .eq("tenant_id", tenantId)
-        .or("intervalo_origem.eq.pre_assinalado,status.in.(incompleto,ajuste_pendente),tipo_dia.eq.folga_compensatoria")
-        .gte("data", `${competencia}-01`)
-        .lte("data", `${competencia}-${String(ultimoDia).padStart(2, "0")}`) as { data: any[] | null; error: any };
-      if (errDia) throw errDia;
-      (diarios || []).forEach((d: any) => {
-        const chave = `${soDigitos(d.colaborador_cpf)}|${d.data}`;
-        if (d.intervalo_origem === "pre_assinalado") {
-          intervaloPorCpfDia.set(chave, {
-            origem: d.intervalo_origem ?? null,
-            minutos: d.intervalo_pre_assinalado_minutos ?? null,
-          });
-        }
-        if (d.status === "incompleto" || d.status === "ajuste_pendente") {
-          pendenciaPorCpfDia.add(chave);
-        }
-        if (d.tipo_dia === "folga_compensatoria") {
-          folgaPorCpfDia.add(chave);
-        }
-      });
-    }
-
-    // Faltas convertidas em débito do banco (compensação EFETIVADA): o espelho
-    // marca o dia como "Falta compensada em banco" — a folha não desconta (o
-    // banco é a única cobrança), então não pode aparecer como falta não
-    // justificada (pareceria cobrança dupla).
-    const faltaCompensadaPorCpfDia = new Set<string>();
-    {
-      const { data: comps, error: errComp } = await fromTable("ponto_compensacao_falta")
-        .select("colaborador_cpf, data_falta, status")
-        .eq("tenant_id", tenantId)
-        .eq("status", "efetivada")
-        .gte("data_falta", `${competencia}-01`)
-        .lte("data_falta", `${competencia}-${String(ultimoDia).padStart(2, "0")}`) as { data: any[] | null; error: any };
-      if (errComp) throw errComp;
-      (comps || []).forEach((c: any) => {
-        faltaCompensadaPorCpfDia.add(`${soDigitos(c.colaborador_cpf)}|${c.data_falta}`);
-      });
-    }
-
-    const porCpfDia = new Map<string, MarcacaoDia[]>();
-    (marcacoesMes || []).forEach((m: any) => {
-      const chave = `${soDigitos(m.colaborador_cpf)}|${m.data_marcacao}`;
-      const lista = porCpfDia.get(chave) || [];
-      lista.push({
-        hora: String(m.hora_marcacao || "").substring(0, 5),
-        tipo: m.tipo_marcacao ?? null,
-        // Marcação não original é sempre incluída ("A"), mesmo com rótulo antigo "O".
-        origem: m.marcacao_original === false || m.origem_marcacao === "A" ? "A" : "O",
-      });
-      porCpfDia.set(chave, lista);
+  /** A moldura do documento com o que a tela já carregou (mesmos números de antes). */
+  const contextoDoEspelho = (): ContextoEspelho => {
+    const emp: any = empresaPorId(empresaAtivaId) || {};
+    const colaboradorPorCpf = new Map<string, any>();
+    colaboradores.forEach((c: any) => {
+      const cpf = soDigitos(c.cpf);
+      if (cpf && !colaboradorPorCpf.has(cpf)) colaboradorPorCpf.set(cpf, c);
     });
-
-    const resultado: Array<{
-      nome: string; cpf: string; dias: DiaEspelho[];
-      trabalhado: number; previsto: number; creditos: number; debitos: number;
-      saldo: number; faltas: number; protegidos: number;
-      he50: number; he100: number;
-    }> = [];
-
-    for (const c of unicos) {
-      const { data, error } = await (supabase.rpc as any)("ponto_saldo_dias_competencia", {
-        p_tenant_id: tenantId,
-        p_colaborador_cpf: c.cpf,
-        p_competencia: competencia,
-      });
-      if (error) throw error;
-
-      const dias: DiaEspelho[] = ((data || []) as any[]).map(d => ({
-        dia: String(d.dia),
-        entrada: d.entrada ? String(d.entrada).substring(0, 5) : null,
-        saida: d.saida ? String(d.saida).substring(0, 5) : null,
-        trabalhado_min: Number(d.trabalhado_min) || 0,
-        jornada_min: Number(d.jornada_min) || 0,
-        saldo_min: Number(d.saldo_min) || 0,
-        protegido: Boolean(d.protegido),
-        equalizacao: Boolean(d.equalizacao),
-        excedente_retido_min: Number(d.excedente_retido_min) || 0,
-        marcacoes: (porCpfDia.get(`${c.cpf}|${String(d.dia)}`) || [])
-          .slice()
-          .sort((a, b) => a.hora.localeCompare(b.hora)),
-        intervalo_origem: (intervaloPorCpfDia.get(`${c.cpf}|${String(d.dia)}`)?.origem ?? null) as
-          | "marcado" | "pre_assinalado" | null,
-        intervalo_pre_assinalado_min:
-          intervaloPorCpfDia.get(`${c.cpf}|${String(d.dia)}`)?.minutos ?? null,
-        pendencia: pendenciaPorCpfDia.has(`${c.cpf}|${String(d.dia)}`),
-        folga_compensatoria: folgaPorCpfDia.has(`${c.cpf}|${String(d.dia)}`),
-        falta_compensada: faltaCompensadaPorCpfDia.has(`${c.cpf}|${String(d.dia)}`),
-      })).sort((a, b) => a.dia.localeCompare(b.dia));
-
-      resultado.push({
-        nome: c.nome,
-        cpf: c.cpf,
-        dias,
-        trabalhado: dias.reduce((s, d) => s + d.trabalhado_min, 0),
-        previsto: dias.reduce((s, d) => s + d.jornada_min, 0),
-        creditos: dias.reduce((s, d) => s + (d.saldo_min > 0 ? d.saldo_min : 0), 0),
-        debitos: dias.reduce((s, d) => s + (d.saldo_min < 0 ? -d.saldo_min : 0), 0),
-        saldo: dias.reduce((s, d) => s + d.saldo_min, 0),
-        // Falta compensada em banco não conta como falta (vira débito no banco,
-        // não desconto de folha) — fica fora da contagem de faltas do resumo.
-        faltas: dias.filter(d => !d.protegido && !d.falta_compensada && d.jornada_min > 0 && d.trabalhado_min === 0).length,
-        protegidos: dias.filter(d => d.protegido).length,
-        // Extras separadas por percentual (RN28): 100% em domingo/dia sem
-        // escala, 50% nos demais.
-        he50: dias.reduce((s, d) => s + (d.saldo_min > 0 && percentualHE(d) === "50%" ? d.saldo_min : 0), 0),
-        he100: dias.reduce((s, d) => s + (d.saldo_min > 0 && percentualHE(d) === "100%" ? d.saldo_min : 0), 0),
-      });
-    }
-
-    return resultado;
+    const bancoPorCpf = new Map<string, any>();
+    (bancosHorasTodos as any[]).forEach((b) => {
+      const cpf = soDigitos(b.colaborador_cpf);
+      if (cpf && !bancoPorCpf.has(cpf)) bancoPorCpf.set(cpf, b);
+    });
+    return {
+      empregador: {
+        razaoSocial: empresaDoRelatorio || "—",
+        cnpj: cnpjDoRelatorio,
+        endereco: [emp.endereco, emp.numero, emp.bairro].filter(Boolean).join(", ") || null,
+        cidade: emp.cidade || null,
+        uf: emp.estado || null,
+      },
+      colaboradorPorCpf,
+      oficialPorCpf,
+      bancoPorCpf,
+    };
   };
 
 
 
 
+
+  /**
+   * PDF de UM colaborador para assinatura: o mesmo gerador do botão "Gerar",
+   * com a data do fechamento e um identificador estável gravados no arquivo
+   * (o documento enviado é reproduzível). O servidor congela este PDF e
+   * calcula o hash dele no envio.
+   */
+  const gerarPdfParaAssinatura = async (e: PontoEspelho): Promise<Blob | null> => {
+    if (!tenantId) return null;
+    const criadoEm = fechamentoDaCompetencia?.data_fechamento
+      ? new Date(fechamentoDaCompetencia.data_fechamento)
+      : new Date();
+    const { doc, colaboradores: lista } = await montarEspelhoPdf({
+      tenantId,
+      empresaId: empresaAtivaId || null,
+      competencia,
+      alvos: [{ nome: e.colaborador_nome, cpf: soDigitos(e.colaborador_cpf) }],
+      contexto: contextoDoEspelho(),
+      fixar: { criadoEm, fileId: await idArquivoEstavel(`${e.id}|${competencia}`) },
+    });
+    return lista.length ? doc.output("blob") : null;
+  };
+
+  /** Pré-visualização do recorte atual (filtro de departamento/colaborador). */
+  const gerarPreVisualizacao = async (): Promise<Blob | null> => {
+    if (!tenantId) return null;
+    const { doc, colaboradores: lista } = await montarEspelhoPdf({
+      tenantId,
+      empresaId: empresaAtivaId || null,
+      competencia,
+      alvos: alvosDoEspelho(),
+      contexto: contextoDoEspelho(),
+    });
+    return lista.length ? doc.output("blob") : null;
+  };
+
+  const espelhoDoColaboradorFiltrado = colaboradorFiltro !== "todos"
+    ? (espelhos as PontoEspelho[]).find((e) => soDigitos(e.colaborador_cpf) === colaboradorFiltro)
+    : undefined;
+  const solicitacaoDoFiltrado = espelhoDoColaboradorFiltrado
+    ? assinaturas.porEspelho.get(espelhoDoColaboradorFiltrado.id)
+    : undefined;
+  const regraEnvio = !competenciaFechada
+    ? "Feche a competência para liberar o envio para assinatura."
+    : colaboradorFiltro === "todos"
+      ? "Escolha um colaborador no filtro para enviar o espelho dele (ou use o painel abaixo)."
+      : !espelhoDoColaboradorFiltrado
+        ? "Este colaborador não tem espelho gerado na competência."
+        : solicitacaoDoFiltrado && ["na_fila", "enviado", "visualizado"].includes(solicitacaoDoFiltrado.status)
+          ? "Este espelho já está com o colaborador para assinatura."
+          : temCienciaValidaDoColaborador(espelhoDoColaboradorFiltrado)
+            ? "Este espelho já tem a ciência do colaborador (assinatura eletrônica ou papel)."
+            : null;
+
+  const enviarDoFiltro = async () => {
+    if (!espelhoDoColaboradorFiltrado || regraEnvio) return;
+    const pdf = await gerarPdfParaAssinatura(espelhoDoColaboradorFiltrado);
+    if (!pdf) {
+      toast.warning("Nenhuma apuração encontrada para este colaborador na competência.");
+      return;
+    }
+    const r = await assinaturas.enviar.mutateAsync({ espelhoId: espelhoDoColaboradorFiltrado.id, pdf }).catch(() => null);
+    if (!r) return;
+    if (r.link) {
+      try { await navigator.clipboard.writeText(r.link); } catch { /* sem permissão de área de transferência */ }
+    }
+    toast.success(
+      r.email_enviado
+        ? `Enviado para ${r.destino}. O link também foi copiado.`
+        : "O e-mail não saiu, mas o link foi copiado: envie ao colaborador.",
+    );
+  };
 
   const [perguntandoBanco, setPerguntandoBanco] = useState(false);
 
@@ -936,88 +857,25 @@ export function PontoRelatoriosTab() {
     });
 
     if (tipoRelatorio === "cartao_ponto" || tipoRelatorio === "espelho") {
-      // Modelo clássico de cartão ponto: uma folha por colaborador, com a
-      // mesma apuração do Banco de Horas.
-      const detalhado = await carregarEspelhoDetalhado();
+      // Uma folha por colaborador, pelo gerador único (o mesmo do Fechamento
+      // e do envio para assinatura), com a mesma apuração do Banco de Horas.
+      const { doc: docEspelho, colaboradores: detalhado } = await montarEspelhoPdf({
+        tenantId: tenantId as string,
+        empresaId: empresaAtivaId || null,
+        competencia,
+        alvos: alvosDoEspelho(),
+        variante: tipoRelatorio === "espelho" ? "espelho" : "cartao",
+        incluirBanco: comBanco,
+        contexto: contextoDoEspelho(),
+        emissao: geradoEm,
+      });
       if (detalhado.length === 0) {
         toast.warning("Nenhum colaborador com apuração nesta competência.");
         return;
       }
 
-      const emp: any = empresaPorId(empresaAtivaId) || {};
-      const enderecoCompleto = [emp.endereco, emp.numero, emp.bairro]
-        .filter(Boolean).join(", ") || null;
-      const ultimoDiaMes = new Date(year, month, 0).getDate();
-      const periodo = `01/${String(month).padStart(2, "0")}/${year} a ${ultimoDiaMes}/${String(month).padStart(2, "0")}/${year}`;
-
-      detalhado.forEach((c, i) => {
-        if (i > 0) doc.addPage();
-        const col = colaboradores.find((x: any) => soDigitos(x.cpf) === c.cpf) as any;
-        const banco: any = bancosHorasTodos.find(
-          (b: any) => soDigitos(b.colaborador_cpf) === c.cpf,
-        );
-
-        const desenhar = tipoRelatorio === "espelho" ? desenharEspelhoPonto : desenharCartaoPonto;
-        desenhar(doc, {
-          incluirBanco: comBanco,
-          empregador: {
-            razaoSocial: empresaDoRelatorio || "—",
-            cnpj: cnpjDoRelatorio,
-            endereco: enderecoCompleto,
-            cidade: emp.cidade || null,
-            uf: emp.estado || null,
-          },
-          empregado: {
-            nome: c.nome,
-            cpf: c.cpf,
-            matricula: col?.matricula || null,
-            cargo: col?.cargo || null,
-            setor: col?.departamento || null,
-            admissao: col?.data_admissao
-              ? dataBr(String(col.data_admissao).substring(0, 10))
-              : null,
-            categoria: col?.tipo_contrato || "Mensalista",
-            horarios: col?.jornada_trabalho || null,
-          },
-          periodo,
-          emissao: geradoEm,
-          dias: c.dias,
-          // Crédito/débito/saldo vêm da FONTE ÚNICA do banco de horas, a
-          // mesma que o relatório de Banco de Horas imprime: competência
-          // fechada devolve a apuração congelada (Súmula 338), competência
-          // aberta devolve a apuração de agora somada aos lançamentos
-          // manuais e compensações. Antes cada documento fazia a própria
-          // conta e os dois podiam discordar no mesmo dia.
-          banco: (() => {
-            const of = oficialPorCpf.get(c.cpf);
-            if (of) {
-              return {
-                saldoAnterior: of.saldo_anterior_min,
-                creditos: of.creditos_min,
-                debitos: of.debitos_min,
-                compensados: of.compensados_min,
-                saldoAtual: of.saldo_atual_min,
-                temRegime: of.tem_regime !== false,
-              };
-            }
-            return {
-              saldoAnterior: banco?.saldo_anterior_minutos ?? 0,
-              creditos: c.creditos,
-              debitos: c.debitos,
-              compensados: banco?.compensados_minutos ?? 0,
-              saldoAtual:
-                (banco?.saldo_anterior_minutos ?? 0) +
-                c.saldo -
-                (banco?.compensados_minutos ?? 0),
-            };
-          })(),
-
-          logoDataUrl: logo,
-        });
-      });
-
       const nomeArq = tipoRelatorio === "espelho" ? "espelho-ponto" : "cartao-ponto";
-      doc.save(`${nomeArq}-${competencia}.pdf`);
+      docEspelho.save(`${nomeArq}-${competencia}.pdf`);
       void registrarExportacao("exportou_relatorio", `PDF: ${nomeArq} da competência ${competencia}.`);
       toast.success(tipoRelatorio === "espelho" ? "Espelho de ponto gerado!" : "Cartão ponto gerado!");
       return;
@@ -1440,10 +1298,48 @@ export function PontoRelatoriosTab() {
         }}
       />
 
-      <Button onClick={solicitarRelatorio} disabled={gerando} className="w-full md:w-auto">
-        <Download className="w-4 h-4 mr-2" />
-        {gerando ? "Gerando..." : "Gerar Relatório"}
-      </Button>
+      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+        <Button onClick={solicitarRelatorio} disabled={gerando} className="w-full md:w-auto">
+          <Download className="w-4 h-4 mr-2" />
+          {gerando ? "Gerando..." : "Gerar Relatório"}
+        </Button>
+        {tipoRelatorio === "espelho" && (
+          <>
+            <Button variant="outline" onClick={() => setVisualizando(true)} className="w-full md:w-auto" data-testid="btn-visualizar-espelho">
+              <Eye className="w-4 h-4 mr-2" /> Visualizar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={enviarDoFiltro}
+              disabled={!!regraEnvio || assinaturas.enviar.isPending}
+              className="w-full md:w-auto"
+              data-testid="btn-enviar-assinatura"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              {assinaturas.enviar.isPending ? "Enviando..." : "Enviar para assinatura"}
+            </Button>
+          </>
+        )}
+      </div>
+      {tipoRelatorio === "espelho" && regraEnvio && (
+        <p className="text-xs text-muted-foreground" data-testid="regra-envio-assinatura">{regraEnvio}</p>
+      )}
+
+      {tipoRelatorio === "espelho" && (
+        <EspelhoAssinaturaStatus
+          competencia={competencia}
+          espelhos={(espelhos as PontoEspelho[]).filter((e) => cpfPermitido(e.colaborador_cpf))}
+          competenciaFechada={competenciaFechada}
+          gerarPdf={gerarPdfParaAssinatura}
+        />
+      )}
+
+      <EspelhoVisualizarDialog
+        aberto={visualizando}
+        onFechar={() => setVisualizando(false)}
+        gerar={gerarPreVisualizacao}
+        subtitulo={`Competência ${competencia}. Esta tela não gera arquivo para baixar.`}
+      />
 
       {/* Info about AFD/AEFP */}
       <Card className="bg-muted/30">

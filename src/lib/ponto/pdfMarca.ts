@@ -13,7 +13,9 @@
  *   --brand-navy   215 65% 12%   → 11,  27,  50
  */
 import type jsPDF from "jspdf";
-import logoAsset from "@/assets/logo-youreyes-mark.png.asset.json";
+// PNG do próprio repositório (Vite resolve a URL respeitando o base de
+// /teste/ e /homologacao/). Não usar /__l5e/... do antigo host Lovable.
+import logoUrl from "@/assets/logo-youreyes-mark.png";
 
 
 export type RGB = [number, number, number];
@@ -35,8 +37,9 @@ let logoCache: string | null | undefined;
 export async function carregarLogo(): Promise<string | null> {
   if (logoCache !== undefined) return logoCache;
   try {
-    const resp = await fetch(logoAsset.url);
+    const resp = await fetch(logoUrl);
     const blob = await resp.blob();
+    if (!resp.ok || !blob.type.startsWith("image/")) throw new Error("logo inválida");
     logoCache = await new Promise<string>((resolve, reject) => {
       const fr = new FileReader();
       fr.onload = () => resolve(String(fr.result));
@@ -84,8 +87,8 @@ export function desenharCabecalho(doc: jsPDF, o: CabecalhoOpts) {
   let textoX = 14;
   if (o.logoDataUrl) {
     try {
-      // Placa branca atrás da marca: o PNG não tem fundo transparente e,
-      // sem a placa, sobra um retângulo branco que parece defeito.
+      // Placa branca atrás da marca: o símbolo tem o ponto central navy,
+      // que sumiria sobre a faixa navy do cabeçalho.
       doc.setFillColor(...MARCA.branco);
       doc.roundedRect(13, 6, 18, 18, 2.5, 2.5, "F");
       doc.addImage(o.logoDataUrl, "PNG", 15, 8, 14, 14);

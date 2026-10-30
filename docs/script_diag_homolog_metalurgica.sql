@@ -7,8 +7,9 @@ WITH emp AS MATERIALIZED (
 ),
 usr AS MATERIALIZED (
   SELECT ub.tenant_id, ub.tipo_usuario
-  FROM public.usuarios_base ub
-  WHERE lower(COALESCE(ub.email,'')) = 'leirinuernberg@gmail.com'
+  FROM auth.users au
+  LEFT JOIN public.usuarios_base ub ON ub.auth_user_id = au.id
+  WHERE lower(au.email) = 'leirinuernberg@gmail.com'
 )
 SELECT json_build_object(
   'empresas', (SELECT json_agg(json_build_object('razao', razao_social, 'fantasia', nome_fantasia,

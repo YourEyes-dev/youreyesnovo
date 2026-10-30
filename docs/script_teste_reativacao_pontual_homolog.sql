@@ -59,7 +59,7 @@ BEGIN
   BEGIN
     INSERT INTO public.ponto_marcacoes (tenant_id, colaborador_id, colaborador_nome, colaborador_cpf,
                                         data_marcacao, hora_marcacao, tipo_marcacao)
-    VALUES (v_t.tenant_id, v_t.id::text, '[TESTE]', v_t.cpf, CURRENT_DATE - 3, '17:00', 'saida');
+    VALUES (v_t.tenant_id, v_t.id, '[TESTE]', v_t.cpf, CURRENT_DATE - 3, '17:00', 'saida');
     RAISE NOTICE 'TESTE controle_desligado: batida ACEITA (inesperado)';
   EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'TESTE controle_desligado: batida RECUSADA: %', SQLERRM;
@@ -85,7 +85,7 @@ BEGIN
   BEGIN
     INSERT INTO public.ponto_marcacoes (tenant_id, colaborador_id, colaborador_nome, colaborador_cpf,
                                         data_marcacao, hora_marcacao, tipo_marcacao)
-    VALUES (v_t.tenant_id, v_t.id::text, '[TESTE]', v_t.cpf, CURRENT_DATE - 3, '17:00', 'saida');
+    VALUES (v_t.tenant_id, v_t.id, '[TESTE]', v_t.cpf, CURRENT_DATE - 3, '17:00', 'saida');
     RAISE NOTICE 'TESTE trava_ponto: batida do dia anterior ACEITA com o cadastro reativado';
   EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'TESTE trava_ponto: batida RECUSADA: %', SQLERRM;

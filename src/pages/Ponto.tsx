@@ -1436,11 +1436,11 @@ const Ponto = () => {
         {/* Compliance */}
         <TabsContent value="compliance">
           <Tabs value={complianceTab} onValueChange={setComplianceTab} className="w-full">
-            <TabsList className="grid w-full max-w-3xl grid-cols-5 mb-4">
+            <TabsList className="grid w-full max-w-4xl grid-cols-5 mb-4">
               <TabsTrigger value="alertas" className="text-xs"><Bell className="h-3.5 w-3.5 mr-1" />Alertas CLT</TabsTrigger>
               <TabsTrigger value="auditoria" className="text-xs"><ShieldAlert className="h-3.5 w-3.5 mr-1" />Auditoria de ajustes</TabsTrigger>
-              <TabsTrigger value="acordos" className="text-xs"><FileText className="h-3.5 w-3.5 mr-1" />Acordos</TabsTrigger>
-              <TabsTrigger value="cct" className="text-xs"><Scale className="h-3.5 w-3.5 mr-1" />CCT</TabsTrigger>
+              <TabsTrigger value="acordos" className="text-xs"><FileText className="h-3.5 w-3.5 mr-1" />Convenções e acordos</TabsTrigger>
+              <TabsTrigger value="cct" className="text-xs"><Scale className="h-3.5 w-3.5 mr-1" />CCT (antiga)</TabsTrigger>
               <TabsTrigger value="dossie" className="text-xs"><FolderArchive className="h-3.5 w-3.5 mr-1" />Dossiê fiscal</TabsTrigger>
             </TabsList>
             <TabsContent value="alertas"><PontoAlertasTab /></TabsContent>

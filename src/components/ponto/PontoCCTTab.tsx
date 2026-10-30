@@ -7,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useTenant } from "@/hooks/useTenant";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Scale, Plus, Edit, Trash2 } from "lucide-react";
+import { Scale, Edit, ArrowRightLeft, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { rpcUntyped } from "@/integrations/supabase/untypedClient";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -84,12 +85,6 @@ export function PontoCCTTab() {
     enabled: !!tenantId,
   });
 
-  const handleNova = () => {
-    setForm(defaultForm);
-    setEditId(null);
-    setShowModal(true);
-  };
-
   const handleEditar = (cct: any) => {
     setForm({
       nome: cct.nome || "",
@@ -125,15 +120,24 @@ export function PontoCCTTab() {
     }
     setSalvando(true);
     try {
-      const payload = { ...form, tenant_id: tenantId };
-
-      if (editId) {
-        await fromTable("ponto_cct_config").update(payload as any).eq("id", editId);
-        toast.success("CCT atualizada!");
-      } else {
-        await fromTable("ponto_cct_config").insert(payload as any);
-        toast.success("CCT cadastrada!");
-      }
+      if (!editId) return;
+      // Só os parâmetros que o cálculo ainda lê desta tela (jornada diária, % de
+      // hora extra, horário noturno e hora ficta, vigência). O resto mudou para
+      // Convenções e acordos e para a configuração do banco de horas.
+      const payload = {
+        vigencia_inicio: form.vigencia_inicio || null,
+        vigencia_fim: form.vigencia_fim || null,
+        jornada_diaria_horas: form.jornada_diaria_horas,
+        he_percentual_dia_util: form.he_percentual_dia_util,
+        he_percentual_domingos: form.he_percentual_domingos,
+        he_percentual_feriados: form.he_percentual_feriados,
+        hora_noturna_inicio: form.hora_noturna_inicio,
+        hora_noturna_fim: form.hora_noturna_fim,
+        usa_hora_ficta: form.usa_hora_ficta,
+      };
+      const { error } = await fromTable("ponto_cct_config").update(payload as any).eq("id", editId);
+      if (error) throw error;
+      toast.success("Parâmetros atualizados");
 
       queryClient.invalidateQueries({ queryKey: ["ponto-cct-config"] });
       setShowModal(false);
@@ -144,28 +148,42 @@ export function PontoCCTTab() {
     }
   };
 
-  const handleExcluir = async (id: string) => {
-    await fromTable("ponto_cct_config").delete().eq("id", id);
+  // Traz a CCT para o cadastro novo (Convenções e acordos). O instrumento nasce
+  // INATIVO: ativar é decisão do RH, porque instrumento coletivo ativo já conta
+  // para 12x36 e registro alternativo.
+  const handleImportar = async (cct: any) => {
+    const { data, error } = await rpcUntyped("ponto_importar_cct_legado", { p_cct_id: cct.id });
+    if (error || !data?.ok) { toast.error(error?.message || "Não foi possível trazer a CCT"); return; }
+    toast.success(data.ja_importada
+      ? "Esta CCT já está no novo cadastro."
+      : "CCT copiada para Convenções e acordos (inativa). Revise lá os sindicatos, as empresas e o documento, e ative.");
     queryClient.invalidateQueries({ queryKey: ["ponto-cct-config"] });
-    toast.success("CCT removida");
+    queryClient.invalidateQueries({ queryKey: ["ponto-acordos"] });
   };
 
   const updateForm = (field: keyof CCTForm, value: any) => setForm(prev => ({ ...prev, [field]: value }));
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Scale className="w-5 h-5 text-primary" /> Convenções Coletivas (CCT)
-          </h3>
-          <p className="text-sm text-muted-foreground">Parametrize regras por sindicato, empresa ou categoria</p>
-        </div>
-        <Button onClick={handleNova}><Plus className="w-4 h-4 mr-2" /> Nova CCT</Button>
+      <div>
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Scale className="w-5 h-5 text-primary" /> CCT (configuração antiga)
+        </h3>
+        <p className="text-sm text-muted-foreground">Somente leitura. Mostra as convenções do cadastro antigo.</p>
       </div>
 
+      <Alert className="border-sky-500/40 bg-sky-50 dark:bg-sky-950/20">
+        <Info className="h-4 w-4" />
+        <AlertDescription className="text-sm">
+          As convenções agora são cadastradas em <strong>Compliance → Convenções e acordos</strong>, onde cabe mais de
+          uma por empresa (atividade principal e categorias diferenciadas), com sindicatos, abrangência e documento.
+          Use "Trazer para o novo cadastro" em cada linha. Enquanto a próxima etapa não chega, o cálculo ainda lê
+          daqui a jornada diária, os percentuais de hora extra e o horário noturno — por isso eles continuam editáveis.
+        </AlertDescription>
+      </Alert>
+
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -183,13 +201,13 @@ export function PontoCCTTab() {
               {isLoading ? (
                 <TableRow><TableCell colSpan={8} className="text-center py-8">Carregando...</TableCell></TableRow>
               ) : ccts.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhuma CCT cadastrada. Use os padrões CLT.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nada no cadastro antigo. Use Convenções e acordos.</TableCell></TableRow>
               ) : ccts.map((cct: any) => (
                 <TableRow key={cct.id}>
                   <TableCell className="font-medium">{cct.nome}</TableCell>
                   <TableCell>{cct.sindicato || "—"}</TableCell>
                   <TableCell>{cct.categoria_profissional || "—"}</TableCell>
-                  <TableCell className="text-center">{cct.jornada_semanal_horas}h/sem</TableCell>
+                  <TableCell className="text-center">{cct.jornada_diaria_horas}h/dia</TableCell>
                   <TableCell className="text-center">{cct.he_percentual_dia_util}%</TableCell>
                   <TableCell className="text-center">{cct.he_percentual_domingos}% / {cct.he_percentual_feriados}%</TableCell>
                   <TableCell className="text-center">
@@ -199,8 +217,14 @@ export function PontoCCTTab() {
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => handleEditar(cct)}><Edit className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleExcluir(cct.id)}><Trash2 className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" title="Parâmetros que o cálculo ainda usa" onClick={() => handleEditar(cct)}><Edit className="w-4 h-4" /></Button>
+                      {cct.instrumento_id ? (
+                        <Badge variant="outline" className="text-[10px]">no novo cadastro</Badge>
+                      ) : (
+                        <Button variant="ghost" size="sm" onClick={() => handleImportar(cct)}>
+                          <ArrowRightLeft className="w-4 h-4 mr-1" /> Trazer para o novo cadastro
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -210,141 +234,55 @@ export function PontoCCTTab() {
         </CardContent>
       </Card>
 
-      {/* Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editId ? "Editar CCT" : "Nova Convenção Coletiva"}</DialogTitle>
+            <DialogTitle>Parâmetros que o cálculo ainda usa — {form.nome}</DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
-            {/* Identificação */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
-                <Label>Nome da CCT *</Label>
-                <Input value={form.nome} onChange={e => updateForm("nome", e.target.value)} placeholder="Ex: CCT Metalúrgicos SP 2025" />
-              </div>
-              <div className="space-y-2">
-                <Label>Sindicato</Label>
-                <Input value={form.sindicato} onChange={e => updateForm("sindicato", e.target.value)} placeholder="Nome do sindicato" />
+                <Label>Vigência início</Label>
+                <Input type="date" value={form.vigencia_inicio} onChange={e => updateForm("vigencia_inicio", e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Categoria Profissional</Label>
-                <Input value={form.categoria_profissional} onChange={e => updateForm("categoria_profissional", e.target.value)} placeholder="Ex: Metalúrgicos" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-2">
-                  <Label>Vigência Início</Label>
-                  <Input type="date" value={form.vigencia_inicio} onChange={e => updateForm("vigencia_inicio", e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Vigência Fim</Label>
-                  <Input type="date" value={form.vigencia_fim} onChange={e => updateForm("vigencia_fim", e.target.value)} />
-                </div>
+                <Label>Vigência fim</Label>
+                <Input type="date" value={form.vigencia_fim} onChange={e => updateForm("vigencia_fim", e.target.value)} />
               </div>
             </div>
-
-            {/* Jornada */}
-            <div>
-              <h4 className="font-medium mb-3">Jornada</h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Jornada Semanal (h)</Label>
-                  <Input type="number" value={form.jornada_semanal_horas} onChange={e => updateForm("jornada_semanal_horas", Number(e.target.value))} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Jornada Diária (h)</Label>
-                  <Input type="number" value={form.jornada_diaria_horas} onChange={e => updateForm("jornada_diaria_horas", Number(e.target.value))} />
-                </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label>Jornada diária (h)</Label>
+                <Input type="number" value={form.jornada_diaria_horas} onChange={e => updateForm("jornada_diaria_horas", Number(e.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label>% HE dia útil</Label>
+                <Input type="number" value={form.he_percentual_dia_util} onChange={e => updateForm("he_percentual_dia_util", Number(e.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label>% HE domingos</Label>
+                <Input type="number" value={form.he_percentual_domingos} onChange={e => updateForm("he_percentual_domingos", Number(e.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label>% HE feriados</Label>
+                <Input type="number" value={form.he_percentual_feriados} onChange={e => updateForm("he_percentual_feriados", Number(e.target.value))} />
               </div>
             </div>
-
-            {/* Horas Extras */}
-            <div>
-              <h4 className="font-medium mb-3">Horas Extras</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label>% Dia Útil</Label>
-                  <Input type="number" value={form.he_percentual_dia_util} onChange={e => updateForm("he_percentual_dia_util", Number(e.target.value))} />
-                </div>
-                <div className="space-y-2">
-                  <Label>% Domingos</Label>
-                  <Input type="number" value={form.he_percentual_domingos} onChange={e => updateForm("he_percentual_domingos", Number(e.target.value))} />
-                </div>
-                <div className="space-y-2">
-                  <Label>% Feriados</Label>
-                  <Input type="number" value={form.he_percentual_feriados} onChange={e => updateForm("he_percentual_feriados", Number(e.target.value))} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Limite Diário (min)</Label>
-                  <Input type="number" value={form.he_limite_diario_min} onChange={e => updateForm("he_limite_diario_min", Number(e.target.value))} />
-                </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Noturno: início</Label>
+                <Input type="time" value={form.hora_noturna_inicio} onChange={e => updateForm("hora_noturna_inicio", e.target.value)} />
               </div>
-            </div>
-
-            {/* Adicional Noturno */}
-            <div>
-              <h4 className="font-medium mb-3">Adicional Noturno</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label>Percentual (%)</Label>
-                  <Input type="number" value={form.adicional_noturno_percentual} onChange={e => updateForm("adicional_noturno_percentual", Number(e.target.value))} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Início</Label>
-                  <Input type="time" value={form.hora_noturna_inicio} onChange={e => updateForm("hora_noturna_inicio", e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Fim</Label>
-                  <Input type="time" value={form.hora_noturna_fim} onChange={e => updateForm("hora_noturna_fim", e.target.value)} />
-                </div>
-                <div className="flex items-center gap-2 pt-6">
-                  <Switch checked={form.usa_hora_ficta} onCheckedChange={v => updateForm("usa_hora_ficta", v)} />
-                  <Label>Hora ficta (52m30s)</Label>
-                </div>
+              <div className="space-y-2">
+                <Label>Noturno: fim</Label>
+                <Input type="time" value={form.hora_noturna_fim} onChange={e => updateForm("hora_noturna_fim", e.target.value)} />
               </div>
-            </div>
-
-            {/* Intervalos */}
-            <div>
-              <h4 className="font-medium mb-3">Intervalos</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Intervalo Mínimo (min)</Label>
-                  <Input type="number" value={form.intervalo_minimo_min} onChange={e => updateForm("intervalo_minimo_min", Number(e.target.value))} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Intervalo Máximo (min)</Label>
-                  <Input type="number" value={form.intervalo_maximo_min} onChange={e => updateForm("intervalo_maximo_min", Number(e.target.value))} />
-                </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Switch checked={form.usa_hora_ficta} onCheckedChange={v => updateForm("usa_hora_ficta", v)} />
+                <Label>Hora ficta (52m30s)</Label>
               </div>
-            </div>
-
-            {/* Banco de Horas */}
-            <div>
-              <h4 className="font-medium mb-3">Banco de Horas & DSR</h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="flex items-center gap-2">
-                  <Switch checked={form.banco_horas_permitido} onCheckedChange={v => updateForm("banco_horas_permitido", v)} />
-                  <Label>Banco de Horas Permitido</Label>
-                </div>
-                <div className="space-y-2">
-                  <Label>Prazo Compensação (meses)</Label>
-                  <Input type="number" value={form.banco_horas_prazo_compensacao_meses} onChange={e => updateForm("banco_horas_prazo_compensacao_meses", Number(e.target.value))} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={form.dsr_proporcional} onCheckedChange={v => updateForm("dsr_proporcional", v)} />
-                  <Label>DSR Proporcional</Label>
-                </div>
-              </div>
-            </div>
-
-            {/* Observações */}
-            <div className="space-y-2">
-              <Label>Observações</Label>
-              <Input value={form.observacoes} onChange={e => updateForm("observacoes", e.target.value)} placeholder="Observações adicionais" />
             </div>
           </div>
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
             <Button onClick={handleSalvar} disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button>

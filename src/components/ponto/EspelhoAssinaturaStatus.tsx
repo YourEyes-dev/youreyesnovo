@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Copy, FileSignature, Link2, Mail, Send, XCircle, FileCheck2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import type { PontoEspelho } from "@/hooks/usePontoFechamento";
+import { temCienciaValidaDoColaborador, type PontoEspelho } from "@/hooks/usePontoFechamento";
 import { useAssinaturaSolicitacoes, type AssinaturaSolicitacao } from "@/hooks/useAssinaturaSolicitacoes";
 
 /**
@@ -32,8 +32,12 @@ const SELOS: Record<string, Selo> = {
 
 function seloDoEspelho(e: PontoEspelho, s?: AssinaturaSolicitacao): Selo {
   if (e.ciencia_origem === "papel_digitalizado") return SELOS.papel;
-  if (e.ciencia_origem === "rh_legado") return SELOS.legado;
   const st = s?.status;
+  // Ciência antiga do RH não vale como do colaborador: com envio em andamento
+  // o selo é Pendente; sem envio, "Ciência antiga (RH)" (com a ação Enviar).
+  if (e.ciencia_origem === "rh_legado") {
+    return st && ["na_fila", "enviado", "visualizado"].includes(st) ? SELOS.pendente : SELOS.legado;
+  }
   if (st === "assinado") return SELOS.assinado;
   if (st === "assinado_com_ressalva") return SELOS.ressalva;
   if (st === "contestado" || e.status === "contestado") return SELOS.contestado;
@@ -59,7 +63,7 @@ export function EspelhoAssinaturaStatus({ competencia, espelhos, competenciaFech
 
   const ativa = (s?: AssinaturaSolicitacao) => !!s && ["na_fila", "enviado", "visualizado"].includes(s.status);
   const podeEnviar = (e: PontoEspelho, s?: AssinaturaSolicitacao) =>
-    competenciaFechada && !ativa(s) && (!e.ciencia_origem || e.status === "contestado");
+    competenciaFechada && !ativa(s) && !temCienciaValidaDoColaborador(e);
 
   const handleEnviar = async (e: PontoEspelho) => {
     setEnviandoId(e.id);
@@ -163,9 +167,14 @@ export function EspelhoAssinaturaStatus({ competencia, espelhos, competenciaFech
                   <TableCell>
                     <div className="flex justify-end gap-1">
                       {podeEnviar(e, s) && (
-                        <Button size="sm" variant="outline" onClick={() => handleEnviar(e)} disabled={enviandoId !== null}>
+                        <Button size="sm" variant="outline" onClick={() => handleEnviar(e)} disabled={enviandoId !== null}
+                          title={e.ciencia_origem === "rh_legado"
+                            ? "A ciência antiga do RH não vale como ciência do colaborador: envie para ele assinar."
+                            : undefined}>
                           {enviandoId === e.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Send className="w-4 h-4 mr-1" />}
-                          {s?.status === "contestado" || e.status === "contestado" ? "Reenviar corrigido" : "Enviar"}
+                          {s?.status === "contestado" || e.status === "contestado"
+                            ? "Reenviar corrigido"
+                            : e.ciencia_origem === "rh_legado" ? "Enviar para assinatura" : "Enviar"}
                         </Button>
                       )}
                       {s && ativa(s) && (

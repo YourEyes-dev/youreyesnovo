@@ -447,7 +447,8 @@ export function PontoFechamentoTab() {
                           <Download className="w-4 h-4" />
                         </Button>
                       )}
-                      {e.status !== "preview" && semCiencia(e) && (
+                      {/* rh_legado não é ciência do colaborador: o papel assinado pode substituí-la. */}
+                      {e.status !== "preview" && (semCiencia(e) || e.ciencia_origem === "rh_legado") && (
                         <Button
                           size="sm"
                           variant="ghost"

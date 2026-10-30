@@ -16,7 +16,20 @@ import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PontoEscalaAvisos } from "@/components/ponto/PontoEscalaAvisos";
-import { Plus, Calendar, Clock, Users, Settings, Sparkles, Pencil, Power, Trash2, CalendarDays, Repeat, Copy, Search, AlertTriangle } from "lucide-react";
+import { PontoEc141Painel } from "@/components/ponto/PontoEc141Painel";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  useTetoLegal,
+  useAgendamentosEscalas,
+  useAvisosTetoEscalas,
+  useCancelarAgendamentoEscala,
+  useMarcosAtivosConta,
+  diaAnteriorISO,
+  formatarDataBR,
+  formatarHoras,
+  hojeISO,
+} from "@/hooks/usePontoEc141";
+import { Plus, Calendar, Clock, Users, Settings, Sparkles, Pencil, Power, Trash2, CalendarDays, Repeat, Copy, Search, AlertTriangle, CalendarX } from "lucide-react";
 import { toast } from "sonner";
 import { confirm } from "@/components/ui/confirm-dialog";
 import { CadastroInteligenteEscala } from "./CadastroInteligenteEscala";
@@ -171,8 +184,11 @@ export function PontoEscalasTab() {
       const mapa: Record<string, string> = {};
       await Promise.all(
         escalas.map(async (e) => {
-          const { data, error } = await (supabase.rpc as any)("ponto_escala_formalizacao_status", {
+          // Versão da escala vigente HOJE e instrumento coletivo da empresa
+          // na data (EC 141 F1): uma alteração agendada não antecipa o selo.
+          const { data, error } = await (supabase.rpc as any)("ponto_escala_formalizacao_status_em", {
             p_escala_id: e.id,
+            p_data: hojeISO(),
           });
           if (!error && data) mapa[e.id] = data as string;
         }),
@@ -211,6 +227,38 @@ export function PontoEscalasTab() {
 
   /** Minutos declarados para a escala em edição (0 quando não há declaração). */
   const intervaloDeclarado = editando ? (intervaloDeclaradoPorEscala[editando.id] ?? 0) : 0;
+
+  // EC 141 F1 — "vale a partir de": a edição pode valer de uma data em diante
+  // (os valores atuais continuam valendo até a véspera). Sem data, a edição
+  // vale como sempre valeu (a partir de hoje).
+  const [vigencia, setVigencia] = useState<{ modo: "hoje" | "data"; data: string; motivo: string; marco: string }>({
+    modo: "hoje", data: "", motivo: "", marco: "",
+  });
+  const { data: agendamentos = {} } = useAgendamentosEscalas();
+  const { data: marcosAtivos = [] } = useMarcosAtivosConta();
+  const cancelarAgendamento = useCancelarAgendamentoEscala();
+  const { data: avisosTeto = {} } = useAvisosTetoEscalas(
+    escalas.map(e => e.id),
+    Object.fromEntries(Object.values(agendamentos).map(a => [a.escala_id, a.vigente_a_partir_de])),
+  );
+  const agendamentoEditando = editando ? agendamentos[editando.id] : undefined;
+  const dataReferenciaTeto = vigencia.modo === "data" && vigencia.data ? vigencia.data : hojeISO();
+  const { data: tetoLegal } = useTetoLegal(dataReferenciaTeto);
+
+  const handleCancelarAgendamento = async (escalaId: string, nome: string) => {
+    const ag = agendamentos[escalaId];
+    if (!ag) return;
+    const ok = await confirm({
+      title: "Cancelar a alteração agendada?",
+      description: `A escala "${nome}" tem uma alteração marcada para valer a partir de ${formatarDataBR(ag.vigente_a_partir_de)}. Ao cancelar, a escala volta aos valores de hoje (${formatarHoras(ag.atual_carga_semanal_min)}/semana) e nada muda nessa data.`,
+      confirmLabel: "Cancelar agendamento",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    await cancelarAgendamento.mutateAsync(escalaId);
+    setShowCriar(false);
+    setEditando(null);
+  };
 
   const selo_formalizacao = (escalaId: string) => {
     const st = statusFormalizacao[escalaId];
@@ -289,6 +337,27 @@ export function PontoEscalasTab() {
       payload.tipo = "personalizada";
     }
     if (editando) {
+      if (vigencia.modo === "data" && !agendamentoEditando) {
+        const hoje = hojeISO();
+        if (!vigencia.data) { toast.error("Informe a data a partir da qual a alteração vale."); return; }
+        const retroativa = vigencia.data < hoje;
+        if (retroativa && vigencia.motivo.trim().length < 5) {
+          toast.error("Alteração com data anterior a hoje exige justificativa.");
+          return;
+        }
+        const ok = await confirm({
+          title: retroativa ? "Aplicar a alteração com data passada?" : "Agendar a alteração da escala?",
+          description: retroativa
+            ? `Os novos horários passam a valer desde ${formatarDataBR(vigencia.data)}. Os dias a partir dessa data passam a ser apurados com a nova jornada (competências fechadas não podem ser atingidas). Até ${formatarDataBR(diaAnteriorISO(vigencia.data))} nada muda.`
+            : `Até ${formatarDataBR(diaAnteriorISO(vigencia.data))} a escala continua com os valores de hoje. A partir de ${formatarDataBR(vigencia.data)} passam a valer os novos horários. Você pode cancelar o agendamento até essa data.`,
+          confirmLabel: retroativa ? "Aplicar" : "Agendar",
+          variant: "default",
+        });
+        if (!ok) return;
+        payload.parametros_vigentes_desde = vigencia.data;
+        payload.parametros_vigencia_motivo = vigencia.motivo.trim() || null;
+        payload.parametros_marco_codigo = vigencia.marco || null;
+      }
       await atualizarEscala({ id: editando.id, ...payload } as any);
     } else {
       await criarEscala(payload as any);
@@ -299,6 +368,7 @@ export function PontoEscalasTab() {
 
   const abrirNova = () => {
     setEditando(null);
+    setVigencia({ modo: "hoje", data: "", motivo: "", marco: "" });
     setEscalaForm({
       nome: "", tipo: "5x2", modalidade: "fixa",
       dias_config: diasConfigPadrao(),
@@ -317,6 +387,7 @@ export function PontoEscalasTab() {
 
   const abrirEditar = (e: PontoEscala) => {
     setEditando(e);
+    setVigencia({ modo: "hoje", data: "", motivo: "", marco: "" });
     const anyE = e as any;
     setEscalaForm({
       nome: e.nome,
@@ -436,6 +507,13 @@ export function PontoEscalasTab() {
     }
   };
 
+  // A atribuição anterior termina na véspera da nova; se as duas começam no
+  // mesmo dia, a anterior não pode terminar antes de ter começado.
+  const fimDaAtribuicaoAnterior = (inicioAnterior: string | undefined, inicioNova: string) => {
+    const vespera = diaAnteriorISO(inicioNova);
+    return inicioAnterior && vespera < String(inicioAnterior).slice(0, 10) ? String(inicioAnterior).slice(0, 10) : vespera;
+  };
+
   const handleSalvarEdicaoAtribuicao = async () => {
     if (!editAtribuicao) return;
     if (!editAtribuicao.escala_id_nova) { toast.error("Selecione a escala"); return; }
@@ -445,9 +523,10 @@ export function PontoEscalasTab() {
     }
     setSalvandoEdicao(true);
     try {
-      // Encerra a atribuição vigente na data de início da nova
+      // Encerra a atribuição vigente na VÉSPERA do início da nova (senão o
+      // colaborador fica com duas escalas no mesmo dia).
       await fromTable("ponto_escala_atribuicoes")
-        .update({ ativa: false, data_fim: editAtribuicao.data_inicio } as any)
+        .update({ ativa: false, data_fim: fimDaAtribuicaoAnterior(atribuicoes.find(a => a.id === editAtribuicao.id)?.data_inicio, editAtribuicao.data_inicio) } as any)
         .eq("id", editAtribuicao.id);
 
       await atribuirEscala({
@@ -481,9 +560,9 @@ export function PontoEscalasTab() {
         if (atual) {
           if (atual.escala_id === atribuicaoForm.escala_id) { pulados++; continue; }
           if (!atribuicaoForm.substituir) { pulados++; continue; }
-          // Inativa atribuição anterior
+          // Inativa atribuição anterior, encerrando na véspera da nova
           await fromTable("ponto_escala_atribuicoes")
-            .update({ ativa: false, data_fim: atribuicaoForm.data_inicio } as any)
+            .update({ ativa: false, data_fim: fimDaAtribuicaoAnterior(atual.data_inicio, atribuicaoForm.data_inicio) } as any)
             .eq("id", atual.id);
           substituidos++;
         }
@@ -532,6 +611,9 @@ export function PontoEscalasTab() {
         </div>
       </div>
 
+      {/* EC 141/2026: só aparece quando o SuperAdmin ativa um marco da emenda */}
+      <PontoEc141Painel />
+
       {/* Avisos: escala sem o acordo exigido e turnos a descoberto */}
       <PontoEscalaAvisos escalas={escalas as any} />
 
@@ -564,18 +646,61 @@ export function PontoEscalasTab() {
                 <TableRow key={e.id}>
                   <TableCell className="font-medium">{e.nome}</TableCell>
                   <TableCell><Badge variant="outline">{ESCALA_TIPOS.find(t => t.value === e.tipo)?.label || e.tipo}</Badge></TableCell>
-                  <TableCell>{formatMinutos(e.jornada_diaria_minutos)}</TableCell>
-                  <TableCell>{formatMinutos(e.jornada_semanal_minutos)}</TableCell>
+                  {agendamentos[e.id] ? (
+                    <>
+                      <TableCell data-testid="escala-jornada-agendada">
+                        <div className="text-sm">Atual: {formatMinutos(agendamentos[e.id].atual_jornada_diaria_min ?? 0)}</div>
+                        <div className="text-xs text-blue-700 dark:text-blue-400">
+                          A partir de {formatarDataBR(agendamentos[e.id].vigente_a_partir_de).slice(0, 5)}: {formatMinutos(e.jornada_diaria_minutos)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">Atual: {formatarHoras(agendamentos[e.id].atual_carga_semanal_min)}</div>
+                        <div className="text-xs text-blue-700 dark:text-blue-400">
+                          A partir de {formatarDataBR(agendamentos[e.id].vigente_a_partir_de).slice(0, 5)}: {formatarHoras(agendamentos[e.id].nova_carga_semanal_min)}
+                        </div>
+                      </TableCell>
+                    </>
+                  ) : (
+                    <>
+                      <TableCell>{formatMinutos(e.jornada_diaria_minutos)}</TableCell>
+                      <TableCell>{formatMinutos(e.jornada_semanal_minutos)}</TableCell>
+                    </>
+                  )}
                   <TableCell>{formatMinutos(e.intervalo_intrajornada_minutos)}</TableCell>
                   <TableCell>{e.tolerancia_minutos}min / {e.tolerancia_diaria_minutos}min</TableCell>
                   <TableCell className="font-mono text-sm">{e.hora_entrada_padrao?.substring(0,5)} - {e.hora_saida_padrao?.substring(0,5)}</TableCell>
-                  <TableCell><Badge className={e.ativa ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>{e.ativa ? "Ativa" : "Inativa"}</Badge></TableCell>
+                  <TableCell>
+                    <div className="flex flex-col items-start gap-1">
+                      <Badge className={e.ativa ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>{e.ativa ? "Ativa" : "Inativa"}</Badge>
+                      {(avisosTeto[e.id] || []).length > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-400 text-amber-800 bg-amber-50 cursor-help"
+                          title={(avisosTeto[e.id] || []).map(a => a.mensagem).join("\n")}
+                          data-testid="escala-aviso-teto"
+                        >
+                          <AlertTriangle className="w-3 h-3 mr-1" /> Teto legal
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-center">{selo_formalizacao(e.id)}</TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <Button size="icon" variant="ghost" title="Editar" onClick={() => abrirEditar(e)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
+                      {agendamentos[e.id] && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title={`Cancelar a alteração agendada para ${formatarDataBR(agendamentos[e.id].vigente_a_partir_de)}`}
+                          onClick={() => handleCancelarAgendamento(e.id, e.nome)}
+                        >
+                          <CalendarX className="w-4 h-4 text-blue-700" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" title={e.ativa ? "Inativar" : "Ativar"} onClick={() => handleToggleAtiva(e)}>
                         <Power className={`w-4 h-4 ${e.ativa ? "text-amber-600" : "text-emerald-600"}`} />
                       </Button>
@@ -776,18 +901,21 @@ export function PontoEscalasTab() {
                   const compMin = calcularCompensacaoSemanal(escalaForm.compensacoes_mensais || []);
                   const total = j.semanal + compMin;
                   const fmt = (m: number) => `${Math.floor(m/60)}h${m%60?` ${String(m%60).padStart(2,"0")}min`:""}`;
-                  const meta44 = 44 * 60;
-                  const meta40 = 40 * 60;
+                  // Teto legal ATIVO na data em que a escala passa a valer
+                  // (CF/88 44h/220h enquanto nenhum marco EC 141 for ativado).
+                  const meta44 = tetoLegal?.teto_semanal_min ?? 44 * 60;
+                  const tetoH = fmt(meta44);
+                  const meta40 = Math.min(40 * 60, meta44);
                   const pct = Math.min(100, Math.round((total / meta44) * 100));
                   let cor = "bg-emerald-500";
                   let alerta = "";
-                  if (total < meta40) { cor = "bg-amber-500"; alerta = `Faltam ${fmt(meta40 - total)} para 40h ou ${fmt(meta44 - total)} para 44h. Considere usar Compensações Mensais.`; }
-                  else if (total < meta44) { cor = "bg-blue-500"; alerta = `${fmt(meta44 - total)} abaixo do limite de 44h/sem (CLT). Compensação opcional.`; }
-                  else if (total === meta44) { cor = "bg-emerald-500"; alerta = "Carga semanal exatamente no limite CLT (44h)."; }
-                  else { cor = "bg-red-500"; alerta = `Excede ${fmt(total - meta44)} sobre o limite CLT de 44h/sem. Revise a escala.`; }
-                  // Mensal: semana × 4.345 (média de semanas/mês). Padrão CLT folha = 220h
+                  if (total < meta40) { cor = "bg-amber-500"; alerta = meta40 < meta44 ? `Faltam ${fmt(meta40 - total)} para 40h ou ${fmt(meta44 - total)} para ${tetoH}. Considere usar Compensações Mensais.` : `${fmt(meta44 - total)} abaixo do limite de ${tetoH}/sem.`; }
+                  else if (total < meta44) { cor = "bg-blue-500"; alerta = `${fmt(meta44 - total)} abaixo do limite de ${tetoH}/sem. Compensação opcional.`; }
+                  else if (total === meta44) { cor = "bg-emerald-500"; alerta = `Carga semanal exatamente no limite legal (${tetoH}).`; }
+                  else { cor = "bg-red-500"; alerta = `Excede ${fmt(total - meta44)} sobre o limite legal de ${tetoH}/sem. Revise a escala.`; }
+                  // Mensal: semana × 4.345 (média de semanas/mês). Divisor do marco legal ativo (CF/88 = 220h)
                   const mensalMin = Math.round(total * 4.345);
-                  const mensalCLT = 220 * 60;
+                  const mensalCLT = (tetoLegal?.divisor_padrao ?? 220) * 60;
                   return (
                     <div className="mt-3 rounded-md border bg-background p-3 space-y-2">
                       <div className="flex items-baseline justify-between gap-2 flex-wrap">
@@ -801,7 +929,7 @@ export function PontoEscalasTab() {
                         </div>
                         <div className="text-[11px] text-muted-foreground text-right">
                           {compMin > 0 ? <>Base {fmt(j.semanal)} + Comp {fmt(compMin)}/sem</> : <>Sem compensações</>}
-                          <div>Meta CLT: 44h/sem • 220h/mês</div>
+                          <div>Teto legal: {tetoH}/sem • {Math.round(mensalCLT / 60)}h/mês{vigencia.modo === "data" && vigencia.data ? ` (em ${formatarDataBR(vigencia.data)})` : ""}</div>
                           {intervaloDeclarado > 0 && (
                             <div className="text-emerald-700 dark:text-emerald-400">
                               Já descontado o intervalo pré-assinalado de {intervaloDeclarado}min/dia
@@ -816,10 +944,10 @@ export function PontoEscalasTab() {
                         <span>{alerta}</span>
                         <span className="tabular-nums">
                           {mensalMin < mensalCLT
-                            ? `${fmt(mensalCLT - mensalMin)} abaixo de 220h/mês`
+                            ? `${fmt(mensalCLT - mensalMin)} abaixo de ${Math.round(mensalCLT / 60)}h/mês`
                             : mensalMin === mensalCLT
-                              ? "Exatamente 220h/mês"
-                              : `${fmt(mensalMin - mensalCLT)} acima de 220h/mês`}
+                              ? `Exatamente ${Math.round(mensalCLT / 60)}h/mês`
+                              : `${fmt(mensalMin - mensalCLT)} acima de ${Math.round(mensalCLT / 60)}h/mês`}
                         </span>
                       </div>
                     </div>
@@ -1038,6 +1166,78 @@ export function PontoEscalasTab() {
                 Define se quem está nesta escala folga ou trabalha nos feriados. Exceções individuais podem ser configuradas na tela de Feriados.
               </p>
             </div>
+
+            {editando && agendamentoEditando && (
+              <div className="rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-950/20 p-3 text-sm space-y-2" data-testid="escala-agendamento-pendente">
+                <p className="text-blue-900 dark:text-blue-200">
+                  <strong>Alteração agendada:</strong> os horários deste formulário passam a valer a partir de{" "}
+                  <strong>{formatarDataBR(agendamentoEditando.vigente_a_partir_de)}</strong>
+                  {agendamentoEditando.marco_codigo ? ` (${agendamentoEditando.marco_codigo})` : ""}. Até lá vale a carga atual de{" "}
+                  <strong>{formatarHoras(agendamentoEditando.atual_carga_semanal_min)}/semana</strong>. Salvar aqui ajusta o que foi agendado, na mesma data.
+                </p>
+                <Button
+                  type="button" size="sm" variant="outline"
+                  onClick={() => handleCancelarAgendamento(editando.id, editando.nome)}
+                  disabled={cancelarAgendamento.isPending}
+                >
+                  <CalendarX className="w-4 h-4 mr-1" /> Cancelar agendamento
+                </Button>
+              </div>
+            )}
+
+            {editando && !agendamentoEditando && (
+              <div className="space-y-2 rounded-md border bg-muted/30 px-4 py-3" data-testid="escala-vigencia">
+                <Label>Quando esta alteração passa a valer?</Label>
+                <Select value={vigencia.modo} onValueChange={(v) => setVigencia({ ...vigencia, modo: v as "hoje" | "data" })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hoje">A partir de hoje (como sempre foi)</SelectItem>
+                    <SelectItem value="data">A partir de uma data que eu escolher</SelectItem>
+                  </SelectContent>
+                </Select>
+                {vigencia.modo === "data" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Vale a partir de</Label>
+                      <Input type="date" value={vigencia.data} onChange={e => setVigencia({ ...vigencia, data: e.target.value })} />
+                    </div>
+                    {marcosAtivos.length > 0 && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Motivo legal (opcional)</Label>
+                        <Select value={vigencia.marco || "nenhum"} onValueChange={(v) => setVigencia({ ...vigencia, marco: v === "nenhum" ? "" : v })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="nenhum">Nenhum</SelectItem>
+                            {marcosAtivos.map(m => (
+                              <SelectItem key={m.codigo} value={m.codigo}>{m.nome}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    {vigencia.data && vigencia.data < hojeISO() && (
+                      <div className="space-y-1 md:col-span-2">
+                        <Label className="text-xs">Justificativa (obrigatória para data passada)</Label>
+                        <Textarea
+                          rows={2}
+                          value={vigencia.motivo}
+                          onChange={e => setVigencia({ ...vigencia, motivo: e.target.value })}
+                          placeholder="Ex.: correção do cadastro, a escala real mudou nesse dia"
+                        />
+                        <p className="text-[11px] text-amber-700">
+                          Os dias a partir dessa data passam a ser apurados com a nova jornada. Competência já fechada não pode ser atingida.
+                        </p>
+                      </div>
+                    )}
+                    {vigencia.data && (
+                      <p className="text-[11px] text-muted-foreground md:col-span-2">
+                        Até {formatarDataBR(diaAnteriorISO(vigencia.data))} valem os horários de hoje; a partir de {formatarDataBR(vigencia.data)}, os deste formulário.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {editando && <DetalhesEscalaPanel escalaId={editando.id} />}
           </div>

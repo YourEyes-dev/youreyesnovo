@@ -1,3 +1,6 @@
+-- SUBSTITUÍDO (30/10/2026): use docs/script_assinatura_fundacao_parte1_estrutura.sql
+-- e docs/script_assinatura_fundacao_parte2_funcoes.sql (ordem e conferência no
+-- cabeçalho deles). Este arquivo fica só como histórico; não cole.
 -- =========================================================
 -- ASS-0001 — FASE 0 (FUNDAÇÃO): script de ENTREGA (SQL Editor de homologação/produção).
 --

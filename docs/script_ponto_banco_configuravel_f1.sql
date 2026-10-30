@@ -21,8 +21,10 @@
 --
 -- ANTES DE ALTERAR, guarda cópia de ponto_banco_horas_config e ponto_cct_config
 -- no schema privado backup (backup.ponto_bh_config_20261030 e
--- backup.ponto_cct_config_20261030). Nenhuma linha existente é alterada aqui:
--- só ganham colunas novas com padrão. Para desfazer o regime vigente, recrie a
+-- backup.ponto_cct_config_20261030). Linhas existentes:
+-- só ganham colunas novas com padrão, e a modalidade das regras que já existem é
+-- inferida do prazo atual (<= 31 mensal; <= 183 semestral; acima anual) uma
+-- única vez, quando a coluna nasce. Para desfazer o regime vigente, recrie a
 -- função a partir de 20260819260000_ponto_onda5_banco_instrumento_vigente.sql.
 --
 -- Tabelas criadas por EXECUTE e atribuição só por subconsulta escalar (o
@@ -285,6 +287,31 @@ CREATE TRIGGER trg_ponto_instr_colab_guarda
   FOR EACH ROW EXECUTE FUNCTION public.ponto_instr_vinculo_guarda();
 
 -- ── 3) Banco de horas ampliado (padrões = comportamento de hoje) ────────────
+-- Modalidade inferida do prazo que a regra já tem (<= 31 dias mensal; <= 183
+-- semestral; acima, anual). Usada UMA vez, só nas regras que já existiam quando
+-- a coluna nasce — assim elas não aparecem em massa com o aviso falso "prazo
+-- acima da modalidade". Regra nova nasce 'mensal' e o RH escolhe.
+CREATE OR REPLACE FUNCTION public.ponto_banco_modalidade_do_prazo(p_prazo_dias integer)
+RETURNS text LANGUAGE sql IMMUTABLE AS $fn$
+  SELECT CASE
+           WHEN p_prazo_dias IS NULL OR p_prazo_dias <= 31 THEN 'mensal'
+           WHEN p_prazo_dias <= 183 THEN 'semestral'
+           ELSE 'anual'
+         END
+$fn$;
+
+DO $mod$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'ponto_banco_horas_config'
+                    AND column_name = 'modalidade') THEN
+    ALTER TABLE public.ponto_banco_horas_config ADD COLUMN modalidade text NOT NULL DEFAULT 'mensal';
+    -- coluna acabou de nascer: nenhuma linha foi editada ainda
+    UPDATE public.ponto_banco_horas_config
+       SET modalidade = public.ponto_banco_modalidade_do_prazo(prazo_compensacao_dias);
+  END IF;
+END $mod$;
+
 ALTER TABLE public.ponto_banco_horas_config
   ADD COLUMN IF NOT EXISTS modalidade text NOT NULL DEFAULT 'mensal',
   ADD COLUMN IF NOT EXISTS tipo_ciclo text NOT NULL DEFAULT 'fixo',
@@ -899,6 +926,7 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'instrumento_id', v_id, 'ja_importada', false);
 END $fn$;
 
+GRANT EXECUTE ON FUNCTION public.ponto_banco_modalidade_do_prazo(integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.ponto_acordo_cobre_empresa(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.ponto_acordo_vigente_em(uuid, date) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.ponto_tem_coletivo_vigente(uuid, uuid, date) TO authenticated;
@@ -983,7 +1011,7 @@ $fn$;
 COMMENT ON FUNCTION public.ponto_banco_regime_vigente(uuid, text, text, date) IS
   'Resolve o regime de banco de horas vigente do vinculo na data (config especifica da escala prevalece sobre a da empresa e a do tenant; exige acordo/CCT anexado quando o regime marca que o exige). Banco configuravel F1: a regra mais especifica do tipo sem_banco significa SEM regime; respeita data_fim; ignora regras presas a instrumento (Fatia 2). Retorna a linha de ponto_banco_horas_config, ou linha nula quando nao ha regime. CLT art. 59 §§2/5.';
 
--- ════════ PARTE 2: casos de teste do motor (PONTO-520..525) ════════
+-- ════════ PARTE 2: casos de teste do motor (PONTO-520..526) ════════
 -- ============================================================================
 -- QA — BANCO DE HORAS CONFIGURÁVEL, FATIA 1 (casos api)
 --
@@ -994,6 +1022,7 @@ COMMENT ON FUNCTION public.ponto_banco_regime_vigente(uuid, text, text, date) IS
 --   PONTO-524  ponto_banco_regime_vigente: sem_banco é sem banco, respeita data_fim,
 --              ignora regra presa a instrumento
 --   PONTO-525  restrições do colaborador: aprendiz (bloqueio), menor e insalubre (aviso)
+--   PONTO-526  modalidade inferida do prazo nas regras que já existiam (sem aviso falso)
 --
 -- Rotinas no cercado (tenant sandbox), desfeitas pelo motor ao fim
 -- (qa_executar_descartavel). Atribuição só por subconsulta escalar
@@ -1382,17 +1411,56 @@ EXCEPTION WHEN OTHERS THEN
   r.situacao := 'erro'; r.obtido := 'A rotina quebrou'; r.erro_tecnico := SQLERRM; RETURN r;
 END $fn$;
 
+-- ── PONTO-526 ─────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.qa_caso_ponto_526()
+RETURNS public.qa_retorno LANGUAGE plpgsql SET search_path TO 'public' AS $fn$
+DECLARE
+  r public.qa_retorno;
+  v_t uuid; v_id uuid := gen_random_uuid();
+  v_lim text; v_av text[]; v_nova text;
+BEGIN
+  PERFORM public.qa_modo_ligar();
+  v_t := public.qa_sandbox_tenant_id();
+
+  r.passo_ordem := 1;
+  r.passo_acao := 'Inferir a modalidade pelos limites do prazo (31/32, 183/184, sem prazo) e avaliar uma regra antiga de 180 dias com a modalidade inferida';
+  r.esperado := 'mensal, semestral, semestral, anual, mensal; sem PRAZO_ACIMA_MODALIDADE; regra nova nasce mensal';
+  v_lim := public.ponto_banco_modalidade_do_prazo(31) || ',' || public.ponto_banco_modalidade_do_prazo(32) || ','
+        || public.ponto_banco_modalidade_do_prazo(183) || ',' || public.ponto_banco_modalidade_do_prazo(184) || ','
+        || public.ponto_banco_modalidade_do_prazo(NULL);
+  v_av := ARRAY(SELECT codigo FROM public.ponto_banco_config_avisos_previa(v_t,
+            jsonb_build_object('tipo', 'individual', 'prazo_compensacao_dias', 180,
+                               'modalidade', public.ponto_banco_modalidade_do_prazo(180))));
+  INSERT INTO public.ponto_banco_horas_config (id, tenant_id, tipo, prazo_compensacao_dias, ativo)
+  VALUES (v_id, v_t, 'individual', 180, false);
+  v_nova := (SELECT modalidade FROM public.ponto_banco_horas_config WHERE id = v_id);
+
+  IF v_lim <> 'mensal,semestral,semestral,anual,mensal' THEN
+    r.situacao := 'falhou'; r.obtido := 'Limites da inferência errados: ' || v_lim;
+  ELSIF 'PRAZO_ACIMA_MODALIDADE' = ANY (v_av) THEN
+    r.situacao := 'falhou'; r.obtido := 'Regra antiga de 180 dias com modalidade inferida ainda gera aviso falso';
+  ELSIF v_nova IS DISTINCT FROM 'mensal' THEN
+    r.situacao := 'falhou'; r.obtido := 'Regra nova devia nascer mensal e nasceu ' || COALESCE(v_nova, 'nula');
+  ELSE
+    r.situacao := 'passou';
+    r.obtido := 'Inferência correta nos limites; sem aviso falso; regra nova nasce mensal.';
+  END IF;
+  RETURN r;
+EXCEPTION WHEN OTHERS THEN
+  r.situacao := 'erro'; r.obtido := 'A rotina quebrou'; r.erro_tecnico := SQLERRM; RETURN r;
+END $fn$;
+
 -- Documentação dos casos + implementações
 DO $doc$
 DECLARE v_mod uuid;
 BEGIN
   IF to_regclass('public.qa_casos_teste') IS NULL OR to_regclass('public.qa_modulos') IS NULL THEN
-    RAISE NOTICE 'Motor de QA ausente; casos PONTO-520..525 não documentados.';
+    RAISE NOTICE 'Motor de QA ausente; casos PONTO-520..526 não documentados.';
     RETURN;
   END IF;
   v_mod := (SELECT id FROM public.qa_modulos WHERE path = 'jornada-rotina/ponto' LIMIT 1);
   IF v_mod IS NULL THEN
-    RAISE NOTICE 'Módulo jornada-rotina/ponto ausente; casos PONTO-520..525 não documentados.';
+    RAISE NOTICE 'Módulo jornada-rotina/ponto ausente; casos PONTO-520..526 não documentados.';
     RETURN;
   END IF;
 
@@ -1461,7 +1529,16 @@ BEGIN
    'Cercado de QA; três admissões fictícias (aprendiz, menor, insalubre); sem CCT/ACT.',
    '[{"ordem":1,"acao":"Avisos por colaborador, sinal para o cálculo e avisos da configuração da empresa","resultado_esperado":"APRENDIZ_SEM_BANCO (bloqueio), MENOR_SEM_COLETIVO, INSALUBRE_SEM_LICENCA; bloqueado só o aprendiz; APRENDIZES_NO_ESCOPO, MENORES_SEM_COLETIVO, INSALUBRES_SEM_COLETIVO"}]'::jsonb,
    'Restrições sinalizadas no colaborador e na configuração.',
-   'Fatia 1 só sinaliza: o cálculo passa a excluir aprendiz na Fatia 2 (ponto_banco_colaborador_bloqueado).')
+   'Fatia 1 só sinaliza: o cálculo passa a excluir aprendiz na Fatia 2 (ponto_banco_colaborador_bloqueado).'),
+  (v_mod, 'PONTO-526',
+   'Regras de banco que já existiam ganham a modalidade pelo prazo atual, sem aviso falso',
+   'feliz', 'alta', 'aprovado', 'api',
+   'CLT art. 59 §§2º, 5º e 6º',
+   'Ao nascer a coluna modalidade, cada regra existente recebe mensal (prazo até 31 dias), semestral (até 183) ou anual (acima), uma única vez. Sem isso, todas nasceriam mensais e as de 180 dias mostrariam em massa o aviso "prazo acima da modalidade". Regra nova nasce mensal.',
+   'Cercado de QA.',
+   '[{"ordem":1,"acao":"ponto_banco_modalidade_do_prazo em 31, 32, 183, 184 e nulo; avisos de uma regra de 180 dias com a modalidade inferida; inserir regra nova","resultado_esperado":"mensal, semestral, semestral, anual, mensal; sem PRAZO_ACIMA_MODALIDADE; nova = mensal"}]'::jsonb,
+   'Inferência correta e sem aviso falso.',
+   'A inferência roda só quando a coluna é criada (migration e script); regras editadas depois não são tocadas.')
   ON CONFLICT (codigo) DO UPDATE SET
     modulo_id = EXCLUDED.modulo_id, titulo = EXCLUDED.titulo, objetivo = EXCLUDED.objetivo,
     passos = EXCLUDED.passos, resultado_esperado = EXCLUDED.resultado_esperado,
@@ -1474,18 +1551,20 @@ BEGIN
       ('PONTO-522', 'qa_caso_ponto_522', true),
       ('PONTO-523', 'qa_caso_ponto_523', true),
       ('PONTO-524', 'qa_caso_ponto_524', true),
-      ('PONTO-525', 'qa_caso_ponto_525', true)
+      ('PONTO-525', 'qa_caso_ponto_525', true),
+      ('PONTO-526', 'qa_caso_ponto_526', true)
     ON CONFLICT (codigo) DO UPDATE SET funcao_sql = EXCLUDED.funcao_sql, ativo = true;
   END IF;
 EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'Documentação PONTO-520..525 não registrada: %', SQLERRM;
+  RAISE NOTICE 'Documentação PONTO-520..526 não registrada: %', SQLERRM;
 END $doc$;
 
 -- ── CONFERÊNCIA (único resultado que o editor mostra) ──────────────────────
--- Esperado: colunas_config_novas = 26, tabelas_novas = 2, funcoes_novas = 12,
--- gatilho_validacao = true, regime_corrigido = true, casos_qa = 6,
--- rotinas_qa = 6, backups = 2. configs_sem_banco_ativas = quantas regras
+-- Esperado: colunas_config_novas = 26, tabelas_novas = 2, funcoes_novas = 13,
+-- gatilho_validacao = true, regime_corrigido = true, casos_qa = 7,
+-- rotinas_qa = 7, backups = 2. configs_sem_banco_ativas = quantas regras
 -- "sem banco" ativas existem (essas passam a valer como SEM banco).
+-- modalidades = contagem por modalidade (inferida do prazo nas regras antigas).
 -- A bateria NÃO roda aqui (segundo gesto):
 --   SELECT public.qa_rodar_bateria('manual', 'jornada-rotina/ponto');
 SELECT
@@ -1509,13 +1588,15 @@ SELECT
       'ponto_acordo_cobre_empresa','ponto_acordo_vigente_em','ponto_tem_coletivo_vigente',
       'ponto_instrumento_do_colaborador','ponto_instrumento_avisos_vinculo','ponto_banco_avisos_colaborador',
       'ponto_banco_colaborador_bloqueado','ponto_banco_config_avisos_previa','ponto_instrumento_sugestoes',
-      'ponto_importar_cct_legado')) AS funcoes_novas,
+      'ponto_importar_cct_legado','ponto_banco_modalidade_do_prazo')) AS funcoes_novas,
   EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_ponto_banco_config_valida' AND NOT tgisinternal) AS gatilho_validacao,
   position('[banco-f1]' IN pg_get_functiondef('public.ponto_banco_regime_vigente(uuid,text,text,date)'::regprocedure)) > 0 AS regime_corrigido,
   (SELECT count(*) FROM public.ponto_banco_horas_config WHERE tipo = 'sem_banco' AND COALESCE(ativo, false)) AS configs_sem_banco_ativas,
-  (SELECT count(*) FROM public.qa_casos_teste WHERE codigo IN ('PONTO-520','PONTO-521','PONTO-522','PONTO-523','PONTO-524','PONTO-525')) AS casos_qa,
+  (SELECT count(*) FROM public.qa_casos_teste WHERE codigo IN ('PONTO-520','PONTO-521','PONTO-522','PONTO-523','PONTO-524','PONTO-525','PONTO-526')) AS casos_qa,
   (SELECT count(*) FROM public.qa_implementacoes i
-    WHERE i.codigo IN ('PONTO-520','PONTO-521','PONTO-522','PONTO-523','PONTO-524','PONTO-525')
+    WHERE i.codigo IN ('PONTO-520','PONTO-521','PONTO-522','PONTO-523','PONTO-524','PONTO-525','PONTO-526')
       AND to_regprocedure('public.' || i.funcao_sql || '()') IS NOT NULL) AS rotinas_qa,
+  (SELECT string_agg(x.modalidade || '=' || x.n, ', ' ORDER BY x.modalidade)
+     FROM (SELECT modalidade, count(*) AS n FROM public.ponto_banco_horas_config GROUP BY modalidade) x) AS modalidades,
   (SELECT count(*) FROM pg_tables WHERE schemaname = 'backup'
     AND tablename IN ('ponto_bh_config_20261030','ponto_cct_config_20261030')) AS backups;

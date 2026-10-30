@@ -8,6 +8,7 @@
 --   PONTO-524  ponto_banco_regime_vigente: sem_banco é sem banco, respeita data_fim,
 --              ignora regra presa a instrumento
 --   PONTO-525  restrições do colaborador: aprendiz (bloqueio), menor e insalubre (aviso)
+--   PONTO-526  modalidade inferida do prazo nas regras que já existiam (sem aviso falso)
 --
 -- Rotinas no cercado (tenant sandbox), desfeitas pelo motor ao fim
 -- (qa_executar_descartavel). Atribuição só por subconsulta escalar
@@ -397,17 +398,56 @@ EXCEPTION WHEN OTHERS THEN
   r.situacao := 'erro'; r.obtido := 'A rotina quebrou'; r.erro_tecnico := SQLERRM; RETURN r;
 END $fn$;
 
+-- ── PONTO-526 ─────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.qa_caso_ponto_526()
+RETURNS public.qa_retorno LANGUAGE plpgsql SET search_path TO 'public' AS $fn$
+DECLARE
+  r public.qa_retorno;
+  v_t uuid; v_id uuid := gen_random_uuid();
+  v_lim text; v_av text[]; v_nova text;
+BEGIN
+  PERFORM public.qa_modo_ligar();
+  v_t := public.qa_sandbox_tenant_id();
+
+  r.passo_ordem := 1;
+  r.passo_acao := 'Inferir a modalidade pelos limites do prazo (31/32, 183/184, sem prazo) e avaliar uma regra antiga de 180 dias com a modalidade inferida';
+  r.esperado := 'mensal, semestral, semestral, anual, mensal; sem PRAZO_ACIMA_MODALIDADE; regra nova nasce mensal';
+  v_lim := public.ponto_banco_modalidade_do_prazo(31) || ',' || public.ponto_banco_modalidade_do_prazo(32) || ','
+        || public.ponto_banco_modalidade_do_prazo(183) || ',' || public.ponto_banco_modalidade_do_prazo(184) || ','
+        || public.ponto_banco_modalidade_do_prazo(NULL);
+  v_av := ARRAY(SELECT codigo FROM public.ponto_banco_config_avisos_previa(v_t,
+            jsonb_build_object('tipo', 'individual', 'prazo_compensacao_dias', 180,
+                               'modalidade', public.ponto_banco_modalidade_do_prazo(180))));
+  INSERT INTO public.ponto_banco_horas_config (id, tenant_id, tipo, prazo_compensacao_dias, ativo)
+  VALUES (v_id, v_t, 'individual', 180, false);
+  v_nova := (SELECT modalidade FROM public.ponto_banco_horas_config WHERE id = v_id);
+
+  IF v_lim <> 'mensal,semestral,semestral,anual,mensal' THEN
+    r.situacao := 'falhou'; r.obtido := 'Limites da inferência errados: ' || v_lim;
+  ELSIF 'PRAZO_ACIMA_MODALIDADE' = ANY (v_av) THEN
+    r.situacao := 'falhou'; r.obtido := 'Regra antiga de 180 dias com modalidade inferida ainda gera aviso falso';
+  ELSIF v_nova IS DISTINCT FROM 'mensal' THEN
+    r.situacao := 'falhou'; r.obtido := 'Regra nova devia nascer mensal e nasceu ' || COALESCE(v_nova, 'nula');
+  ELSE
+    r.situacao := 'passou';
+    r.obtido := 'Inferência correta nos limites; sem aviso falso; regra nova nasce mensal.';
+  END IF;
+  RETURN r;
+EXCEPTION WHEN OTHERS THEN
+  r.situacao := 'erro'; r.obtido := 'A rotina quebrou'; r.erro_tecnico := SQLERRM; RETURN r;
+END $fn$;
+
 -- Documentação dos casos + implementações
 DO $doc$
 DECLARE v_mod uuid;
 BEGIN
   IF to_regclass('public.qa_casos_teste') IS NULL OR to_regclass('public.qa_modulos') IS NULL THEN
-    RAISE NOTICE 'Motor de QA ausente; casos PONTO-520..525 não documentados.';
+    RAISE NOTICE 'Motor de QA ausente; casos PONTO-520..526 não documentados.';
     RETURN;
   END IF;
   v_mod := (SELECT id FROM public.qa_modulos WHERE path = 'jornada-rotina/ponto' LIMIT 1);
   IF v_mod IS NULL THEN
-    RAISE NOTICE 'Módulo jornada-rotina/ponto ausente; casos PONTO-520..525 não documentados.';
+    RAISE NOTICE 'Módulo jornada-rotina/ponto ausente; casos PONTO-520..526 não documentados.';
     RETURN;
   END IF;
 
@@ -476,7 +516,16 @@ BEGIN
    'Cercado de QA; três admissões fictícias (aprendiz, menor, insalubre); sem CCT/ACT.',
    '[{"ordem":1,"acao":"Avisos por colaborador, sinal para o cálculo e avisos da configuração da empresa","resultado_esperado":"APRENDIZ_SEM_BANCO (bloqueio), MENOR_SEM_COLETIVO, INSALUBRE_SEM_LICENCA; bloqueado só o aprendiz; APRENDIZES_NO_ESCOPO, MENORES_SEM_COLETIVO, INSALUBRES_SEM_COLETIVO"}]'::jsonb,
    'Restrições sinalizadas no colaborador e na configuração.',
-   'Fatia 1 só sinaliza: o cálculo passa a excluir aprendiz na Fatia 2 (ponto_banco_colaborador_bloqueado).')
+   'Fatia 1 só sinaliza: o cálculo passa a excluir aprendiz na Fatia 2 (ponto_banco_colaborador_bloqueado).'),
+  (v_mod, 'PONTO-526',
+   'Regras de banco que já existiam ganham a modalidade pelo prazo atual, sem aviso falso',
+   'feliz', 'alta', 'aprovado', 'api',
+   'CLT art. 59 §§2º, 5º e 6º',
+   'Ao nascer a coluna modalidade, cada regra existente recebe mensal (prazo até 31 dias), semestral (até 183) ou anual (acima), uma única vez. Sem isso, todas nasceriam mensais e as de 180 dias mostrariam em massa o aviso "prazo acima da modalidade". Regra nova nasce mensal.',
+   'Cercado de QA.',
+   '[{"ordem":1,"acao":"ponto_banco_modalidade_do_prazo em 31, 32, 183, 184 e nulo; avisos de uma regra de 180 dias com a modalidade inferida; inserir regra nova","resultado_esperado":"mensal, semestral, semestral, anual, mensal; sem PRAZO_ACIMA_MODALIDADE; nova = mensal"}]'::jsonb,
+   'Inferência correta e sem aviso falso.',
+   'A inferência roda só quando a coluna é criada (migration e script); regras editadas depois não são tocadas.')
   ON CONFLICT (codigo) DO UPDATE SET
     modulo_id = EXCLUDED.modulo_id, titulo = EXCLUDED.titulo, objetivo = EXCLUDED.objetivo,
     passos = EXCLUDED.passos, resultado_esperado = EXCLUDED.resultado_esperado,
@@ -489,9 +538,10 @@ BEGIN
       ('PONTO-522', 'qa_caso_ponto_522', true),
       ('PONTO-523', 'qa_caso_ponto_523', true),
       ('PONTO-524', 'qa_caso_ponto_524', true),
-      ('PONTO-525', 'qa_caso_ponto_525', true)
+      ('PONTO-525', 'qa_caso_ponto_525', true),
+      ('PONTO-526', 'qa_caso_ponto_526', true)
     ON CONFLICT (codigo) DO UPDATE SET funcao_sql = EXCLUDED.funcao_sql, ativo = true;
   END IF;
 EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'Documentação PONTO-520..525 não registrada: %', SQLERRM;
+  RAISE NOTICE 'Documentação PONTO-520..526 não registrada: %', SQLERRM;
 END $doc$;

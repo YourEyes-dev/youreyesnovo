@@ -235,6 +235,31 @@ CREATE TRIGGER trg_ponto_instr_colab_guarda
   FOR EACH ROW EXECUTE FUNCTION public.ponto_instr_vinculo_guarda();
 
 -- ── 3) Banco de horas ampliado (padrões = comportamento de hoje) ────────────
+-- Modalidade inferida do prazo que a regra já tem (<= 31 dias mensal; <= 183
+-- semestral; acima, anual). Usada UMA vez, só nas regras que já existiam quando
+-- a coluna nasce — assim elas não aparecem em massa com o aviso falso "prazo
+-- acima da modalidade". Regra nova nasce 'mensal' e o RH escolhe.
+CREATE OR REPLACE FUNCTION public.ponto_banco_modalidade_do_prazo(p_prazo_dias integer)
+RETURNS text LANGUAGE sql IMMUTABLE AS $fn$
+  SELECT CASE
+           WHEN p_prazo_dias IS NULL OR p_prazo_dias <= 31 THEN 'mensal'
+           WHEN p_prazo_dias <= 183 THEN 'semestral'
+           ELSE 'anual'
+         END
+$fn$;
+
+DO $mod$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'ponto_banco_horas_config'
+                    AND column_name = 'modalidade') THEN
+    ALTER TABLE public.ponto_banco_horas_config ADD COLUMN modalidade text NOT NULL DEFAULT 'mensal';
+    -- coluna acabou de nascer: nenhuma linha foi editada ainda
+    UPDATE public.ponto_banco_horas_config
+       SET modalidade = public.ponto_banco_modalidade_do_prazo(prazo_compensacao_dias);
+  END IF;
+END $mod$;
+
 ALTER TABLE public.ponto_banco_horas_config
   ADD COLUMN IF NOT EXISTS modalidade text NOT NULL DEFAULT 'mensal',
   ADD COLUMN IF NOT EXISTS tipo_ciclo text NOT NULL DEFAULT 'fixo',
@@ -849,6 +874,7 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'instrumento_id', v_id, 'ja_importada', false);
 END $fn$;
 
+GRANT EXECUTE ON FUNCTION public.ponto_banco_modalidade_do_prazo(integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.ponto_acordo_cobre_empresa(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.ponto_acordo_vigente_em(uuid, date) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.ponto_tem_coletivo_vigente(uuid, uuid, date) TO authenticated;

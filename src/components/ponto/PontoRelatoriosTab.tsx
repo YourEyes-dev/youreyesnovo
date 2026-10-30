@@ -12,7 +12,7 @@ import { usePontoBancoHoras } from "@/hooks/usePontoBancoHoras";
 import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/integrations/supabase/untypedClient";
 import { format } from "date-fns";
-import { FileDown, FileText, Download, Archive } from "lucide-react";
+import { FileDown, FileText, Download, Archive, Eye, Send } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -26,6 +26,7 @@ import {
 } from "@/lib/ponto/pdfMarca";
 import {
   carregarEspelhoDetalhado as carregarEspelhoDetalhadoLib,
+  idArquivoEstavel,
   montarEspelhoPdf,
   percentualHE,
   type AlvoEspelho,
@@ -35,6 +36,10 @@ import {
 import { gerarAFD671 } from "@/lib/ponto/afd671";
 import { gerarAEJ671, type AejMarcacao, type AejOcorrencia } from "@/lib/ponto/aej671";
 import { IncluirBancoHorasDialog } from "@/components/ponto/IncluirBancoHorasDialog";
+import { EspelhoVisualizarDialog } from "@/components/ponto/EspelhoVisualizarDialog";
+import { EspelhoAssinaturaStatus } from "@/components/ponto/EspelhoAssinaturaStatus";
+import { useAssinaturaSolicitacoes } from "@/hooks/useAssinaturaSolicitacoes";
+import type { PontoEspelho } from "@/hooks/usePontoFechamento";
 
 
 type ReportType = "cartao_ponto" | "espelho" | "horas_extras" | "banco_horas" | "absenteismo" | "afd" | "aej";
@@ -61,7 +66,7 @@ export function PontoRelatoriosTab() {
   const [colaboradorFiltro, setColaboradorFiltro] = useState<string>("todos");
 
   const { usePontoDiario } = usePonto();
-  const { useEspelhos } = usePontoFechamento();
+  const { useEspelhos, useFechamentos } = usePontoFechamento();
   const { useBancoHorasPorCompetencia, useBancoHorasOficial } = usePontoBancoHoras();
 
   const year = parseInt(competencia.split("-")[0]);
@@ -139,6 +144,11 @@ export function PontoRelatoriosTab() {
 
 
   const { data: espelhos = [] } = useEspelhos(competencia);
+  const { data: fechamentos = [] } = useFechamentos();
+  const fechamentoDaCompetencia = fechamentos.find((f) => f.competencia === competencia);
+  const competenciaFechada = fechamentoDaCompetencia?.status === "fechado";
+  const [visualizando, setVisualizando] = useState(false);
+  const assinaturas = useAssinaturaSolicitacoes(competencia);
   const { data: bancosHorasTodos = [] } = useBancoHorasPorCompetencia(competencia);
   // Fonte única do banco de horas: é dela que saem os números impressos, para
   // o espelho e o relatório de banco de horas não discordarem entre si.
@@ -389,6 +399,78 @@ export function PontoRelatoriosTab() {
 
 
 
+
+  /**
+   * PDF de UM colaborador para assinatura: o mesmo gerador do botão "Gerar",
+   * com a data do fechamento e um identificador estável gravados no arquivo
+   * (o documento enviado é reproduzível). O servidor congela este PDF e
+   * calcula o hash dele no envio.
+   */
+  const gerarPdfParaAssinatura = async (e: PontoEspelho): Promise<Blob | null> => {
+    if (!tenantId) return null;
+    const criadoEm = fechamentoDaCompetencia?.data_fechamento
+      ? new Date(fechamentoDaCompetencia.data_fechamento)
+      : new Date();
+    const { doc, colaboradores: lista } = await montarEspelhoPdf({
+      tenantId,
+      empresaId: empresaAtivaId || null,
+      competencia,
+      alvos: [{ nome: e.colaborador_nome, cpf: soDigitos(e.colaborador_cpf) }],
+      contexto: contextoDoEspelho(),
+      fixar: { criadoEm, fileId: await idArquivoEstavel(`${e.id}|${competencia}`) },
+    });
+    return lista.length ? doc.output("blob") : null;
+  };
+
+  /** Pré-visualização do recorte atual (filtro de departamento/colaborador). */
+  const gerarPreVisualizacao = async (): Promise<Blob | null> => {
+    if (!tenantId) return null;
+    const { doc, colaboradores: lista } = await montarEspelhoPdf({
+      tenantId,
+      empresaId: empresaAtivaId || null,
+      competencia,
+      alvos: alvosDoEspelho(),
+      contexto: contextoDoEspelho(),
+    });
+    return lista.length ? doc.output("blob") : null;
+  };
+
+  const espelhoDoColaboradorFiltrado = colaboradorFiltro !== "todos"
+    ? (espelhos as PontoEspelho[]).find((e) => soDigitos(e.colaborador_cpf) === colaboradorFiltro)
+    : undefined;
+  const solicitacaoDoFiltrado = espelhoDoColaboradorFiltrado
+    ? assinaturas.porEspelho.get(espelhoDoColaboradorFiltrado.id)
+    : undefined;
+  const regraEnvio = !competenciaFechada
+    ? "Feche a competência para liberar o envio para assinatura."
+    : colaboradorFiltro === "todos"
+      ? "Escolha um colaborador no filtro para enviar o espelho dele (ou use o painel abaixo)."
+      : !espelhoDoColaboradorFiltrado
+        ? "Este colaborador não tem espelho gerado na competência."
+        : solicitacaoDoFiltrado && ["na_fila", "enviado", "visualizado"].includes(solicitacaoDoFiltrado.status)
+          ? "Este espelho já está com o colaborador para assinatura."
+          : espelhoDoColaboradorFiltrado.ciencia_origem && espelhoDoColaboradorFiltrado.status !== "contestado"
+            ? "Este espelho já tem ciência registrada."
+            : null;
+
+  const enviarDoFiltro = async () => {
+    if (!espelhoDoColaboradorFiltrado || regraEnvio) return;
+    const pdf = await gerarPdfParaAssinatura(espelhoDoColaboradorFiltrado);
+    if (!pdf) {
+      toast.warning("Nenhuma apuração encontrada para este colaborador na competência.");
+      return;
+    }
+    const r = await assinaturas.enviar.mutateAsync({ espelhoId: espelhoDoColaboradorFiltrado.id, pdf }).catch(() => null);
+    if (!r) return;
+    if (r.link) {
+      try { await navigator.clipboard.writeText(r.link); } catch { /* sem permissão de área de transferência */ }
+    }
+    toast.success(
+      r.email_enviado
+        ? `Enviado para ${r.destino}. O link também foi copiado.`
+        : "O e-mail não saiu, mas o link foi copiado: envie ao colaborador.",
+    );
+  };
 
   const [perguntandoBanco, setPerguntandoBanco] = useState(false);
 
@@ -1199,10 +1281,48 @@ export function PontoRelatoriosTab() {
         }}
       />
 
-      <Button onClick={solicitarRelatorio} disabled={gerando} className="w-full md:w-auto">
-        <Download className="w-4 h-4 mr-2" />
-        {gerando ? "Gerando..." : "Gerar Relatório"}
-      </Button>
+      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+        <Button onClick={solicitarRelatorio} disabled={gerando} className="w-full md:w-auto">
+          <Download className="w-4 h-4 mr-2" />
+          {gerando ? "Gerando..." : "Gerar Relatório"}
+        </Button>
+        {tipoRelatorio === "espelho" && (
+          <>
+            <Button variant="outline" onClick={() => setVisualizando(true)} className="w-full md:w-auto" data-testid="btn-visualizar-espelho">
+              <Eye className="w-4 h-4 mr-2" /> Visualizar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={enviarDoFiltro}
+              disabled={!!regraEnvio || assinaturas.enviar.isPending}
+              className="w-full md:w-auto"
+              data-testid="btn-enviar-assinatura"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              {assinaturas.enviar.isPending ? "Enviando..." : "Enviar para assinatura"}
+            </Button>
+          </>
+        )}
+      </div>
+      {tipoRelatorio === "espelho" && regraEnvio && (
+        <p className="text-xs text-muted-foreground" data-testid="regra-envio-assinatura">{regraEnvio}</p>
+      )}
+
+      {tipoRelatorio === "espelho" && (
+        <EspelhoAssinaturaStatus
+          competencia={competencia}
+          espelhos={(espelhos as PontoEspelho[]).filter((e) => cpfPermitido(e.colaborador_cpf))}
+          competenciaFechada={competenciaFechada}
+          gerarPdf={gerarPdfParaAssinatura}
+        />
+      )}
+
+      <EspelhoVisualizarDialog
+        aberto={visualizando}
+        onFechar={() => setVisualizando(false)}
+        gerar={gerarPreVisualizacao}
+        subtitulo={`Competência ${competencia}. Esta tela não gera arquivo para baixar.`}
+      />
 
       {/* Info about AFD/AEFP */}
       <Card className="bg-muted/30">

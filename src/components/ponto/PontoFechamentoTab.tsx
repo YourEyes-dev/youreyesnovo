@@ -17,7 +17,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatarHoraMinuto } from "@/lib/ponto/diaSemana";
-import { montarEspelhoPdf } from "@/lib/ponto/espelhoPdf";
+import { idArquivoEstavel, montarEspelhoPdf } from "@/lib/ponto/espelhoPdf";
+import { EspelhoAssinaturaStatus } from "@/components/ponto/EspelhoAssinaturaStatus";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const STATUS_FECHAMENTO: Record<string, { label: string; color: string }> = {
@@ -47,6 +48,7 @@ const STATUS_ESPELHO: Record<string, { label: string; color: string }> = {
   confirmado: { label: "Confirmado", color: "bg-green-100 text-green-800" },
   ressalva: { label: "Ressalva", color: "bg-yellow-100 text-yellow-800" },
   assinado: { label: "Assinado", color: "bg-green-100 text-green-800" },
+  contestado: { label: "Contestado", color: "bg-red-100 text-red-800" },
 };
 
 /** De onde veio a ciência (ponto_espelhos.ciencia_origem). */
@@ -58,7 +60,8 @@ const ORIGEM_CIENCIA: Record<string, string> = {
 
 /** Espelho ainda sem ciência do colaborador (mesma regra do portão do fechamento). */
 const semCiencia = (e: PontoEspelho) =>
-  !e.ciencia_origem && ["gerado", "enviado"].includes(e.status) && !e.data_confirmacao && !(e.ressalva_texto || "").trim();
+  e.status === "contestado" ||
+  (!e.ciencia_origem && ["gerado", "enviado"].includes(e.status) && !e.data_confirmacao && !(e.ressalva_texto || "").trim());
 
 export function PontoFechamentoTab() {
   const { useFechamentos, useEspelhos, fecharPeriodo, fechandoPeriodo, reabrirPeriodo, reabrindoPeriodo, registrarCienciaPapel, registrandoCienciaPapel } = usePontoFechamento();
@@ -229,6 +232,22 @@ export function PontoFechamentoTab() {
     } catch {
       // a mensagem já aparece em aviso; o diálogo fica aberto para corrigir
     }
+  };
+
+  /** PDF de UM colaborador para assinatura (data do fechamento e id estável gravados). */
+  const gerarPdfParaAssinatura = async (espelho: PontoEspelho): Promise<Blob | null> => {
+    if (!tenantId) return null;
+    const { doc, colaboradores } = await montarEspelhoPdf({
+      tenantId,
+      empresaId: empresaAtivaId || espelho.empresa_id || null,
+      competencia: espelho.competencia,
+      alvos: [{ nome: espelho.colaborador_nome, cpf: espelho.colaborador_cpf }],
+      fixar: {
+        criadoEm: fechamentoAtual?.data_fechamento ? new Date(fechamentoAtual.data_fechamento) : new Date(),
+        fileId: await idArquivoEstavel(`${espelho.id}|${espelho.competencia}`),
+      },
+    });
+    return colaboradores.length ? doc.output("blob") : null;
   };
 
   /**
@@ -448,6 +467,15 @@ export function PontoFechamentoTab() {
         </CardContent>
       </Card>
 
+
+      {espelhos.length > 0 && (
+        <EspelhoAssinaturaStatus
+          competencia={competencia}
+          espelhos={espelhos}
+          competenciaFechada={isFechado}
+          gerarPdf={gerarPdfParaAssinatura}
+        />
+      )}
 
       {/* Dialog Fechar */}
       <Dialog open={showFechar} onOpenChange={setShowFechar}>

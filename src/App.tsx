@@ -93,6 +93,7 @@ const EntrevistaGuiada = lazy(() => import("./pages/EntrevistaGuiada"));
 const PdiAssinatura = lazy(() => import("./pages/PdiAssinatura"));
 const PontoExterno = lazy(() => import("./pages/PontoExterno"));
 const FeriasAssinatura = lazy(() => import("./pages/FeriasAssinatura"));
+const AssinaturaDocumento = lazy(() => import("./pages/AssinaturaDocumento"));
 const TrilhaTerceiroPublica = lazy(() => import("./pages/TrilhaTerceiroPublica"));
 const AssinaturaContrato = lazy(() => import("./pages/AssinaturaContrato"));
 const ExperienciaAssinatura = lazy(() => import("./pages/ExperienciaAssinatura"));
@@ -222,6 +223,8 @@ const App = () => (
               <Route path="/entrevista/:token" element={<Suspense fallback={<PageLoader />}><EntrevistaGuiada /></Suspense>} />
               <Route path="/pdi-assinatura/:token" element={<PdiAssinatura />} />
               <Route path="/ferias-assinatura/:token" element={<FeriasAssinatura />} />
+              {/* Assinatura eletrônica com evidências (1º uso: espelho de ponto) */}
+              <Route path="/assinar/:token" element={<AssinaturaDocumento />} />
               <Route path="/trilha-terceiro/:token" element={<TrilhaTerceiroPublica />} />
               <Route path="/ponto-externo" element={<PontoExterno />} />
               <Route path="/ponto-externo/:token" element={<PontoExterno />} />

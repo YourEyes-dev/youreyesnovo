@@ -4,6 +4,7 @@ import {
   Img,
   Body, Button, Container, Head, Heading, Hr, Html, Preview, Section, Text,
 } from 'npm:@react-email/components@0.0.22'
+import { LOGO_EMAIL_URL } from '../marca.ts'
 
 interface Props {
   nome?: string
@@ -17,7 +18,7 @@ export const ConviteColaboradorEmail = ({ nome, empresa, confirmationUrl }: Prop
     <Preview>Você foi convidado para acessar o YourEyes</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Section style={logoSection}><Img src="https://www.youreyes.com.br/__l5e/assets-v1/71abd0f4-9610-42ba-8d8d-abed0207ebd0/logo-youreyes.png" alt="YourEyes" width="140" style={{ margin: '0 auto', display: 'block' }} /></Section>
+        <Section style={logoSection}><Img src={LOGO_EMAIL_URL} alt="YourEyes" width="64" height="64" style={{ margin: '0 auto', display: 'block' }} /></Section>
         <Hr style={divider} />
         <Heading style={h1}>Olá{nome ? `, ${nome}` : ''}!</Heading>
         <Text style={text}>

@@ -20,7 +20,12 @@
 // Casos cobertos: PONTO-HOM-A1 (nova declaração de intervalo),
 //   PONTO-HOM-E1 (novo certificado digital), PONTO-HOM-B1 (fechamento),
 //   PONTO-HOM-E2 (dossiê fiscal), PONTO-HOM-I1 (alertas CLT),
-//   PONTO-HOM-H1 (escalas), PONTO-HOM-F1 (feriados unificados).
+//   PONTO-HOM-H1 (escalas), PONTO-HOM-F1 (feriados unificados),
+//   PONTO-498 (justificativas: natureza, app e aviso de nome × regra),
+//   ESP-ASS-012..015 (espelho com assinatura eletrônica: pré-visualização,
+//   botão de envio com a regra da competência fechada, /assinar com token
+//   inválido e o painel de selos). O envio real e a assinatura com câmera
+//   (ESP-ASS-013 completo e ESP-ASS-016) são homologação manual.
 // =====================================================================
 
 import { credenciaisDeTeste } from "../support/credenciais";
@@ -127,5 +132,68 @@ describe("Módulo Ponto", () => {
     // a abrangência 'Filial / unidade' saiu do cadastro por localização
     cy.get('[role="dialog"]').contains("Filial / unidade").should("not.exist");
     cy.get("body").type("{esc}", { force: true });
+  });
+
+  // PONTO-498 — Configurações › Geral › Justificativas: colunas Natureza e
+  // No app, e o aviso ao vivo quando o nome contradiz a regra de abono.
+  // Não salva nada (o aviso aparece antes de salvar).
+  it("abre Configurações › Geral › Justificativas com natureza, app e aviso de nome × regra", () => {
+    abrirArea("tab-ponto-configuracoes");
+    cy.contains('[role="tab"]', /^\s*Geral\s*$/, { timeout: 20000 }).click({ force: true });
+    cy.contains("button", "Configurar Justificativas", { timeout: 20000 }).should("be.visible").click({ force: true });
+    cy.get('[role="dialog"]', { timeout: 15000 }).should("exist");
+    cy.get('[role="dialog"]').contains("th", "Natureza", { timeout: 20000 }).should("exist");
+    cy.get('[role="dialog"]').contains("th", "No app").should("exist");
+    cy.get('[role="dialog"]').find('input[placeholder="Ex.: Atestado médico"]').clear().type("Falta não abonada");
+    cy.get('[data-testid="just-abono"]').click({ force: true });
+    cy.contains('[role="option"]', "Sim (abona)", { timeout: 10000 }).click({ force: true });
+    cy.get('[data-testid="just-aviso-divergencia"]', { timeout: 10000 })
+      .should("be.visible")
+      .and("contain.text", "NÃO abona");
+    cy.get("body").type("{esc}", { force: true });
+  });
+
+  // ESP-ASS-012 — Relatórios › Espelho: Visualizar abre o PDF num diálogo, sem
+  // botão de baixar. Não depende de massa: com ou sem apuração o diálogo abre.
+  it("abre Relatórios › Espelho de Ponto e a pré-visualização sem botão de baixar", () => {
+    abrirArea("tab-ponto-apuracao");
+    abrirSub("Relatórios");
+    cy.get('[data-testid="btn-visualizar-espelho"]', { timeout: 20000 }).should("be.visible").click({ force: true });
+    cy.get('[data-testid="espelho-visualizar"]', { timeout: 20000 }).should("be.visible").within(() => {
+      cy.contains("Pré-visualização do espelho").should("be.visible");
+      cy.contains("button", /baixar|download/i).should("not.exist");
+    });
+    cy.get("body").type("{esc}", { force: true });
+  });
+
+  // ESP-ASS-013 (entrada) — o botão de envio existe e diz a regra quando ainda
+  // não pode enviar (competência aberta ou colaborador não escolhido).
+  it("mostra Enviar para assinatura no Espelho de Ponto com a regra da competência fechada", () => {
+    abrirArea("tab-ponto-apuracao");
+    abrirSub("Relatórios");
+    cy.get('[data-testid="btn-enviar-assinatura"]', { timeout: 20000 }).should("exist");
+    cy.get('[data-testid="regra-envio-assinatura"]', { timeout: 20000 })
+      .should("be.visible")
+      .invoke("text")
+      .should("match", /compet[eê]ncia|colaborador|espelho/i);
+  });
+
+  // ESP-ASS-014 — página pública com token inválido não revela nada.
+  it("abre /assinar com token inválido e mostra Link inválido", () => {
+    cy.visit(`${baseUrl}/assinar/token-invalido-qa`);
+    cy.contains("Link inválido", { timeout: 20000 }).should("be.visible");
+  });
+
+  // ESP-ASS-015 — painel de assinaturas com a legenda dos selos.
+  it("mostra o painel de assinaturas do espelho com a legenda dos selos", () => {
+    abrirArea("tab-ponto-apuracao");
+    abrirSub("Relatórios");
+    cy.get('[data-testid="painel-assinaturas-espelho"]', { timeout: 20000 }).should("be.visible");
+    cy.get('[data-testid="legenda-selos"]').within(() => {
+      cy.contains("Assinado ✓").should("exist");
+      cy.contains("Ressalva").should("exist");
+      cy.contains("Contestado").should("exist");
+      cy.contains("Pendente").should("exist");
+    });
   });
 });

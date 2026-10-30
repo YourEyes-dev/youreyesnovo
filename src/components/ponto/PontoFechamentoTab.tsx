@@ -11,20 +11,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { usePontoFechamento, type PontoEspelho } from "@/hooks/usePontoFechamento";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
-import { arquivarDocumento } from "@/utils/arquivarDocumento";
 import { format } from "date-fns";
-import { Lock, Unlock, FileText, CheckCircle, AlertTriangle, Download, Archive, RefreshCw } from "lucide-react";
+import { Lock, Unlock, FileText, AlertTriangle, Download, FileSignature } from "lucide-react";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
-import { fromTable } from "@/integrations/supabase/untypedClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatarHoraMinuto } from "@/lib/ponto/diaSemana";
+import { montarEspelhoPdf } from "@/lib/ponto/espelhoPdf";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const STATUS_FECHAMENTO: Record<string, { label: string; color: string }> = {
   aberto: { label: "Aberto", color: "bg-green-100 text-green-800" },
   em_revisao: { label: "Em Revisão", color: "bg-yellow-100 text-yellow-800" },
   fechado: { label: "Fechado", color: "bg-red-100 text-red-800" },
+  reaberto: { label: "Reaberto", color: "bg-amber-100 text-amber-800" },
 };
 
 interface PendenciaFechamento {
@@ -46,21 +46,35 @@ const STATUS_ESPELHO: Record<string, { label: string; color: string }> = {
   enviado: { label: "Enviado", color: "bg-blue-100 text-blue-800" },
   confirmado: { label: "Confirmado", color: "bg-green-100 text-green-800" },
   ressalva: { label: "Ressalva", color: "bg-yellow-100 text-yellow-800" },
+  assinado: { label: "Assinado", color: "bg-green-100 text-green-800" },
 };
 
+/** De onde veio a ciência (ponto_espelhos.ciencia_origem). */
+const ORIGEM_CIENCIA: Record<string, string> = {
+  colaborador_eletronica: "assinatura eletrônica",
+  papel_digitalizado: "papel digitalizado",
+  rh_legado: "registrada pelo RH (antigo)",
+};
+
+/** Espelho ainda sem ciência do colaborador (mesma regra do portão do fechamento). */
+const semCiencia = (e: PontoEspelho) =>
+  !e.ciencia_origem && ["gerado", "enviado"].includes(e.status) && !e.data_confirmacao && !(e.ressalva_texto || "").trim();
+
 export function PontoFechamentoTab() {
-  const { useFechamentos, useEspelhos, fecharPeriodo, fechandoPeriodo, reabrirPeriodo, reabrindoPeriodo, confirmarEspelho, confirmandoEspelho } = usePontoFechamento();
-  const { tenantId, user, profile } = useAuth();
+  const { useFechamentos, useEspelhos, fecharPeriodo, fechandoPeriodo, reabrirPeriodo, reabrindoPeriodo, registrarCienciaPapel, registrandoCienciaPapel } = usePontoFechamento();
+  const { tenantId } = useAuth();
   const { empresaAtiva, empresaAtivaId } = useEmpresaAtiva();
   const nomeEmpresa = empresaAtiva?.razao_social || empresaAtiva?.nome_fantasia || null;
   const [competencia, setCompetencia] = useState(format(new Date(), "yyyy-MM"));
   const [showFechar, setShowFechar] = useState(false);
   const [showReabrir, setShowReabrir] = useState(false);
   const [motivoReabertura, setMotivoReabertura] = useState("");
-  const [showRessalva, setShowRessalva] = useState(false);
-  const [selectedEspelho, setSelectedEspelho] = useState<PontoEspelho | null>(null);
-  const [observacoes, setObservacoes] = useState("");
+  const [espelhoPapel, setEspelhoPapel] = useState<PontoEspelho | null>(null);
+  const [arquivoPapel, setArquivoPapel] = useState<File | null>(null);
+  const [papelComRessalva, setPapelComRessalva] = useState(false);
   const [ressalvaTexto, setRessalvaTexto] = useState("");
+  const [baixando, setBaixando] = useState<string | null>(null);
+  const [observacoes, setObservacoes] = useState("");
 
   const { data: fechamentos = [] } = useFechamentos();
   const { data: espelhos = [], isLoading } = useEspelhos(competencia);
@@ -196,88 +210,59 @@ export function PontoFechamentoTab() {
   };
 
 
-  const handleConfirmar = async (espelhoId: string) => {
-    await confirmarEspelho({ espelhoId });
-  };
-
-  const handleRessalva = async () => {
-    if (!selectedEspelho) return;
-    await confirmarEspelho({ espelhoId: selectedEspelho.id, ressalva: ressalvaTexto });
-    setShowRessalva(false);
+  const fecharDialogoPapel = () => {
+    setEspelhoPapel(null);
+    setArquivoPapel(null);
+    setPapelComRessalva(false);
     setRessalvaTexto("");
-    setSelectedEspelho(null);
   };
 
-  const gerarEspelhoPDF = async (espelho: PontoEspelho) => {
-    const pdf = new jsPDF();
-    pdf.setFontSize(16);
-    pdf.text("Espelho de Ponto", 20, 20);
-    pdf.setFontSize(10);
-    pdf.text(`Competência: ${espelho.competencia}`, 20, 30);
-    pdf.text(`Colaborador: ${espelho.colaborador_nome}`, 20, 37);
-    pdf.text(`CPF: ${espelho.colaborador_cpf}`, 20, 44);
-    pdf.text(`Status: ${STATUS_ESPELHO[espelho.status]?.label || espelho.status}`, 20, 51);
-
-    const saldo = espelho.banco_horas_saldo_minutos ?? 0;
-    const sinal = saldo >= 0 ? "+" : "-";
-
-    let y = 65;
-    pdf.setFontSize(12);
-    pdf.text("Resumo da Jornada", 20, y); y += 10;
-    pdf.setFontSize(10);
-    pdf.text(`Dias trabalhados: ${espelho.total_dias_trabalhados ?? 0}`, 20, y); y += 7;
-    pdf.text(`Horas trabalhadas: ${formatMinutos(espelho.total_trabalhado_minutos ?? 0)}`, 20, y); y += 7;
-    pdf.text(`Jornada prevista: ${formatMinutos(espelho.total_jornada_prevista_minutos ?? 0)}`, 20, y); y += 7;
-    pdf.text(`Creditos no periodo: ${formatMinutos(espelho.total_creditos_minutos ?? 0)}`, 20, y); y += 7;
-    pdf.text(`Debitos no periodo: ${formatMinutos(espelho.total_debitos_minutos ?? 0)}`, 20, y); y += 7;
-    pdf.text(`Saldo do periodo: ${sinal}${formatMinutos(saldo)}`, 20, y); y += 7;
-    pdf.text(`Faltas: ${espelho.total_faltas ?? 0}`, 20, y); y += 7;
-    pdf.text(`Dias abonados (atestado/ferias/afastamento/feriado): ${espelho.total_dias_protegidos ?? 0}`, 20, y); y += 7;
-    if ((espelho.total_excedente_retido_minutos ?? 0) > 0) {
-      pdf.text(`Excedente retido para decisao do RH: ${formatMinutos(espelho.total_excedente_retido_minutos ?? 0)}`, 20, y); y += 7;
-    }
-    if (espelho.dia_equalizacao) {
-      const [ea, em, ed] = String(espelho.dia_equalizacao).split("-");
-      pdf.text(`Dia de equalizacao: ${ed}/${em}/${ea}`, 20, y); y += 7;
-    }
-    y += 4;
-
-    // RN28: o crédito do banco de horas é a base de pagamento de hora extra.
-    pdf.text(`Horas extras 50%: ${formatMinutos(espelho.total_horas_extras_50_minutos ?? 0)}`, 20, y); y += 7;
-    pdf.text(`Horas extras 100% (domingo/feriado): ${formatMinutos(espelho.total_horas_extras_100_minutos ?? 0)}`, 20, y); y += 7;
-    pdf.setFontSize(8);
-    pdf.text("Adicional noturno nao e apurado neste modelo; consulte a folha.", 20, y); y += 10;
-    pdf.setFontSize(10);
-
-    if (espelho.status === "confirmado" || espelho.status === "ressalva") {
-      pdf.text(`Confirmado em: ${espelho.data_confirmacao ? format(new Date(espelho.data_confirmacao), "dd/MM/yyyy HH:mm") : "-"}`, 20, y); y += 7;
-      if (espelho.ressalva_texto) {
-        pdf.text(`Ressalva: ${espelho.ressalva_texto}`, 20, y);
-      }
-    }
-
-    // Download local
-    pdf.save(`espelho-ponto-${espelho.colaborador_nome}-${espelho.competencia}.pdf`);
-    toast.success("PDF gerado!");
-
-    // Auto-archive to Documentos module
-    if (tenantId && user) {
-      const blob = pdf.output("blob");
-      const fileName = `Espelho de Ponto - ${espelho.colaborador_nome} - ${espelho.competencia}.pdf`;
-      await arquivarDocumento({
-        tenantId,
-        empresaId: empresaAtivaId,
-        userId: user.id,
-        userNome: profile?.nome_completo || "Sistema",
-        file: blob,
-        fileName,
-        tipo: "Espelho de Ponto",
-        observacoes: `Espelho de ponto competência ${espelho.competencia}`,
-        colaboradorId: espelho.colaborador_id || null,
-        colaboradorNome: espelho.colaborador_nome,
-        colaboradorCpf: espelho.colaborador_cpf,
-        subpastaColaborador: "Vida Funcional",
+  const handleRegistrarPapel = async () => {
+    if (!espelhoPapel || !arquivoPapel) return;
+    try {
+      await registrarCienciaPapel({
+        espelho: espelhoPapel,
+        arquivo: arquivoPapel,
+        ressalva: papelComRessalva ? ressalvaTexto : undefined,
       });
+      fecharDialogoPapel();
+    } catch {
+      // a mensagem já aparece em aviso; o diálogo fica aberto para corrigir
+    }
+  };
+
+  /**
+   * Baixa o espelho de UM colaborador pelo gerador único (o mesmo PDF legal
+   * da aba Relatórios e do envio para assinatura). Antes saía daqui um PDF
+   * simplificado, com outros números, e cada clique arquivava uma cópia sem
+   * assinatura em Documentos.
+   */
+  const baixarEspelho = async (espelho: PontoEspelho) => {
+    if (!tenantId) return;
+    setBaixando(espelho.id);
+    try {
+      const { doc, colaboradores } = await montarEspelhoPdf({
+        tenantId,
+        empresaId: empresaAtivaId || espelho.empresa_id || null,
+        competencia: espelho.competencia,
+        alvos: [{ nome: espelho.colaborador_nome, cpf: espelho.colaborador_cpf }],
+      });
+      if (colaboradores.length === 0) {
+        toast.warning("Nenhuma apuração encontrada para este colaborador na competência.");
+        return;
+      }
+      doc.save(`espelho-ponto-${espelho.colaborador_nome}-${espelho.competencia}.pdf`);
+      void (supabase.rpc as any)("ponto_log_exportacao", {
+        p_tenant_id: tenantId,
+        p_acao: "exportou_relatorio",
+        p_escopo: { competencia: espelho.competencia, empresa_id: empresaAtivaId || null, tipo_relatorio: "espelho", origem: "fechamento" },
+        p_descricao: `PDF: espelho de ponto de 1 colaborador da competência ${espelho.competencia} (aba Fechamento).`,
+      });
+      toast.success("PDF gerado!");
+    } catch (e) {
+      toast.error("Erro ao gerar o espelho: " + (e as Error).message);
+    } finally {
+      setBaixando(null);
     }
   };
 
@@ -430,23 +415,29 @@ export function PontoFechamentoTab() {
                   <TableCell className="text-right">{e.total_faltas}</TableCell>
                   <TableCell>
                     <Badge className={STATUS_ESPELHO[e.status]?.color}>{STATUS_ESPELHO[e.status]?.label || e.status}</Badge>
+                    {e.ciencia_origem && (
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        {ORIGEM_CIENCIA[e.ciencia_origem] || e.ciencia_origem}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       {e.status !== "preview" && (
-                        <Button size="sm" variant="ghost" onClick={() => gerarEspelhoPDF(e)} title="Baixar PDF">
+                        <Button size="sm" variant="ghost" onClick={() => baixarEspelho(e)} title="Baixar PDF" disabled={baixando === e.id}>
                           <Download className="w-4 h-4" />
                         </Button>
                       )}
-                      {e.status === "gerado" && (
-                        <>
-                          <Button size="sm" variant="ghost" className="text-success" onClick={() => handleConfirmar(e.id)} title="Confirmar">
-                            <CheckCircle className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" className="text-warning" onClick={() => { setSelectedEspelho(e); setShowRessalva(true); }} title="Ressalva">
-                            <AlertTriangle className="w-4 h-4" />
-                          </Button>
-                        </>
+                      {e.status !== "preview" && semCiencia(e) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEspelhoPapel(e)}
+                          title="Registrar ciência em papel"
+                          data-testid="btn-ciencia-papel"
+                        >
+                          <FileSignature className="w-4 h-4" />
+                        </Button>
                       )}
                     </div>
                   </TableCell>
@@ -524,9 +515,10 @@ export function PontoFechamentoTab() {
           <DialogHeader>
             <DialogTitle>Reabrir Período</DialogTitle>
             <DialogDescription>
-              A competência volta a ficar aberta para correção. Os espelhos ainda não
-              confirmados pelos colaboradores são descartados e serão gerados de novo no
-              próximo fechamento; os já confirmados ou com ressalva permanecem.
+              A competência volta a ficar aberta para correção. Todos os espelhos atuais
+              ficam guardados no histórico (versão anterior). Os que ainda não têm ciência
+              do colaborador saem da competência e serão gerados de novo no próximo
+              fechamento; os que já têm ciência permanecem.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -559,20 +551,61 @@ export function PontoFechamentoTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Ressalva */}
-      <Dialog open={showRessalva} onOpenChange={setShowRessalva}>
+      {/* Dialog Ciência em papel */}
+      <Dialog open={!!espelhoPapel} onOpenChange={(aberto) => { if (!aberto) fecharDialogoPapel(); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Registrar Ressalva</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Registrar ciência em papel</DialogTitle>
+            <DialogDescription>
+              Use quando o colaborador assinou o espelho IMPRESSO. Anexe a digitalização do papel
+              assinado: ela fica guardada em Documentos, na pasta do colaborador, e a ciência passa a
+              constar como dada por ele em papel. O sistema não aceita ciência sem o papel anexado.
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Descrição da ressalva</Label>
-              <Textarea value={ressalvaTexto} onChange={e => setRessalvaTexto(e.target.value)} placeholder="Descreva a divergência encontrada..." rows={4} />
+            <div className="p-3 rounded-lg border text-sm space-y-1">
+              <div>
+                <span className="text-muted-foreground">Colaborador: </span>
+                <strong>{espelhoPapel?.colaborador_nome}</strong>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Competência: </span>
+                <strong>{espelhoPapel?.competencia}</strong>
+              </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="papel-assinado">Papel assinado (PDF ou foto)</Label>
+              <Input
+                id="papel-assinado"
+                type="file"
+                accept="application/pdf,image/jpeg,image/png"
+                onChange={ev => setArquivoPapel(ev.target.files?.[0] || null)}
+              />
+            </div>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="papel-ressalva"
+                checked={papelComRessalva}
+                onCheckedChange={v => setPapelComRessalva(v === true)}
+              />
+              <Label htmlFor="papel-ressalva" className="font-normal leading-snug">
+                O colaborador escreveu uma ressalva no papel
+              </Label>
+            </div>
+            {papelComRessalva && (
+              <div className="space-y-2">
+                <Label>Ressalva escrita pelo colaborador (transcreva)</Label>
+                <Textarea value={ressalvaTexto} onChange={e => setRessalvaTexto(e.target.value)} rows={3} />
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRessalva(false)}>Cancelar</Button>
-            <Button onClick={handleRessalva} disabled={!ressalvaTexto || confirmandoEspelho}>
-              {confirmandoEspelho ? "Registrando..." : "Registrar Ressalva"}
+            <Button variant="outline" onClick={fecharDialogoPapel}>Cancelar</Button>
+            <Button
+              onClick={handleRegistrarPapel}
+              disabled={!arquivoPapel || (papelComRessalva && !ressalvaTexto.trim()) || registrandoCienciaPapel}
+            >
+              {registrandoCienciaPapel ? "Registrando..." : "Registrar ciência"}
             </Button>
           </DialogFooter>
         </DialogContent>

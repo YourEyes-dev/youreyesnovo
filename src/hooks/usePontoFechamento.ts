@@ -5,7 +5,7 @@ import { useAuth } from "./useAuth";
 import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
 import { toast } from "sonner";
 import { handleMutationError } from "@/lib/toastError";
-import { format } from "date-fns";
+import { arquivarDocumento } from "@/utils/arquivarDocumento";
 
 export interface PontoFechamento {
   id: string;
@@ -56,6 +56,10 @@ export interface PontoEspelho {
   ressalva_texto: string | null;
   data_confirmacao: string | null;
   created_at: string | null;
+  /** colaborador_eletronica | papel_digitalizado | rh_legado; nula = sem ciência. */
+  ciencia_origem?: string | null;
+  arquivo_url?: string | null;
+  empresa_id?: string | null;
 }
 
 export function usePontoFechamento() {
@@ -205,7 +209,10 @@ export function usePontoFechamento() {
             total_dias_protegidos: Number(l.dias_protegidos) || 0,
             total_excedente_retido_minutos: Number(l.excedente_retido_min) || 0,
             dia_equalizacao: l.dia_equalizacao || null,
-            status: "gerado",
+            // SEM `status` de propósito: no refechamento a linha já existe e
+            // pode ter a ciência do colaborador (confirmado/ressalva/assinado).
+            // Mandar status "gerado" aqui apagava essa ciência. Linha nova
+            // nasce "gerado" pelo padrão da coluna.
           } as never, { onConflict: "tenant_id,colaborador_cpf,competencia" });
       }
 
@@ -240,38 +247,35 @@ export function usePontoFechamento() {
   /**
    * Reabertura de competência já fechada. O fechamento não é definitivo:
    * quando a apuração sai errada, o RH precisa corrigir e fechar de novo.
-   * Os espelhos ainda não assinados (gerado/enviado) são descartados para
-   * não conviverem dois documentos com números diferentes; os já
-   * confirmados ou com ressalva permanecem como prova do que foi aceito.
+   * Quem reabre é o SERVIDOR (ponto_reabrir_competencia, PONTO-358): arquiva
+   * todos os espelhos da competência no histórico (versão anterior), retira os
+   * que ainda não têm ciência (serão gerados de novo no próximo fechamento) e
+   * mantém os que já têm ciência do colaborador. Antes a tela apagava espelhos
+   * pelo navegador, sem histórico.
    */
   const reabrirPeriodoMutation = useMutation({
     mutationFn: async ({ competencia, motivo }: { competencia: string; motivo?: string }) => {
       if (!tenantId || !user) throw new Error("Não autenticado");
-
-      let del = fromTable("ponto_espelhos")
-        .delete()
-        .eq("tenant_id", tenantId)
-        .eq("competencia", competencia)
-        .in("status", ["gerado", "enviado"]);
-      if (empresaAtivaId) del = del.eq("empresa_id", empresaAtivaId);
-      const { error: delErr } = await del;
-      if (delErr) throw delErr;
-
-      let upd = fromTable("ponto_fechamentos")
-        .update({
-          status: "aberto",
-          data_fechamento: null,
-          fechado_por: null,
-          fechado_por_nome: null,
-          observacoes: motivo
-            ? `Reaberto em ${format(new Date(), "dd/MM/yyyy HH:mm")} por ${profile?.nome_completo || "usuário"}: ${motivo}`
-            : null,
-        } as any)
-        .eq("tenant_id", tenantId)
-        .eq("competencia", competencia);
-      if (empresaAtivaId) upd = upd.eq("empresa_id", empresaAtivaId);
-      const { error } = await upd;
+      const { data, error } = await (supabase.rpc as any)("ponto_reabrir_competencia", {
+        p_tenant_id: tenantId,
+        p_empresa_id: empresaAtivaId || null,
+        p_competencia: competencia,
+        p_motivo: motivo || "",
+        p_por: user.id,
+        p_por_nome: profile?.nome_completo || null,
+      });
       if (error) throw error;
+      const res = (data || {}) as { ok?: boolean; erro?: string };
+      if (!res.ok) {
+        const MSG: Record<string, string> = {
+          motivo_obrigatorio: "Informe o motivo da reabertura.",
+          competencia_sem_fechamento: "Esta competência ainda não foi fechada.",
+          competencia_nao_esta_fechada: "Esta competência não está fechada.",
+          sem_alcada_para_reabrir: "Seu acesso não permite reabrir competência (só gestão).",
+        };
+        throw new Error(MSG[res.erro || ""] || res.erro || "Não foi possível reabrir.");
+      }
+      return res;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ponto-fechamentos"] });
@@ -283,23 +287,67 @@ export function usePontoFechamento() {
     onError: (e: Error) => toast.error("Erro ao reabrir período: " + e.message),
   });
 
-  const confirmarEspelhoMutation = useMutation({
-    mutationFn: async ({ espelhoId, ressalva }: { espelhoId: string; ressalva?: string }) => {
-      if (!user) throw new Error("Não autenticado");
-      const { error } = await fromTable("ponto_espelhos")
-        .update({
-          status: ressalva ? "ressalva" : "confirmado",
-          ressalva_texto: ressalva || null,
-          data_confirmacao: new Date().toISOString(),
-          confirmado_por: user.id,
-        } as any)
-        .eq("id", espelhoId);
+  /**
+   * "Registrar ciência em papel": o colaborador assinou o espelho IMPRESSO e o
+   * RH anexa a digitalização. O papel vai para Documentos (pasta do
+   * colaborador) e o servidor grava a ciência como papel_digitalizado — quem
+   * deu a ciência foi o colaborador; quem registrou fica só na trilha.
+   * Substitui o antigo "Confirmar", que gravava o id do RH como se fosse a
+   * ciência do trabalhador.
+   */
+  const registrarCienciaPapelMutation = useMutation({
+    mutationFn: async ({
+      espelho,
+      arquivo,
+      ressalva,
+    }: {
+      espelho: PontoEspelho;
+      arquivo: File;
+      ressalva?: string;
+    }) => {
+      if (!tenantId || !user) throw new Error("Não autenticado");
+      if (!arquivo) throw new Error("Anexe o papel assinado (PDF ou foto).");
+      const extensao = (arquivo.name.split(".").pop() || "pdf").toLowerCase();
+      const arquivado = await arquivarDocumento({
+        tenantId,
+        empresaId: empresaAtivaId,
+        userId: user.id,
+        userNome: profile?.nome_completo || "Sistema",
+        file: arquivo,
+        fileName: `Espelho de Ponto assinado (papel) - ${espelho.colaborador_nome} - ${espelho.competencia}.${extensao}`,
+        mimeType: arquivo.type || "application/pdf",
+        tipo: "Espelho de Ponto assinado",
+        observacoes: `Ciência do espelho de ponto ${espelho.competencia} em papel, digitalizada.`,
+        colaboradorId: espelho.colaborador_id || null,
+        colaboradorNome: espelho.colaborador_nome,
+        colaboradorCpf: espelho.colaborador_cpf,
+        subpastaColaborador: "Vida Funcional",
+      });
+      if (!arquivado?.id) throw new Error("Não foi possível guardar o papel em Documentos.");
+
+      const { data, error } = await (supabase.rpc as any)("ponto_espelho_registrar_ciencia_papel", {
+        p_espelho_id: espelho.id,
+        p_documento_id: arquivado.id,
+        p_ressalva: ressalva?.trim() || null,
+      });
       if (error) throw error;
+      const res = (data || {}) as { ok?: boolean; erro?: string };
+      if (!res.ok) {
+        const MSG: Record<string, string> = {
+          anexo_obrigatorio: "Anexe o papel assinado.",
+          anexo_de_outro_colaborador: "O papel anexado é de outro colaborador.",
+          espelho_ja_tem_ciencia: "Este espelho já tem ciência registrada.",
+          sem_permissao: "Seu acesso não permite registrar ciência de espelho.",
+          espelho_de_outra_empresa: "Este espelho é de outra empresa.",
+        };
+        throw new Error(MSG[res.erro || ""] || res.erro || "Não foi possível registrar.");
+      }
+      return res;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ponto-espelhos"] });
       queryClient.invalidateQueries({ queryKey: ["ponto-fechamento-pendencias"] });
-      toast.success("Espelho confirmado!");
+      toast.success("Ciência em papel registrada e papel guardado em Documentos.");
     },
     onError: handleMutationError,
   });
@@ -312,7 +360,7 @@ export function usePontoFechamento() {
     reabrirPeriodo: reabrirPeriodoMutation.mutateAsync,
     reabrindoPeriodo: reabrirPeriodoMutation.isPending,
 
-    confirmarEspelho: confirmarEspelhoMutation.mutateAsync,
-    confirmandoEspelho: confirmarEspelhoMutation.isPending,
+    registrarCienciaPapel: registrarCienciaPapelMutation.mutateAsync,
+    registrandoCienciaPapel: registrarCienciaPapelMutation.isPending,
   };
 }

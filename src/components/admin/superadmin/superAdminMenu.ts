@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, Activity, Building2, Users, FileSignature, Target, TrendingUp,
-  CreditCard, Handshake, FileText, Brain, Store, Landmark, Bug, Radar, BookOpen,
+  CreditCard, Handshake, FileText, Brain, Store, Landmark, Bug, Radar, BookOpen, Scale,
 } from "lucide-react";
 
 // Menu lateral do Painel Super Admin, agrupado por área de trabalho.
@@ -72,6 +72,7 @@ export const SUPER_ADMIN_MENU: SuperAdminMenuArea[] = [
     items: [
       { id: "psicossocial", label: "Psicossocial", descricao: "Campanhas, respostas e classificação de risco psicossocial em todas as empresas.", icon: Brain, path: "/admin/psicossocial" },
       { id: "marketye", label: "MarketYE", descricao: "Quem entra na vitrine, denúncias, pedidos de revisão, destaques e ajustes.", icon: Store, path: "/admin/marketye" },
+      { id: "marcos-legais", label: "Marcos legais do ponto", descricao: "Teto legal da jornada (CF/88, EC 141/2026): ativar, desativar e mudar a data dos marcos, com prévia do impacto por conta.", icon: Scale, path: "/admin/marcos-legais" },
     ],
   },
   {

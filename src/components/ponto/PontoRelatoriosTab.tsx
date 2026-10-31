@@ -620,11 +620,13 @@ export function PontoRelatoriosTab() {
           .lte("data_referencia", fim)
           .limit(50000),
       ),
-      filtrarEmpresa(
-        fromTable("ponto_escalas").select(
-          "id, nome, hora_entrada_padrao, hora_saida_padrao, intervalo_intrajornada_minutos, jornada_diaria_minutos",
-        ),
-      ),
+      // Horários contratuais da escala VÁLIDOS na competência (EC 141 F1:
+      // uma alteração agendada para depois não antecipa o AEJ).
+      (supabase.rpc as any)("ponto_escalas_na_data", {
+        p_data: inicio,
+        p_escala_ids: null,
+        p_empresa_id: empresaAtivaId || null,
+      }),
       fromTable("ponto_escala_atribuicoes")
         .select("escala_id, colaborador_cpf, data_inicio, data_fim, ativa")
         .lte("data_inicio", fim)

@@ -12,6 +12,7 @@ import { PrecosAddonsPanel } from "@/components/admin/superadmin/PrecosAddonsPan
 import { ParceirosPanel } from "@/components/admin/superadmin/ParceirosPanel";
 import { YourEyesEmpresaPanel } from "@/components/admin/superadmin/YourEyesEmpresaPanel";
 import { MarketYEAdminPanel } from "@/components/admin/superadmin/MarketYEAdminPanel";
+import { MarcosLegaisPanel } from "@/components/admin/superadmin/MarcosLegaisPanel";
 import { SUPER_ADMIN_MENU, localizarItemDoMenu, rotaDaAbaLegada } from "@/components/admin/superadmin/superAdminMenu";
 
 // Painel Super Admin. Antes era uma tela única com onze abas lado a lado;
@@ -85,6 +86,7 @@ const SECOES: Record<string, ComponentType> = {
   "/admin/parceiros": ParceirosPanel,
   "/admin/psicossocial": PsicossocialSuperAdminPanel,
   "/admin/marketye": MarketYEAdminPanel,
+  "/admin/marcos-legais": MarcosLegaisPanel,
   "/admin/dados-youreyes": YourEyesEmpresaPanel,
 };
 

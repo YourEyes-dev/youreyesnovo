@@ -14,7 +14,7 @@
 // borda. Sem dependência de Deno nem do navegador: só constantes e funções puras.
 // =====================================================================
 
-export const VERSAO_TEXTOS_ASSINATURA = "assinatura-textos-v1-2026-10-30";
+export const VERSAO_TEXTOS_ASSINATURA = "assinatura-textos-v2-2026-10-31";
 
 export const NOME_DA_ASSINATURA = "Assinatura eletrônica com evidências";
 export const BASE_LEGAL_ASSINATURA = "MP 2.200-2/2001, art. 10, §2º";
@@ -119,6 +119,119 @@ export const MANIFESTO = {
   notaRodape:
     "Hora registrada pelo servidor. Endereço IP e navegador obtidos pelo servidor, não informados pelo signatário.",
 } as const;
+
+// ── Textos por tipo de documento (contexto da solicitação) ───────────
+// v2 (31/10/2026): além do espelho de ponto, o aditivo individual de
+// alteração de horário da EC 141/2026 (contexto 'ponto_ec141_aditivo').
+// Os textos do espelho NÃO mudaram; quando o contexto não está aqui, vale o
+// do espelho (TELA/EMAIL acima).
+export const CONTEXTO_ADITIVO_EC141 = "ponto_ec141_aditivo";
+
+export interface TextosDoDocumento {
+  /** "Espelho de Ponto 10/2026" — título no manifesto e no nome do arquivo. */
+  documentoTitulo: (referenciaBr: string) => string;
+  /** Rótulo da referência no cabeçalho da tela ("Competência", "A partir de"). */
+  rotuloReferencia: string;
+  tela: {
+    titulo: string;
+    introducao: string;
+    marcarLido: string;
+    lerParaResponder: string;
+    declaracaoAssinado: string;
+    declaracaoRessalva: string;
+    declaracaoContestado: string;
+  };
+  email: {
+    conviteAssunto: (ref: string) => string;
+    conviteTitulo: string;
+    conviteMensagem: (nome: string, ref: string, prazo: string) => string;
+    lembreteAssunto: (ref: string) => string;
+    lembreteTitulo: string;
+    lembreteMensagem: (nome: string, ref: string, prazo: string) => string;
+    botaoAbrir: string;
+    viaAssunto: (ref: string) => string;
+    viaMensagem: (nome: string, ref: string, decisao: string) => string;
+  };
+}
+
+const TEXTOS_ESPELHO: TextosDoDocumento = {
+  documentoTitulo: (ref) => `Espelho de Ponto ${ref}`,
+  rotuloReferencia: "Competência",
+  tela: {
+    titulo: TELA.titulo,
+    introducao: TELA.introducao,
+    marcarLido: TELA.marcarLido,
+    lerParaResponder: "Marque que leu o espelho para responder.",
+    declaracaoAssinado: TELA.decisoes.assinado.declaracao,
+    declaracaoRessalva: TELA.decisoes.assinado_com_ressalva.declaracao,
+    declaracaoContestado: TELA.decisoes.contestado.declaracao,
+  },
+  email: {
+    conviteAssunto: EMAIL.conviteAssunto,
+    conviteTitulo: EMAIL.conviteTitulo,
+    conviteMensagem: EMAIL.conviteMensagem,
+    lembreteAssunto: EMAIL.lembreteAssunto,
+    lembreteTitulo: EMAIL.lembreteTitulo,
+    lembreteMensagem: EMAIL.lembreteMensagem,
+    botaoAbrir: EMAIL.botaoAbrir,
+    viaAssunto: EMAIL.viaAssunto,
+    viaMensagem: EMAIL.viaMensagem,
+  },
+};
+
+const TEXTOS_ADITIVO_EC141: TextosDoDocumento = {
+  documentoTitulo: (ref) => `Aditivo de alteração de horário (EC 141/2026) a partir de ${ref}`,
+  rotuloReferencia: "A partir de",
+  tela: {
+    titulo: "Aditivo de alteração de horário para sua assinatura",
+    introducao:
+      "A empresa ajustou o seu horário de trabalho à redução da jornada da Emenda Constitucional 141/2026, sem redução do salário. Leia o termo aditivo com atenção antes de responder.",
+    marcarLido: "Li o termo aditivo de alteração de horário.",
+    lerParaResponder: "Marque que leu o termo aditivo para responder.",
+    declaracaoAssinado:
+      "Declaro que li o termo aditivo e concordo com a alteração do meu horário de trabalho nele descrita.",
+    declaracaoRessalva:
+      "Declaro que li o termo aditivo e assino com a ressalva abaixo.",
+    declaracaoContestado:
+      "Declaro que NÃO concordo com o termo aditivo, pelo motivo abaixo. Esta resposta não é assinatura de concordância.",
+  },
+  email: {
+    conviteAssunto: (ref) => `Aditivo de alteração de horário (a partir de ${ref}) para sua assinatura`,
+    conviteTitulo: "Seu aditivo de horário está disponível",
+    conviteMensagem: (nome, ref, prazo) =>
+      `Olá, ${nome}. Com a redução da jornada (EC 141/2026), o seu horário de trabalho muda a partir de ${ref}, sem redução do salário. ` +
+      `Abra pelo botão abaixo, leia o termo aditivo e registre a sua resposta até ${prazo}. ` +
+      `Por segurança, o documento não vai anexado a este e-mail.`,
+    lembreteAssunto: (ref) => `Lembrete: aditivo de horário (a partir de ${ref}) aguardando sua resposta`,
+    lembreteTitulo: "Seu aditivo de horário ainda aguarda resposta",
+    lembreteMensagem: (nome, ref, prazo) =>
+      `Olá, ${nome}. O termo aditivo de alteração de horário (a partir de ${ref}) ainda aguarda a sua resposta (prazo: ${prazo}). ` +
+      `Use o botão abaixo: os links de e-mails anteriores deixam de valer.`,
+    botaoAbrir: "Abrir o aditivo",
+    viaAssunto: (ref) => `Sua via do aditivo de horário (a partir de ${ref})`,
+    viaMensagem: (nome, ref, decisao) =>
+      `Olá, ${nome}. Registramos a sua resposta ao termo aditivo de alteração de horário (a partir de ${ref}): ${decisao}. ` +
+      `Pelo botão abaixo você pode ver e guardar a sua via.`,
+  },
+};
+
+/**
+ * Referência legível conforme o contexto: espelho "2026-10" -> "10/2026";
+ * aditivo "2026-12-15" -> "15/12/2026".
+ */
+export function referenciaBr(contexto: string | null | undefined, referencia: string | null | undefined): string {
+  const r = String(referencia || "");
+  if (contexto === CONTEXTO_ADITIVO_EC141 && /^\d{4}-\d{2}-\d{2}$/.test(r)) {
+    const [a, m, d] = r.split("-");
+    return `${d}/${m}/${a}`;
+  }
+  return competenciaBr(r);
+}
+
+/** Textos do documento conforme o contexto da solicitação (padrão: espelho). */
+export function textosDoContexto(contexto?: string | null): TextosDoDocumento {
+  return contexto === CONTEXTO_ADITIVO_EC141 ? TEXTOS_ADITIVO_EC141 : TEXTOS_ESPELHO;
+}
 
 /** "dd/MM/aaaa" de uma data ISO, no horário de Brasília (UTC-3). */
 export function dataCurtaBr(iso: string): string {

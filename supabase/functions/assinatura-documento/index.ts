@@ -23,7 +23,7 @@ import { gerarCodigoOtp, hashOtp, sha256Hex, mascararEmail, mascararCpf } from '
 import { enviarEmailAssinatura } from '../_shared/resend.ts'
 import { anexarManifesto } from '../_shared/manifesto-pdf.ts'
 import { montarLink } from '../_shared/assinatura-envio.ts'
-import { EMAIL, MANIFESTO, competenciaBr } from '../_shared/assinatura-textos.ts'
+import { EMAIL, MANIFESTO, competenciaBr, referenciaBr, textosDoContexto } from '../_shared/assinatura-textos.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -82,6 +82,8 @@ Deno.serve(async (req) => {
         empresa: empresa ?? null,
         referencia: s.referencia,
         competencia_br: competenciaBr(s.referencia),
+        contexto: s.contexto ?? null,
+        referencia_br: referenciaBr(s.contexto, s.referencia),
         expira_em: s.expira_em,
         tem_email: !!s.email,
         email_mascarado: mascararEmail(s.email),
@@ -247,11 +249,11 @@ Deno.serve(async (req) => {
         }
         const { data: emp } = await admin.from('empresa_cadastro').select('razao_social, nome_fantasia').eq('id', sol.empresa_id).maybeSingle()
         const final = await anexarManifesto(original, {
-          documentoTitulo: `Espelho de Ponto ${competenciaBr(sol.referencia)}`,
+          documentoTitulo: textosDoContexto(sol.contexto).documentoTitulo(referenciaBr(sol.contexto, sol.referencia)),
           empresa: emp?.razao_social || emp?.nome_fantasia || null,
           colaboradorNome: sol.colaborador_nome || '',
           cpfMascarado: mascararCpf(cpf),
-          referencia: competenciaBr(sol.referencia),
+          referencia: referenciaBr(sol.contexto, sol.referencia),
           decisao, texto,
           originalSha256: sol.original_sha256,
           assinadoEmIso: quando,
@@ -269,7 +271,9 @@ Deno.serve(async (req) => {
         const { error: e1 } = await admin.storage.from(BUCKET_DOC).upload(caminhoAssinado, final, { contentType: 'application/pdf', upsert: false })
         if (e1) return json({ ok: false, erro: 'falha_ao_guardar' }, 500)
         subidos.push([BUCKET_DOC, caminhoAssinado])
-        const nomeArquivo = `Espelho de Ponto assinado - ${sol.colaborador_nome} - ${sol.referencia}.pdf`
+        const nomeArquivo = sol.contexto === 'ponto_ec141_aditivo'
+          ? `Aditivo de horario EC 141 assinado - ${sol.colaborador_nome} - ${sol.referencia}.pdf`
+          : `Espelho de Ponto assinado - ${sol.colaborador_nome} - ${sol.referencia}.pdf`
         const seguro = nomeArquivo.replace(/[^a-zA-Z0-9._-]/g, '_')
         const caminhoDoc = `${sol.tenant_id}/colaboradores/${sol.colaborador_id || 'sem-id'}/${Date.now()}_${seguro}`
         const { error: e2 } = await admin.storage.from('documentos').upload(caminhoDoc, final, { contentType: 'application/pdf', upsert: false })
@@ -295,9 +299,9 @@ Deno.serve(async (req) => {
       if (sol.email) {
         const nome = String(sol.colaborador_nome || '').split(' ')[0] || ''
         const r = await enviarEmailAssinatura(sol.email, {
-          assunto: EMAIL.viaAssunto(competenciaBr(sol.referencia)),
+          assunto: textosDoContexto(sol.contexto).email.viaAssunto(referenciaBr(sol.contexto, sol.referencia)),
           titulo: EMAIL.viaTitulo,
-          mensagem: EMAIL.viaMensagem(nome, competenciaBr(sol.referencia), MANIFESTO.decisoes[decisao] || decisao),
+          mensagem: textosDoContexto(sol.contexto).email.viaMensagem(nome, referenciaBr(sol.contexto, sol.referencia), MANIFESTO.decisoes[decisao] || decisao),
           actionUrl: montarLink(sol.link_base, token), actionLabel: EMAIL.botaoVia, rodape: EMAIL.rodape,
         })
         await admin.rpc('assinatura_registrar_envio', {

@@ -218,3 +218,12 @@ export const useEmpresaAtiva = () => {
   if (!ctx) throw new Error("useEmpresaAtiva must be used within EmpresaAtivaProvider");
   return ctx;
 };
+
+/**
+ * Versão tolerante: fora do EmpresaAtivaProvider (ex.: painel do SuperAdmin,
+ * que não tem empresa ativa) devolve empresaAtivaId nulo em vez de lançar erro.
+ */
+export const useEmpresaAtivaOpcional = (): Pick<EmpresaAtivaContextType, "empresaAtivaId"> => {
+  const ctx = useContext(EmpresaAtivaContext);
+  return { empresaAtivaId: ctx?.empresaAtivaId ?? null };
+};

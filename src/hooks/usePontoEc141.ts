@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { useEmpresaAtiva } from "@/contexts/EmpresaAtivaContext";
+import { useEmpresaAtivaOpcional } from "@/contexts/EmpresaAtivaContext";
 import { toast } from "sonner";
 
 /**
@@ -121,7 +121,7 @@ export const formatarHoras = (min?: number | null) => {
 /** Teto legal ATIVO na data (CF/88 enquanto nenhum marco EC 141 for ativado). */
 export function useTetoLegal(data?: string) {
   const { tenantId } = useAuth();
-  const { empresaAtivaId } = useEmpresaAtiva();
+  const { empresaAtivaId } = useEmpresaAtivaOpcional();
   const dia = data || hojeISO();
   return useQuery({
     queryKey: ["ponto-teto-legal", tenantId, empresaAtivaId, dia],
@@ -225,7 +225,7 @@ export function useCancelarAgendamentoEscala() {
 /** Painel de impacto (somente leitura). Para o cliente, só há conteúdo com marco EC 141 ativo. */
 export function useImpactoEc141(opts: { tenantId?: string | null; empresaId?: string | null; marco?: string | null; enabled?: boolean } = {}) {
   const { tenantId: tenantLogado } = useAuth();
-  const { empresaAtivaId } = useEmpresaAtiva();
+  const { empresaAtivaId } = useEmpresaAtivaOpcional();
   const tenant = opts.tenantId === undefined ? tenantLogado : opts.tenantId;
   const empresa = opts.empresaId === undefined ? empresaAtivaId || null : opts.empresaId;
   return useQuery({
@@ -336,7 +336,7 @@ const invalidarEc141 = (queryClient: ReturnType<typeof useQueryClient>) => {
 /** Prévia por colaborador (somente leitura). */
 export function usePreviaMigracaoEc141(destino: DestinoEc141, excecoes: Record<string, DestinoColaborador>, enabled = true) {
   const { tenantId } = useAuth();
-  const { empresaAtivaId } = useEmpresaAtiva();
+  const { empresaAtivaId } = useEmpresaAtivaOpcional();
   return useQuery({
     queryKey: ["ponto-ec141-previa", tenantId, empresaAtivaId, destino, JSON.stringify(excecoes)],
     queryFn: async (): Promise<PreviaMigracao> => {
@@ -352,7 +352,7 @@ export function usePreviaMigracaoEc141(destino: DestinoEc141, excecoes: Record<s
 
 export function useAplicarMigracaoEc141() {
   const { tenantId } = useAuth();
-  const { empresaAtivaId } = useEmpresaAtiva();
+  const { empresaAtivaId } = useEmpresaAtivaOpcional();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: { destino: DestinoEc141; excecoes: Record<string, DestinoColaborador>; confirmar8h24: boolean }) => {
@@ -375,7 +375,7 @@ export function useAplicarMigracaoEc141() {
 
 export function useMigracoesEc141(enabled = true) {
   const { tenantId } = useAuth();
-  const { empresaAtivaId } = useEmpresaAtiva();
+  const { empresaAtivaId } = useEmpresaAtivaOpcional();
   return useQuery({
     queryKey: ["ponto-ec141-migracoes", tenantId, empresaAtivaId],
     queryFn: async (): Promise<MigracaoEc141[]> => {
@@ -389,7 +389,7 @@ export function useMigracoesEc141(enabled = true) {
 
 export function useCancelarMigracaoEc141() {
   const { tenantId } = useAuth();
-  const { empresaAtivaId } = useEmpresaAtiva();
+  const { empresaAtivaId } = useEmpresaAtivaOpcional();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (args: { migracaoId?: string; motivo: string }) => {
@@ -414,7 +414,7 @@ export function useCancelarMigracaoEc141() {
 
 export function useAditivosEc141(soPendentes = false, enabled = true) {
   const { tenantId } = useAuth();
-  const { empresaAtivaId } = useEmpresaAtiva();
+  const { empresaAtivaId } = useEmpresaAtivaOpcional();
   return useQuery({
     queryKey: ["ponto-ec141-aditivos", tenantId, empresaAtivaId, soPendentes],
     queryFn: async (): Promise<AditivoEc141[]> => {

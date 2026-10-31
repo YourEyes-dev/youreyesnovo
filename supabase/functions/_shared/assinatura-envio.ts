@@ -6,7 +6,7 @@
 // O token é gerado NO BANCO (256 bits) a cada envio e só o hash fica guardado;
 // por isso cada e-mail leva um link novo e os anteriores deixam de valer.
 // =====================================================================
-import { EMAIL, competenciaBr, dataCurtaBr } from './assinatura-textos.ts'
+import { EMAIL, dataCurtaBr, referenciaBr, textosDoContexto } from './assinatura-textos.ts'
 import { enviarEmailAssinatura } from './resend.ts'
 
 // deno-lint-ignore no-explicit-any
@@ -54,17 +54,18 @@ export async function enviarConvite(
   const token = tok.token as string
   const link = montarLink(sol.link_base, token)
   const nome = String(sol.colaborador_nome || '').split(' ')[0] || 'colaborador(a)'
-  const comp = competenciaBr(sol.referencia)
+  const comp = referenciaBr(sol.contexto, sol.referencia)
+  const tx = textosDoContexto(sol.contexto).email
   const prazo = sol.expira_em ? dataCurtaBr(sol.expira_em) : ''
 
   let emailEnviado = false
   let emailErro: string | undefined
   if (sol.email) {
     const props = tipo === 'lembrete'
-      ? { assunto: EMAIL.lembreteAssunto(comp), titulo: EMAIL.lembreteTitulo, mensagem: EMAIL.lembreteMensagem(nome, comp, prazo) }
-      : { assunto: EMAIL.conviteAssunto(comp), titulo: EMAIL.conviteTitulo, mensagem: EMAIL.conviteMensagem(nome, comp, prazo) }
+      ? { assunto: tx.lembreteAssunto(comp), titulo: tx.lembreteTitulo, mensagem: tx.lembreteMensagem(nome, comp, prazo) }
+      : { assunto: tx.conviteAssunto(comp), titulo: tx.conviteTitulo, mensagem: tx.conviteMensagem(nome, comp, prazo) }
     const r = await enviarEmailAssinatura(sol.email, {
-      ...props, actionUrl: link, actionLabel: EMAIL.botaoAbrir, rodape: EMAIL.rodape,
+      ...props, actionUrl: link, actionLabel: tx.botaoAbrir, rodape: EMAIL.rodape,
     })
     emailEnviado = r.ok
     emailErro = r.erro

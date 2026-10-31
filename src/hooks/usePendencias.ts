@@ -174,6 +174,13 @@ export function usePendencias() {
       const assinPendentes = assinaturas.filter(
         (a) => (a.status === "enviado" || a.status === "visualizado") && a.enviado_em && Date.parse(a.enviado_em) < tresDiasAtras,
       );
+      // EC 141 (F2a): aditivo de alteração de horário ainda não assinado. Só
+      // existe depois que o RH migra pelo assistente (marco da lei ativo).
+      const { data: aditRes } = await (supabase.rpc as any)("ponto_ec141_aditivos_lista", {
+        p_tenant: tenantId, p_empresa: empresaAtivaId || null, p_so_pendentes: true,
+      });
+      const aditivosEc141 = (Array.isArray(aditRes) ? aditRes : []) as any[];
+
       const compBr = (c?: string | null) => {
         const [ano, mes] = String(c || "").split("-");
         return ano && mes ? `${mes}/${ano}` : String(c || "");
@@ -312,6 +319,20 @@ export function usePendencias() {
             label: a.colaborador_nome || "Colaborador",
             sublabel: `${compBr(a.referencia)} • ${a.visualizado_em ? "visto, ainda sem resposta" : "ainda não abriu o link"}`,
             acao: "Acompanhar a assinatura do espelho",
+          })),
+        },
+        {
+          key: "ec141_aditivos",
+          title: "Aditivos de horário (EC 141) não assinados",
+          count: aditivosEc141.length,
+          path: "/ponto",
+          priority: "medium" as const,
+          items: aditivosEc141.map((a) => ({
+            id: a.id,
+            label: a.colaborador_nome || "Colaborador",
+            sublabel: `a partir de ${String(a.vigencia_inicio || "").split("-").reverse().join("/")} • ${
+              a.situacao === "contestado" ? "contestou o aditivo" : a.situacao === "aguardando_assinatura" ? "aguardando assinatura" : "ainda não enviado"}`,
+            acao: "Enviar ou acompanhar o aditivo (Ponto › Escalas › Redução da jornada)",
           })),
         },
       ];

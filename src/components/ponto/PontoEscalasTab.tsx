@@ -27,6 +27,7 @@ import {
   formatarDataBR,
   formatarHoras,
   hojeISO,
+  validarSalvarEscalaEc141,
 } from "@/hooks/usePontoEc141";
 import { Plus, Calendar, Clock, Users, Settings, Sparkles, Pencil, Power, Trash2, CalendarDays, Repeat, Copy, Search, AlertTriangle, CalendarX } from "lucide-react";
 import { toast } from "sonner";
@@ -356,6 +357,29 @@ export function PontoEscalasTab() {
         payload.parametros_vigencia_motivo = vigencia.motivo.trim() || null;
         payload.parametros_marco_codigo = vigencia.marco || null;
       }
+    }
+    // EC 141 F2a: com marco ativo, a escala que vale a partir da data do marco
+    // não pode ficar acima do limite semanal nem com 6 dias sem instrumento
+    // coletivo (o banco recusa do mesmo jeito). Sem marco ativo, nada muda.
+    const desdeEc141 = editando
+      ? (payload.parametros_vigentes_desde || agendamentoEditando?.vigente_a_partir_de || null)
+      : null;
+    const conf = await validarSalvarEscalaEc141(editando ? editando.id : null, payload, desdeEc141);
+    if (conf.bloqueia) {
+      toast.error(conf.erros.map((e) => e.mensagem).join(" "), { duration: 12000 });
+      return;
+    }
+    const fortes = (conf.avisos || []).filter((a) => a.nivel === "forte");
+    if (fortes.length > 0) {
+      const seguir = await confirm({
+        title: "Atenção: jornada acima de 8h por dia",
+        description: fortes.map((a) => a.mensagem).join(" "),
+        confirmLabel: "Salvar mesmo assim",
+        variant: "default",
+      });
+      if (!seguir) return;
+    }
+    if (editando) {
       await atualizarEscala({ id: editando.id, ...payload } as any);
     } else {
       await criarEscala(payload as any);

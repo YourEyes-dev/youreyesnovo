@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertCircle, CheckCircle2, FileText, Loader2, Mail, ShieldCheck, Camera } from "lucide-react";
-import { TELA } from "@/lib/assinaturaTextos";
+import { TELA, textosDoContexto } from "@/lib/assinaturaTextos";
 import {
   FINALIDADE_CONSENTIMENTO_BIOMETRICO,
   VERSAO_CONSENTIMENTO_BIOMETRICO,
@@ -35,6 +35,9 @@ interface Estado {
   primeiro_nome: string | null;
   empresa: string | null;
   competencia_br: string;
+  /** Tipo do documento (ponto_espelho, ponto_ec141_aditivo) e referência legível. */
+  contexto?: string | null;
+  referencia_br?: string;
   expira_em: string | null;
   tem_email: boolean;
   email_mascarado: string;
@@ -229,11 +232,19 @@ export default function AssinaturaDocumento() {
     window.open(r.url, "_blank", "noopener,noreferrer");
   };
 
+  // Textos do tipo de documento (espelho de ponto, aditivo da EC 141...).
+  const DOC = textosDoContexto(estado?.contexto);
+  const declaracao: Record<Decisao, string> = {
+    assinado: DOC.tela.declaracaoAssinado,
+    assinado_com_ressalva: DOC.tela.declaracaoRessalva,
+    contestado: DOC.tela.declaracaoContestado,
+  };
+
   const cabecalho = estado && (
     <div className="space-y-1">
-      <h1 className="text-xl font-semibold flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> {TELA.titulo}</h1>
+      <h1 className="text-xl font-semibold flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> {DOC.tela.titulo}</h1>
       <p className="text-sm text-muted-foreground">
-        {estado.empresa ? `${estado.empresa} · ` : ""}Competência {estado.competencia_br}
+        {estado.empresa ? `${estado.empresa} · ` : ""}{DOC.rotuloReferencia} {estado.referencia_br || estado.competencia_br}
         {estado.primeiro_nome ? ` · ${estado.primeiro_nome}` : ""}
       </p>
     </div>
@@ -287,7 +298,7 @@ export default function AssinaturaDocumento() {
           </Card>
         ) : (
           <>
-            <p className="text-sm text-muted-foreground">{TELA.introducao}</p>
+            <p className="text-sm text-muted-foreground">{DOC.tela.introducao}</p>
 
             {etapa === "cpf" && (
               <Card className="p-6 space-y-3">
@@ -306,7 +317,7 @@ export default function AssinaturaDocumento() {
               <Card className="p-2">
                 <iframe title="Documento para assinatura" src={`${urlDoc}#toolbar=0&navpanes=0`} className="h-[60vh] w-full rounded" />
                 <label className="flex items-center gap-2 p-3 text-sm">
-                  <Checkbox checked={lido} onCheckedChange={(v) => setLido(v === true)} /> {TELA.marcarLido}
+                  <Checkbox checked={lido} onCheckedChange={(v) => setLido(v === true)} /> {DOC.tela.marcarLido}
                 </label>
               </Card>
             )}
@@ -384,7 +395,7 @@ export default function AssinaturaDocumento() {
                       <input type="radio" name="decisao" className="mt-1" checked={decisao === k} onChange={() => setDecisao(k)} />
                       <span>
                         <strong>{TELA.decisoes[k].rotulo}</strong>
-                        <span className="block text-muted-foreground">{TELA.decisoes[k].declaracao}</span>
+                        <span className="block text-muted-foreground">{declaracao[k]}</span>
                       </span>
                     </label>
                   ))}
@@ -402,7 +413,7 @@ export default function AssinaturaDocumento() {
                   {ocupado ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {TELA.decisoes[decisao].rotulo}
                 </Button>
-                {!lido && <p className="text-xs text-muted-foreground">Marque que leu o espelho para responder.</p>}
+                {!lido && <p className="text-xs text-muted-foreground">{DOC.tela.lerParaResponder}</p>}
                 {aviso}
               </Card>
             )}
